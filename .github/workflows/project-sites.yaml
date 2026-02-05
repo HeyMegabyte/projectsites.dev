@@ -1,0 +1,198 @@
+name: Project Sites CI/CD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/project-sites/**'
+      - 'packages/shared/**'
+      - 'supabase/migrations/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/project-sites/**'
+      - 'packages/shared/**'
+      - 'supabase/migrations/**'
+
+env:
+  NODE_VERSION: '20.18.0'
+  PNPM_VERSION: '9.14.4'
+
+jobs:
+  lint-and-typecheck:
+    name: Lint & Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck shared package
+        run: pnpm --filter @project-sites/shared typecheck
+
+      - name: Typecheck worker
+        run: pnpm --filter @project-sites/worker typecheck
+
+  test:
+    name: Unit & Integration Tests
+    runs-on: ubuntu-latest
+    env:
+      ENVIRONMENT: test
+      STRIPE_SECRET_KEY: sk_test_placeholder
+      STRIPE_PUBLISHABLE_KEY: pk_test_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_test_placeholder
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Test shared package
+        run: pnpm --filter @project-sites/shared test -- --coverage
+
+      - name: Test worker
+        run: pnpm --filter @project-sites/worker test -- --coverage
+
+  deploy-staging:
+    name: Deploy to Staging
+    needs: [lint-and-typecheck, test]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Deploy Worker to staging
+        working-directory: apps/project-sites
+        run: npx wrangler deploy --env staging
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+
+  e2e-staging:
+    name: E2E Tests (Staging)
+    needs: [deploy-staging]
+    runs-on: ubuntu-latest
+    env:
+      CYPRESS_BASE_URL: https://sites-staging.megabyte.space
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Cypress E2E
+        uses: cypress-io/github-action@v6
+        with:
+          config: baseUrl=${{ env.CYPRESS_BASE_URL }}
+          working-directory: apps/project-sites
+
+      - name: Upload screenshots on failure
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: cypress-screenshots
+          path: apps/project-sites/cypress/screenshots
+
+  deploy-production:
+    name: Deploy to Production
+    needs: [e2e-staging]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Deploy Worker to production
+        working-directory: apps/project-sites
+        run: npx wrangler deploy --env production
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+
+  e2e-production:
+    name: Post-Deploy E2E (Production)
+    needs: [deploy-production]
+    runs-on: ubuntu-latest
+    env:
+      CYPRESS_BASE_URL: https://sites.megabyte.space
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run production smoke tests
+        uses: cypress-io/github-action@v6
+        with:
+          config: baseUrl=${{ env.CYPRESS_BASE_URL }}
+          spec: 'cypress/e2e/smoke/**'
+          working-directory: apps/project-sites
+
+      - name: Rollback on failure
+        if: failure()
+        working-directory: apps/project-sites
+        run: |
+          echo "Production E2E failed - triggering rollback"
+          npx wrangler rollback --env production --message "Automated rollback: E2E failed"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}

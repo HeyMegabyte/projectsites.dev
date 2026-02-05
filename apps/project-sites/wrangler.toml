@@ -1,0 +1,83 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "project-sites"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+send_metrics = false
+
+# KV Namespace for caching
+[[kv_namespaces]]
+binding = "CACHE_KV"
+id = "placeholder-kv-id"
+
+# R2 Bucket for static site output
+[[r2_buckets]]
+binding = "SITES_BUCKET"
+bucket_name = "project-sites"
+
+# Queue producer for workflow jobs
+[[queues.producers]]
+binding = "WORKFLOW_QUEUE"
+queue = "project-sites-workflows"
+
+# Queue consumer
+[[queues.consumers]]
+queue = "project-sites-workflows"
+max_batch_size = 10
+max_retries = 3
+
+# --- Staging ---
+[env.staging]
+name = "project-sites-staging"
+routes = [
+  { pattern = "sites-staging.megabyte.space", custom_domain = true },
+  { pattern = "*.sites-staging.megabyte.space", custom_domain = true }
+]
+
+[env.staging.vars]
+ENVIRONMENT = "staging"
+
+[[env.staging.kv_namespaces]]
+binding = "CACHE_KV"
+id = "placeholder-staging-kv-id"
+
+[[env.staging.r2_buckets]]
+binding = "SITES_BUCKET"
+bucket_name = "project-sites-staging"
+
+[[env.staging.queues.producers]]
+binding = "WORKFLOW_QUEUE"
+queue = "project-sites-workflows-staging"
+
+[[env.staging.queues.consumers]]
+queue = "project-sites-workflows-staging"
+max_batch_size = 10
+max_retries = 3
+
+# --- Production ---
+[env.production]
+name = "project-sites"
+routes = [
+  { pattern = "sites.megabyte.space", custom_domain = true },
+  { pattern = "*.sites.megabyte.space", custom_domain = true }
+]
+
+[env.production.vars]
+ENVIRONMENT = "production"
+
+[[env.production.kv_namespaces]]
+binding = "CACHE_KV"
+id = "placeholder-production-kv-id"
+
+[[env.production.r2_buckets]]
+binding = "SITES_BUCKET"
+bucket_name = "project-sites-production"
+
+[[env.production.queues.producers]]
+binding = "WORKFLOW_QUEUE"
+queue = "project-sites-workflows-production"
+
+[[env.production.queues.consumers]]
+queue = "project-sites-workflows-production"
+max_batch_size = 10
+max_retries = 3
