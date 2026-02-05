@@ -430,8 +430,20 @@ describe('provisionCustomDomain', () => {
 describe('getSiteHostnames', () => {
   it('returns array of hostnames', async () => {
     const hostnames = [
-      { id: 'h1', hostname: 'app.sites.megabyte.space', type: 'free_subdomain', status: 'active', ssl_status: 'active' },
-      { id: 'h2', hostname: 'custom.example.com', type: 'custom_cname', status: 'pending', ssl_status: 'pending_validation' },
+      {
+        id: 'h1',
+        hostname: 'app.sites.megabyte.space',
+        type: 'free_subdomain',
+        status: 'active',
+        ssl_status: 'active',
+      },
+      {
+        id: 'h2',
+        hostname: 'custom.example.com',
+        type: 'custom_cname',
+        status: 'pending',
+        ssl_status: 'pending_validation',
+      },
     ];
     mockQuery.mockResolvedValueOnce({ data: hostnames, error: null, status: 200 });
 
@@ -484,7 +496,9 @@ describe('getHostnameByDomain', () => {
 describe('verifyPendingHostnames', () => {
   it('returns { verified: 1, failed: 0 } when hostname becomes active', async () => {
     mockQuery.mockResolvedValueOnce({
-      data: [{ id: 'h-pending', cf_custom_hostname_id: 'cf-pending-1', hostname: 'pending.example.com' }],
+      data: [
+        { id: 'h-pending', cf_custom_hostname_id: 'cf-pending-1', hostname: 'pending.example.com' },
+      ],
       error: null,
       status: 200,
     });

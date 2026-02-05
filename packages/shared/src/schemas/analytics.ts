@@ -34,5 +34,5 @@ export const usageEventSchema = z.object({
 });
 
 export type AnalyticsDaily = z.infer<typeof analyticsDailySchema>;
-export type FunnelEvent = z.infer<typeof funnelEventSchema>;
+export type FunnelEventRecord = z.infer<typeof funnelEventSchema>;
 export type UsageEvent = z.infer<typeof usageEventSchema>;

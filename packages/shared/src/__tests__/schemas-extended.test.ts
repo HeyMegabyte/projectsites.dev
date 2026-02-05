@@ -11,25 +11,9 @@
  */
 
 import { z } from 'zod';
-import {
-  uuidSchema,
-  nameSchema,
-  errorEnvelopeSchema,
-  successEnvelopeSchema,
-  slugSchema,
-} from '../schemas/base';
-import {
-  orgSchema,
-  membershipSchema,
-  createMembershipSchema,
-  updateMembershipSchema,
-} from '../schemas/org';
-import {
-  siteSchema,
-  updateSiteSchema,
-  confidenceAttributeSchema,
-  researchDataSchema,
-} from '../schemas/site';
+import { uuidSchema, nameSchema, errorEnvelopeSchema, successEnvelopeSchema, slugSchema } from '../schemas/base';
+import { orgSchema, membershipSchema, createMembershipSchema, updateMembershipSchema } from '../schemas/org';
+import { siteSchema, updateSiteSchema, confidenceAttributeSchema, researchDataSchema } from '../schemas/site';
 import { subscriptionSchema, saleWebhookPayloadSchema } from '../schemas/billing';
 import {
   userSchema,
@@ -517,9 +501,7 @@ describe('saleWebhookPayloadSchema', () => {
 
   it('rejects currency not 3 chars', () => {
     expect(() => saleWebhookPayloadSchema.parse({ ...valid, currency: 'us' })).toThrow();
-    expect(() =>
-      saleWebhookPayloadSchema.parse({ ...valid, currency: 'usdx' }),
-    ).toThrow();
+    expect(() => saleWebhookPayloadSchema.parse({ ...valid, currency: 'usdx' })).toThrow();
   });
 });
 
@@ -664,9 +646,7 @@ describe('webhookEventSchema', () => {
   });
 
   it('rejects event_id over 500 chars', () => {
-    expect(() =>
-      webhookEventSchema.parse({ ...valid, event_id: 'x'.repeat(501) }),
-    ).toThrow();
+    expect(() => webhookEventSchema.parse({ ...valid, event_id: 'x'.repeat(501) })).toThrow();
   });
 
   it('accepts error message up to 2000 chars', () => {
@@ -785,14 +765,7 @@ describe('hostnameRecordSchema', () => {
   });
 
   it('accepts all valid hostname statuses', () => {
-    for (const status of [
-      'pending',
-      'active',
-      'moved',
-      'deleted',
-      'pending_deletion',
-      'verification_failed',
-    ]) {
+    for (const status of ['pending', 'active', 'moved', 'deleted', 'pending_deletion', 'verification_failed']) {
       const result = hostnameRecordSchema.parse({ ...valid, status });
       expect(result.status).toBe(status);
     }
@@ -1027,15 +1000,11 @@ describe('apiErrorSchema', () => {
   });
 
   it('rejects invalid error code', () => {
-    expect(() =>
-      apiErrorSchema.parse({ error: { code: 'UNKNOWN', message: 'test' } }),
-    ).toThrow();
+    expect(() => apiErrorSchema.parse({ error: { code: 'UNKNOWN', message: 'test' } })).toThrow();
   });
 
   it('rejects message over 2000 chars', () => {
-    expect(() =>
-      apiErrorSchema.parse({ error: { code: 'BAD_REQUEST', message: 'x'.repeat(2001) } }),
-    ).toThrow();
+    expect(() => apiErrorSchema.parse({ error: { code: 'BAD_REQUEST', message: 'x'.repeat(2001) } })).toThrow();
   });
 });
 
@@ -1225,9 +1194,7 @@ describe('createGoogleOAuthSchema', () => {
   });
 
   it('rejects invalid redirect_url', () => {
-    expect(() =>
-      createGoogleOAuthSchema.parse({ redirect_url: 'not-a-url' }),
-    ).toThrow();
+    expect(() => createGoogleOAuthSchema.parse({ redirect_url: 'not-a-url' })).toThrow();
   });
 });
 
@@ -1298,9 +1265,7 @@ describe('researchDataSchema', () => {
   });
 
   it('rejects raw_output over 65536 chars', () => {
-    expect(() =>
-      researchDataSchema.parse({ ...valid, raw_output: 'x'.repeat(65537) }),
-    ).toThrow();
+    expect(() => researchDataSchema.parse({ ...valid, raw_output: 'x'.repeat(65537) })).toThrow();
   });
 
   it('rejects more than 20 source URLs', () => {

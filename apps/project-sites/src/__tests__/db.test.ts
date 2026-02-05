@@ -1,4 +1,9 @@
-import { createServiceClient, createAnonClient, supabaseQuery, type SupabaseClient } from '../services/db.js';
+import {
+  createServiceClient,
+  createAnonClient,
+  supabaseQuery,
+  type SupabaseClient,
+} from '../services/db.js';
 
 const mockEnv = {
   SUPABASE_URL: 'https://test.supabase.co',
@@ -195,9 +200,9 @@ describe('supabaseQuery', () => {
 
   it('returns error text on non-ok response', async () => {
     const errorBody = '{"message":"Row not found"}';
-    const mockFetch = jest.fn().mockResolvedValue(
-      new Response(errorBody, { status: 404, statusText: 'Not Found' }),
-    );
+    const mockFetch = jest
+      .fn()
+      .mockResolvedValue(new Response(errorBody, { status: 404, statusText: 'Not Found' }));
     const client = makeClient(mockFetch);
 
     const result = await supabaseQuery(client, 'sites', { query: 'id=eq.999', single: true });

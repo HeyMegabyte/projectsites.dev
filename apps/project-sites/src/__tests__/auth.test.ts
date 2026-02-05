@@ -86,7 +86,13 @@ describe('verifyMagicLink', () => {
     mockQuery
       .mockResolvedValueOnce({
         data: [
-          { id: 'link-1', email: 'user@example.com', redirect_url: null, used: false, expires_at: futureDate },
+          {
+            id: 'link-1',
+            email: 'user@example.com',
+            redirect_url: null,
+            used: false,
+            expires_at: futureDate,
+          },
         ],
         error: null,
         status: 200,
@@ -109,7 +115,13 @@ describe('verifyMagicLink', () => {
     const pastDate = new Date(Date.now() - 3_600_000).toISOString();
     mockQuery.mockResolvedValueOnce({
       data: [
-        { id: 'link-2', email: 'old@example.com', redirect_url: null, used: false, expires_at: pastDate },
+        {
+          id: 'link-2',
+          email: 'old@example.com',
+          redirect_url: null,
+          used: false,
+          expires_at: pastDate,
+        },
       ],
       error: null,
       status: 200,
@@ -123,7 +135,13 @@ describe('verifyMagicLink', () => {
     mockQuery
       .mockResolvedValueOnce({
         data: [
-          { id: 'link-3', email: 'mark@example.com', redirect_url: null, used: false, expires_at: futureDate },
+          {
+            id: 'link-3',
+            email: 'mark@example.com',
+            redirect_url: null,
+            used: false,
+            expires_at: futureDate,
+          },
         ],
         error: null,
         status: 200,
@@ -351,9 +369,9 @@ describe('handleGoogleOAuthCallback', () => {
   it('throws unauthorized when the state is not found', async () => {
     mockQuery.mockResolvedValueOnce({ data: [], error: null, status: 200 });
 
-    await expect(
-      handleGoogleOAuthCallback(mockDb, mockEnv, 'code', 'bad-state'),
-    ).rejects.toThrow('Invalid OAuth state');
+    await expect(handleGoogleOAuthCallback(mockDb, mockEnv, 'code', 'bad-state')).rejects.toThrow(
+      'Invalid OAuth state',
+    );
   });
 
   it('throws unauthorized when the state is expired', async () => {
@@ -497,8 +515,18 @@ describe('getUserSessions', () => {
 
   it('returns active sessions for the given user', async () => {
     const sessions = [
-      { id: 's1', device_info: 'Firefox', last_active_at: new Date().toISOString(), created_at: new Date().toISOString() },
-      { id: 's2', device_info: null, last_active_at: new Date().toISOString(), created_at: new Date().toISOString() },
+      {
+        id: 's1',
+        device_info: 'Firefox',
+        last_active_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      },
+      {
+        id: 's2',
+        device_info: null,
+        last_active_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      },
     ];
     mockQuery.mockResolvedValueOnce({ data: sessions, error: null, status: 200 });
 

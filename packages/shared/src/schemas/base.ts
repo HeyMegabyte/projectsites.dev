@@ -34,10 +34,7 @@ export const hostnameSchema = z
   .string()
   .min(3)
   .max(253)
-  .regex(
-    /^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/,
-    'Invalid hostname format',
-  );
+  .regex(/^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/, 'Invalid hostname format');
 
 /** URL: https only */
 export const httpsUrlSchema = z.string().url().startsWith('https://').max(2048);
@@ -91,7 +88,6 @@ export const successEnvelopeSchema = <T extends z.ZodTypeAny>(dataSchema: T) =>
 export const confidenceScoreSchema = z.number().int().min(0).max(100);
 
 /** JSON metadata field (safe bounded depth) */
-export const metadataSchema = z.record(z.unknown()).refine(
-  (val) => JSON.stringify(val).length <= 65536,
-  'Metadata too large (max 64KB)',
-);
+export const metadataSchema = z
+  .record(z.unknown())
+  .refine((val) => JSON.stringify(val).length <= 65536, 'Metadata too large (max 64KB)');

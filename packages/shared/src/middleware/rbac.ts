@@ -48,14 +48,7 @@ const ROLE_PERMISSIONS: Record<Role, Set<Permission>> = {
     'member:write',
     'admin:read',
   ]),
-  member: new Set<Permission>([
-    'org:read',
-    'site:read',
-    'site:write',
-    'site:publish',
-    'billing:read',
-    'member:read',
-  ]),
+  member: new Set<Permission>(['org:read', 'site:read', 'site:write', 'site:publish', 'billing:read', 'member:read']),
   viewer: new Set<Permission>(['org:read', 'site:read', 'billing:read', 'member:read']),
 };
 
@@ -77,11 +70,7 @@ export function requireRole(userRole: Role, minRole: Role): boolean {
 /**
  * Check if a role (+ optional billing_admin flag) has a specific permission.
  */
-export function checkPermission(
-  userRole: Role,
-  permission: Permission,
-  billingAdmin: boolean = false,
-): boolean {
+export function checkPermission(userRole: Role, permission: Permission, billingAdmin: boolean = false): boolean {
   // billing_admin flag grants billing:write regardless of role
   if (permission === 'billing:write' && billingAdmin) {
     return true;

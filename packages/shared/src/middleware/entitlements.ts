@@ -21,10 +21,7 @@ export function getEntitlements(orgId: string, plan: Plan): Entitlements {
 /**
  * Check if a specific entitlement is enabled for a plan.
  */
-export function requireEntitlement(
-  plan: Plan,
-  entitlement: keyof typeof ENTITLEMENTS.paid,
-): boolean {
+export function requireEntitlement(plan: Plan, entitlement: keyof typeof ENTITLEMENTS.paid): boolean {
   const planEntitlements = ENTITLEMENTS[plan];
   return !!planEntitlements[entitlement];
 }

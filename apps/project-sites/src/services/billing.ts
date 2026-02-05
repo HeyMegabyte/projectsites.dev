@@ -1,13 +1,4 @@
-import {
-  PRICING,
-  ENTITLEMENTS,
-  DUNNING,
-  type Entitlements,
-  getEntitlements,
-  badRequest,
-  notFound,
-  conflict,
-} from '@project-sites/shared';
+import { PRICING, type Entitlements, getEntitlements, badRequest } from '@project-sites/shared';
 import type { SupabaseClient } from './db.js';
 import { supabaseQuery } from './db.js';
 import type { Env } from '../types/env.js';
@@ -22,11 +13,13 @@ export async function getOrCreateStripeCustomer(
   email: string,
 ): Promise<{ stripe_customer_id: string }> {
   // Check if org already has a Stripe customer
-  const result = await supabaseQuery<
-    Array<{ id: string; stripe_customer_id: string }>
-  >(db, 'subscriptions', {
-    query: `org_id=eq.${orgId}&deleted_at=is.null&select=id,stripe_customer_id`,
-  });
+  const result = await supabaseQuery<Array<{ id: string; stripe_customer_id: string }>>(
+    db,
+    'subscriptions',
+    {
+      query: `org_id=eq.${orgId}&deleted_at=is.null&select=id,stripe_customer_id`,
+    },
+  );
 
   if (result.data?.[0]?.stripe_customer_id) {
     return { stripe_customer_id: result.data[0].stripe_customer_id };
@@ -96,10 +89,10 @@ export async function createCheckoutSession(
   );
 
   const params = new URLSearchParams({
-    'mode': 'subscription',
-    'customer': stripe_customer_id,
-    'success_url': opts.successUrl,
-    'cancel_url': opts.cancelUrl,
+    mode: 'subscription',
+    customer: stripe_customer_id,
+    success_url: opts.successUrl,
+    cancel_url: opts.cancelUrl,
     'payment_method_types[0]': 'card',
     'payment_method_types[1]': 'link',
     'line_items[0][price_data][currency]': PRICING.CURRENCY,
@@ -109,8 +102,8 @@ export async function createCheckoutSession(
     'line_items[0][price_data][product_data][description]':
       'Remove top bar, custom domains, analytics',
     'line_items[0][quantity]': '1',
-    'allow_promotion_codes': 'true',
-    'billing_address_collection': 'auto',
+    allow_promotion_codes: 'true',
+    billing_address_collection: 'auto',
   });
 
   if (opts.siteId) {
@@ -255,17 +248,10 @@ export async function handlePaymentFailed(
 /**
  * Get org entitlements based on subscription state.
  */
-export async function getOrgEntitlements(
-  db: SupabaseClient,
-  orgId: string,
-): Promise<Entitlements> {
-  const result = await supabaseQuery<Array<{ plan: string; status: string }>>(
-    db,
-    'subscriptions',
-    {
-      query: `org_id=eq.${orgId}&deleted_at=is.null&select=plan,status`,
-    },
-  );
+export async function getOrgEntitlements(db: SupabaseClient, orgId: string): Promise<Entitlements> {
+  const result = await supabaseQuery<Array<{ plan: string; status: string }>>(db, 'subscriptions', {
+    query: `org_id=eq.${orgId}&deleted_at=is.null&select=plan,status`,
+  });
 
   const sub = result.data?.[0];
   if (!sub || sub.plan !== 'paid' || sub.status !== 'active') {
@@ -313,20 +299,17 @@ export async function createBillingPortalSession(
   stripeCustomerId: string,
   returnUrl: string,
 ): Promise<{ portal_url: string }> {
-  const response = await fetch(
-    'https://api.stripe.com/v1/billing_portal/sessions',
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        customer: stripeCustomerId,
-        return_url: returnUrl,
-      }),
+  const response = await fetch('https://api.stripe.com/v1/billing_portal/sessions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
     },
-  );
+    body: new URLSearchParams({
+      customer: stripeCustomerId,
+      return_url: returnUrl,
+    }),
+  });
 
   if (!response.ok) {
     const err = await response.text();

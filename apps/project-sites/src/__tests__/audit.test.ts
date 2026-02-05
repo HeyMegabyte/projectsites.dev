@@ -69,14 +69,16 @@ describe('writeAuditLog', () => {
     const call = mockQuery.mock.calls[0];
     const body = (call[2] as any).body;
     const parsed = createAuditLogSchema.parse(validEntry);
-    expect(body).toEqual(expect.objectContaining({
-      org_id: parsed.org_id,
-      actor_id: parsed.actor_id,
-      action: parsed.action,
-      target_type: parsed.target_type,
-      target_id: parsed.target_id,
-      request_id: parsed.request_id,
-    }));
+    expect(body).toEqual(
+      expect.objectContaining({
+        org_id: parsed.org_id,
+        actor_id: parsed.actor_id,
+        action: parsed.action,
+        target_type: parsed.target_type,
+        target_id: parsed.target_id,
+        request_id: parsed.request_id,
+      }),
+    );
   });
 
   it('throws on invalid entry (schema validation failure)', async () => {

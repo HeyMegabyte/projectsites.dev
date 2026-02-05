@@ -97,7 +97,9 @@ describe('resolveSite', () => {
     mockQuery
       // sites table query
       .mockResolvedValueOnce({
-        data: [{ id: 'site-001', slug: 'cool-biz', org_id: 'org-001', current_build_version: 'v2' }],
+        data: [
+          { id: 'site-001', slug: 'cool-biz', org_id: 'org-001', current_build_version: 'v2' },
+        ],
         error: null,
         status: 200,
       })
@@ -130,7 +132,9 @@ describe('resolveSite', () => {
   it('looks up site by slug in DB', async () => {
     mockQuery
       .mockResolvedValueOnce({
-        data: [{ id: 'site-abc', slug: 'test-slug', org_id: 'org-abc', current_build_version: 'v5' }],
+        data: [
+          { id: 'site-abc', slug: 'test-slug', org_id: 'org-abc', current_build_version: 'v5' },
+        ],
         error: null,
         status: 200,
       })
@@ -226,7 +230,9 @@ describe('resolveSite', () => {
   it('returns plan=free when subscription exists but is not active', async () => {
     mockQuery
       .mockResolvedValueOnce({
-        data: [{ id: 'site-i', slug: 'inactive-site', org_id: 'org-i', current_build_version: 'v1' }],
+        data: [
+          { id: 'site-i', slug: 'inactive-site', org_id: 'org-i', current_build_version: 'v1' },
+        ],
         error: null,
         status: 200,
       })
@@ -380,10 +386,7 @@ describe('serveSiteFromR2', () => {
     expect(response.headers.get('Content-Type')).toBe('text/html');
     // Should have tried the original path first, then fallen back to index.html
     expect(env.SITES_BUCKET.get).toHaveBeenCalledTimes(2);
-    expect(env.SITES_BUCKET.get).toHaveBeenNthCalledWith(
-      2,
-      `sites/my-site/v1/index.html`,
-    );
+    expect(env.SITES_BUCKET.get).toHaveBeenNthCalledWith(2, `sites/my-site/v1/index.html`);
   });
 
   it('returns 404 when file not found', async () => {
@@ -400,9 +403,7 @@ describe('serveSiteFromR2', () => {
 
   it('returns 404 when SPA fallback also not found', async () => {
     // Both the original path and index.html fallback return null
-    (env.SITES_BUCKET.get as jest.Mock)
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(null);
+    (env.SITES_BUCKET.get as jest.Mock).mockResolvedValueOnce(null).mockResolvedValueOnce(null);
 
     const site = makeSite();
     const response = await serveSiteFromR2(env as any, site, '/dashboard');

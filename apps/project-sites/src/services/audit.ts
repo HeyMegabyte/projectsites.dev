@@ -8,10 +8,7 @@ import { supabaseQuery } from './db.js';
  * Logs auth events, permission changes, billing changes, deletes, admin actions,
  * and webhook processing decisions.
  */
-export async function writeAuditLog(
-  db: SupabaseClient,
-  entry: CreateAuditLog,
-): Promise<void> {
+export async function writeAuditLog(db: SupabaseClient, entry: CreateAuditLog): Promise<void> {
   const validated = createAuditLogSchema.parse(entry);
 
   const { error } = await supabaseQuery(db, 'audit_logs', {

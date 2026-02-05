@@ -99,13 +99,7 @@ export const FUNNEL_EVENTS = [
 export type FunnelEvent = (typeof FUNNEL_EVENTS)[number];
 
 /** Webhook providers */
-export const WEBHOOK_PROVIDERS = [
-  'stripe',
-  'dub',
-  'chatwoot',
-  'novu',
-  'lago',
-] as const;
+export const WEBHOOK_PROVIDERS = ['stripe', 'dub', 'chatwoot', 'novu', 'lago'] as const;
 export type WebhookProvider = (typeof WEBHOOK_PROVIDERS)[number];
 
 /** HTTP status codes used in typed errors */

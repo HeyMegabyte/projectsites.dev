@@ -1,11 +1,4 @@
-import {
-  sha256Hex,
-  hmacSha256,
-  randomHex,
-  randomUUID,
-  generateOtp,
-  timingSafeEqual,
-} from '../utils/crypto.js';
+import { sha256Hex, hmacSha256, randomHex, randomUUID, generateOtp, timingSafeEqual } from '../utils/crypto.js';
 
 describe('sha256Hex extended', () => {
   it('produces correct hash for empty string', async () => {
@@ -95,9 +88,7 @@ describe('randomHex extended', () => {
 describe('randomUUID extended', () => {
   it('matches UUID v4 format', () => {
     const uuid = randomUUID();
-    expect(uuid).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
-    );
+    expect(uuid).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   });
 
   it('generates unique values across multiple calls', () => {

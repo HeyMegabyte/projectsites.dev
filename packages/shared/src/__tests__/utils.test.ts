@@ -55,9 +55,7 @@ describe('sanitizeHtml', () => {
   });
 
   it('preserves safe HTML', () => {
-    expect(sanitizeHtml('<p>Hello <strong>World</strong></p>')).toBe(
-      '<p>Hello <strong>World</strong></p>',
-    );
+    expect(sanitizeHtml('<p>Hello <strong>World</strong></p>')).toBe('<p>Hello <strong>World</strong></p>');
   });
 
   it('handles empty strings', () => {
@@ -296,9 +294,7 @@ describe('randomHex', () => {
 describe('randomUUID', () => {
   it('generates valid UUID v4', () => {
     const uuid = randomUUID();
-    expect(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(uuid),
-    ).toBe(true);
+    expect(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(uuid)).toBe(true);
   });
 
   it('generates unique values', () => {

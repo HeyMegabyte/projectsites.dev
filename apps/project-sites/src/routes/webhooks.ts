@@ -23,11 +23,7 @@ webhooks.post('/webhooks/stripe', async (c) => {
   const requestId = c.get('requestId');
 
   // 1. Verify signature
-  const verification = await verifyStripeSignature(
-    rawBody,
-    signature,
-    c.env.STRIPE_WEBHOOK_SECRET,
-  );
+  const verification = await verifyStripeSignature(rawBody, signature, c.env.STRIPE_WEBHOOK_SECRET);
 
   if (!verification.valid) {
     console.error(

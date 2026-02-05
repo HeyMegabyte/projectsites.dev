@@ -25,7 +25,7 @@ export const securityHeadersMiddleware: MiddlewareHandler<{
       "img-src 'self' data: https:",
       "font-src 'self'",
       "connect-src 'self' https://api.stripe.com https://*.supabase.co",
-      "frame-src https://js.stripe.com",
+      'frame-src https://js.stripe.com',
       "object-src 'none'",
       "base-uri 'self'",
     ].join('; '),

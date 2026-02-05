@@ -162,9 +162,7 @@ describe('securityHeadersMiddleware', () => {
     const app = createApp();
     const res = await app.request('/test');
 
-    expect(res.headers.get('Permissions-Policy')).toBe(
-      'camera=(), microphone=(), geolocation=()',
-    );
+    expect(res.headers.get('Permissions-Policy')).toBe('camera=(), microphone=(), geolocation=()');
   });
 
   it('sets Content-Security-Policy with correct directives', async () => {

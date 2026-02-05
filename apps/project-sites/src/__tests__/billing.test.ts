@@ -106,9 +106,9 @@ describe('getOrCreateStripeCustomer', () => {
       text: async () => 'Stripe error',
     });
 
-    await expect(
-      getOrCreateStripeCustomer(mockDb, mockEnv, 'org_1', 'a@b.com'),
-    ).rejects.toThrow('Failed to create Stripe customer');
+    await expect(getOrCreateStripeCustomer(mockDb, mockEnv, 'org_1', 'a@b.com')).rejects.toThrow(
+      'Failed to create Stripe customer',
+    );
   });
 });
 

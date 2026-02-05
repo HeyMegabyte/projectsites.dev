@@ -1,7 +1,4 @@
-import {
-  verifyStripeSignature,
-  verifyHmacSignature,
-} from '../services/webhook';
+import { verifyStripeSignature, verifyHmacSignature } from '../services/webhook';
 import { hmacSha256 } from '@project-sites/shared';
 
 describe('verifyStripeSignature', () => {
@@ -90,12 +87,7 @@ describe('verifyStripeSignature', () => {
     const timestamp = Math.floor(Date.now() / 1000) - 100; // 100 seconds ago
     const payload = `${timestamp}.${body}`;
     const signature = await hmacSha256(secret, payload);
-    const result = await verifyStripeSignature(
-      body,
-      `t=${timestamp},v1=${signature}`,
-      secret,
-      300,
-    );
+    const result = await verifyStripeSignature(body, `t=${timestamp},v1=${signature}`, secret, 300);
     expect(result.valid).toBe(true);
   });
 
@@ -104,12 +96,7 @@ describe('verifyStripeSignature', () => {
     const timestamp = Math.floor(Date.now() / 1000) + 100; // 100 seconds in future
     const payload = `${timestamp}.${body}`;
     const signature = await hmacSha256(secret, payload);
-    const result = await verifyStripeSignature(
-      body,
-      `t=${timestamp},v1=${signature}`,
-      secret,
-      300,
-    );
+    const result = await verifyStripeSignature(body, `t=${timestamp},v1=${signature}`, secret, 300);
     expect(result.valid).toBe(true);
   });
 });

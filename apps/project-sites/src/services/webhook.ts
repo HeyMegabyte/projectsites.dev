@@ -100,11 +100,9 @@ export async function checkWebhookIdempotency(
 ): Promise<{ isDuplicate: boolean; existingId?: string }> {
   const query = `provider=eq.${provider}&event_id=eq.${encodeURIComponent(eventId)}&select=id,status`;
 
-  const result = await supabaseQuery<Array<{ id: string; status: string }>>(
-    db,
-    'webhook_events',
-    { query },
-  );
+  const result = await supabaseQuery<Array<{ id: string; status: string }>>(db, 'webhook_events', {
+    query,
+  });
 
   if (result.data && result.data.length > 0) {
     return { isDuplicate: true, existingId: result.data[0]!.id };

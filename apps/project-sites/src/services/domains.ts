@@ -123,10 +123,7 @@ export async function checkHostnameStatus(
 /**
  * Delete a custom hostname.
  */
-export async function deleteCustomHostname(
-  env: Env,
-  cfCustomHostnameId: string,
-): Promise<void> {
+export async function deleteCustomHostname(env: Env, cfCustomHostnameId: string): Promise<void> {
   const response = await fetch(
     `https://api.cloudflare.com/client/v4/zones/${env.CF_ZONE_ID}/custom_hostnames/${cfCustomHostnameId}`,
     {
@@ -154,13 +151,9 @@ export async function provisionFreeDomain(
   const hostname = `${opts.slug}.${DOMAINS.SITES_BASE}`;
 
   // Check if already exists
-  const existing = await supabaseQuery<Array<{ id: string; status: string }>>(
-    db,
-    'hostnames',
-    {
-      query: `hostname=eq.${encodeURIComponent(hostname)}&deleted_at=is.null&select=id,status`,
-    },
-  );
+  const existing = await supabaseQuery<Array<{ id: string; status: string }>>(db, 'hostnames', {
+    query: `hostname=eq.${encodeURIComponent(hostname)}&deleted_at=is.null&select=id,status`,
+  });
 
   if (existing.data && existing.data.length > 0) {
     return { hostname, status: existing.data[0]!.status as HostnameState };
@@ -204,21 +197,12 @@ export async function provisionCustomDomain(
   opts: { org_id: string; site_id: string; hostname: string },
 ): Promise<{ hostname: string; status: HostnameState }> {
   // Check domain limit
-  const existingDomains = await supabaseQuery<Array<{ id: string }>>(
-    db,
-    'hostnames',
-    {
-      query: `org_id=eq.${opts.org_id}&type=eq.custom_cname&deleted_at=is.null&select=id`,
-    },
-  );
+  const existingDomains = await supabaseQuery<Array<{ id: string }>>(db, 'hostnames', {
+    query: `org_id=eq.${opts.org_id}&type=eq.custom_cname&deleted_at=is.null&select=id`,
+  });
 
-  if (
-    existingDomains.data &&
-    existingDomains.data.length >= ENTITLEMENTS.paid.maxCustomDomains
-  ) {
-    throw conflict(
-      `Maximum custom domains (${ENTITLEMENTS.paid.maxCustomDomains}) reached`,
-    );
+  if (existingDomains.data && existingDomains.data.length >= ENTITLEMENTS.paid.maxCustomDomains) {
+    throw conflict(`Maximum custom domains (${ENTITLEMENTS.paid.maxCustomDomains}) reached`);
   }
 
   // Check if hostname already exists

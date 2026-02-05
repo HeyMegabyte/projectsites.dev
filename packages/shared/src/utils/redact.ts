@@ -6,8 +6,7 @@
 const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
 const PHONE_REGEX = /\+?[1-9]\d{6,14}/g;
 const TOKEN_REGEX = /(?:sk_(?:test|live)_|pk_(?:test|live)_|whsec_|rk_|Bearer\s+)[a-zA-Z0-9_-]{6,}/g;
-const SECRET_KV_REGEX =
-  /(?:password|secret|token|otp|code)["']?\s*[:=]\s*["']?[a-zA-Z0-9_+/=-]{8,}["']?/gi;
+const SECRET_KV_REGEX = /(?:password|secret|token|otp|code)["']?\s*[:=]\s*["']?[a-zA-Z0-9_+/=-]{8,}["']?/gi;
 
 export function redact(input: string): string {
   return input

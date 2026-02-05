@@ -124,14 +124,11 @@ export default {
   /**
    * Queue consumer handler for workflow jobs.
    */
-  async queue(
-    batch: MessageBatch,
-    env: Env,
-  ): Promise<void> {
+  async queue(batch: MessageBatch, _env: Env): Promise<void> {
     for (const message of batch.messages) {
       try {
         const payload = message.body as Record<string, unknown>;
-        console.info(
+        console.warn(
           JSON.stringify({
             level: 'info',
             service: 'queue',
@@ -164,16 +161,12 @@ export default {
   /**
    * Scheduled handler for periodic tasks.
    */
-  async scheduled(
-    _event: ScheduledEvent,
-    env: Env,
-    _ctx: ExecutionContext,
-  ): Promise<void> {
+  async scheduled(_event: ScheduledEvent, _env: Env, _ctx: ExecutionContext): Promise<void> {
     // TODO: Implement scheduled tasks
     // - verifyPendingHostnames
     // - dunning check
     // - analytics rollup
-    console.info(
+    console.warn(
       JSON.stringify({
         level: 'info',
         service: 'cron',

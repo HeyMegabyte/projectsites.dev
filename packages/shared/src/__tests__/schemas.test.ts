@@ -13,16 +13,8 @@ import {
 } from '../schemas/base';
 import { createOrgSchema, membershipSchema } from '../schemas/org';
 import { createSiteSchema, siteSchema } from '../schemas/site';
-import {
-  createCheckoutSessionSchema,
-  entitlementsSchema,
-  saleWebhookPayloadSchema,
-} from '../schemas/billing';
-import {
-  createMagicLinkSchema,
-  verifyPhoneOtpSchema,
-  googleOAuthCallbackSchema,
-} from '../schemas/auth';
+import { createCheckoutSessionSchema, entitlementsSchema, saleWebhookPayloadSchema } from '../schemas/billing';
+import { createMagicLinkSchema, verifyPhoneOtpSchema, googleOAuthCallbackSchema } from '../schemas/auth';
 import { createAuditLogSchema } from '../schemas/audit';
 import { webhookIngestionSchema } from '../schemas/webhook';
 import { createWorkflowJobSchema, jobEnvelopeSchema } from '../schemas/workflow';
@@ -123,9 +115,7 @@ describe('hostnameSchema', () => {
   it('accepts valid hostnames', () => {
     expect(hostnameSchema.parse('example.com')).toBe('example.com');
     expect(hostnameSchema.parse('sub.example.com')).toBe('sub.example.com');
-    expect(hostnameSchema.parse('my-site.sites.megabyte.space')).toBe(
-      'my-site.sites.megabyte.space',
-    );
+    expect(hostnameSchema.parse('my-site.sites.megabyte.space')).toBe('my-site.sites.megabyte.space');
   });
 
   it('rejects hostnames without TLD', () => {
@@ -238,9 +228,7 @@ describe('createOrgSchema', () => {
   });
 
   it('rejects script injection in name', () => {
-    expect(() =>
-      createOrgSchema.parse({ name: '<script>alert(1)</script>', slug: 'valid' }),
-    ).toThrow();
+    expect(() => createOrgSchema.parse({ name: '<script>alert(1)</script>', slug: 'valid' })).toThrow();
   });
 
   it('rejects invalid slugs', () => {
@@ -273,15 +261,11 @@ describe('createSiteSchema', () => {
   });
 
   it('rejects script injection in business name', () => {
-    expect(() =>
-      createSiteSchema.parse({ business_name: '<script>alert(1)</script>' }),
-    ).toThrow();
+    expect(() => createSiteSchema.parse({ business_name: '<script>alert(1)</script>' })).toThrow();
   });
 
   it('rejects invalid emails', () => {
-    expect(() =>
-      createSiteSchema.parse({ business_name: 'Valid', business_email: 'not-email' }),
-    ).toThrow();
+    expect(() => createSiteSchema.parse({ business_name: 'Valid', business_email: 'not-email' })).toThrow();
   });
 });
 
@@ -460,9 +444,7 @@ describe('createWorkflowJobSchema', () => {
   });
 
   it('rejects empty job_name', () => {
-    expect(() =>
-      createWorkflowJobSchema.parse({ job_name: '', org_id: validUuid }),
-    ).toThrow();
+    expect(() => createWorkflowJobSchema.parse({ job_name: '', org_id: validUuid })).toThrow();
   });
 
   it('rejects max_attempts > 10', () => {
@@ -537,9 +519,7 @@ describe('envConfigSchema', () => {
   });
 
   it('rejects invalid SUPABASE_URL', () => {
-    expect(() =>
-      envConfigSchema.parse({ ...validConfig, SUPABASE_URL: 'not-a-url' }),
-    ).toThrow();
+    expect(() => envConfigSchema.parse({ ...validConfig, SUPABASE_URL: 'not-a-url' })).toThrow();
   });
 
   it('defaults METERING_PROVIDER to internal', () => {

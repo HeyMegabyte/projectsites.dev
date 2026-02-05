@@ -7,7 +7,7 @@ import { supabaseQuery } from './db.js';
  * Top bar HTML injected for unpaid sites.
  * Minimal, non-intrusive, with call-to-action.
  */
-export function generateTopBar(slug: string, siteUrl: string): string {
+export function generateTopBar(slug: string, _siteUrl?: string): string {
   return `<!-- Project Sites Top Bar -->
 <div id="ps-topbar" style="position:fixed;top:0;left:0;right:0;z-index:99999;background:#1a1a2e;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px;padding:8px 16px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 8px rgba(0,0,0,0.2)">
   <span>This site is powered by <a href="https://${DOMAINS.SITES_BASE}" style="color:#64ffda;text-decoration:none;font-weight:600">Project Sites</a></span>
@@ -59,11 +59,13 @@ export async function resolveSite(
 
   // Try hostname table lookup first (for custom domains)
   if (!slug) {
-    const hostnameResult = await supabaseQuery<
-      Array<{ site_id: string; org_id: string }>
-    >(db, 'hostnames', {
-      query: `hostname=eq.${encodeURIComponent(hostname)}&status=eq.active&deleted_at=is.null&select=site_id,org_id`,
-    });
+    const hostnameResult = await supabaseQuery<Array<{ site_id: string; org_id: string }>>(
+      db,
+      'hostnames',
+      {
+        query: `hostname=eq.${encodeURIComponent(hostname)}&status=eq.active&deleted_at=is.null&select=site_id,org_id`,
+      },
+    );
 
     if (hostnameResult.data?.[0]) {
       const { site_id, org_id } = hostnameResult.data[0];
@@ -211,10 +213,7 @@ async function buildSiteResponse(
     const topBar = generateTopBar(site.slug, `https://${site.slug}.${DOMAINS.SITES_BASE}`);
 
     // Inject after <body> tag
-    const injected = html.replace(
-      /(<body[^>]*>)/i,
-      `$1\n${topBar}\n`,
-    );
+    const injected = html.replace(/(<body[^>]*>)/i, `$1\n${topBar}\n`);
 
     return new Response(injected, { status: 200, headers });
   }

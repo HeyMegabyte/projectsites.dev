@@ -118,9 +118,7 @@ export async function createPhoneOtp(
 
   const otp = generateOtp(AUTH.OTP_LENGTH);
   const otpHash = await sha256Hex(otp);
-  const expiresAt = new Date(
-    Date.now() + AUTH.OTP_EXPIRY_MINUTES * 60 * 1000,
-  ).toISOString();
+  const expiresAt = new Date(Date.now() + AUTH.OTP_EXPIRY_MINUTES * 60 * 1000).toISOString();
 
   await supabaseQuery(db, 'phone_otps', {
     method: 'POST',
@@ -165,9 +163,11 @@ export async function verifyPhoneOtp(
 
   // Find matching unexpired OTP
   const query = `phone=eq.${encodeURIComponent(validated.phone)}&verified=eq.false&expires_at=gt.${new Date().toISOString()}&order=created_at.desc&limit=1&select=id,otp_hash,attempts`;
-  const result = await supabaseQuery<
-    Array<{ id: string; otp_hash: string; attempts: number }>
-  >(db, 'phone_otps', { query });
+  const result = await supabaseQuery<Array<{ id: string; otp_hash: string; attempts: number }>>(
+    db,
+    'phone_otps',
+    { query },
+  );
 
   const record = result.data?.[0];
   if (!record) {
@@ -254,11 +254,13 @@ export async function handleGoogleOAuthCallback(
   state: string,
 ): Promise<{ email: string; display_name: string | null; avatar_url: string | null }> {
   // Verify state
-  const stateResult = await supabaseQuery<
-    Array<{ id: string; state: string; expires_at: string }>
-  >(db, 'oauth_states', {
-    query: `state=eq.${state}&provider=eq.google&select=id,state,expires_at`,
-  });
+  const stateResult = await supabaseQuery<Array<{ id: string; state: string; expires_at: string }>>(
+    db,
+    'oauth_states',
+    {
+      query: `state=eq.${state}&provider=eq.google&select=id,state,expires_at`,
+    },
+  );
 
   const stateRecord = stateResult.data?.[0];
   if (!stateRecord) {
@@ -363,11 +365,13 @@ export async function getSession(
 } | null> {
   const tokenHash = await sha256Hex(token);
 
-  const result = await supabaseQuery<
-    Array<{ id: string; user_id: string; expires_at: string }>
-  >(db, 'sessions', {
-    query: `token_hash=eq.${tokenHash}&deleted_at=is.null&select=id,user_id,expires_at`,
-  });
+  const result = await supabaseQuery<Array<{ id: string; user_id: string; expires_at: string }>>(
+    db,
+    'sessions',
+    {
+      query: `token_hash=eq.${tokenHash}&deleted_at=is.null&select=id,user_id,expires_at`,
+    },
+  );
 
   const session = result.data?.[0];
   if (!session) return null;
@@ -389,10 +393,7 @@ export async function getSession(
 /**
  * Revoke a specific session.
  */
-export async function revokeSession(
-  db: SupabaseClient,
-  sessionId: string,
-): Promise<void> {
+export async function revokeSession(db: SupabaseClient, sessionId: string): Promise<void> {
   await supabaseQuery(db, 'sessions', {
     method: 'PATCH',
     query: `id=eq.${sessionId}`,
@@ -406,7 +407,9 @@ export async function revokeSession(
 export async function getUserSessions(
   db: SupabaseClient,
   userId: string,
-): Promise<Array<{ id: string; device_info: string | null; last_active_at: string; created_at: string }>> {
+): Promise<
+  Array<{ id: string; device_info: string | null; last_active_at: string; created_at: string }>
+> {
   const result = await supabaseQuery<
     Array<{ id: string; device_info: string | null; last_active_at: string; created_at: string }>
   >(db, 'sessions', {
