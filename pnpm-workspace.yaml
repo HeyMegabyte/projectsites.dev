@@ -1,0 +1,7 @@
+packages:
+  # Main bolt.diy app (root level - existing)
+  - '.'
+  # Shared package with types, schemas, utilities
+  - 'packages/shared'
+  # Project Sites Cloudflare Worker
+  - 'apps/project-sites'

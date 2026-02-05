@@ -1,0 +1,164 @@
+# Project Sites Cloudflare Worker
+# API gateway + site delivery + routing
+
+name = "project-sites"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+send_metrics = false
+
+# =============================================================================
+# KV Namespaces
+# =============================================================================
+
+[[kv_namespaces]]
+binding = "CACHE_KV"
+id = "CACHE_KV_ID_PLACEHOLDER"
+preview_id = "CACHE_KV_PREVIEW_ID_PLACEHOLDER"
+
+# =============================================================================
+# R2 Buckets
+# =============================================================================
+
+[[r2_buckets]]
+binding = "SITES_BUCKET"
+bucket_name = "project-sites"
+preview_bucket_name = "project-sites-preview"
+
+# =============================================================================
+# Queues
+# =============================================================================
+
+[[queues.producers]]
+binding = "WORKFLOW_QUEUE"
+queue = "project-sites-workflows"
+
+[[queues.consumers]]
+queue = "project-sites-workflows"
+max_batch_size = 10
+max_batch_timeout = 30
+max_retries = 3
+dead_letter_queue = "project-sites-dlq"
+
+# =============================================================================
+# Workflows
+# =============================================================================
+
+[[workflows]]
+name = "site-generation"
+binding = "SITE_GENERATION_WORKFLOW"
+class_name = "SiteGenerationWorkflow"
+
+# =============================================================================
+# Durable Objects (for rate limiting, etc.)
+# =============================================================================
+
+[[durable_objects.bindings]]
+name = "RATE_LIMITER"
+class_name = "RateLimiter"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["RateLimiter"]
+
+# =============================================================================
+# Custom Domains (Cloudflare for SaaS)
+# =============================================================================
+
+# Routes for the primary domain
+[[routes]]
+pattern = "sites.megabyte.space/*"
+zone_name = "megabyte.space"
+
+# Wildcard route for customer subdomains
+[[routes]]
+pattern = "*.sites.megabyte.space/*"
+zone_name = "megabyte.space"
+
+# =============================================================================
+# Environment Variables (non-secret, default values)
+# =============================================================================
+
+[vars]
+ENVIRONMENT = "development"
+LOG_LEVEL = "debug"
+
+# =============================================================================
+# Staging Environment
+# =============================================================================
+
+[env.staging]
+name = "project-sites-staging"
+
+[[env.staging.routes]]
+pattern = "sites-staging.megabyte.space/*"
+zone_name = "megabyte.space"
+
+[[env.staging.routes]]
+pattern = "*.sites-staging.megabyte.space/*"
+zone_name = "megabyte.space"
+
+[env.staging.vars]
+ENVIRONMENT = "staging"
+LOG_LEVEL = "info"
+
+[[env.staging.kv_namespaces]]
+binding = "CACHE_KV"
+id = "STAGING_CACHE_KV_ID_PLACEHOLDER"
+
+[[env.staging.r2_buckets]]
+binding = "SITES_BUCKET"
+bucket_name = "project-sites-staging"
+
+[[env.staging.queues.producers]]
+binding = "WORKFLOW_QUEUE"
+queue = "project-sites-workflows-staging"
+
+# =============================================================================
+# Production Environment
+# =============================================================================
+
+[env.production]
+name = "project-sites-production"
+
+[[env.production.routes]]
+pattern = "sites.megabyte.space/*"
+zone_name = "megabyte.space"
+
+[[env.production.routes]]
+pattern = "*.sites.megabyte.space/*"
+zone_name = "megabyte.space"
+
+[env.production.vars]
+ENVIRONMENT = "production"
+LOG_LEVEL = "warn"
+
+[[env.production.kv_namespaces]]
+binding = "CACHE_KV"
+id = "PRODUCTION_CACHE_KV_ID_PLACEHOLDER"
+
+[[env.production.r2_buckets]]
+binding = "SITES_BUCKET"
+bucket_name = "project-sites-production"
+
+[[env.production.queues.producers]]
+binding = "WORKFLOW_QUEUE"
+queue = "project-sites-workflows-production"
+
+# =============================================================================
+# Observability
+# =============================================================================
+
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
+invocation_logs = true
+
+# =============================================================================
+# Build Configuration
+# =============================================================================
+
+[build]
+command = "pnpm build"
