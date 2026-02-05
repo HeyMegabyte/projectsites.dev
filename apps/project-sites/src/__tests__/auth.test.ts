@@ -1,0 +1,511 @@
+jest.mock('../services/db.js', () => ({
+  supabaseQuery: jest.fn(),
+}));
+
+import { supabaseQuery } from '../services/db.js';
+import {
+  createMagicLink,
+  verifyMagicLink,
+  createPhoneOtp,
+  verifyPhoneOtp,
+  createGoogleOAuthState,
+  handleGoogleOAuthCallback,
+  createSession,
+  getSession,
+  revokeSession,
+  getUserSessions,
+} from '../services/auth.js';
+import { AppError } from '@project-sites/shared';
+
+const mockQuery = supabaseQuery as jest.MockedFunction<typeof supabaseQuery>;
+
+const mockEnv = {
+  ENVIRONMENT: 'staging',
+  SUPABASE_URL: 'https://test.supabase.co',
+  GOOGLE_CLIENT_ID: 'test-google-client-id',
+  GOOGLE_CLIENT_SECRET: 'test-google-client-secret',
+} as any;
+
+const mockDb = {
+  url: 'https://test.supabase.co',
+  headers: { apikey: 'test-key' },
+  fetch: jest.fn(),
+} as any;
+
+beforeEach(() => {
+  jest.clearAllMocks();
+});
+
+// ---------------------------------------------------------------------------
+// createMagicLink
+// ---------------------------------------------------------------------------
+describe('createMagicLink', () => {
+  const input = { email: 'user@example.com' };
+
+  beforeEach(() => {
+    mockQuery.mockResolvedValue({ data: null, error: null, status: 201 });
+  });
+
+  it('returns a 64-character hex token', async () => {
+    const result = await createMagicLink(mockDb, mockEnv, input);
+    expect(result.token).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('returns expires_at as an ISO 8601 string', async () => {
+    const result = await createMagicLink(mockDb, mockEnv, input);
+    expect(() => new Date(result.expires_at).toISOString()).not.toThrow();
+    expect(new Date(result.expires_at).getTime()).toBeGreaterThan(Date.now());
+  });
+
+  it('calls supabaseQuery POST on magic_links table', async () => {
+    await createMagicLink(mockDb, mockEnv, input);
+
+    expect(mockQuery).toHaveBeenCalledWith(
+      mockDb,
+      'magic_links',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.objectContaining({
+          email: 'user@example.com',
+          used: false,
+        }),
+      }),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// verifyMagicLink
+// ---------------------------------------------------------------------------
+describe('verifyMagicLink', () => {
+  const token = 'a'.repeat(64);
+  const input = { token };
+
+  it('returns email when a valid token is found', async () => {
+    const futureDate = new Date(Date.now() + 3_600_000).toISOString();
+    mockQuery
+      .mockResolvedValueOnce({
+        data: [
+          { id: 'link-1', email: 'user@example.com', redirect_url: null, used: false, expires_at: futureDate },
+        ],
+        error: null,
+        status: 200,
+      })
+      .mockResolvedValueOnce({ data: null, error: null, status: 200 });
+
+    const result = await verifyMagicLink(mockDb, input);
+    expect(result.email).toBe('user@example.com');
+    expect(result.redirect_url).toBeNull();
+  });
+
+  it('throws unauthorized when no matching link is found', async () => {
+    mockQuery.mockResolvedValueOnce({ data: [], error: null, status: 200 });
+
+    await expect(verifyMagicLink(mockDb, input)).rejects.toThrow(AppError);
+    await expect(verifyMagicLink(mockDb, input)).rejects.toThrow('Invalid or expired magic link');
+  });
+
+  it('throws unauthorized when the link is expired', async () => {
+    const pastDate = new Date(Date.now() - 3_600_000).toISOString();
+    mockQuery.mockResolvedValueOnce({
+      data: [
+        { id: 'link-2', email: 'old@example.com', redirect_url: null, used: false, expires_at: pastDate },
+      ],
+      error: null,
+      status: 200,
+    });
+
+    await expect(verifyMagicLink(mockDb, input)).rejects.toThrow('Magic link has expired');
+  });
+
+  it('marks the link as used after successful verification', async () => {
+    const futureDate = new Date(Date.now() + 3_600_000).toISOString();
+    mockQuery
+      .mockResolvedValueOnce({
+        data: [
+          { id: 'link-3', email: 'mark@example.com', redirect_url: null, used: false, expires_at: futureDate },
+        ],
+        error: null,
+        status: 200,
+      })
+      .mockResolvedValueOnce({ data: null, error: null, status: 200 });
+
+    await verifyMagicLink(mockDb, input);
+
+    expect(mockQuery).toHaveBeenCalledTimes(2);
+    expect(mockQuery).toHaveBeenLastCalledWith(
+      mockDb,
+      'magic_links',
+      expect.objectContaining({
+        method: 'PATCH',
+        query: 'id=eq.link-3',
+        body: expect.objectContaining({ used: true }),
+      }),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createPhoneOtp
+// ---------------------------------------------------------------------------
+describe('createPhoneOtp', () => {
+  const input = { phone: '+15551234567' };
+
+  it('returns expires_at', async () => {
+    mockQuery
+      .mockResolvedValueOnce({ data: [], error: null, status: 200 }) // rate limit check
+      .mockResolvedValueOnce({ data: null, error: null, status: 201 }); // insert
+
+    const result = await createPhoneOtp(mockDb, mockEnv, input);
+    expect(result.expires_at).toBeDefined();
+    expect(new Date(result.expires_at).getTime()).toBeGreaterThan(Date.now());
+  });
+
+  it('throws rateLimited when a recent OTP exists', async () => {
+    mockQuery.mockResolvedValueOnce({
+      data: [{ id: 'recent-otp' }],
+      error: null,
+      status: 200,
+    });
+
+    try {
+      await createPhoneOtp(mockDb, mockEnv, input);
+      fail('Expected rateLimited error to be thrown');
+    } catch (err) {
+      expect(err).toBeInstanceOf(AppError);
+      expect((err as AppError).message).toBe('Please wait before requesting another OTP');
+      expect((err as AppError).statusCode).toBe(429);
+    }
+  });
+
+  it('creates an OTP record in the phone_otps table', async () => {
+    mockQuery
+      .mockResolvedValueOnce({ data: [], error: null, status: 200 })
+      .mockResolvedValueOnce({ data: null, error: null, status: 201 });
+
+    await createPhoneOtp(mockDb, mockEnv, input);
+
+    expect(mockQuery).toHaveBeenCalledTimes(2);
+    expect(mockQuery).toHaveBeenLastCalledWith(
+      mockDb,
+      'phone_otps',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.objectContaining({
+          phone: '+15551234567',
+          attempts: 0,
+          verified: false,
+        }),
+      }),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// verifyPhoneOtp
+// ---------------------------------------------------------------------------
+describe('verifyPhoneOtp', () => {
+  const phone = '+15551234567';
+
+  it('returns { verified: true } when the OTP hash matches', async () => {
+    // We need a real sha256 hash of the OTP to match at runtime.
+    // Compute the sha256 of '123456' using Web Crypto to set up the mock.
+    const { sha256Hex } = await import('@project-sites/shared');
+    const otpHash = await sha256Hex('123456');
+
+    mockQuery
+      .mockResolvedValueOnce({
+        data: [{ id: 'otp-1', otp_hash: otpHash, attempts: 0 }],
+        error: null,
+        status: 200,
+      })
+      .mockResolvedValueOnce({ data: null, error: null, status: 200 }) // increment attempts
+      .mockResolvedValueOnce({ data: null, error: null, status: 200 }); // mark verified
+
+    const result = await verifyPhoneOtp(mockDb, { phone, otp: '123456' });
+    expect(result).toEqual({ verified: true });
+  });
+
+  it('throws unauthorized when no pending OTP is found', async () => {
+    mockQuery.mockResolvedValueOnce({ data: [], error: null, status: 200 });
+
+    await expect(verifyPhoneOtp(mockDb, { phone, otp: '123456' })).rejects.toThrow(
+      'No pending OTP found',
+    );
+  });
+
+  it('throws rateLimited when max attempts are exceeded', async () => {
+    mockQuery.mockResolvedValueOnce({
+      data: [{ id: 'otp-2', otp_hash: 'some-hash', attempts: 3 }],
+      error: null,
+      status: 200,
+    });
+
+    await expect(verifyPhoneOtp(mockDb, { phone, otp: '123456' })).rejects.toThrow(
+      'Too many OTP attempts',
+    );
+  });
+
+  it('throws unauthorized when the OTP hash does not match', async () => {
+    mockQuery
+      .mockResolvedValueOnce({
+        data: [{ id: 'otp-3', otp_hash: 'definitely-wrong-hash', attempts: 0 }],
+        error: null,
+        status: 200,
+      })
+      .mockResolvedValueOnce({ data: null, error: null, status: 200 }); // increment attempts
+
+    await expect(verifyPhoneOtp(mockDb, { phone, otp: '999999' })).rejects.toThrow('Invalid OTP');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createGoogleOAuthState
+// ---------------------------------------------------------------------------
+describe('createGoogleOAuthState', () => {
+  beforeEach(() => {
+    mockQuery.mockResolvedValue({ data: null, error: null, status: 201 });
+  });
+
+  it('returns an authUrl containing accounts.google.com', async () => {
+    const result = await createGoogleOAuthState(mockDb, mockEnv);
+    expect(result.authUrl).toContain('accounts.google.com');
+  });
+
+  it('returns a hex state string', async () => {
+    const result = await createGoogleOAuthState(mockDb, mockEnv);
+    expect(result.state).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('stores the state in the oauth_states table', async () => {
+    const result = await createGoogleOAuthState(mockDb, mockEnv);
+
+    expect(mockQuery).toHaveBeenCalledWith(
+      mockDb,
+      'oauth_states',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.objectContaining({
+          state: result.state,
+          provider: 'google',
+        }),
+      }),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// handleGoogleOAuthCallback
+// ---------------------------------------------------------------------------
+describe('handleGoogleOAuthCallback', () => {
+  const originalFetch = global.fetch;
+
+  beforeEach(() => {
+    global.fetch = jest.fn();
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it('returns email and user info on successful callback', async () => {
+    const futureDate = new Date(Date.now() + 600_000).toISOString();
+
+    // supabaseQuery: find state
+    mockQuery
+      .mockResolvedValueOnce({
+        data: [{ id: 'state-1', state: 'valid-state', expires_at: futureDate }],
+        error: null,
+        status: 200,
+      })
+      // supabaseQuery: delete used state
+      .mockResolvedValueOnce({ data: null, error: null, status: 204 });
+
+    // global.fetch: token exchange
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ access_token: 'mock-access-token' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+      // global.fetch: userinfo
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            email: 'google-user@gmail.com',
+            name: 'Google User',
+            picture: 'https://example.com/avatar.jpg',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+
+    const result = await handleGoogleOAuthCallback(mockDb, mockEnv, 'auth-code', 'valid-state');
+
+    expect(result.email).toBe('google-user@gmail.com');
+    expect(result.display_name).toBe('Google User');
+    expect(result.avatar_url).toBe('https://example.com/avatar.jpg');
+  });
+
+  it('throws unauthorized when the state is not found', async () => {
+    mockQuery.mockResolvedValueOnce({ data: [], error: null, status: 200 });
+
+    await expect(
+      handleGoogleOAuthCallback(mockDb, mockEnv, 'code', 'bad-state'),
+    ).rejects.toThrow('Invalid OAuth state');
+  });
+
+  it('throws unauthorized when the state is expired', async () => {
+    const pastDate = new Date(Date.now() - 600_000).toISOString();
+
+    mockQuery.mockResolvedValueOnce({
+      data: [{ id: 'state-2', state: 'expired-state', expires_at: pastDate }],
+      error: null,
+      status: 200,
+    });
+
+    await expect(
+      handleGoogleOAuthCallback(mockDb, mockEnv, 'code', 'expired-state'),
+    ).rejects.toThrow('OAuth state expired');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createSession
+// ---------------------------------------------------------------------------
+describe('createSession', () => {
+  beforeEach(() => {
+    mockQuery.mockResolvedValue({ data: null, error: null, status: 201 });
+  });
+
+  it('returns a 64-character hex token and expires_at', async () => {
+    const result = await createSession(mockDb, 'user-id-1');
+
+    expect(result.token).toMatch(/^[0-9a-f]{64}$/);
+    expect(new Date(result.expires_at).getTime()).toBeGreaterThan(Date.now());
+  });
+
+  it('creates a session record in the sessions table', async () => {
+    await createSession(mockDb, 'user-id-2', 'Chrome on macOS', '192.168.1.1');
+
+    expect(mockQuery).toHaveBeenCalledWith(
+      mockDb,
+      'sessions',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.objectContaining({
+          user_id: 'user-id-2',
+          device_info: 'Chrome on macOS',
+          ip_address: '192.168.1.1',
+        }),
+      }),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getSession
+// ---------------------------------------------------------------------------
+describe('getSession', () => {
+  const token = 'b'.repeat(64);
+
+  it('returns session data for a valid token', async () => {
+    const futureDate = new Date(Date.now() + 86_400_000).toISOString();
+
+    mockQuery
+      .mockResolvedValueOnce({
+        data: [{ id: 'sess-1', user_id: 'user-1', expires_at: futureDate }],
+        error: null,
+        status: 200,
+      })
+      .mockResolvedValueOnce({ data: null, error: null, status: 200 }); // update last_active_at
+
+    const result = await getSession(mockDb, token);
+
+    expect(result).toEqual({
+      id: 'sess-1',
+      user_id: 'user-1',
+      expires_at: futureDate,
+    });
+  });
+
+  it('returns null when no session matches the token', async () => {
+    mockQuery.mockResolvedValueOnce({ data: [], error: null, status: 200 });
+
+    const result = await getSession(mockDb, token);
+    expect(result).toBeNull();
+  });
+
+  it('returns null when the session is expired', async () => {
+    const pastDate = new Date(Date.now() - 86_400_000).toISOString();
+
+    mockQuery.mockResolvedValueOnce({
+      data: [{ id: 'sess-2', user_id: 'user-2', expires_at: pastDate }],
+      error: null,
+      status: 200,
+    });
+
+    const result = await getSession(mockDb, token);
+    expect(result).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// revokeSession
+// ---------------------------------------------------------------------------
+describe('revokeSession', () => {
+  it('calls PATCH with deleted_at set on the sessions table', async () => {
+    mockQuery.mockResolvedValue({ data: null, error: null, status: 200 });
+
+    await revokeSession(mockDb, 'sess-to-revoke');
+
+    expect(mockQuery).toHaveBeenCalledWith(
+      mockDb,
+      'sessions',
+      expect.objectContaining({
+        method: 'PATCH',
+        query: 'id=eq.sess-to-revoke',
+        body: expect.objectContaining({
+          deleted_at: expect.any(String),
+        }),
+      }),
+    );
+  });
+
+  it('passes updated_at alongside deleted_at', async () => {
+    mockQuery.mockResolvedValue({ data: null, error: null, status: 200 });
+
+    await revokeSession(mockDb, 'sess-99');
+
+    const callBody = mockQuery.mock.calls[0][2]?.body as Record<string, unknown>;
+    expect(callBody.updated_at).toBeDefined();
+    expect(callBody.deleted_at).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getUserSessions
+// ---------------------------------------------------------------------------
+describe('getUserSessions', () => {
+  it('returns an empty array when no sessions exist', async () => {
+    mockQuery.mockResolvedValueOnce({ data: [], error: null, status: 200 });
+
+    const result = await getUserSessions(mockDb, 'user-no-sessions');
+    expect(result).toEqual([]);
+  });
+
+  it('returns active sessions for the given user', async () => {
+    const sessions = [
+      { id: 's1', device_info: 'Firefox', last_active_at: new Date().toISOString(), created_at: new Date().toISOString() },
+      { id: 's2', device_info: null, last_active_at: new Date().toISOString(), created_at: new Date().toISOString() },
+    ];
+    mockQuery.mockResolvedValueOnce({ data: sessions, error: null, status: 200 });
+
+    const result = await getUserSessions(mockDb, 'user-with-sessions');
+
+    expect(result).toHaveLength(2);
+    expect(result[0].id).toBe('s1');
+    expect(result[1].device_info).toBeNull();
+  });
+});
