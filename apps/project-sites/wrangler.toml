@@ -33,12 +33,29 @@ dead_letter_queue = "project-sites-dlq"
 [triggers]
 crons = ["*/5 * * * *"]
 
+# Default (dev) environment variables
+[vars]
+ENVIRONMENT = "development"
+LOG_LEVEL = "debug"
+SITE_BASE_DOMAIN = "localhost:8787"
+API_BASE_URL = "http://localhost:8787"
+STRIPE_MODE = "test"
+
 # Environment: Staging
 [env.staging]
 name = "project-sites-staging"
 routes = [
-  { pattern = "staging.sites.megabyte.space/*", zone_name = "megabyte.space" }
+  { pattern = "sites-staging.megabyte.space/*", zone_name = "megabyte.space" },
+  { pattern = "*.sites-staging.megabyte.space/*", zone_name = "megabyte.space" },
+  { pattern = "api.sites-staging.megabyte.space/*", zone_name = "megabyte.space" }
 ]
+
+[env.staging.vars]
+ENVIRONMENT = "staging"
+LOG_LEVEL = "debug"
+SITE_BASE_DOMAIN = "sites-staging.megabyte.space"
+API_BASE_URL = "https://api.sites-staging.megabyte.space"
+STRIPE_MODE = "test"
 
 [[env.staging.kv_namespaces]]
 binding = "CACHE_KV"
@@ -57,8 +74,16 @@ queue = "project-sites-workflows-staging"
 name = "project-sites-production"
 routes = [
   { pattern = "sites.megabyte.space/*", zone_name = "megabyte.space" },
-  { pattern = "*.sites.megabyte.space/*", zone_name = "megabyte.space" }
+  { pattern = "*.sites.megabyte.space/*", zone_name = "megabyte.space" },
+  { pattern = "api.sites.megabyte.space/*", zone_name = "megabyte.space" }
 ]
+
+[env.production.vars]
+ENVIRONMENT = "production"
+LOG_LEVEL = "info"
+SITE_BASE_DOMAIN = "sites.megabyte.space"
+API_BASE_URL = "https://api.sites.megabyte.space"
+STRIPE_MODE = "live"
 
 [[env.production.kv_namespaces]]
 binding = "CACHE_KV"

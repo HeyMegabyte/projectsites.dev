@@ -48,6 +48,10 @@ export interface CloudflareBindings {
 
   // Environment
   ENVIRONMENT?: 'development' | 'staging' | 'production';
+  LOG_LEVEL?: 'debug' | 'info' | 'warn' | 'error';
+  SITE_BASE_DOMAIN?: string;
+  API_BASE_URL?: string;
+  STRIPE_MODE?: 'test' | 'live';
 }
 
 // ============================================================================
