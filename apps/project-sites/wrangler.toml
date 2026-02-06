@@ -5,28 +5,61 @@ compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
 send_metrics = false
 
-# KV Namespace for caching
+# ─── Observability ───────────────────────────────────────────
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+invocation_logs = true
+
+[observability.traces]
+enabled = true
+head_sampling_rate = 1
+
+# ─── KV Namespace for caching ────────────────────────────────
 [[kv_namespaces]]
 binding = "CACHE_KV"
 id = "placeholder-kv-id"
 
-# R2 Bucket for static site output
+# ─── D1 Database ─────────────────────────────────────────────
+[[d1_databases]]
+binding = "DB"
+database_name = "project-sites-db"
+database_id = "placeholder-d1-id"
+
+# ─── R2 Bucket for static site output ────────────────────────
 [[r2_buckets]]
 binding = "SITES_BUCKET"
 bucket_name = "project-sites"
 
-# Queue producer for workflow jobs
+# ─── Queue producer for workflow jobs ─────────────────────────
 [[queues.producers]]
 binding = "WORKFLOW_QUEUE"
 queue = "project-sites-workflows"
 
-# Queue consumer
+# ─── Queue consumer ──────────────────────────────────────────
 [[queues.consumers]]
 queue = "project-sites-workflows"
 max_batch_size = 10
 max_retries = 3
 
-# --- Staging ---
+# ─── AI binding for Cloudflare Workers AI ─────────────────────
+[ai]
+binding = "AI"
+
+# ─── KV for prompt hotfixes (optional override of bundled prompts) ─
+[[kv_namespaces]]
+binding = "PROMPT_STORE"
+id = "placeholder-prompt-kv-id"
+
+# ─── Static Assets for marketing site ────────────────────────
+# [assets]
+# directory = "./public"
+
+# ─── Staging ─────────────────────────────────────────────────
 [env.staging]
 name = "project-sites-staging"
 routes = [
@@ -37,9 +70,31 @@ routes = [
 [env.staging.vars]
 ENVIRONMENT = "staging"
 
+[env.staging.observability]
+enabled = true
+head_sampling_rate = 1
+
+[env.staging.observability.logs]
+enabled = true
+head_sampling_rate = 1
+invocation_logs = true
+
+[env.staging.observability.traces]
+enabled = true
+head_sampling_rate = 1
+
 [[env.staging.kv_namespaces]]
 binding = "CACHE_KV"
 id = "placeholder-staging-kv-id"
+
+[[env.staging.kv_namespaces]]
+binding = "PROMPT_STORE"
+id = "placeholder-staging-prompt-kv-id"
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "project-sites-db-staging"
+database_id = "placeholder-staging-d1-id"
 
 [[env.staging.r2_buckets]]
 binding = "SITES_BUCKET"
@@ -54,7 +109,7 @@ queue = "project-sites-workflows-staging"
 max_batch_size = 10
 max_retries = 3
 
-# --- Production ---
+# ─── Production ──────────────────────────────────────────────
 [env.production]
 name = "project-sites"
 routes = [
@@ -65,9 +120,31 @@ routes = [
 [env.production.vars]
 ENVIRONMENT = "production"
 
+[env.production.observability]
+enabled = true
+head_sampling_rate = 0.1
+
+[env.production.observability.logs]
+enabled = true
+head_sampling_rate = 0.1
+invocation_logs = true
+
+[env.production.observability.traces]
+enabled = true
+head_sampling_rate = 0.1
+
 [[env.production.kv_namespaces]]
 binding = "CACHE_KV"
 id = "placeholder-production-kv-id"
+
+[[env.production.kv_namespaces]]
+binding = "PROMPT_STORE"
+id = "placeholder-production-prompt-kv-id"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "project-sites-db-production"
+database_id = "placeholder-production-d1-id"
 
 [[env.production.r2_buckets]]
 binding = "SITES_BUCKET"

@@ -5,6 +5,10 @@
 export interface Env {
   // KV
   CACHE_KV: KVNamespace;
+  PROMPT_STORE: KVNamespace;
+
+  // D1
+  DB: D1Database;
 
   // R2
   SITES_BUCKET: R2Bucket;
@@ -12,8 +16,15 @@ export interface Env {
   // Queue
   WORKFLOW_QUEUE: Queue;
 
+  // Workers AI
+  AI: Ai;
+
   // Environment
   ENVIRONMENT: string;
+
+  // PostHog
+  POSTHOG_API_KEY: string;
+  POSTHOG_HOST?: string;
 
   // Supabase
   SUPABASE_URL: string;

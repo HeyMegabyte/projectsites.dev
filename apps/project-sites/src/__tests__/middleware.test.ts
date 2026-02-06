@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
-import { requestIdMiddleware } from '../middleware/request-id.js';
-import { payloadLimitMiddleware } from '../middleware/payload-limit.js';
-import { securityHeadersMiddleware } from '../middleware/security-headers.js';
+import { requestIdMiddleware } from '../middleware/request_id.js';
+import { payloadLimitMiddleware } from '../middleware/payload_limit.js';
+import { securityHeadersMiddleware } from '../middleware/security_headers.js';
 
 beforeEach(() => {
   jest.clearAllMocks();

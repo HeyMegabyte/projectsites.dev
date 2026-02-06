@@ -7,7 +7,7 @@ import { supabaseQuery } from './db.js';
  * Top bar HTML injected for unpaid sites.
  * Minimal, non-intrusive, with call-to-action.
  */
-export function generateTopBar(slug: string, _siteUrl?: string): string {
+export function generateTopBar(slug: string): string {
   return `<!-- Project Sites Top Bar -->
 <div id="ps-topbar" style="position:fixed;top:0;left:0;right:0;z-index:99999;background:#1a1a2e;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px;padding:8px 16px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 8px rgba(0,0,0,0.2)">
   <span>This site is powered by <a href="https://${DOMAINS.SITES_BASE}" style="color:#64ffda;text-decoration:none;font-weight:600">Project Sites</a></span>
@@ -210,7 +210,7 @@ async function buildSiteResponse(
   // For HTML responses, inject top bar if unpaid
   if (contentType === 'text/html' && site.plan !== 'paid') {
     const html = await object.text();
-    const topBar = generateTopBar(site.slug, `https://${site.slug}.${DOMAINS.SITES_BASE}`);
+    const topBar = generateTopBar(site.slug);
 
     // Inject after <body> tag
     const injected = html.replace(/(<body[^>]*>)/i, `$1\n${topBar}\n`);

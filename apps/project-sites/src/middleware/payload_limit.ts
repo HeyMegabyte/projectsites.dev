@@ -12,7 +12,7 @@ export const payloadLimitMiddleware: MiddlewareHandler<{
   const contentLength = c.req.header('content-length');
 
   if (contentLength) {
-    const size = parseInt(contentLength, 10);
+    const size = Number(contentLength);
     if (!Number.isNaN(size) && size > DEFAULT_CAPS.MAX_REQUEST_BODY_BYTES) {
       throw payloadTooLarge(
         `Request body exceeds maximum size of ${DEFAULT_CAPS.MAX_REQUEST_BODY_BYTES} bytes`,

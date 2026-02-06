@@ -267,8 +267,8 @@ api.get('/api/audit-logs', async (c) => {
   const orgId = c.get('orgId');
   if (!orgId) throw unauthorized('Must be authenticated');
 
-  const limit = parseInt(c.req.query('limit') ?? '50', 10);
-  const offset = parseInt(c.req.query('offset') ?? '0', 10);
+  const limit = Number(c.req.query('limit') ?? '50');
+  const offset = Number(c.req.query('offset') ?? '0');
 
   const result = await auditService.getAuditLogs(db, orgId, { limit, offset });
   return c.json({ data: result.data });

@@ -1,15 +1,15 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import type { Env, Variables } from './types/env.js';
-import { requestIdMiddleware } from './middleware/request-id.js';
-import { errorHandler } from './middleware/error-handler.js';
-import { payloadLimitMiddleware } from './middleware/payload-limit.js';
-import { securityHeadersMiddleware } from './middleware/security-headers.js';
+import { requestIdMiddleware } from './middleware/request_id.js';
+import { errorHandler } from './middleware/error_handler.js';
+import { payloadLimitMiddleware } from './middleware/payload_limit.js';
+import { securityHeadersMiddleware } from './middleware/security_headers.js';
 import { health } from './routes/health.js';
 import { api } from './routes/api.js';
 import { webhooks } from './routes/webhooks.js';
 import { createServiceClient } from './services/db.js';
-import { resolveSite, serveSiteFromR2 } from './services/site-serving.js';
+import { resolveSite, serveSiteFromR2 } from './services/site_serving.js';
 import { DOMAINS } from '@project-sites/shared';
 
 const app = new Hono<{ Bindings: Env; Variables: Variables }>();

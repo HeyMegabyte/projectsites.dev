@@ -53,7 +53,7 @@ export async function verifyStripeSignature(
 
   // Check timestamp tolerance
   const now = Math.floor(Date.now() / 1000);
-  const ts = parseInt(timestamp, 10);
+  const ts = Number(timestamp);
   if (Number.isNaN(ts) || Math.abs(now - ts) > toleranceSeconds) {
     return { valid: false, reason: 'Timestamp outside tolerance' };
   }

@@ -13,13 +13,16 @@
     "./utils": "./src/utils/index.ts"
   },
   "scripts": {
-    "test": "jest --config jest.config.cjs",
+    "test": "npm run test:unit",
+    "test:unit": "jest --config jest.config.cjs",
     "test:watch": "jest --config jest.config.cjs --watch",
     "test:coverage": "jest --config jest.config.cjs --coverage",
     "typecheck": "tsc --noEmit",
     "lint": "eslint --config eslint.config.mjs src",
+    "lint:fix": "eslint --config eslint.config.mjs --fix src",
     "format": "prettier --write src",
-    "format:check": "prettier --check src"
+    "format:check": "prettier --check src",
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm run test:unit"
   },
   "dependencies": {
     "zod": "^3.24.1"

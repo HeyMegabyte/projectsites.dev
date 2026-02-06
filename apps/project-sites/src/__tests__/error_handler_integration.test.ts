@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { errorHandler } from '../middleware/error-handler.js';
+import { errorHandler } from '../middleware/error_handler.js';
 import {
   AppError,
   badRequest,

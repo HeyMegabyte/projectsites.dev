@@ -3,7 +3,7 @@ jest.mock('../services/db.js', () => ({
 }));
 
 import { supabaseQuery } from '../services/db.js';
-import { resolveSite, serveSiteFromR2 } from '../services/site-serving.js';
+import { resolveSite, serveSiteFromR2 } from '../services/site_serving.js';
 import { DOMAINS } from '@project-sites/shared';
 
 const mockQuery = supabaseQuery as jest.MockedFunction<typeof supabaseQuery>;
