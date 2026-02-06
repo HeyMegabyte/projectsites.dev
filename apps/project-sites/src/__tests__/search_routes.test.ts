@@ -12,7 +12,7 @@ import { search } from '../routes/search.js';
  *   POST /api/sites/create-from-search - site creation + workflow enqueue
  *
  * Global fetch is mocked to intercept Google Places API and Supabase REST calls.
- * WORKFLOW_QUEUE.send is a jest.fn() mock.
+ * QUEUE.send is a jest.fn() mock.
  */
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
@@ -25,7 +25,7 @@ const mockEnv = {
   SUPABASE_SERVICE_ROLE_KEY: 'test-service-role-key',
   SUPABASE_ANON_KEY: 'test-anon-key',
   ENVIRONMENT: 'test',
-  WORKFLOW_QUEUE: { send: mockQueueSend },
+  QUEUE: { send: mockQueueSend },
 } as unknown as Env;
 
 // ─── App setup ──────────────────────────────────────────────────────────────

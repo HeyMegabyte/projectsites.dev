@@ -219,7 +219,7 @@ describe('deleteCustomHostname', () => {
 // provisionFreeDomain
 // ---------------------------------------------------------------------------
 describe('provisionFreeDomain', () => {
-  it('returns hostname in format slug.sites.megabyte.space', async () => {
+  it('returns hostname in format slug-sites.megabyte.space', async () => {
     mockQuery.mockResolvedValueOnce({ data: [], error: null, status: 200 });
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -238,7 +238,7 @@ describe('provisionFreeDomain', () => {
       slug: 'my-app',
     });
 
-    expect(result.hostname).toBe('my-app.sites.megabyte.space');
+    expect(result.hostname).toBe('my-app-sites.megabyte.space');
     expect(result.status).toBe('pending');
   });
 
@@ -256,7 +256,7 @@ describe('provisionFreeDomain', () => {
     });
 
     expect(result).toEqual({
-      hostname: 'existing-app.sites.megabyte.space',
+      hostname: 'existing-app-sites.megabyte.space',
       status: 'active',
     });
     expect(global.fetch).not.toHaveBeenCalled();
@@ -282,7 +282,7 @@ describe('provisionFreeDomain', () => {
     });
 
     expect(result).toEqual({
-      hostname: 'new-app.sites.megabyte.space',
+      hostname: 'new-app-sites.megabyte.space',
       status: 'active',
     });
 
@@ -299,7 +299,7 @@ describe('provisionFreeDomain', () => {
         body: expect.objectContaining({
           org_id: 'org-2',
           site_id: 'site-2',
-          hostname: 'new-app.sites.megabyte.space',
+          hostname: 'new-app-sites.megabyte.space',
           type: 'free_subdomain',
           status: 'active',
           cf_custom_hostname_id: 'cf-new-1',
@@ -432,7 +432,7 @@ describe('getSiteHostnames', () => {
     const hostnames = [
       {
         id: 'h1',
-        hostname: 'app.sites.megabyte.space',
+        hostname: 'app-sites.megabyte.space',
         type: 'free_subdomain',
         status: 'active',
         ssl_status: 'active',

@@ -609,7 +609,7 @@ describe('Domains Service Error Paths', () => {
       });
 
       expect(result).toEqual({
-        hostname: 'existing-app.sites.megabyte.space',
+        hostname: 'existing-app-sites.megabyte.space',
         status: 'active',
       });
       // Should not call CF API or insert into DB

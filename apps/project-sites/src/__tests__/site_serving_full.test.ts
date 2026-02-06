@@ -85,15 +85,15 @@ describe('resolveSite', () => {
     const cached = makeSite();
     (env.CACHE_KV.get as jest.Mock).mockResolvedValue(cached);
 
-    const result = await resolveSite(env as any, db, 'my-site.sites.megabyte.space');
+    const result = await resolveSite(env as any, db, 'my-site-sites.megabyte.space');
 
     expect(result).toEqual(cached);
-    expect(env.CACHE_KV.get).toHaveBeenCalledWith('host:my-site.sites.megabyte.space', 'json');
+    expect(env.CACHE_KV.get).toHaveBeenCalledWith('host:my-site-sites.megabyte.space', 'json');
     // Should NOT have queried the database
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
-  it('extracts slug from subdomain of sites.megabyte.space and looks up site in DB', async () => {
+  it('extracts slug from dash-based hostname (slug-sites.megabyte.space) and looks up site in DB', async () => {
     mockQuery
       // sites table query
       .mockResolvedValueOnce({
@@ -110,7 +110,7 @@ describe('resolveSite', () => {
         status: 200,
       });
 
-    const result = await resolveSite(env as any, db, `cool-biz.${DOMAINS.SITES_BASE}`);
+    const result = await resolveSite(env as any, db, `cool-biz${DOMAINS.SITES_SUFFIX}`);
 
     expect(result).toEqual({
       site_id: 'site-001',
@@ -144,7 +144,7 @@ describe('resolveSite', () => {
         status: 200,
       });
 
-    const result = await resolveSite(env as any, db, `test-slug.${DOMAINS.SITES_BASE}`);
+    const result = await resolveSite(env as any, db, `test-slug${DOMAINS.SITES_SUFFIX}`);
 
     expect(result).not.toBeNull();
     expect(result!.slug).toBe('test-slug');
@@ -204,7 +204,7 @@ describe('resolveSite', () => {
         status: 200,
       });
 
-    const result = await resolveSite(env as any, db, `paid-site.${DOMAINS.SITES_BASE}`);
+    const result = await resolveSite(env as any, db, `paid-site${DOMAINS.SITES_SUFFIX}`);
 
     expect(result!.plan).toBe('paid');
   });
@@ -222,7 +222,7 @@ describe('resolveSite', () => {
         status: 200,
       });
 
-    const result = await resolveSite(env as any, db, `free-site.${DOMAINS.SITES_BASE}`);
+    const result = await resolveSite(env as any, db, `free-site${DOMAINS.SITES_SUFFIX}`);
 
     expect(result!.plan).toBe('free');
   });
@@ -242,7 +242,7 @@ describe('resolveSite', () => {
         status: 200,
       });
 
-    const result = await resolveSite(env as any, db, `inactive-site.${DOMAINS.SITES_BASE}`);
+    const result = await resolveSite(env as any, db, `inactive-site${DOMAINS.SITES_SUFFIX}`);
 
     expect(result!.plan).toBe('free');
   });
@@ -254,7 +254,7 @@ describe('resolveSite', () => {
       status: 200,
     });
 
-    const result = await resolveSite(env as any, db, `nonexistent.${DOMAINS.SITES_BASE}`);
+    const result = await resolveSite(env as any, db, `nonexistent${DOMAINS.SITES_SUFFIX}`);
 
     expect(result).toBeNull();
   });
@@ -272,10 +272,10 @@ describe('resolveSite', () => {
         status: 200,
       });
 
-    await resolveSite(env as any, db, `cached-site.${DOMAINS.SITES_BASE}`);
+    await resolveSite(env as any, db, `cached-site${DOMAINS.SITES_SUFFIX}`);
 
     expect(env.CACHE_KV.put).toHaveBeenCalledWith(
-      `host:cached-site.${DOMAINS.SITES_BASE}`,
+      `host:cached-site${DOMAINS.SITES_SUFFIX}`,
       expect.any(String),
       { expirationTtl: 60 },
     );
@@ -307,7 +307,7 @@ describe('resolveSite', () => {
       status: 500,
     });
 
-    const result = await resolveSite(env as any, db, `broken.${DOMAINS.SITES_BASE}`);
+    const result = await resolveSite(env as any, db, `broken${DOMAINS.SITES_SUFFIX}`);
 
     expect(result).toBeNull();
   });

@@ -22,13 +22,18 @@ head_sampling_rate = 1
 # ─── KV Namespace for caching ────────────────────────────────
 [[kv_namespaces]]
 binding = "CACHE_KV"
-id = "placeholder-kv-id"
+id = "dc6e00fd0de94cc3afc2c6c774347312"
+
+# ─── KV for prompt hotfixes (optional override of bundled prompts) ─
+[[kv_namespaces]]
+binding = "PROMPT_STORE"
+id = "c74012c6439e403487ece3f66b6f1362"
 
 # ─── D1 Database ─────────────────────────────────────────────
 [[d1_databases]]
 binding = "DB"
 database_name = "project-sites-db"
-database_id = "placeholder-d1-id"
+database_id = "f5b59818-c785-4807-8aca-282c9037c58c"
 
 # ─── R2 Bucket for static site output ────────────────────────
 [[r2_buckets]]
@@ -37,12 +42,12 @@ bucket_name = "project-sites"
 
 # ─── Queue producer for workflow jobs ─────────────────────────
 [[queues.producers]]
-binding = "WORKFLOW_QUEUE"
-queue = "project-sites-workflows"
+binding = "QUEUE"
+queue = "project-sites-workflow"
 
 # ─── Queue consumer ──────────────────────────────────────────
 [[queues.consumers]]
-queue = "project-sites-workflows"
+queue = "project-sites-workflow"
 max_batch_size = 10
 max_retries = 3
 
@@ -50,25 +55,18 @@ max_retries = 3
 [ai]
 binding = "AI"
 
-# ─── KV for prompt hotfixes (optional override of bundled prompts) ─
-[[kv_namespaces]]
-binding = "PROMPT_STORE"
-id = "placeholder-prompt-kv-id"
-
-# ─── Static Assets for marketing site ────────────────────────
-# [assets]
-# directory = "./public"
-
 # ─── Staging ─────────────────────────────────────────────────
 [env.staging]
 name = "project-sites-staging"
 routes = [
-  { pattern = "sites-staging.megabyte.space", custom_domain = true },
-  { pattern = "*.sites-staging.megabyte.space", custom_domain = true }
+  { pattern = "sites-staging.megabyte.space", custom_domain = true }
 ]
 
 [env.staging.vars]
 ENVIRONMENT = "staging"
+
+[env.staging.ai]
+binding = "AI"
 
 [env.staging.observability]
 enabled = true
@@ -85,23 +83,23 @@ head_sampling_rate = 1
 
 [[env.staging.kv_namespaces]]
 binding = "CACHE_KV"
-id = "placeholder-staging-kv-id"
+id = "1efeecd1a22c4b029beda649938e2e3c"
 
 [[env.staging.kv_namespaces]]
 binding = "PROMPT_STORE"
-id = "placeholder-staging-prompt-kv-id"
+id = "fd15127279a44952a3a4eb2c557722ee"
 
 [[env.staging.d1_databases]]
 binding = "DB"
 database_name = "project-sites-db-staging"
-database_id = "placeholder-staging-d1-id"
+database_id = "7bdf6256-7b5d-417f-9b29-c7466ec78508"
 
 [[env.staging.r2_buckets]]
 binding = "SITES_BUCKET"
 bucket_name = "project-sites-staging"
 
 [[env.staging.queues.producers]]
-binding = "WORKFLOW_QUEUE"
+binding = "QUEUE"
 queue = "project-sites-workflows-staging"
 
 [[env.staging.queues.consumers]]
@@ -113,12 +111,14 @@ max_retries = 3
 [env.production]
 name = "project-sites"
 routes = [
-  { pattern = "sites.megabyte.space", custom_domain = true },
-  { pattern = "*.sites.megabyte.space", custom_domain = true }
+  { pattern = "sites.megabyte.space", custom_domain = true }
 ]
 
 [env.production.vars]
 ENVIRONMENT = "production"
+
+[env.production.ai]
+binding = "AI"
 
 [env.production.observability]
 enabled = true
@@ -135,23 +135,23 @@ head_sampling_rate = 0.1
 
 [[env.production.kv_namespaces]]
 binding = "CACHE_KV"
-id = "placeholder-production-kv-id"
+id = "d4f48d52fbe14ccd884ea6dd368568ba"
 
 [[env.production.kv_namespaces]]
 binding = "PROMPT_STORE"
-id = "placeholder-production-prompt-kv-id"
+id = "5ab9b9509a0741f5a76a6f5c97d7c709"
 
 [[env.production.d1_databases]]
 binding = "DB"
 database_name = "project-sites-db-production"
-database_id = "placeholder-production-d1-id"
+database_id = "ea3e839a-c641-4861-ae30-dfc63bff8032"
 
 [[env.production.r2_buckets]]
 binding = "SITES_BUCKET"
 bucket_name = "project-sites-production"
 
 [[env.production.queues.producers]]
-binding = "WORKFLOW_QUEUE"
+binding = "QUEUE"
 queue = "project-sites-workflows-production"
 
 [[env.production.queues.consumers]]

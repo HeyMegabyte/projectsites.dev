@@ -49,12 +49,13 @@ export async function resolveSite(
     };
   }
 
-  // Extract slug from hostname
+  // Extract slug from hostname (e.g., slug-sites.megabyte.space)
   let slug: string | null = null;
-  const baseDomain = DOMAINS.SITES_BASE;
 
-  if (hostname.endsWith(`.${baseDomain}`)) {
-    slug = hostname.replace(`.${baseDomain}`, '');
+  if (hostname.endsWith(DOMAINS.SITES_SUFFIX)) {
+    slug = hostname.slice(0, -DOMAINS.SITES_SUFFIX.length);
+  } else if (hostname.endsWith(DOMAINS.SITES_STAGING_SUFFIX)) {
+    slug = hostname.slice(0, -DOMAINS.SITES_STAGING_SUFFIX.length);
   }
 
   // Try hostname table lookup first (for custom domains)

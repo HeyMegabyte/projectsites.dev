@@ -115,7 +115,7 @@ describe('hostnameSchema', () => {
   it('accepts valid hostnames', () => {
     expect(hostnameSchema.parse('example.com')).toBe('example.com');
     expect(hostnameSchema.parse('sub.example.com')).toBe('sub.example.com');
-    expect(hostnameSchema.parse('my-site.sites.megabyte.space')).toBe('my-site.sites.megabyte.space');
+    expect(hostnameSchema.parse('my-site-sites.megabyte.space')).toBe('my-site-sites.megabyte.space');
   });
 
   it('rejects hostnames without TLD', () => {
@@ -547,7 +547,7 @@ describe('createHostnameSchema', () => {
   it('accepts valid free subdomain', () => {
     const result = createHostnameSchema.parse({
       site_id: validUuid,
-      hostname: 'my-biz.sites.megabyte.space',
+      hostname: 'my-biz-sites.megabyte.space',
       type: 'free_subdomain',
     });
     expect(result.type).toBe('free_subdomain');

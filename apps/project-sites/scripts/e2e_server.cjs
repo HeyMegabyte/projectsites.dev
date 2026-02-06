@@ -42,11 +42,11 @@ function setSecurityHeaders(res) {
     'Content-Security-Policy',
     [
       "default-src 'self'",
-      "script-src 'self' https://unpkg.com https://js.stripe.com",
-      "style-src 'self' 'unsafe-inline'",
+      "script-src 'self' 'unsafe-inline' https://unpkg.com https://releases.transloadit.com https://js.stripe.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://releases.transloadit.com",
       "img-src 'self' data: https:",
-      "font-src 'self'",
-      "connect-src 'self' https://api.stripe.com https://*.supabase.co",
+      "font-src 'self' https://fonts.gstatic.com",
+      "connect-src 'self' https://api.stripe.com https://*.supabase.co https://lottie.host",
       'frame-src https://js.stripe.com',
       "object-src 'none'",
       "base-uri 'self'",
@@ -105,8 +105,17 @@ const server = http.createServer(async (req, res) => {
     host === 'localhost' ||
     host === '127.0.0.1' ||
     host === 'sites.megabyte.space' ||
-    host === 'sites-staging.megabyte.space' ||
-    host === `www.sites.megabyte.space`;
+    host === 'sites-staging.megabyte.space';
+
+  // Check for customer site subdomains: {slug}-sites.megabyte.space
+  if (host.endsWith('-sites.megabyte.space') || host.endsWith('-sites-staging.megabyte.space')) {
+    return sendJson(res, 404, {
+      error: {
+        code: 'NOT_FOUND',
+        message: 'Site not found',
+      },
+    });
+  }
 
   if (!isBaseDomain && host.includes('.')) {
     // Unknown subdomain → 404

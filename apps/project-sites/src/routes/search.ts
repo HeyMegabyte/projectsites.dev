@@ -167,7 +167,7 @@ search.post('/api/sites/create-from-search', async (c) => {
   }
 
   // Enqueue AI workflow
-  await c.env.WORKFLOW_QUEUE.send({
+  await c.env.QUEUE.send({
     job_name: 'generate_site',
     site_id: siteId,
     business_name: body.business_name,

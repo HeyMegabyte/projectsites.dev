@@ -114,7 +114,7 @@ function createMockEnv(aiRunImpl?: jest.Mock): Env {
     PROMPT_STORE: {} as any,
     DB: {} as any,
     SITES_BUCKET: {} as any,
-    WORKFLOW_QUEUE: {} as any,
+    QUEUE: {} as any,
     SUPABASE_URL: 'https://test.supabase.co',
     SUPABASE_ANON_KEY: 'test-anon-key',
     SUPABASE_SERVICE_ROLE_KEY: 'test-service-role-key',

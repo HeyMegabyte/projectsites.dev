@@ -747,7 +747,7 @@ describe('hostnameRecordSchema', () => {
     id: UUID,
     org_id: UUID,
     site_id: UUID,
-    hostname: 'test.sites.megabyte.space',
+    hostname: 'test-sites.megabyte.space',
     type: 'free_subdomain' as const,
     status: 'active' as const,
     cf_custom_hostname_id: 'cf-id-123',

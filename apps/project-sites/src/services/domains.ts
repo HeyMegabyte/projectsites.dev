@@ -141,14 +141,14 @@ export async function deleteCustomHostname(env: Env, cfCustomHostnameId: string)
 }
 
 /**
- * Provision a free subdomain for a site (e.g., slug.sites.megabyte.space).
+ * Provision a free subdomain for a site (e.g., slug-sites.megabyte.space).
  */
 export async function provisionFreeDomain(
   db: SupabaseClient,
   env: Env,
   opts: { org_id: string; site_id: string; slug: string },
 ): Promise<{ hostname: string; status: HostnameState }> {
-  const hostname = `${opts.slug}.${DOMAINS.SITES_BASE}`;
+  const hostname = `${opts.slug}${DOMAINS.SITES_SUFFIX}`;
 
   // Check if already exists
   const existing = await supabaseQuery<Array<{ id: string; status: string }>>(db, 'hostnames', {

@@ -128,8 +128,15 @@ export const BRAND = {
 
 /** Domain configuration */
 export const DOMAINS = {
+  /** Base domain for the marketing homepage (sites.megabyte.space) */
   SITES_BASE: 'sites.megabyte.space',
+  /** Base domain for staging (sites-staging.megabyte.space) */
   SITES_STAGING: 'sites-staging.megabyte.space',
+  /** Suffix for customer site subdomains: {slug}-sites.megabyte.space */
+  SITES_SUFFIX: '-sites.megabyte.space',
+  /** Suffix for staging customer sites: {slug}-sites-staging.megabyte.space */
+  SITES_STAGING_SUFFIX: '-sites-staging.megabyte.space',
   BOLT_BASE: 'bolt.megabyte.space',
+  BOLT_STAGING: 'bolt-staging.megabyte.space',
   CLAIM_BASE: 'claimyour.site',
 } as const;

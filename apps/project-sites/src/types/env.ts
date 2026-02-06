@@ -14,7 +14,7 @@ export interface Env {
   SITES_BUCKET: R2Bucket;
 
   // Queue
-  WORKFLOW_QUEUE: Queue;
+  QUEUE: Queue;
 
   // Workers AI
   AI: Ai;

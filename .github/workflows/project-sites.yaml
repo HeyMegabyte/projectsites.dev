@@ -2,7 +2,7 @@ name: Project Sites CI/CD
 
 on:
   push:
-    branches: [main]
+    branches: [main, staging]
     paths:
       - 'apps/project-sites/**'
       - 'packages/shared/**'
@@ -104,7 +104,7 @@ jobs:
   deploy-staging:
     name: Deploy to Staging
     needs: [test-unit]
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
     runs-on: ubuntu-latest
     environment: staging
     outputs:
@@ -129,13 +129,13 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
 
-  # ─── Stage 4: Cypress E2E on Staging ───────────────────────
+  # ─── Stage 4: Playwright E2E on Staging ───────────────────
   e2e-staging:
     name: E2E Tests (Staging)
     needs: [deploy-staging]
     runs-on: ubuntu-latest
     env:
-      CYPRESS_BASE_URL: https://sites-staging.megabyte.space
+      BASE_URL: https://sites-staging.megabyte.space
     steps:
       - uses: actions/checkout@v4
 
@@ -147,28 +147,22 @@ jobs:
         working-directory: apps/project-sites
         run: npm ci --legacy-peer-deps
 
-      - name: Run Cypress E2E on staging
-        uses: cypress-io/github-action@v6
-        with:
-          config-file: cypress.config.cjs
-          config: baseUrl=${{ env.CYPRESS_BASE_URL }}
-          working-directory: apps/project-sites
-          wait-on: ${{ env.CYPRESS_BASE_URL }}/health
-          wait-on-timeout: 60
+      - name: Install Playwright browsers
+        working-directory: apps/project-sites
+        run: npx playwright install --with-deps chromium
 
-      - name: Upload screenshots on failure
+      - name: Run Playwright E2E on staging
+        working-directory: apps/project-sites
+        run: npx playwright test
+        env:
+          BASE_URL: ${{ env.BASE_URL }}
+
+      - name: Upload test results on failure
         uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: cypress-screenshots-staging
-          path: apps/project-sites/cypress/screenshots
-
-      - name: Upload videos
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: cypress-videos-staging
-          path: apps/project-sites/cypress/videos
+          name: playwright-results-staging
+          path: apps/project-sites/test-results
 
   # ─── Stage 5: Deploy to Production ─────────────────────────
   deploy-production:
@@ -200,7 +194,7 @@ jobs:
     needs: [deploy-production]
     runs-on: ubuntu-latest
     env:
-      CYPRESS_BASE_URL: https://sites.megabyte.space
+      BASE_URL: https://sites.megabyte.space
     steps:
       - uses: actions/checkout@v4
 
@@ -212,22 +206,22 @@ jobs:
         working-directory: apps/project-sites
         run: npm ci --legacy-peer-deps
 
-      - name: Run production smoke tests
-        uses: cypress-io/github-action@v6
-        with:
-          config-file: cypress.config.cjs
-          config: baseUrl=${{ env.CYPRESS_BASE_URL }}
-          spec: cypress/e2e/smoke/**
-          working-directory: apps/project-sites
-          wait-on: ${{ env.CYPRESS_BASE_URL }}/health
-          wait-on-timeout: 60
+      - name: Install Playwright browsers
+        working-directory: apps/project-sites
+        run: npx playwright install --with-deps chromium
 
-      - name: Upload screenshots on failure
+      - name: Run production smoke tests
+        working-directory: apps/project-sites
+        run: npx playwright test
+        env:
+          BASE_URL: ${{ env.BASE_URL }}
+
+      - name: Upload test results on failure
         uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: cypress-screenshots-production
-          path: apps/project-sites/cypress/screenshots
+          name: playwright-results-production
+          path: apps/project-sites/test-results
 
       # ─── Rollback if E2E fails ──────────────────────────────
       - name: Rollback on failure
