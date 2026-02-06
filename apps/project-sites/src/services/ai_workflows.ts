@@ -217,7 +217,7 @@ export async function generateSiteCopy(
   return result.output;
 }
 
-// ── Full Site Generation Workflow ─────────────────────────────
+// ── Full Site Generation Workflow (legacy v1) ────────────────
 
 export async function runSiteGenerationWorkflow(
   env: Env,
@@ -242,6 +242,232 @@ export async function runSiteGenerationWorkflow(
   const quality = await scoreQuality(env, html);
 
   return { research, html, quality };
+}
+
+// ══════════════════════════════════════════════════════════════
+// V2 WORKFLOW: Parallelized research + full website generation
+// ══════════════════════════════════════════════════════════════
+
+import type {
+  ResearchProfileOutput as ProfileResult,
+  ResearchSocialOutput as SocialResult,
+  ResearchBrandOutput as BrandResult,
+  ResearchSellingPointsOutput as SellingPointsResult,
+  ResearchImagesOutput as ImagesResult,
+  ScoreWebsiteOutput as WebsiteScore,
+} from '../prompts/schemas.js';
+
+/** Input for the v2 site generation workflow. */
+export interface WorkflowInput {
+  businessName: string;
+  businessAddress?: string;
+  businessPhone?: string;
+  googlePlaceId?: string;
+  additionalContext?: string;
+  uploadedAssets?: string[];
+}
+
+/** Complete research results from all parallel prompts. */
+export interface WorkflowResearch {
+  profile: ProfileResult;
+  social: SocialResult;
+  brand: BrandResult;
+  sellingPoints: SellingPointsResult;
+  images: ImagesResult;
+}
+
+/** Full output of the v2 workflow. */
+export interface WorkflowResult {
+  research: WorkflowResearch;
+  html: string;
+  privacyHtml: string;
+  termsHtml: string;
+  quality: WebsiteScore;
+}
+
+// ── Phase 1: Profile Research ────────────────────────────────
+
+async function runResearchProfile(env: Env, input: WorkflowInput): Promise<ProfileResult> {
+  const result = await runPrompt(env, 'research_profile', 1, {
+    business_name: input.businessName,
+    business_address: input.businessAddress ?? '',
+    business_phone: input.businessPhone ?? '',
+    google_place_id: input.googlePlaceId ?? '',
+    additional_context: input.additionalContext ?? '',
+  });
+  return validatePromptOutput('research_profile', JSON.parse(result.output)) as ProfileResult;
+}
+
+// ── Phase 2: Parallel Research ───────────────────────────────
+
+async function runResearchSocial(
+  env: Env, input: WorkflowInput, businessType: string,
+): Promise<SocialResult> {
+  const result = await runPrompt(env, 'research_social', 1, {
+    business_name: input.businessName,
+    business_address: input.businessAddress ?? '',
+    business_type: businessType,
+  });
+  return validatePromptOutput('research_social', JSON.parse(result.output)) as SocialResult;
+}
+
+async function runResearchBrand(
+  env: Env, input: WorkflowInput, businessType: string, websiteUrl: string,
+): Promise<BrandResult> {
+  const result = await runPrompt(env, 'research_brand', 1, {
+    business_name: input.businessName,
+    business_type: businessType,
+    business_address: input.businessAddress ?? '',
+    website_url: websiteUrl,
+    additional_context: input.additionalContext ?? '',
+  });
+  return validatePromptOutput('research_brand', JSON.parse(result.output)) as BrandResult;
+}
+
+async function runResearchSellingPoints(
+  env: Env, input: WorkflowInput, businessType: string,
+  servicesJson: string, description: string,
+): Promise<SellingPointsResult> {
+  const result = await runPrompt(env, 'research_selling_points', 1, {
+    business_name: input.businessName,
+    business_type: businessType,
+    services_json: servicesJson,
+    description,
+    additional_context: input.additionalContext ?? '',
+  });
+  return validatePromptOutput(
+    'research_selling_points', JSON.parse(result.output),
+  ) as SellingPointsResult;
+}
+
+async function runResearchImages(
+  env: Env, input: WorkflowInput, businessType: string, servicesJson: string,
+): Promise<ImagesResult> {
+  const result = await runPrompt(env, 'research_images', 1, {
+    business_name: input.businessName,
+    business_type: businessType,
+    business_address: input.businessAddress ?? '',
+    services_json: servicesJson,
+    additional_context: input.additionalContext ?? '',
+  });
+  return validatePromptOutput('research_images', JSON.parse(result.output)) as ImagesResult;
+}
+
+// ── Phase 3: Website Generation ──────────────────────────────
+
+async function runGenerateWebsite(
+  env: Env, research: WorkflowResearch, uploads?: string[],
+): Promise<string> {
+  const result = await runPrompt(env, 'generate_website', 1, {
+    profile_json: JSON.stringify(research.profile),
+    brand_json: JSON.stringify(research.brand),
+    selling_points_json: JSON.stringify(research.sellingPoints),
+    social_json: JSON.stringify(research.social),
+    images_json: JSON.stringify(research.images),
+    uploads_json: uploads ? JSON.stringify(uploads) : '',
+  });
+  validatePromptOutput('generate_website', result.output);
+  return result.output;
+}
+
+// ── Phase 4: Legal Pages ─────────────────────────────────────
+
+async function runGenerateLegalPage(
+  env: Env, research: WorkflowResearch, pageType: 'privacy' | 'terms',
+): Promise<string> {
+  const addr = research.profile.address;
+  const addressStr = [addr.street, addr.city, addr.state, addr.zip]
+    .filter(Boolean).join(', ');
+
+  const result = await runPrompt(env, 'generate_legal_pages', 1, {
+    business_name: research.profile.business_name,
+    brand_json: JSON.stringify(research.brand),
+    page_type: pageType,
+    business_address: addressStr,
+    business_email: research.profile.email ?? '',
+    website_url: research.social.website_url ?? '',
+  });
+  validatePromptOutput('generate_legal_pages', result.output);
+  return result.output;
+}
+
+// ── Phase 4: Quality Scoring ─────────────────────────────────
+
+async function runScoreWebsite(
+  env: Env, html: string, businessName: string,
+): Promise<WebsiteScore> {
+  const result = await runPrompt(env, 'score_website', 1, {
+    html_content: html.substring(0, 6000),
+    business_name: businessName,
+  });
+  return validatePromptOutput('score_website', JSON.parse(result.output)) as WebsiteScore;
+}
+
+// ── V2 Full Workflow Orchestration ───────────────────────────
+
+/**
+ * Run the v2 site generation workflow with parallelized research.
+ *
+ * Phase 1: Profile research (need business_type for other prompts)
+ * Phase 2: Social, brand, selling points, images (parallel)
+ * Phase 3: Generate main website HTML
+ * Phase 4: Privacy page + terms page + quality score (parallel)
+ */
+export async function runSiteGenerationWorkflowV2(
+  env: Env,
+  input: WorkflowInput,
+): Promise<WorkflowResult> {
+  // Phase 1: Research profile first (we need business_type for other prompts)
+  const profile = await runResearchProfile(env, input);
+
+  console.warn(JSON.stringify({
+    level: 'info', service: 'ai_workflow', phase: 1,
+    message: 'Profile research complete',
+    business_type: profile.business_type,
+  }));
+
+  // Phase 2: Parallel research (all depend on profile.business_type)
+  const servicesJson = JSON.stringify(profile.services.map((s) => s.name));
+
+  const [social, brand, sellingPoints, images] = await Promise.all([
+    runResearchSocial(env, input, profile.business_type),
+    runResearchBrand(env, input, profile.business_type, ''),
+    runResearchSellingPoints(env, input, profile.business_type, servicesJson, profile.description),
+    runResearchImages(env, input, profile.business_type, servicesJson),
+  ]);
+
+  const research: WorkflowResearch = { profile, social, brand, sellingPoints, images };
+
+  console.warn(JSON.stringify({
+    level: 'info', service: 'ai_workflow', phase: 2,
+    message: 'Parallel research complete',
+    social_links_found: social.social_links.filter((l) => l.url && l.confidence >= 0.9).length,
+    logo_found: brand.logo.found_online,
+  }));
+
+  // Phase 3: Generate main website HTML
+  const html = await runGenerateWebsite(env, research, input.uploadedAssets);
+
+  console.warn(JSON.stringify({
+    level: 'info', service: 'ai_workflow', phase: 3,
+    message: 'Website HTML generated', html_size: html.length,
+  }));
+
+  // Phase 4: Parallel - legal pages + quality scoring
+  const [privacyHtml, termsHtml, quality] = await Promise.all([
+    runGenerateLegalPage(env, research, 'privacy'),
+    runGenerateLegalPage(env, research, 'terms'),
+    runScoreWebsite(env, html, input.businessName),
+  ]);
+
+  console.warn(JSON.stringify({
+    level: 'info', service: 'ai_workflow', phase: 4,
+    message: 'Legal pages and scoring complete',
+    quality_score: quality.overall,
+    missing_sections: quality.missing_sections,
+  }));
+
+  return { research, html, privacyHtml, termsHtml, quality };
 }
 
 // ── Prompt Registration (called at startup) ──────────────────
@@ -411,4 +637,247 @@ export function registerAllPrompts(): void {
 
   // Configure A/B test: 80% variant a (default), 20% variant b
   registry.configureVariants('site_copy', 3, { a: 80, b: 20 });
+
+  // ── V2 Workflow Prompts ──────────────────────────────────────
+
+  const defaultModels = ['@cf/meta/llama-3.1-70b-instruct', '@cf/meta/llama-3.1-8b-instruct'];
+
+  registry.registerAll([
+    {
+      id: 'research_profile',
+      version: 1,
+      description: 'Deep business profile research',
+      models: defaultModels,
+      params: { temperature: 0.3, maxTokens: 4096 },
+      inputs: {
+        required: ['business_name'],
+        optional: ['business_address', 'business_phone', 'google_place_id', 'additional_context'],
+      },
+      outputs: { format: 'json', schema: 'ResearchProfileOutput' },
+      notes: { pii: 'No customer PII' },
+      system: [
+        'You are a business intelligence analyst. Produce a comprehensive JSON profile for a professional portfolio website.',
+        'Infer business type from name/context. Generate plausible hours, services (4-8), and FAQ (3-5).',
+        'All text must be professional, concise, and free of jargon.',
+        'Return valid JSON matching the schema: business_name, tagline, description, mission_statement,',
+        'business_type, services[{name,description,price_hint}], hours[{day,open,close,closed}],',
+        'phone, email, address{street,city,state,zip,country}, faq[{question,answer}],',
+        'seo_title (under 60 chars), seo_description (under 160 chars).',
+      ].join('\n'),
+      user: [
+        'Business Name: {{business_name}}',
+        'Address: {{business_address}}',
+        'Phone: {{business_phone}}',
+        'Google Place ID: {{google_place_id}}',
+        'Additional Context: {{additional_context}}',
+        '',
+        'Research this business thoroughly and return the JSON profile.',
+      ].join('\n'),
+    },
+    {
+      id: 'research_social',
+      version: 1,
+      description: 'Discover social media profiles and online presence',
+      models: defaultModels,
+      params: { temperature: 0.2, maxTokens: 2048 },
+      inputs: {
+        required: ['business_name'],
+        optional: ['business_address', 'business_type'],
+      },
+      outputs: { format: 'json', schema: 'ResearchSocialOutput' },
+      notes: { confidence: '90%+ confidence only' },
+      system: [
+        'You are a social media researcher. Determine the most likely social media URLs for this business.',
+        'Only return URLs with 90%+ confidence. Include confidence scores (0.0-1.0).',
+        'Check: Facebook, Instagram, X/Twitter, LinkedIn, Yelp, Google Maps, TikTok, YouTube, Pinterest.',
+        'Return JSON: { social_links[{platform,url,confidence}], website_url, review_platforms[{platform,url,rating}] }',
+      ].join('\n'),
+      user: [
+        'Business Name: {{business_name}}',
+        'Address: {{business_address}}',
+        'Business Type: {{business_type}}',
+        '',
+        'Find social media profiles. Only include links where confidence >= 0.9.',
+      ].join('\n'),
+    },
+    {
+      id: 'research_brand',
+      version: 1,
+      description: 'Determine brand identity - colors, fonts, logo, style',
+      models: defaultModels,
+      params: { temperature: 0.3, maxTokens: 2048 },
+      inputs: {
+        required: ['business_name', 'business_type'],
+        optional: ['business_address', 'website_url', 'additional_context'],
+      },
+      outputs: { format: 'json', schema: 'ResearchBrandOutput' },
+      notes: { colors: 'Appropriate for industry' },
+      system: [
+        'You are a brand identity consultant. Determine visual brand identity for this business.',
+        'Suggest 3-5 colors (hex) appropriate for the industry. Recommend Google Fonts.',
+        'For logo: indicate if findable online or needs generation. If generating, describe a text-based logo.',
+        'Return JSON: { logo{found_online,search_query,fallback_design{text,font,accent_shape,accent_color}},',
+        'colors{primary,secondary,accent,background,surface,text_primary,text_secondary},',
+        'fonts{heading,body}, brand_personality, style_notes }',
+      ].join('\n'),
+      user: [
+        'Business Name: {{business_name}}',
+        'Business Type: {{business_type}}',
+        'Address: {{business_address}}',
+        'Website: {{website_url}}',
+        'Additional Context: {{additional_context}}',
+        '',
+        'Determine the brand identity.',
+      ].join('\n'),
+    },
+    {
+      id: 'research_selling_points',
+      version: 1,
+      description: 'Identify top 3 USPs and hero content',
+      models: defaultModels,
+      params: { temperature: 0.4, maxTokens: 2048 },
+      inputs: {
+        required: ['business_name', 'business_type'],
+        optional: ['services_json', 'description', 'additional_context'],
+      },
+      outputs: { format: 'json', schema: 'ResearchSellingPointsOutput' },
+      notes: { icons: 'Use Lucide icon names' },
+      system: [
+        'You are a marketing strategist. Identify exactly 3 selling points for this business.',
+        'Each has: headline (3-6 words), description (2-3 sentences), icon (Lucide icon name).',
+        'Also generate 2-3 hero slogans with CTAs and 3-5 benefit bullets.',
+        'Icons: shield-check, clock, star, heart, zap, award, users, thumbs-up, scissors, wrench, utensils.',
+        'Return JSON: { selling_points[3], hero_slogans[{headline,subheadline,cta_primary,cta_secondary}],',
+        'benefit_bullets[] }',
+      ].join('\n'),
+      user: [
+        'Business Name: {{business_name}}',
+        'Business Type: {{business_type}}',
+        'Services: {{services_json}}',
+        'Description: {{description}}',
+        'Additional Context: {{additional_context}}',
+        '',
+        'Identify the top 3 selling points and hero content.',
+      ].join('\n'),
+    },
+    {
+      id: 'research_images',
+      version: 1,
+      description: 'Determine image needs and search strategies',
+      models: defaultModels,
+      params: { temperature: 0.3, maxTokens: 2048 },
+      inputs: {
+        required: ['business_name', 'business_type'],
+        optional: ['business_address', 'services_json', 'additional_context'],
+      },
+      outputs: { format: 'json', schema: 'ResearchImagesOutput' },
+      notes: { confidence: '90%+ for real images' },
+      system: [
+        'You are a visual content strategist. Determine image needs for this business website.',
+        'For hero carousel: 3 image concepts. For each: specific search query and stock fallback.',
+        'Include storefront, team, and service images with confidence scores.',
+        'Return JSON: { hero_images[], storefront_image, team_image, service_images[],',
+        'placeholder_strategy (gradient|pattern|illustration) }',
+      ].join('\n'),
+      user: [
+        'Business Name: {{business_name}}',
+        'Business Type: {{business_type}}',
+        'Address: {{business_address}}',
+        'Services: {{services_json}}',
+        'Additional Context: {{additional_context}}',
+        '',
+        'Determine image needs and search strategies.',
+      ].join('\n'),
+    },
+    {
+      id: 'generate_website',
+      version: 1,
+      description: 'Generate complete portfolio website from all research data',
+      models: defaultModels,
+      params: { temperature: 0.2, maxTokens: 16000 },
+      inputs: {
+        required: ['profile_json', 'brand_json', 'selling_points_json', 'social_json'],
+        optional: ['images_json', 'uploads_json', 'privacy_template', 'terms_template'],
+      },
+      outputs: { format: 'html', schema: 'GenerateWebsiteOutput' },
+      notes: { size: 'Under 80KB', a11y: 'WCAG 2.1 AA' },
+      system: [
+        'You are an elite web designer creating gorgeous, concise, intuitive business portfolio websites.',
+        'Produce a complete HTML file with embedded CSS and minimal inline JS.',
+        '',
+        'Required sections: 1) Hero with CSS carousel (3 slides, auto-rotating), gradient overlays, CTAs.',
+        '2) Selling points (3 cards with SVG icons). 3) About with mission blockquote.',
+        '4) Services grid with CTA. 5) Full-width Google Maps embed.',
+        '6) Contact form (name, email, phone, message). 7) Social media icon links (inline SVGs).',
+        '8) Footer with copyright, /privacy and /terms links.',
+        '',
+        'Technical: Mobile-first, CSS custom properties, Google Fonts, semantic HTML5,',
+        'smooth scroll, fadeInUp animations, WCAG 2.1 AA, SEO meta + Open Graph tags.',
+        'No frameworks. Under 80KB. Return ONLY <!DOCTYPE html> document.',
+      ].join('\n'),
+      user: [
+        '## Business Profile\n{{profile_json}}',
+        '\n## Brand Identity\n{{brand_json}}',
+        '\n## Selling Points & Hero\n{{selling_points_json}}',
+        '\n## Social Media\n{{social_json}}',
+        '\n## Images\n{{images_json}}',
+        '\n## Uploads\n{{uploads_json}}',
+        '\nGenerate the complete, gorgeous HTML website now.',
+      ].join('\n'),
+    },
+    {
+      id: 'generate_legal_pages',
+      version: 1,
+      description: 'Generate privacy policy or terms of service page',
+      models: defaultModels,
+      params: { temperature: 0.1, maxTokens: 12000 },
+      inputs: {
+        required: ['business_name', 'brand_json', 'page_type'],
+        optional: ['business_address', 'business_email', 'website_url'],
+      },
+      outputs: { format: 'html', schema: 'GenerateLegalPageOutput' },
+      notes: { legal: 'Generic, not legal advice' },
+      system: [
+        'Generate a privacy policy or terms of service page for a small business website.',
+        'Match the main site visual design from brand data.',
+        'Include header (business name linking to /), the legal content, and matching footer.',
+        '',
+        'Privacy sections: Introduction, Info We Collect, When We Collect, How We Use,',
+        'How We Protect, Cookies, Third-Party Disclosure, Third-Party Links,',
+        'Children Privacy, Data Breach Notice, Your Rights, Contact.',
+        '',
+        'Terms sections: Agreement, Responsible Use, Content Ownership, Privacy reference,',
+        'Warranties, Liability, IP, Termination, Governing Law, Contact.',
+        '',
+        'Return ONLY <!DOCTYPE html> document matching the site design.',
+      ].join('\n'),
+      user: [
+        'Business: {{business_name}}',
+        'Address: {{business_address}}',
+        'Email: {{business_email}}',
+        'Website: {{website_url}}',
+        'Page Type: {{page_type}}',
+        'Brand: {{brand_json}}',
+        '',
+        'Generate the complete {{page_type}} page HTML.',
+      ].join('\n'),
+    },
+    {
+      id: 'score_website',
+      version: 1,
+      description: 'Score website quality across 8 dimensions',
+      models: defaultModels,
+      params: { temperature: 0.1, maxTokens: 2048 },
+      inputs: { required: ['html_content', 'business_name'], optional: [] },
+      outputs: { format: 'json', schema: 'ScoreWebsiteOutput' },
+      notes: { threshold: 'Below 0.6 = regenerate' },
+      system: [
+        'Evaluate this HTML website. Score 0.0-1.0 on:',
+        'visual_design, content_quality, completeness, responsiveness,',
+        'accessibility, seo, performance, brand_consistency.',
+        'Return JSON: { scores{...}, overall, issues[], suggestions[], missing_sections[] }',
+      ].join('\n'),
+      user: 'Business: {{business_name}}\n\nHTML:\n{{html_content}}\n\nScore this website.',
+    },
+  ]);
 }

@@ -20,6 +20,72 @@ import { supabaseQuery } from './db.js';
 import type { Env } from '../types/env.js';
 
 /**
+ * Send an email via SendGrid v3 API.
+ */
+async function sendEmail(
+  env: Env,
+  opts: { to: string; subject: string; html: string },
+): Promise<void> {
+  if (!env.SENDGRID_API_KEY) {
+    console.warn(
+      JSON.stringify({
+        level: 'warn',
+        service: 'auth',
+        message: 'SENDGRID_API_KEY not set, skipping email send',
+        to: opts.to,
+      }),
+    );
+    return;
+  }
+
+  const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.SENDGRID_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      personalizations: [{ to: [{ email: opts.to }] }],
+      from: { email: 'noreply@megabyte.space', name: 'Project Sites' },
+      subject: opts.subject,
+      content: [{ type: 'text/html', value: opts.html }],
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    console.warn(
+      JSON.stringify({
+        level: 'error',
+        service: 'auth',
+        message: 'SendGrid API error',
+        status: res.status,
+        body: text.slice(0, 500),
+      }),
+    );
+  }
+}
+
+/**
+ * Build the magic link email HTML.
+ */
+function buildMagicLinkEmail(verifyUrl: string): string {
+  return `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0a0a1a;color:#e2e8f0;padding:40px 20px;">
+  <div style="max-width:480px;margin:0 auto;background:#161635;border-radius:12px;padding:40px;border:1px solid rgba(100,255,218,0.1);">
+    <h1 style="color:#64ffda;font-size:24px;margin:0 0 16px;">Sign in to Project Sites</h1>
+    <p style="color:#94a3b8;line-height:1.6;margin:0 0 24px;">Click the button below to sign in. This link expires in ${AUTH.MAGIC_LINK_EXPIRY_HOURS} hour(s).</p>
+    <a href="${verifyUrl}" style="display:inline-block;background:linear-gradient(135deg,#64ffda,#7c3aed);color:#0a0a1a;font-weight:700;padding:14px 32px;border-radius:8px;text-decoration:none;font-size:16px;">Sign In</a>
+    <p style="color:#64748b;font-size:13px;margin:24px 0 0;">If you did not request this link, you can safely ignore this email.</p>
+  </div>
+</body>
+</html>`.trim();
+}
+
+/**
  * Create a magic link for passwordless email auth.
  * Stores token hash in DB; sends email via SendGrid.
  */
@@ -49,6 +115,19 @@ export async function createMagicLink(
       updated_at: new Date().toISOString(),
       deleted_at: null,
     },
+  });
+
+  // Build verify URL and send email
+  const baseUrl =
+    env.ENVIRONMENT === 'production'
+      ? 'https://sites.megabyte.space'
+      : 'https://sites-staging.megabyte.space';
+  const verifyUrl = `${baseUrl}/api/auth/magic-link/verify?token=${encodeURIComponent(token)}`;
+
+  await sendEmail(env, {
+    to: validated.email,
+    subject: 'Sign in to Project Sites',
+    html: buildMagicLinkEmail(verifyUrl),
   });
 
   return { token, expires_at: expiresAt };

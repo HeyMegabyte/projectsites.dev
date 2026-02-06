@@ -170,7 +170,7 @@ export default {
         );
 
         if (payload.job_name === 'generate_site') {
-          const { runSiteGenerationWorkflow } = await import('./services/ai_workflows.js');
+          const { runSiteGenerationWorkflowV2 } = await import('./services/ai_workflows.js');
           const { supabaseQuery } = await import('./services/db.js');
           const db = {
             url: env.SUPABASE_URL,
@@ -183,26 +183,46 @@ export default {
             fetch: globalThis.fetch.bind(globalThis),
           };
 
-          const result = await runSiteGenerationWorkflow(env, {
+          const result = await runSiteGenerationWorkflowV2(env, {
             businessName: String(payload.business_name ?? ''),
             businessAddress: payload.business_address
               ? String(payload.business_address)
               : undefined,
+            businessPhone: payload.business_phone
+              ? String(payload.business_phone)
+              : undefined,
             googlePlaceId: payload.google_place_id ? String(payload.google_place_id) : undefined,
+            additionalContext: payload.additional_context
+              ? String(payload.additional_context)
+              : undefined,
           });
 
-          // Upload generated HTML to R2
+          // Upload generated files to R2
           const siteId = String(payload.site_id);
           const slug = String(payload.slug ?? payload.business_name ?? 'site')
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, '-')
             .replace(/^-|-$/g, '');
           const version = new Date().toISOString().replace(/[:.]/g, '-');
-          const r2Path = `sites/${slug}/${version}/index.html`;
 
-          await env.SITES_BUCKET.put(r2Path, result.html, {
-            httpMetadata: { contentType: 'text/html' },
-          });
+          // Upload main page, privacy page, and terms page in parallel
+          await Promise.all([
+            env.SITES_BUCKET.put(`sites/${slug}/${version}/index.html`, result.html, {
+              httpMetadata: { contentType: 'text/html' },
+            }),
+            env.SITES_BUCKET.put(`sites/${slug}/${version}/privacy.html`, result.privacyHtml, {
+              httpMetadata: { contentType: 'text/html' },
+            }),
+            env.SITES_BUCKET.put(`sites/${slug}/${version}/terms.html`, result.termsHtml, {
+              httpMetadata: { contentType: 'text/html' },
+            }),
+            // Store research data as JSON for future rebuilds
+            env.SITES_BUCKET.put(
+              `sites/${slug}/${version}/research.json`,
+              JSON.stringify(result.research, null, 2),
+              { httpMetadata: { contentType: 'application/json' } },
+            ),
+          ]);
 
           // Update site record
           await supabaseQuery(db, 'sites', {
@@ -224,6 +244,7 @@ export default {
               slug,
               version,
               quality_score: result.quality.overall,
+              pages_uploaded: ['index.html', 'privacy.html', 'terms.html', 'research.json'],
             }),
           );
         }

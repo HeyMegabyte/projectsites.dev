@@ -144,8 +144,9 @@ describe('registerAllPrompts', () => {
     // clearRegistry + registerAllPrompts already called in beforeEach
     const stats = getStats();
 
-    expect(stats.totalPrompts).toBe(5); // 4 base + 1 variant
-    expect(stats.uniqueIds).toBe(4);
+    // 5 legacy + 8 v2 = 13 prompts, legacy has 4 unique IDs + 8 v2 = 12 unique
+    expect(stats.totalPrompts).toBe(13);
+    expect(stats.uniqueIds).toBe(12);
   });
 
   it('configures variant weights for site_copy', () => {
@@ -159,8 +160,8 @@ describe('registerAllPrompts', () => {
     const stats = getStats();
 
     // registerAll overwrites existing keys, so counts stay the same
-    expect(stats.totalPrompts).toBe(5);
-    expect(stats.uniqueIds).toBe(4);
+    expect(stats.totalPrompts).toBe(13);
+    expect(stats.uniqueIds).toBe(12);
   });
 });
 

@@ -217,8 +217,8 @@ describe('prompt eval: registry integrity', () => {
 
   it('registers the correct number of prompt specs (including variants)', () => {
     const allSpecs = listAll();
-    // 4 base prompts + 1 site_copy variant b = 5 total
-    expect(allSpecs.length).toBe(5);
+    // 5 legacy + 8 v2 workflow prompts = 13 total
+    expect(allSpecs.length).toBe(13);
   });
 
   it('every registered prompt has valid template placeholders', () => {

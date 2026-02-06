@@ -45,8 +45,8 @@ export interface Env {
   CF_API_TOKEN: string;
   CF_ZONE_ID: string;
 
-  // SendGrid
-  SENDGRID_API_KEY: string;
+  // SendGrid (optional until configured)
+  SENDGRID_API_KEY?: string;
 
   // Chatwoot
   CHATWOOT_API_URL?: string;
