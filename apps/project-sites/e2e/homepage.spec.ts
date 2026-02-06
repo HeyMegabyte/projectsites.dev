@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Homepage', () => {
   test('renders the search screen with hero content', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByText('Project Sites')).toBeVisible();
+    await expect(page.locator('.logo').getByText('Project')).toBeVisible();
     await expect(page.getByPlaceholder(/Search for your business/)).toBeVisible();
   });
 
@@ -15,7 +15,7 @@ test.describe('Homepage', () => {
 
   test('displays the tagline text', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByText(/handled/i)).toBeVisible();
+    await expect(page.locator('.hero-brand').getByText(/handled/i)).toBeVisible();
   });
 });
 
@@ -59,7 +59,7 @@ test.describe('Search Functionality', () => {
     await input.click();
     await input.pressSequentially('xyz nonexistent', { delay: 30 });
 
-    await expect(page.getByText(/custom/i)).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('.search-dropdown .search-result-custom')).toBeVisible({ timeout: 10_000 });
   });
 
   test('handles search API errors gracefully', async ({ page }) => {
@@ -261,5 +261,106 @@ test.describe('API Health', () => {
       headers: { 'Content-Type': 'application/json' },
     });
     expect([401, 403]).toContain(res.status());
+  });
+});
+
+test.describe('Homepage Marketing Sections', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+  });
+
+  test('renders How It Works section with 3 steps', async ({ page }) => {
+    const section = page.locator('#how-it-works');
+    await expect(section).toBeVisible();
+    await expect(section.getByText(/how it works/i)).toBeVisible();
+
+    const steps = section.locator('.step-card');
+    await expect(steps).toHaveCount(3);
+
+    await expect(section.getByText(/tell us about your business/i)).toBeVisible();
+    await expect(section.getByText(/ai builds your site/i)).toBeVisible();
+    await expect(section.getByText(/go live/i)).toBeVisible();
+  });
+
+  test('renders Features section with 4 selling points', async ({ page }) => {
+    const section = page.locator('#features');
+    await expect(section).toBeVisible();
+
+    const cards = section.locator('.feature-card');
+    await expect(cards).toHaveCount(4);
+
+    await expect(section.getByText(/ai-generated content/i)).toBeVisible();
+    await expect(section.getByText(/custom domains/i)).toBeVisible();
+    await expect(section.getByText(/mobile-first/i)).toBeVisible();
+    await expect(section.getByText(/analytics/i)).toBeVisible();
+  });
+
+  test('renders Competitor Comparison table', async ({ page }) => {
+    const section = page.locator('#comparison');
+    await expect(section).toBeVisible();
+
+    // Check column headers in thead
+    const thead = section.locator('thead');
+    await expect(thead.getByText('Project Sites')).toBeVisible();
+    await expect(thead.getByText('Squarespace')).toBeVisible();
+    await expect(thead.getByText('Wix')).toBeVisible();
+    await expect(thead.getByText('WordPress')).toBeVisible();
+
+    // Check row categories
+    await expect(section.getByText(/price/i)).toBeVisible();
+    await expect(section.getByText(/setup time/i)).toBeVisible();
+    await expect(section.getByText(/ai content/i)).toBeVisible();
+  });
+
+  test('renders Pricing section with $50/mo plan', async ({ page }) => {
+    const section = page.locator('#pricing');
+    await expect(section).toBeVisible();
+
+    await expect(section.locator('.pricing-price')).toContainText('$50');
+    await expect(section.locator('.pricing-price')).toContainText('/mo');
+    await expect(section.locator('.pricing-features')).toContainText(/cancel anytime/i);
+  });
+});
+
+test.describe('Footer', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+  });
+
+  test('renders footer with copyright notice', async ({ page }) => {
+    const footer = page.locator('footer');
+    await expect(footer).toBeVisible();
+    await expect(footer.getByText(/© 2025 Megabyte LLC/)).toBeVisible();
+  });
+
+  test('has Privacy Policy link pointing to megabyte.space/privacy', async ({ page }) => {
+    const footer = page.locator('footer');
+    const privacyLink = footer.getByRole('link', { name: /privacy/i });
+    await expect(privacyLink).toBeVisible();
+    await expect(privacyLink).toHaveAttribute('href', 'https://megabyte.space/privacy');
+  });
+
+  test('has Terms of Service link pointing to megabyte.space/terms', async ({ page }) => {
+    const footer = page.locator('footer');
+    const termsLink = footer.getByRole('link', { name: /terms/i });
+    await expect(termsLink).toBeVisible();
+    await expect(termsLink).toHaveAttribute('href', 'https://megabyte.space/terms');
+  });
+
+  test('has social media links', async ({ page }) => {
+    const footer = page.locator('footer');
+
+    // Check for all 6 social links
+    await expect(footer.locator('a[href*="github.com/HeyMegabyte"]')).toBeVisible();
+    await expect(footer.locator('a[href*="x.com/HeyMegabyte"]')).toBeVisible();
+    await expect(footer.locator('a[href*="linkedin.com"]')).toBeVisible();
+    await expect(footer.locator('a[href*="youtube.com"]')).toBeVisible();
+    await expect(footer.locator('a[href*="instagram.com"]')).toBeVisible();
+    await expect(footer.locator('a[href*="facebook.com"]')).toBeVisible();
+  });
+
+  test('has Powered by Cloudflare attribution', async ({ page }) => {
+    const footer = page.locator('footer');
+    await expect(footer.getByText(/powered by cloudflare/i)).toBeVisible();
   });
 });

@@ -34,7 +34,7 @@ test.describe('Health Check', () => {
 test.describe('Marketing Site', () => {
   test('loads the marketing homepage', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByText('Project Sites')).toBeVisible();
+    await expect(page.locator('.logo').getByText('Project')).toBeVisible();
   });
 
   test('has correct content-type for homepage', async ({ request }) => {
