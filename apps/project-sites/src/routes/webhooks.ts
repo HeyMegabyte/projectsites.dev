@@ -1,6 +1,38 @@
+/**
+ * @module routes/webhooks
+ * @description Inbound webhook routes for external service integrations.
+ *
+ * Currently handles Stripe webhooks with full signature verification,
+ * idempotency checking, event storage, and processing pipeline.
+ *
+ * ## Processing Pipeline
+ *
+ * ```
+ * POST /webhooks/stripe
+ *   1. Verify Stripe signature (HMAC-SHA256)
+ *   2. Parse JSON event body
+ *   3. Check idempotency (prevent duplicate processing)
+ *   4. Store webhook event in D1
+ *   5. Dispatch to billing service handler
+ *   6. Mark event as processed / failed
+ *   7. Log audit trail
+ * ```
+ *
+ * ## Handled Stripe Events
+ *
+ * | Event Type                       | Handler                        | Effect                      |
+ * | -------------------------------- | ------------------------------ | --------------------------- |
+ * | `checkout.session.completed`     | `handleCheckoutCompleted`      | Upgrade to paid plan        |
+ * | `customer.subscription.updated`  | `handleSubscriptionUpdated`    | Sync status & period        |
+ * | `customer.subscription.deleted`  | `handleSubscriptionDeleted`    | Downgrade to free           |
+ * | `invoice.payment_failed`         | `handlePaymentFailed`          | Mark as past_due            |
+ * | `invoice.paid`                   | (no-op)                        | Backup for checkout         |
+ *
+ * @packageDocumentation
+ */
+
 import { Hono } from 'hono';
 import type { Env, Variables } from '../types/env.js';
-import { createServiceClient } from '../services/db.js';
 import {
   verifyStripeSignature,
   checkWebhookIdempotency,
@@ -53,7 +85,7 @@ webhooks.post('/webhooks/stripe', async (c) => {
     throw badRequest('Invalid JSON body');
   }
 
-  const db = createServiceClient(c.env);
+  const db = c.env.DB;
 
   // 3. Check idempotency
   const idempotencyCheck = await checkWebhookIdempotency(db, 'stripe', event.id);

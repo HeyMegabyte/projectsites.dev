@@ -24,7 +24,7 @@ export const securityHeadersMiddleware: MiddlewareHandler<{
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://releases.transloadit.com",
       "img-src 'self' data: https:",
       "font-src 'self' https://fonts.gstatic.com",
-      "connect-src 'self' https://api.stripe.com https://*.supabase.co https://lottie.host",
+      "connect-src 'self' https://api.stripe.com https://lottie.host",
       'frame-src https://js.stripe.com',
       "object-src 'none'",
       "base-uri 'self'",

@@ -11,9 +11,6 @@ import { PRICING, AUTH, DUNNING, ROLES } from '../constants/index.js';
 
 const makeValidConfig = (overrides = {}) => ({
   ENVIRONMENT: 'test',
-  SUPABASE_URL: 'https://test.supabase.co',
-  SUPABASE_ANON_KEY: 'test-anon-key',
-  SUPABASE_SERVICE_ROLE_KEY: 'test-service-key',
   STRIPE_SECRET_KEY: 'sk_test_1234567890',
   STRIPE_PUBLISHABLE_KEY: 'pk_test_1234567890',
   STRIPE_WEBHOOK_SECRET: 'whsec_test123',
@@ -183,7 +180,6 @@ describe('envConfigSchema', () => {
     const config = makeValidConfig();
     const result = validateEnvConfig(config);
     expect(result.ENVIRONMENT).toBe('test');
-    expect(result.SUPABASE_URL).toBe('https://test.supabase.co');
   });
 
   it('allows optional fields (OPENAI_API_KEY, etc.) to be omitted', () => {

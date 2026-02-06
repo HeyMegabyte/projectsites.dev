@@ -35,7 +35,6 @@ export function redactObject<T extends Record<string, unknown>>(obj: T): Record<
     'refresh_token',
     'access_token',
     'stripe_secret_key',
-    'supabase_service_role_key',
   ]);
 
   const result: Record<string, unknown> = {};

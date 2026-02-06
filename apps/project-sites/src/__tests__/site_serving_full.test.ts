@@ -1,12 +1,13 @@
 jest.mock('../services/db.js', () => ({
-  supabaseQuery: jest.fn(),
+  dbQuery: jest.fn().mockResolvedValue({ data: [], error: null }),
+  dbQueryOne: jest.fn().mockResolvedValue(null),
 }));
 
-import { supabaseQuery } from '../services/db.js';
+import { dbQuery, dbQueryOne } from '../services/db.js';
 import { resolveSite, serveSiteFromR2 } from '../services/site_serving.js';
 import { DOMAINS } from '@project-sites/shared';
 
-const mockQuery = supabaseQuery as jest.MockedFunction<typeof supabaseQuery>;
+const mockQueryOne = dbQueryOne as jest.MockedFunction<typeof dbQueryOne>;
 
 // ---------------------------------------------------------------------------
 // Mock factories
@@ -36,21 +37,10 @@ const createMockR2 = () => ({
 const createMockEnv = () => ({
   CACHE_KV: createMockKV(),
   SITES_BUCKET: createMockR2(),
-  SUPABASE_URL: 'https://test.supabase.co',
-  SUPABASE_ANON_KEY: 'test-anon',
-  SUPABASE_SERVICE_ROLE_KEY: 'test-service',
+  DB: {} as D1Database,
 });
 
-const createMockDb = () => ({
-  url: 'https://test.supabase.co',
-  headers: {
-    apikey: 'test-service',
-    Authorization: 'Bearer test-service',
-    'Content-Type': 'application/json',
-    Prefer: 'return=representation',
-  },
-  fetch: globalThis.fetch.bind(globalThis),
-});
+const createMockDb = () => ({} as D1Database);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -90,25 +80,17 @@ describe('resolveSite', () => {
     expect(result).toEqual(cached);
     expect(env.CACHE_KV.get).toHaveBeenCalledWith('host:my-site-sites.megabyte.space', 'json');
     // Should NOT have queried the database
-    expect(mockQuery).not.toHaveBeenCalled();
+    expect(mockQueryOne).not.toHaveBeenCalled();
   });
 
-  it('extracts slug from dash-based hostname (slug-sites.megabyte.space) and looks up site in DB', async () => {
-    mockQuery
+  it('extracts slug from dash-based hostname and looks up site in DB', async () => {
+    mockQueryOne
       // sites table query
       .mockResolvedValueOnce({
-        data: [
-          { id: 'site-001', slug: 'cool-biz', org_id: 'org-001', current_build_version: 'v2' },
-        ],
-        error: null,
-        status: 200,
+        id: 'site-001', slug: 'cool-biz', org_id: 'org-001', current_build_version: 'v2',
       })
       // subscriptions query
-      .mockResolvedValueOnce({
-        data: [{ plan: 'paid', status: 'active' }],
-        error: null,
-        status: 200,
-      });
+      .mockResolvedValueOnce({ plan: 'paid', status: 'active' });
 
     const result = await resolveSite(env as any, db, `cool-biz${DOMAINS.SITES_SUFFIX}`);
 
@@ -119,30 +101,14 @@ describe('resolveSite', () => {
       current_build_version: 'v2',
       plan: 'paid',
     });
-    // First call should be to sites table with slug filter
-    expect(mockQuery).toHaveBeenCalledWith(
-      db,
-      'sites',
-      expect.objectContaining({
-        query: expect.stringContaining('slug=eq.cool-biz'),
-      }),
-    );
   });
 
   it('looks up site by slug in DB', async () => {
-    mockQuery
+    mockQueryOne
       .mockResolvedValueOnce({
-        data: [
-          { id: 'site-abc', slug: 'test-slug', org_id: 'org-abc', current_build_version: 'v5' },
-        ],
-        error: null,
-        status: 200,
+        id: 'site-abc', slug: 'test-slug', org_id: 'org-abc', current_build_version: 'v5',
       })
-      .mockResolvedValueOnce({
-        data: [],
-        error: null,
-        status: 200,
-      });
+      .mockResolvedValueOnce(null); // no subscription
 
     const result = await resolveSite(env as any, db, `test-slug${DOMAINS.SITES_SUFFIX}`);
 
@@ -152,25 +118,13 @@ describe('resolveSite', () => {
   });
 
   it('looks up custom domain in hostnames table', async () => {
-    mockQuery
+    mockQueryOne
       // hostnames table
-      .mockResolvedValueOnce({
-        data: [{ site_id: 'site-custom', org_id: 'org-custom' }],
-        error: null,
-        status: 200,
-      })
+      .mockResolvedValueOnce({ site_id: 'site-custom', org_id: 'org-custom' })
       // sites table
-      .mockResolvedValueOnce({
-        data: [{ slug: 'custom-slug', current_build_version: 'v3' }],
-        error: null,
-        status: 200,
-      })
+      .mockResolvedValueOnce({ slug: 'custom-slug', current_build_version: 'v3' })
       // subscriptions
-      .mockResolvedValueOnce({
-        data: [{ plan: 'paid', status: 'active' }],
-        error: null,
-        status: 200,
-      });
+      .mockResolvedValueOnce({ plan: 'paid', status: 'active' });
 
     const result = await resolveSite(env as any, db, 'www.custom-domain.com');
 
@@ -181,28 +135,12 @@ describe('resolveSite', () => {
       current_build_version: 'v3',
       plan: 'paid',
     });
-    // First query should be to hostnames table
-    expect(mockQuery).toHaveBeenCalledWith(
-      db,
-      'hostnames',
-      expect.objectContaining({
-        query: expect.stringContaining('hostname=eq.'),
-      }),
-    );
   });
 
   it('returns plan=paid when subscription is paid and active', async () => {
-    mockQuery
-      .mockResolvedValueOnce({
-        data: [{ id: 'site-p', slug: 'paid-site', org_id: 'org-p', current_build_version: 'v1' }],
-        error: null,
-        status: 200,
-      })
-      .mockResolvedValueOnce({
-        data: [{ plan: 'paid', status: 'active' }],
-        error: null,
-        status: 200,
-      });
+    mockQueryOne
+      .mockResolvedValueOnce({ id: 'site-p', slug: 'paid-site', org_id: 'org-p', current_build_version: 'v1' })
+      .mockResolvedValueOnce({ plan: 'paid', status: 'active' });
 
     const result = await resolveSite(env as any, db, `paid-site${DOMAINS.SITES_SUFFIX}`);
 
@@ -210,17 +148,9 @@ describe('resolveSite', () => {
   });
 
   it('returns plan=free when no subscription exists', async () => {
-    mockQuery
-      .mockResolvedValueOnce({
-        data: [{ id: 'site-f', slug: 'free-site', org_id: 'org-f', current_build_version: 'v1' }],
-        error: null,
-        status: 200,
-      })
-      .mockResolvedValueOnce({
-        data: [],
-        error: null,
-        status: 200,
-      });
+    mockQueryOne
+      .mockResolvedValueOnce({ id: 'site-f', slug: 'free-site', org_id: 'org-f', current_build_version: 'v1' })
+      .mockResolvedValueOnce(null);
 
     const result = await resolveSite(env as any, db, `free-site${DOMAINS.SITES_SUFFIX}`);
 
@@ -228,19 +158,11 @@ describe('resolveSite', () => {
   });
 
   it('returns plan=free when subscription exists but is not active', async () => {
-    mockQuery
+    mockQueryOne
       .mockResolvedValueOnce({
-        data: [
-          { id: 'site-i', slug: 'inactive-site', org_id: 'org-i', current_build_version: 'v1' },
-        ],
-        error: null,
-        status: 200,
+        id: 'site-i', slug: 'inactive-site', org_id: 'org-i', current_build_version: 'v1',
       })
-      .mockResolvedValueOnce({
-        data: [{ plan: 'paid', status: 'canceled' }],
-        error: null,
-        status: 200,
-      });
+      .mockResolvedValueOnce({ plan: 'paid', status: 'canceled' });
 
     const result = await resolveSite(env as any, db, `inactive-site${DOMAINS.SITES_SUFFIX}`);
 
@@ -248,11 +170,7 @@ describe('resolveSite', () => {
   });
 
   it('returns null when site not found', async () => {
-    mockQuery.mockResolvedValueOnce({
-      data: [],
-      error: null,
-      status: 200,
-    });
+    mockQueryOne.mockResolvedValueOnce(null);
 
     const result = await resolveSite(env as any, db, `nonexistent${DOMAINS.SITES_SUFFIX}`);
 
@@ -260,17 +178,9 @@ describe('resolveSite', () => {
   });
 
   it('caches resolved site in KV with 60-second TTL', async () => {
-    mockQuery
-      .mockResolvedValueOnce({
-        data: [{ id: 'site-c', slug: 'cached-site', org_id: 'org-c', current_build_version: 'v1' }],
-        error: null,
-        status: 200,
-      })
-      .mockResolvedValueOnce({
-        data: [{ plan: 'paid', status: 'active' }],
-        error: null,
-        status: 200,
-      });
+    mockQueryOne
+      .mockResolvedValueOnce({ id: 'site-c', slug: 'cached-site', org_id: 'org-c', current_build_version: 'v1' })
+      .mockResolvedValueOnce({ plan: 'paid', status: 'active' });
 
     await resolveSite(env as any, db, `cached-site${DOMAINS.SITES_SUFFIX}`);
 
@@ -287,12 +197,8 @@ describe('resolveSite', () => {
   });
 
   it('returns null for unknown custom domain', async () => {
-    // hostnames lookup returns empty
-    mockQuery.mockResolvedValueOnce({
-      data: [],
-      error: null,
-      status: 200,
-    });
+    // hostnames lookup returns null
+    mockQueryOne.mockResolvedValueOnce(null);
 
     const result = await resolveSite(env as any, db, 'unknown.example.com');
 
@@ -301,11 +207,8 @@ describe('resolveSite', () => {
   });
 
   it('handles DB query errors gracefully', async () => {
-    mockQuery.mockResolvedValueOnce({
-      data: null,
-      error: 'connection refused',
-      status: 500,
-    });
+    // dbQueryOne returns null on error (it catches internally)
+    mockQueryOne.mockResolvedValueOnce(null);
 
     const result = await resolveSite(env as any, db, `broken${DOMAINS.SITES_SUFFIX}`);
 
@@ -372,8 +275,6 @@ describe('serveSiteFromR2', () => {
   });
 
   it('falls back to index.html for paths without extensions (SPA)', async () => {
-    // First R2.get returns null (the SPA path doesn't exist as a file)
-    // Second R2.get returns the index.html fallback
     const indexHtml = createMockR2Object(SAMPLE_HTML);
     (env.SITES_BUCKET.get as jest.Mock)
       .mockResolvedValueOnce(null)
@@ -384,13 +285,11 @@ describe('serveSiteFromR2', () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get('Content-Type')).toBe('text/html');
-    // Should have tried the original path first, then fallen back to index.html
     expect(env.SITES_BUCKET.get).toHaveBeenCalledTimes(2);
     expect(env.SITES_BUCKET.get).toHaveBeenNthCalledWith(2, `sites/my-site/v1/index.html`);
   });
 
   it('returns 404 when file not found', async () => {
-    // R2 returns null for a file with an extension (no SPA fallback)
     (env.SITES_BUCKET.get as jest.Mock).mockResolvedValue(null);
 
     const site = makeSite();
@@ -402,7 +301,6 @@ describe('serveSiteFromR2', () => {
   });
 
   it('returns 404 when SPA fallback also not found', async () => {
-    // Both the original path and index.html fallback return null
     (env.SITES_BUCKET.get as jest.Mock).mockResolvedValueOnce(null).mockResolvedValueOnce(null);
 
     const site = makeSite();
@@ -420,12 +318,9 @@ describe('serveSiteFromR2', () => {
 
     expect(response.status).toBe(200);
     const html = await response.text();
-    // Top bar should be present
     expect(html).toContain('ps-topbar');
     expect(html).toContain('Project Sites');
-    // Original content should still be present
     expect(html).toContain('<h1>Hello</h1>');
-    // Top bar is injected after <body>
     const bodyIndex = html.indexOf('<body>');
     const topBarIndex = html.indexOf('ps-topbar');
     expect(topBarIndex).toBeGreaterThan(bodyIndex);
@@ -453,7 +348,6 @@ describe('serveSiteFromR2', () => {
     const response = await serveSiteFromR2(env as any, site, '/styles.css');
 
     expect(response.status).toBe(200);
-    // Non-HTML should use the stream body, not inject top bar
     expect(response.headers.get('Content-Type')).toBe('text/css');
   });
 
@@ -465,7 +359,6 @@ describe('serveSiteFromR2', () => {
     const response = await serveSiteFromR2(env as any, site, '/');
 
     expect(response.status).toBe(200);
-    // Should request the index.html path from R2
     expect(env.SITES_BUCKET.get).toHaveBeenCalledWith('sites/my-site/v1/index.html');
   });
 

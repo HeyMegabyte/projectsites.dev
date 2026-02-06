@@ -1,20 +1,16 @@
-jest.mock('../services/db.js', () => ({ supabaseQuery: jest.fn() }));
+jest.mock('../services/db.js', () => ({
+  dbQuery: jest.fn().mockResolvedValue({ data: [], error: null }),
+  dbInsert: jest.fn().mockResolvedValue({ error: null }),
+}));
 
-import { supabaseQuery } from '../services/db.js';
+import { dbQuery, dbInsert } from '../services/db.js';
 import { writeAuditLog, getAuditLogs } from '../services/audit.js';
 import { createAuditLogSchema } from '@project-sites/shared';
 
-const mockQuery = supabaseQuery as jest.MockedFunction<typeof supabaseQuery>;
+const mockInsert = dbInsert as jest.MockedFunction<typeof dbInsert>;
+const mockQuery = dbQuery as jest.MockedFunction<typeof dbQuery>;
 
-const mockDb = {
-  url: 'https://test.supabase.co',
-  headers: {
-    apikey: 'test-key',
-    Authorization: 'Bearer test-key',
-    'Content-Type': 'application/json',
-  },
-  fetch: jest.fn(),
-} as any;
+const mockDb = {} as D1Database;
 
 const validEntry = {
   org_id: crypto.randomUUID(),
@@ -33,25 +29,26 @@ beforeEach(() => {
 
 describe('writeAuditLog', () => {
   it('writes valid audit entry to DB', async () => {
-    mockQuery.mockResolvedValue({ data: null, error: null, status: 201 });
+    mockInsert.mockResolvedValue({ error: null });
 
     await writeAuditLog(mockDb, validEntry);
 
-    expect(mockQuery).toHaveBeenCalledWith(
+    expect(mockInsert).toHaveBeenCalledWith(
       mockDb,
       'audit_logs',
       expect.objectContaining({
-        method: 'POST',
-        body: expect.objectContaining({
-          org_id: validEntry.org_id,
-          action: validEntry.action,
-        }),
+        org_id: validEntry.org_id,
+        action: validEntry.action,
+        actor_id: validEntry.actor_id,
+        target_type: validEntry.target_type,
+        target_id: validEntry.target_id,
+        request_id: validEntry.request_id,
       }),
     );
   });
 
   it('does not throw on DB failure (logs error instead)', async () => {
-    mockQuery.mockResolvedValue({ data: null, error: 'DB write failed', status: 500 });
+    mockInsert.mockResolvedValue({ error: 'DB write failed' });
     const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
     await expect(writeAuditLog(mockDb, validEntry)).resolves.not.toThrow();
@@ -61,15 +58,15 @@ describe('writeAuditLog', () => {
   });
 
   it('validates entry with createAuditLogSchema', async () => {
-    mockQuery.mockResolvedValue({ data: null, error: null, status: 201 });
+    mockInsert.mockResolvedValue({ error: null });
 
     await writeAuditLog(mockDb, validEntry);
 
-    // Verify the body passed to supabaseQuery matches the schema-parsed output
-    const call = mockQuery.mock.calls[0];
-    const body = (call[2] as any).body;
+    // Verify the row passed to dbInsert matches the schema-parsed output
+    const call = mockInsert.mock.calls[0];
+    const row = call[2] as Record<string, unknown>;
     const parsed = createAuditLogSchema.parse(validEntry);
-    expect(body).toEqual(
+    expect(row).toEqual(
       expect.objectContaining({
         org_id: parsed.org_id,
         actor_id: parsed.actor_id,
@@ -92,24 +89,22 @@ describe('writeAuditLog', () => {
   });
 
   it('adds created_at timestamp', async () => {
-    mockQuery.mockResolvedValue({ data: null, error: null, status: 201 });
+    mockInsert.mockResolvedValue({ error: null });
 
     await writeAuditLog(mockDb, validEntry);
 
-    expect(mockQuery).toHaveBeenCalledWith(
+    expect(mockInsert).toHaveBeenCalledWith(
       mockDb,
       'audit_logs',
       expect.objectContaining({
-        body: expect.objectContaining({
-          created_at: expect.any(String),
-        }),
+        created_at: expect.any(String),
       }),
     );
 
-    const call = mockQuery.mock.calls[0];
-    const body = (call[2] as any).body;
+    const call = mockInsert.mock.calls[0];
+    const row = call[2] as Record<string, unknown>;
     // Verify created_at is a valid ISO date
-    expect(new Date(body.created_at).toISOString()).toBe(body.created_at);
+    expect(new Date(row.created_at as string).toISOString()).toBe(row.created_at);
   });
 });
 
@@ -123,7 +118,7 @@ describe('getAuditLogs', () => {
       { id: 'log-1', action: 'auth.login' },
       { id: 'log-2', action: 'billing.changed' },
     ];
-    mockQuery.mockResolvedValue({ data: logs, error: null, status: 200 });
+    mockQuery.mockResolvedValue({ data: logs, error: null });
 
     const result = await getAuditLogs(mockDb, orgId);
 
@@ -132,7 +127,7 @@ describe('getAuditLogs', () => {
   });
 
   it('returns empty array when no logs', async () => {
-    mockQuery.mockResolvedValue({ data: [], error: null, status: 200 });
+    mockQuery.mockResolvedValue({ data: [], error: null });
 
     const result = await getAuditLogs(mockDb, orgId);
 
@@ -141,49 +136,31 @@ describe('getAuditLogs', () => {
   });
 
   it('uses default limit=50 and offset=0', async () => {
-    mockQuery.mockResolvedValue({ data: [], error: null, status: 200 });
+    mockQuery.mockResolvedValue({ data: [], error: null });
 
     await getAuditLogs(mockDb, orgId);
 
     expect(mockQuery).toHaveBeenCalledWith(
       mockDb,
-      'audit_logs',
-      expect.objectContaining({
-        query: expect.stringContaining('limit=50'),
-      }),
-    );
-    expect(mockQuery).toHaveBeenCalledWith(
-      mockDb,
-      'audit_logs',
-      expect.objectContaining({
-        query: expect.stringContaining('offset=0'),
-      }),
+      expect.stringContaining('LIMIT'),
+      expect.arrayContaining([orgId, 50, 0]),
     );
   });
 
   it('passes custom limit and offset', async () => {
-    mockQuery.mockResolvedValue({ data: [], error: null, status: 200 });
+    mockQuery.mockResolvedValue({ data: [], error: null });
 
     await getAuditLogs(mockDb, orgId, { limit: 10, offset: 20 });
 
     expect(mockQuery).toHaveBeenCalledWith(
       mockDb,
-      'audit_logs',
-      expect.objectContaining({
-        query: expect.stringContaining('limit=10'),
-      }),
-    );
-    expect(mockQuery).toHaveBeenCalledWith(
-      mockDb,
-      'audit_logs',
-      expect.objectContaining({
-        query: expect.stringContaining('offset=20'),
-      }),
+      expect.stringContaining('LIMIT'),
+      expect.arrayContaining([orgId, 10, 20]),
     );
   });
 
   it('returns error when DB fails', async () => {
-    mockQuery.mockResolvedValue({ data: null, error: 'Query failed', status: 500 });
+    mockQuery.mockResolvedValue({ data: [], error: 'Query failed' });
 
     const result = await getAuditLogs(mockDb, orgId);
 

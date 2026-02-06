@@ -1,6 +1,36 @@
+/**
+ * @module routes/api
+ * @description Authenticated API routes for Project Sites.
+ *
+ * Mounts all JSON API endpoints under `/api/*` that require (or benefit from)
+ * authentication context. Every route reads the D1 database via `c.env.DB`.
+ *
+ * ## Route Map
+ *
+ * | Method | Path                              | Description                   |
+ * | ------ | --------------------------------- | ----------------------------- |
+ * | POST   | `/api/auth/magic-link`            | Request a magic-link email    |
+ * | POST   | `/api/auth/magic-link/verify`     | Verify a magic-link token     |
+ * | POST   | `/api/auth/phone/otp`             | Request a phone OTP           |
+ * | POST   | `/api/auth/phone/verify`          | Verify a phone OTP            |
+ * | GET    | `/api/auth/google`                | Start Google OAuth flow       |
+ * | GET    | `/api/auth/google/callback`       | Google OAuth callback         |
+ * | POST   | `/api/sites`                      | Create a new site             |
+ * | GET    | `/api/sites`                      | List org sites                |
+ * | GET    | `/api/sites/:id`                  | Get a single site             |
+ * | POST   | `/api/billing/checkout`           | Create Stripe checkout        |
+ * | GET    | `/api/billing/subscription`       | Get org subscription          |
+ * | GET    | `/api/billing/entitlements`       | Get org entitlements          |
+ * | GET    | `/api/sites/:siteId/hostnames`    | List site hostnames           |
+ * | POST   | `/api/sites/:siteId/hostnames`    | Provision a hostname          |
+ * | GET    | `/api/audit-logs`                 | List org audit logs           |
+ *
+ * @packageDocumentation
+ */
+
 import { Hono } from 'hono';
 import type { Env, Variables } from '../types/env.js';
-import { createServiceClient } from '../services/db.js';
+import { dbInsert, dbQuery, dbQueryOne } from '../services/db.js';
 import {
   createSiteSchema,
   createCheckoutSessionSchema,
@@ -18,53 +48,46 @@ import * as authService from '../services/auth.js';
 import * as billingService from '../services/billing.js';
 import * as domainService from '../services/domains.js';
 import * as auditService from '../services/audit.js';
-import { supabaseQuery } from '../services/db.js';
 
 const api = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 // ─── Auth Routes ─────────────────────────────────────────────
 
 api.post('/api/auth/magic-link', async (c) => {
-  const db = createServiceClient(c.env);
   const body = await c.req.json();
   const validated = createMagicLinkSchema.parse(body);
-  const result = await authService.createMagicLink(db, c.env, validated);
+  const result = await authService.createMagicLink(c.env.DB, c.env, validated);
   return c.json({ data: { expires_at: result.expires_at } });
 });
 
 api.post('/api/auth/magic-link/verify', async (c) => {
-  const db = createServiceClient(c.env);
   const body = await c.req.json();
   const validated = verifyMagicLinkSchema.parse(body);
-  const result = await authService.verifyMagicLink(db, validated);
+  const result = await authService.verifyMagicLink(c.env.DB, validated);
   return c.json({ data: result });
 });
 
 api.post('/api/auth/phone/otp', async (c) => {
-  const db = createServiceClient(c.env);
   const body = await c.req.json();
   const validated = createPhoneOtpSchema.parse(body);
-  const result = await authService.createPhoneOtp(db, c.env, validated);
+  const result = await authService.createPhoneOtp(c.env.DB, c.env, validated);
   return c.json({ data: result });
 });
 
 api.post('/api/auth/phone/verify', async (c) => {
-  const db = createServiceClient(c.env);
   const body = await c.req.json();
   const validated = verifyPhoneOtpSchema.parse(body);
-  const result = await authService.verifyPhoneOtp(db, validated);
+  const result = await authService.verifyPhoneOtp(c.env.DB, validated);
   return c.json({ data: result });
 });
 
 api.get('/api/auth/google', async (c) => {
-  const db = createServiceClient(c.env);
   const redirectUrl = c.req.query('redirect_url');
-  const result = await authService.createGoogleOAuthState(db, c.env, redirectUrl);
+  const result = await authService.createGoogleOAuthState(c.env.DB, c.env, redirectUrl);
   return c.redirect(result.authUrl);
 });
 
 api.get('/api/auth/google/callback', async (c) => {
-  const db = createServiceClient(c.env);
   const code = c.req.query('code');
   const state = c.req.query('state');
 
@@ -72,14 +95,13 @@ api.get('/api/auth/google/callback', async (c) => {
     throw badRequest('Missing code or state parameter');
   }
 
-  const result = await authService.handleGoogleOAuthCallback(db, c.env, code, state);
+  const result = await authService.handleGoogleOAuthCallback(c.env.DB, c.env, code, state);
   return c.json({ data: result });
 });
 
 // ─── Sites Routes ────────────────────────────────────────────
 
 api.post('/api/sites', async (c) => {
-  const db = createServiceClient(c.env);
   const body = await c.req.json();
   const validated = createSiteSchema.parse(body);
 
@@ -108,22 +130,17 @@ api.post('/api/sites', async (c) => {
     status: 'draft',
     lighthouse_score: null,
     lighthouse_last_run: null,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
     deleted_at: null,
   };
 
-  const result = await supabaseQuery(db, 'sites', {
-    method: 'POST',
-    body: site,
-  });
+  const result = await dbInsert(c.env.DB, 'sites', site);
 
   if (result.error) {
     throw badRequest(`Failed to create site: ${result.error}`);
   }
 
   // Log audit
-  await auditService.writeAuditLog(db, {
+  await auditService.writeAuditLog(c.env.DB, {
     org_id: orgId,
     actor_id: c.get('userId') ?? null,
     action: 'site.created',
@@ -136,38 +153,39 @@ api.post('/api/sites', async (c) => {
 });
 
 api.get('/api/sites', async (c) => {
-  const db = createServiceClient(c.env);
   const orgId = c.get('orgId');
   if (!orgId) throw unauthorized('Must be authenticated');
 
-  const result = await supabaseQuery<unknown[]>(db, 'sites', {
-    query: `org_id=eq.${orgId}&deleted_at=is.null&select=*&order=created_at.desc`,
-  });
+  const { data } = await dbQuery<Record<string, unknown>>(
+    c.env.DB,
+    'SELECT * FROM sites WHERE org_id = ? AND deleted_at IS NULL ORDER BY created_at DESC',
+    [orgId],
+  );
 
-  return c.json({ data: result.data ?? [] });
+  return c.json({ data });
 });
 
 api.get('/api/sites/:id', async (c) => {
-  const db = createServiceClient(c.env);
   const orgId = c.get('orgId');
   if (!orgId) throw unauthorized('Must be authenticated');
 
   const siteId = c.req.param('id');
-  const result = await supabaseQuery<unknown[]>(db, 'sites', {
-    query: `id=eq.${siteId}&org_id=eq.${orgId}&deleted_at=is.null&select=*`,
-  });
+  const site = await dbQueryOne<Record<string, unknown>>(
+    c.env.DB,
+    'SELECT * FROM sites WHERE id = ? AND org_id = ? AND deleted_at IS NULL',
+    [siteId, orgId],
+  );
 
-  if (!result.data || result.data.length === 0) {
+  if (!site) {
     throw notFound('Site not found');
   }
 
-  return c.json({ data: result.data[0] });
+  return c.json({ data: site });
 });
 
 // ─── Billing Routes ──────────────────────────────────────────
 
 api.post('/api/billing/checkout', async (c) => {
-  const db = createServiceClient(c.env);
   const body = await c.req.json();
   const validated = createCheckoutSessionSchema.parse(body);
 
@@ -176,7 +194,7 @@ api.post('/api/billing/checkout', async (c) => {
     throw forbidden('Cannot create checkout for another org');
   }
 
-  const result = await billingService.createCheckoutSession(db, c.env, {
+  const result = await billingService.createCheckoutSession(c.env.DB, c.env, {
     orgId: validated.org_id,
     siteId: validated.site_id,
     customerEmail: '', // Retrieved from user context
@@ -188,35 +206,31 @@ api.post('/api/billing/checkout', async (c) => {
 });
 
 api.get('/api/billing/subscription', async (c) => {
-  const db = createServiceClient(c.env);
   const orgId = c.get('orgId');
   if (!orgId) throw unauthorized('Must be authenticated');
 
-  const sub = await billingService.getOrgSubscription(db, orgId);
+  const sub = await billingService.getOrgSubscription(c.env.DB, orgId);
   return c.json({ data: sub });
 });
 
 api.get('/api/billing/entitlements', async (c) => {
-  const db = createServiceClient(c.env);
   const orgId = c.get('orgId');
   if (!orgId) throw unauthorized('Must be authenticated');
 
-  const entitlements = await billingService.getOrgEntitlements(db, orgId);
+  const entitlements = await billingService.getOrgEntitlements(c.env.DB, orgId);
   return c.json({ data: entitlements });
 });
 
 // ─── Hostname Routes ─────────────────────────────────────────
 
 api.get('/api/sites/:siteId/hostnames', async (c) => {
-  const db = createServiceClient(c.env);
   const siteId = c.req.param('siteId');
 
-  const hostnames = await domainService.getSiteHostnames(db, siteId);
+  const hostnames = await domainService.getSiteHostnames(c.env.DB, siteId);
   return c.json({ data: hostnames });
 });
 
 api.post('/api/sites/:siteId/hostnames', async (c) => {
-  const db = createServiceClient(c.env);
   const body = await c.req.json();
   const siteId = c.req.param('siteId');
   const orgId = c.get('orgId');
@@ -228,19 +242,19 @@ api.post('/api/sites/:siteId/hostnames', async (c) => {
   if (validated.type === 'free_subdomain') {
     // Extract slug from hostname
     const slug = validated.hostname.split('.')[0]!;
-    result = await domainService.provisionFreeDomain(db, c.env, {
+    result = await domainService.provisionFreeDomain(c.env.DB, c.env, {
       org_id: orgId,
       site_id: siteId,
       slug,
     });
   } else {
     // Check entitlements for custom domains
-    const entitlements = await billingService.getOrgEntitlements(db, orgId);
+    const entitlements = await billingService.getOrgEntitlements(c.env.DB, orgId);
     if (!entitlements.topBarHidden) {
       throw forbidden('Custom domains require a paid plan');
     }
 
-    result = await domainService.provisionCustomDomain(db, c.env, {
+    result = await domainService.provisionCustomDomain(c.env.DB, c.env, {
       org_id: orgId,
       site_id: siteId,
       hostname: validated.hostname,
@@ -248,7 +262,7 @@ api.post('/api/sites/:siteId/hostnames', async (c) => {
   }
 
   // Log audit
-  await auditService.writeAuditLog(db, {
+  await auditService.writeAuditLog(c.env.DB, {
     org_id: orgId,
     actor_id: c.get('userId') ?? null,
     action: 'hostname.provisioned',
@@ -263,14 +277,13 @@ api.post('/api/sites/:siteId/hostnames', async (c) => {
 // ─── Audit Routes ────────────────────────────────────────────
 
 api.get('/api/audit-logs', async (c) => {
-  const db = createServiceClient(c.env);
   const orgId = c.get('orgId');
   if (!orgId) throw unauthorized('Must be authenticated');
 
   const limit = Number(c.req.query('limit') ?? '50');
   const offset = Number(c.req.query('offset') ?? '0');
 
-  const result = await auditService.getAuditLogs(db, orgId, { limit, offset });
+  const result = await auditService.getAuditLogs(c.env.DB, orgId, { limit, offset });
   return c.json({ data: result.data });
 });
 

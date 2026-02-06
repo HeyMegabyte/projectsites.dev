@@ -1,8 +1,11 @@
 jest.mock('../services/db.js', () => ({
-  supabaseQuery: jest.fn(),
+  dbQuery: jest.fn().mockResolvedValue({ data: [], error: null }),
+  dbQueryOne: jest.fn().mockResolvedValue(null),
+  dbInsert: jest.fn().mockResolvedValue({ error: null }),
+  dbUpdate: jest.fn().mockResolvedValue({ error: null, changes: 1 }),
 }));
 
-import { supabaseQuery } from '../services/db.js';
+import { dbQuery, dbQueryOne, dbInsert, dbUpdate } from '../services/db.js';
 import {
   createCustomHostname,
   checkHostnameStatus,
@@ -15,18 +18,17 @@ import {
 } from '../services/domains.js';
 import { AppError } from '@project-sites/shared';
 
-const mockQuery = supabaseQuery as jest.MockedFunction<typeof supabaseQuery>;
+const mockQuery = dbQuery as jest.MockedFunction<typeof dbQuery>;
+const mockQueryOne = dbQueryOne as jest.MockedFunction<typeof dbQueryOne>;
+const mockInsert = dbInsert as jest.MockedFunction<typeof dbInsert>;
+const mockUpdate = dbUpdate as jest.MockedFunction<typeof dbUpdate>;
 
 const mockEnv = {
   CF_API_TOKEN: 'test-cf-token',
   CF_ZONE_ID: 'test-zone-id',
 } as any;
 
-const mockDb = {
-  url: 'https://test.supabase.co',
-  headers: {},
-  fetch: jest.fn(),
-} as any;
+const mockDb = {} as D1Database;
 
 const originalFetch = global.fetch;
 
@@ -220,7 +222,7 @@ describe('deleteCustomHostname', () => {
 // ---------------------------------------------------------------------------
 describe('provisionFreeDomain', () => {
   it('returns hostname in format slug-sites.megabyte.space', async () => {
-    mockQuery.mockResolvedValueOnce({ data: [], error: null, status: 200 });
+    mockQueryOne.mockResolvedValueOnce(null);
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
@@ -230,7 +232,7 @@ describe('provisionFreeDomain', () => {
       text: async () => '',
     });
 
-    mockQuery.mockResolvedValueOnce({ data: null, error: null, status: 201 });
+    mockInsert.mockResolvedValueOnce({ error: null });
 
     const result = await provisionFreeDomain(mockDb, mockEnv, {
       org_id: 'org-1',
@@ -243,11 +245,7 @@ describe('provisionFreeDomain', () => {
   });
 
   it('returns existing hostname if already exists', async () => {
-    mockQuery.mockResolvedValueOnce({
-      data: [{ id: 'existing-id', status: 'active' }],
-      error: null,
-      status: 200,
-    });
+    mockQueryOne.mockResolvedValueOnce({ id: 'existing-id', status: 'active' });
 
     const result = await provisionFreeDomain(mockDb, mockEnv, {
       org_id: 'org-1',
@@ -263,7 +261,7 @@ describe('provisionFreeDomain', () => {
   });
 
   it('creates new hostname when none exists', async () => {
-    mockQuery.mockResolvedValueOnce({ data: [], error: null, status: 200 });
+    mockQueryOne.mockResolvedValueOnce(null);
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
@@ -273,7 +271,7 @@ describe('provisionFreeDomain', () => {
       text: async () => '',
     });
 
-    mockQuery.mockResolvedValueOnce({ data: null, error: null, status: 201 });
+    mockInsert.mockResolvedValueOnce({ error: null });
 
     const result = await provisionFreeDomain(mockDb, mockEnv, {
       org_id: 'org-2',
@@ -290,20 +288,17 @@ describe('provisionFreeDomain', () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
 
     // Verify DB insert was called
-    expect(mockQuery).toHaveBeenCalledTimes(2);
-    expect(mockQuery).toHaveBeenLastCalledWith(
+    expect(mockInsert).toHaveBeenCalledTimes(1);
+    expect(mockInsert).toHaveBeenCalledWith(
       mockDb,
       'hostnames',
       expect.objectContaining({
-        method: 'POST',
-        body: expect.objectContaining({
-          org_id: 'org-2',
-          site_id: 'site-2',
-          hostname: 'new-app-sites.megabyte.space',
-          type: 'free_subdomain',
-          status: 'active',
-          cf_custom_hostname_id: 'cf-new-1',
-        }),
+        org_id: 'org-2',
+        site_id: 'site-2',
+        hostname: 'new-app-sites.megabyte.space',
+        type: 'free_subdomain',
+        status: 'active',
+        cf_custom_hostname_id: 'cf-new-1',
       }),
     );
   });
@@ -315,9 +310,9 @@ describe('provisionFreeDomain', () => {
 describe('provisionCustomDomain', () => {
   it('returns hostname and status on success', async () => {
     // Domain limit check
-    mockQuery.mockResolvedValueOnce({ data: [], error: null, status: 200 });
+    mockQuery.mockResolvedValueOnce({ data: [], error: null });
     // Existing hostname check
-    mockQuery.mockResolvedValueOnce({ data: [], error: null, status: 200 });
+    mockQueryOne.mockResolvedValueOnce(null);
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
@@ -328,7 +323,7 @@ describe('provisionCustomDomain', () => {
     });
 
     // DB insert
-    mockQuery.mockResolvedValueOnce({ data: null, error: null, status: 201 });
+    mockInsert.mockResolvedValueOnce({ error: null });
 
     const result = await provisionCustomDomain(mockDb, mockEnv, {
       org_id: 'org-1',
@@ -344,7 +339,7 @@ describe('provisionCustomDomain', () => {
 
   it('throws conflict when max domains reached', async () => {
     const fiveDomains = Array.from({ length: 5 }, (_, i) => ({ id: `dom-${i}` }));
-    mockQuery.mockResolvedValueOnce({ data: fiveDomains, error: null, status: 200 });
+    mockQuery.mockResolvedValueOnce({ data: fiveDomains, error: null });
 
     await expect(
       provisionCustomDomain(mockDb, mockEnv, {
@@ -357,13 +352,9 @@ describe('provisionCustomDomain', () => {
 
   it('throws conflict when hostname already registered', async () => {
     // Domain limit check: under limit
-    mockQuery.mockResolvedValueOnce({ data: [{ id: 'dom-1' }], error: null, status: 200 });
+    mockQuery.mockResolvedValueOnce({ data: [{ id: 'dom-1' }], error: null });
     // Existing hostname check: already taken
-    mockQuery.mockResolvedValueOnce({
-      data: [{ id: 'existing-host' }],
-      error: null,
-      status: 200,
-    });
+    mockQueryOne.mockResolvedValueOnce({ id: 'existing-host' });
 
     await expect(
       provisionCustomDomain(mockDb, mockEnv, {
@@ -375,8 +366,8 @@ describe('provisionCustomDomain', () => {
   });
 
   it('creates CF hostname and DB record', async () => {
-    mockQuery.mockResolvedValueOnce({ data: [], error: null, status: 200 });
-    mockQuery.mockResolvedValueOnce({ data: [], error: null, status: 200 });
+    mockQuery.mockResolvedValueOnce({ data: [], error: null });
+    mockQueryOne.mockResolvedValueOnce(null);
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
@@ -386,7 +377,7 @@ describe('provisionCustomDomain', () => {
       text: async () => '',
     });
 
-    mockQuery.mockResolvedValueOnce({ data: null, error: null, status: 201 });
+    mockInsert.mockResolvedValueOnce({ error: null });
 
     await provisionCustomDomain(mockDb, mockEnv, {
       org_id: 'org-3',
@@ -404,21 +395,18 @@ describe('provisionCustomDomain', () => {
     );
 
     // DB insert with correct fields
-    expect(mockQuery).toHaveBeenCalledTimes(3);
-    expect(mockQuery).toHaveBeenLastCalledWith(
+    expect(mockInsert).toHaveBeenCalledTimes(1);
+    expect(mockInsert).toHaveBeenCalledWith(
       mockDb,
       'hostnames',
       expect.objectContaining({
-        method: 'POST',
-        body: expect.objectContaining({
-          org_id: 'org-3',
-          site_id: 'site-3',
-          hostname: 'custom.example.com',
-          type: 'custom_cname',
-          status: 'active',
-          cf_custom_hostname_id: 'cf-custom-2',
-          ssl_status: 'active',
-        }),
+        org_id: 'org-3',
+        site_id: 'site-3',
+        hostname: 'custom.example.com',
+        type: 'custom_cname',
+        status: 'active',
+        cf_custom_hostname_id: 'cf-custom-2',
+        ssl_status: 'active',
       }),
     );
   });
@@ -445,7 +433,7 @@ describe('getSiteHostnames', () => {
         ssl_status: 'pending_validation',
       },
     ];
-    mockQuery.mockResolvedValueOnce({ data: hostnames, error: null, status: 200 });
+    mockQuery.mockResolvedValueOnce({ data: hostnames, error: null });
 
     const result = await getSiteHostnames(mockDb, 'site-1');
 
@@ -454,7 +442,7 @@ describe('getSiteHostnames', () => {
   });
 
   it('returns empty array when none found', async () => {
-    mockQuery.mockResolvedValueOnce({ data: null, error: null, status: 200 });
+    mockQuery.mockResolvedValueOnce({ data: [], error: null });
 
     const result = await getSiteHostnames(mockDb, 'site-empty');
 
@@ -474,7 +462,7 @@ describe('getHostnameByDomain', () => {
       type: 'custom_cname',
       status: 'active',
     };
-    mockQuery.mockResolvedValueOnce({ data: [record], error: null, status: 200 });
+    mockQueryOne.mockResolvedValueOnce(record);
 
     const result = await getHostnameByDomain(mockDb, 'custom.example.com');
 
@@ -482,7 +470,7 @@ describe('getHostnameByDomain', () => {
   });
 
   it('returns null when not found', async () => {
-    mockQuery.mockResolvedValueOnce({ data: [], error: null, status: 200 });
+    mockQueryOne.mockResolvedValueOnce(null);
 
     const result = await getHostnameByDomain(mockDb, 'nonexistent.example.com');
 
@@ -500,7 +488,6 @@ describe('verifyPendingHostnames', () => {
         { id: 'h-pending', cf_custom_hostname_id: 'cf-pending-1', hostname: 'pending.example.com' },
       ],
       error: null,
-      status: 200,
     });
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -512,25 +499,23 @@ describe('verifyPendingHostnames', () => {
     });
 
     // PATCH update
-    mockQuery.mockResolvedValueOnce({ data: null, error: null, status: 200 });
+    mockUpdate.mockResolvedValueOnce({ error: null, changes: 1 });
 
     const result = await verifyPendingHostnames(mockDb, mockEnv);
 
     expect(result).toEqual({ verified: 1, failed: 0 });
 
-    // Verify PATCH was called with active status
-    expect(mockQuery).toHaveBeenLastCalledWith(
+    // Verify dbUpdate was called with active status
+    expect(mockUpdate).toHaveBeenCalledWith(
       mockDb,
       'hostnames',
       expect.objectContaining({
-        method: 'PATCH',
-        query: 'id=eq.h-pending',
-        body: expect.objectContaining({
-          status: 'active',
-          ssl_status: 'active',
-          verification_errors: null,
-        }),
+        status: 'active',
+        ssl_status: 'active',
+        verification_errors: null,
       }),
+      'id = ?',
+      ['h-pending'],
     );
   });
 
@@ -538,7 +523,6 @@ describe('verifyPendingHostnames', () => {
     mockQuery.mockResolvedValueOnce({
       data: [{ id: 'h-fail', cf_custom_hostname_id: 'cf-fail-1', hostname: 'fail.example.com' }],
       error: null,
-      status: 200,
     });
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -554,27 +538,26 @@ describe('verifyPendingHostnames', () => {
     });
 
     // PATCH update
-    mockQuery.mockResolvedValueOnce({ data: null, error: null, status: 200 });
+    mockUpdate.mockResolvedValueOnce({ error: null, changes: 1 });
 
     const result = await verifyPendingHostnames(mockDb, mockEnv);
 
     expect(result).toEqual({ verified: 0, failed: 1 });
 
-    expect(mockQuery).toHaveBeenLastCalledWith(
+    expect(mockUpdate).toHaveBeenCalledWith(
       mockDb,
       'hostnames',
       expect.objectContaining({
-        method: 'PATCH',
-        body: expect.objectContaining({
-          status: 'verification_failed',
-          verification_errors: ['CNAME record missing'],
-        }),
+        status: 'verification_failed',
+        verification_errors: JSON.stringify(['CNAME record missing']),
       }),
+      'id = ?',
+      ['h-fail'],
     );
   });
 
   it('returns { verified: 0, failed: 0 } when no pending hostnames', async () => {
-    mockQuery.mockResolvedValueOnce({ data: [], error: null, status: 200 });
+    mockQuery.mockResolvedValueOnce({ data: [], error: null });
 
     const result = await verifyPendingHostnames(mockDb, mockEnv);
 

@@ -1,11 +1,51 @@
+/**
+ * @module site_serving
+ * @description Static site serving engine for Project Sites.
+ *
+ * Resolves incoming hostnames to site records, serves static HTML/CSS/JS from
+ * R2, and injects a promotional top bar for sites on the free plan.
+ *
+ * ## Resolution Flow
+ *
+ * ```
+ * Request hostname
+ *   ├─ KV cache hit → return cached site info
+ *   ├─ Dash-based subdomain (slug-sites.megabyte.space) → lookup by slug
+ *   └─ Custom domain → lookup in hostnames table → join sites → join subscriptions
+ *       └─ Cache result in KV for 60 s
+ * ```
+ *
+ * ## R2 Bucket Layout
+ *
+ * | Path Pattern                              | Content           |
+ * | ----------------------------------------- | ----------------- |
+ * | `marketing/index.html`                    | Homepage SPA      |
+ * | `sites/{slug}/{version}/index.html`       | Generated site    |
+ * | `sites/{slug}/{version}/privacy.html`     | Privacy policy    |
+ * | `sites/{slug}/{version}/terms.html`       | Terms of service  |
+ * | `sites/{slug}/{version}/research.json`    | AI research data  |
+ *
+ * @packageDocumentation
+ */
+
 import { DOMAINS, BRAND } from '@project-sites/shared';
 import type { Env } from '../types/env.js';
-import type { SupabaseClient } from './db.js';
-import { supabaseQuery } from './db.js';
+import { dbQuery, dbQueryOne } from './db.js';
 
 /**
- * Top bar HTML injected for unpaid sites.
- * Minimal, non-intrusive, with call-to-action.
+ * Generate the promotional top bar HTML injected into unpaid sites.
+ *
+ * The bar is fixed to the top of the viewport, includes a CTA to upgrade,
+ * and can be dismissed by the visitor (closes via inline JS).
+ *
+ * @param slug - The site's slug (used to build the upgrade link).
+ * @returns HTML string to inject after the `<body>` tag.
+ *
+ * @example
+ * ```ts
+ * const topBar = generateTopBar('vitos-mens-salon');
+ * const injected = html.replace(/(<body[^>]*>)/i, `$1\n${topBar}\n`);
+ * ```
  */
 export function generateTopBar(slug: string): string {
   return `<!-- Project Sites Top Bar -->
@@ -21,12 +61,28 @@ export function generateTopBar(slug: string): string {
 }
 
 /**
- * Resolve a hostname to a site.
- * Uses KV cache for fast path, falls back to DB.
+ * Resolve a hostname to a site record.
+ *
+ * Uses a two-tier lookup: KV cache (60 s TTL) → D1 database.
+ * Supports both dash-based subdomains (`slug-sites.megabyte.space`) and
+ * custom CNAME domains (looked up in the `hostnames` table).
+ *
+ * @param env      - Worker environment (needs `CACHE_KV`, `DB`).
+ * @param db       - D1Database binding.
+ * @param hostname - The incoming request's `Host` header value.
+ * @returns Resolved site info or `null` if not found.
+ *
+ * @example
+ * ```ts
+ * const site = await resolveSite(env, env.DB, 'vitos-mens-salon-sites.megabyte.space');
+ * if (site) {
+ *   return serveSiteFromR2(env, site, '/');
+ * }
+ * ```
  */
 export async function resolveSite(
   env: Env,
-  db: SupabaseClient,
+  db: D1Database,
   hostname: string,
 ): Promise<{
   site_id: string;
@@ -60,50 +116,38 @@ export async function resolveSite(
 
   // Try hostname table lookup first (for custom domains)
   if (!slug) {
-    const hostnameResult = await supabaseQuery<Array<{ site_id: string; org_id: string }>>(
+    const hostnameRow = await dbQueryOne<{ site_id: string; org_id: string }>(
       db,
-      'hostnames',
-      {
-        query: `hostname=eq.${encodeURIComponent(hostname)}&status=eq.active&deleted_at=is.null&select=site_id,org_id`,
-      },
+      'SELECT site_id, org_id FROM hostnames WHERE hostname = ? AND status = ? AND deleted_at IS NULL',
+      [hostname, 'active'],
     );
 
-    if (hostnameResult.data?.[0]) {
-      const { site_id, org_id } = hostnameResult.data[0];
+    if (hostnameRow) {
+      const siteRow = await dbQueryOne<{ slug: string; current_build_version: string | null }>(
+        db,
+        'SELECT slug, current_build_version FROM sites WHERE id = ? AND deleted_at IS NULL',
+        [hostnameRow.site_id],
+      );
 
-      // Look up site
-      const siteResult = await supabaseQuery<
-        Array<{ slug: string; current_build_version: string | null }>
-      >(db, 'sites', {
-        query: `id=eq.${site_id}&deleted_at=is.null&select=slug,current_build_version`,
-      });
-
-      if (siteResult.data?.[0]) {
-        // Look up plan
-        const subResult = await supabaseQuery<Array<{ plan: string; status: string }>>(
+      if (siteRow) {
+        const subRow = await dbQueryOne<{ plan: string; status: string }>(
           db,
-          'subscriptions',
-          { query: `org_id=eq.${org_id}&deleted_at=is.null&select=plan,status` },
+          'SELECT plan, status FROM subscriptions WHERE org_id = ? AND deleted_at IS NULL',
+          [hostnameRow.org_id],
         );
 
         const plan =
-          subResult.data?.[0]?.plan === 'paid' && subResult.data[0].status === 'active'
-            ? 'paid'
-            : 'free';
+          subRow?.plan === 'paid' && subRow.status === 'active' ? 'paid' : 'free';
 
         const resolved = {
-          site_id,
-          slug: siteResult.data[0].slug,
-          org_id,
-          current_build_version: siteResult.data[0].current_build_version,
+          site_id: hostnameRow.site_id,
+          slug: siteRow.slug,
+          org_id: hostnameRow.org_id,
+          current_build_version: siteRow.current_build_version,
           plan,
         };
 
-        // Cache for 60 seconds
-        await env.CACHE_KV.put(cacheKey, JSON.stringify(resolved), {
-          expirationTtl: 60,
-        });
-
+        await env.CACHE_KV.put(cacheKey, JSON.stringify(resolved), { expirationTtl: 60 });
         return resolved;
       }
     }
@@ -111,45 +155,36 @@ export async function resolveSite(
 
   // Look up by slug
   if (slug) {
-    const siteResult = await supabaseQuery<
-      Array<{
-        id: string;
-        slug: string;
-        org_id: string;
-        current_build_version: string | null;
-      }>
-    >(db, 'sites', {
-      query: `slug=eq.${encodeURIComponent(slug)}&deleted_at=is.null&select=id,slug,org_id,current_build_version`,
-    });
+    const siteRow = await dbQueryOne<{
+      id: string;
+      slug: string;
+      org_id: string;
+      current_build_version: string | null;
+    }>(
+      db,
+      'SELECT id, slug, org_id, current_build_version FROM sites WHERE slug = ? AND deleted_at IS NULL',
+      [slug],
+    );
 
-    if (siteResult.data?.[0]) {
-      const site = siteResult.data[0];
-
-      // Look up plan
-      const subResult = await supabaseQuery<Array<{ plan: string; status: string }>>(
+    if (siteRow) {
+      const subRow = await dbQueryOne<{ plan: string; status: string }>(
         db,
-        'subscriptions',
-        { query: `org_id=eq.${site.org_id}&deleted_at=is.null&select=plan,status` },
+        'SELECT plan, status FROM subscriptions WHERE org_id = ? AND deleted_at IS NULL',
+        [siteRow.org_id],
       );
 
       const plan =
-        subResult.data?.[0]?.plan === 'paid' && subResult.data[0].status === 'active'
-          ? 'paid'
-          : 'free';
+        subRow?.plan === 'paid' && subRow.status === 'active' ? 'paid' : 'free';
 
       const resolved = {
-        site_id: site.id,
-        slug: site.slug,
-        org_id: site.org_id,
-        current_build_version: site.current_build_version,
+        site_id: siteRow.id,
+        slug: siteRow.slug,
+        org_id: siteRow.org_id,
+        current_build_version: siteRow.current_build_version,
         plan,
       };
 
-      // Cache for 60 seconds
-      await env.CACHE_KV.put(cacheKey, JSON.stringify(resolved), {
-        expirationTtl: 60,
-      });
-
+      await env.CACHE_KV.put(cacheKey, JSON.stringify(resolved), { expirationTtl: 60 });
       return resolved;
     }
   }
@@ -159,7 +194,20 @@ export async function resolveSite(
 
 /**
  * Serve a site's static files from R2.
- * Injects top bar for unpaid sites.
+ *
+ * Looks up the file at `sites/{slug}/{version}/{path}` in R2, falls back to
+ * `index.html` for SPA-style routing. Injects the promotional top bar for
+ * HTML responses on the free plan.
+ *
+ * @param env         - Worker environment (needs `SITES_BUCKET`).
+ * @param site        - Resolved site info from {@link resolveSite}.
+ * @param requestPath - The URL pathname (e.g. `/`, `/about`, `/style.css`).
+ * @returns HTTP Response with correct content-type and caching headers.
+ *
+ * @example
+ * ```ts
+ * const response = await serveSiteFromR2(env, site, '/privacy.html');
+ * ```
  */
 export async function serveSiteFromR2(
   env: Env,
@@ -195,7 +243,12 @@ export async function serveSiteFromR2(
 }
 
 /**
- * Build a response for a site file, with top bar injection for HTML if unpaid.
+ * Build an HTTP response for a site file, injecting the top bar for HTML on free plans.
+ *
+ * @param object      - R2 object body.
+ * @param site        - Site metadata (slug, plan).
+ * @param contentType - MIME type for the Content-Type header.
+ * @returns Fully formed Response.
  */
 async function buildSiteResponse(
   object: R2ObjectBody,
@@ -223,7 +276,10 @@ async function buildSiteResponse(
 }
 
 /**
- * Get content type from file path.
+ * Map a file extension to its MIME type.
+ *
+ * @param path - File path or URL pathname.
+ * @returns MIME type string (defaults to `application/octet-stream`).
  */
 function getContentType(path: string): string {
   const ext = path.split('.').pop()?.toLowerCase();

@@ -1,14 +1,9 @@
 jest.mock('../services/db.js', () => ({
-  createServiceClient: jest.fn().mockReturnValue({
-    url: 'https://test.supabase.co',
-    headers: {
-      apikey: 'test-key',
-      Authorization: 'Bearer test-key',
-      'Content-Type': 'application/json',
-    },
-    fetch: jest.fn(),
-  }),
-  supabaseQuery: jest.fn(),
+  dbQuery: jest.fn().mockResolvedValue({ data: [], error: null }),
+  dbQueryOne: jest.fn().mockResolvedValue(null),
+  dbInsert: jest.fn().mockResolvedValue({ error: null }),
+  dbUpdate: jest.fn().mockResolvedValue({ error: null, changes: 1 }),
+  dbExecute: jest.fn().mockResolvedValue({ error: null, changes: 1 }),
 }));
 
 jest.mock('../services/webhook.js', () => ({
@@ -73,11 +68,11 @@ const mockAuditLog = auditService.writeAuditLog as jest.MockedFunction<
   typeof auditService.writeAuditLog
 >;
 
+const mockDb = {} as D1Database;
+
 const mockEnv = {
   STRIPE_WEBHOOK_SECRET: 'whsec_test',
-  SUPABASE_URL: 'https://test.supabase.co',
-  SUPABASE_SERVICE_ROLE_KEY: 'test-key',
-  SUPABASE_ANON_KEY: 'test-anon',
+  DB: mockDb,
 };
 
 const createApp = () => {

@@ -1,23 +1,22 @@
-jest.mock('../services/db.js', () => ({ supabaseQuery: jest.fn() }));
+jest.mock('../services/db.js', () => ({
+  dbQuery: jest.fn().mockResolvedValue({ data: [], error: null }),
+  dbQueryOne: jest.fn().mockResolvedValue(null),
+  dbInsert: jest.fn().mockResolvedValue({ error: null }),
+  dbUpdate: jest.fn().mockResolvedValue({ error: null, changes: 1 }),
+}));
 
-import { supabaseQuery } from '../services/db.js';
+import { dbQueryOne, dbInsert, dbUpdate } from '../services/db.js';
 import {
   checkWebhookIdempotency,
   storeWebhookEvent,
   markWebhookProcessed,
 } from '../services/webhook.js';
 
-const mockQuery = supabaseQuery as jest.MockedFunction<typeof supabaseQuery>;
+const mockQueryOne = dbQueryOne as jest.MockedFunction<typeof dbQueryOne>;
+const mockInsert = dbInsert as jest.MockedFunction<typeof dbInsert>;
+const mockUpdate = dbUpdate as jest.MockedFunction<typeof dbUpdate>;
 
-const mockDb = {
-  url: 'https://test.supabase.co',
-  headers: {
-    apikey: 'test-key',
-    Authorization: 'Bearer test-key',
-    'Content-Type': 'application/json',
-  },
-  fetch: jest.fn(),
-} as any;
+const mockDb = {} as D1Database;
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -27,7 +26,7 @@ beforeEach(() => {
 
 describe('checkWebhookIdempotency', () => {
   it('returns isDuplicate:false when no existing event', async () => {
-    mockQuery.mockResolvedValue({ data: [], error: null, status: 200 });
+    mockQueryOne.mockResolvedValue(null);
 
     const result = await checkWebhookIdempotency(mockDb, 'stripe', 'evt_123');
 
@@ -36,11 +35,7 @@ describe('checkWebhookIdempotency', () => {
   });
 
   it('returns isDuplicate:true with existingId when event exists', async () => {
-    mockQuery.mockResolvedValue({
-      data: [{ id: 'existing-uuid', status: 'processed' }],
-      error: null,
-      status: 200,
-    });
+    mockQueryOne.mockResolvedValue({ id: 'existing-uuid', status: 'processed' });
 
     const result = await checkWebhookIdempotency(mockDb, 'stripe', 'evt_123');
 
@@ -49,23 +44,14 @@ describe('checkWebhookIdempotency', () => {
   });
 
   it('queries webhook_events with provider and event_id', async () => {
-    mockQuery.mockResolvedValue({ data: [], error: null, status: 200 });
+    mockQueryOne.mockResolvedValue(null);
 
     await checkWebhookIdempotency(mockDb, 'dub', 'evt_abc');
 
-    expect(mockQuery).toHaveBeenCalledWith(
+    expect(mockQueryOne).toHaveBeenCalledWith(
       mockDb,
-      'webhook_events',
-      expect.objectContaining({
-        query: expect.stringContaining('provider=eq.dub'),
-      }),
-    );
-    expect(mockQuery).toHaveBeenCalledWith(
-      mockDb,
-      'webhook_events',
-      expect.objectContaining({
-        query: expect.stringContaining('event_id=eq.evt_abc'),
-      }),
+      expect.stringContaining('provider = ?'),
+      expect.arrayContaining(['dub', 'evt_abc']),
     );
   });
 });
@@ -74,11 +60,7 @@ describe('checkWebhookIdempotency', () => {
 
 describe('storeWebhookEvent', () => {
   it('returns id on successful insert', async () => {
-    mockQuery.mockResolvedValue({
-      data: [{ id: 'new-uuid-123' }],
-      error: null,
-      status: 201,
-    });
+    mockInsert.mockResolvedValue({ error: null });
 
     const result = await storeWebhookEvent(mockDb, {
       provider: 'stripe',
@@ -86,16 +68,12 @@ describe('storeWebhookEvent', () => {
       event_type: 'checkout.session.completed',
     });
 
-    expect(result.id).toBe('new-uuid-123');
+    expect(result.id).toBeTruthy();
     expect(result.error).toBeNull();
   });
 
   it('returns error when DB fails', async () => {
-    mockQuery.mockResolvedValue({
-      data: null,
-      error: 'Insert failed',
-      status: 500,
-    });
+    mockInsert.mockResolvedValue({ error: 'Insert failed' });
 
     const result = await storeWebhookEvent(mockDb, {
       provider: 'stripe',
@@ -108,11 +86,7 @@ describe('storeWebhookEvent', () => {
   });
 
   it('sets default status to received', async () => {
-    mockQuery.mockResolvedValue({
-      data: [{ id: 'some-id' }],
-      error: null,
-      status: 201,
-    });
+    mockInsert.mockResolvedValue({ error: null });
 
     await storeWebhookEvent(mockDb, {
       provider: 'stripe',
@@ -120,23 +94,17 @@ describe('storeWebhookEvent', () => {
       event_type: 'invoice.paid',
     });
 
-    expect(mockQuery).toHaveBeenCalledWith(
+    expect(mockInsert).toHaveBeenCalledWith(
       mockDb,
       'webhook_events',
       expect.objectContaining({
-        body: expect.objectContaining({
-          status: 'received',
-        }),
+        status: 'received',
       }),
     );
   });
 
   it('sets attempts to 0', async () => {
-    mockQuery.mockResolvedValue({
-      data: [{ id: 'some-id' }],
-      error: null,
-      status: 201,
-    });
+    mockInsert.mockResolvedValue({ error: null });
 
     await storeWebhookEvent(mockDb, {
       provider: 'lago',
@@ -144,13 +112,11 @@ describe('storeWebhookEvent', () => {
       event_type: 'subscription.created',
     });
 
-    expect(mockQuery).toHaveBeenCalledWith(
+    expect(mockInsert).toHaveBeenCalledWith(
       mockDb,
       'webhook_events',
       expect.objectContaining({
-        body: expect.objectContaining({
-          attempts: 0,
-        }),
+        attempts: 0,
       }),
     );
   });
@@ -160,55 +126,52 @@ describe('storeWebhookEvent', () => {
 
 describe('markWebhookProcessed', () => {
   it('sets status to processed and processed_at', async () => {
-    mockQuery.mockResolvedValue({ data: null, error: null, status: 204 });
+    mockUpdate.mockResolvedValue({ error: null, changes: 1 });
 
     await markWebhookProcessed(mockDb, 'event-uuid-1', 'processed');
 
-    expect(mockQuery).toHaveBeenCalledWith(
+    expect(mockUpdate).toHaveBeenCalledWith(
       mockDb,
       'webhook_events',
       expect.objectContaining({
-        method: 'PATCH',
-        query: 'id=eq.event-uuid-1',
-        body: expect.objectContaining({
-          status: 'processed',
-          processed_at: expect.any(String),
-        }),
+        status: 'processed',
+        processed_at: expect.any(String),
       }),
+      'id = ?',
+      ['event-uuid-1'],
     );
   });
 
   it('sets status to failed with error_message', async () => {
-    mockQuery.mockResolvedValue({ data: null, error: null, status: 204 });
+    mockUpdate.mockResolvedValue({ error: null, changes: 1 });
 
     await markWebhookProcessed(mockDb, 'event-uuid-2', 'failed', 'Something broke');
 
-    expect(mockQuery).toHaveBeenCalledWith(
+    expect(mockUpdate).toHaveBeenCalledWith(
       mockDb,
       'webhook_events',
       expect.objectContaining({
-        method: 'PATCH',
-        body: expect.objectContaining({
-          status: 'failed',
-          error_message: 'Something broke',
-        }),
+        status: 'failed',
+        error_message: 'Something broke',
       }),
+      'id = ?',
+      ['event-uuid-2'],
     );
   });
 
   it('defaults status to processed when not specified', async () => {
-    mockQuery.mockResolvedValue({ data: null, error: null, status: 204 });
+    mockUpdate.mockResolvedValue({ error: null, changes: 1 });
 
     await markWebhookProcessed(mockDb, 'event-uuid-3');
 
-    expect(mockQuery).toHaveBeenCalledWith(
+    expect(mockUpdate).toHaveBeenCalledWith(
       mockDb,
       'webhook_events',
       expect.objectContaining({
-        body: expect.objectContaining({
-          status: 'processed',
-        }),
+        status: 'processed',
       }),
+      'id = ?',
+      ['event-uuid-3'],
     );
   });
 });

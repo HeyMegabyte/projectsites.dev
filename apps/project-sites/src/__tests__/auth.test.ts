@@ -1,8 +1,12 @@
 jest.mock('../services/db.js', () => ({
-  supabaseQuery: jest.fn(),
+  dbQuery: jest.fn().mockResolvedValue({ data: [], error: null }),
+  dbQueryOne: jest.fn().mockResolvedValue(null),
+  dbInsert: jest.fn().mockResolvedValue({ error: null }),
+  dbUpdate: jest.fn().mockResolvedValue({ error: null, changes: 1 }),
+  dbExecute: jest.fn().mockResolvedValue({ error: null, changes: 1 }),
 }));
 
-import { supabaseQuery } from '../services/db.js';
+import { dbQuery, dbQueryOne, dbInsert, dbUpdate, dbExecute } from '../services/db.js';
 import {
   createMagicLink,
   verifyMagicLink,
@@ -17,20 +21,19 @@ import {
 } from '../services/auth.js';
 import { AppError } from '@project-sites/shared';
 
-const mockQuery = supabaseQuery as jest.MockedFunction<typeof supabaseQuery>;
+const mockDbQuery = dbQuery as jest.MockedFunction<typeof dbQuery>;
+const mockDbQueryOne = dbQueryOne as jest.MockedFunction<typeof dbQueryOne>;
+const mockDbInsert = dbInsert as jest.MockedFunction<typeof dbInsert>;
+const mockDbUpdate = dbUpdate as jest.MockedFunction<typeof dbUpdate>;
+const mockDbExecute = dbExecute as jest.MockedFunction<typeof dbExecute>;
 
 const mockEnv = {
   ENVIRONMENT: 'staging',
-  SUPABASE_URL: 'https://test.supabase.co',
   GOOGLE_CLIENT_ID: 'test-google-client-id',
   GOOGLE_CLIENT_SECRET: 'test-google-client-secret',
 } as any;
 
-const mockDb = {
-  url: 'https://test.supabase.co',
-  headers: { apikey: 'test-key' },
-  fetch: jest.fn(),
-} as any;
+const mockDb = {} as D1Database;
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -43,7 +46,7 @@ describe('createMagicLink', () => {
   const input = { email: 'user@example.com' };
 
   beforeEach(() => {
-    mockQuery.mockResolvedValue({ data: null, error: null, status: 201 });
+    mockDbInsert.mockResolvedValue({ error: null });
   });
 
   it('returns a 64-character hex token', async () => {
@@ -57,18 +60,15 @@ describe('createMagicLink', () => {
     expect(new Date(result.expires_at).getTime()).toBeGreaterThan(Date.now());
   });
 
-  it('calls supabaseQuery POST on magic_links table', async () => {
+  it('calls dbInsert on magic_links table', async () => {
     await createMagicLink(mockDb, mockEnv, input);
 
-    expect(mockQuery).toHaveBeenCalledWith(
+    expect(mockDbInsert).toHaveBeenCalledWith(
       mockDb,
       'magic_links',
       expect.objectContaining({
-        method: 'POST',
-        body: expect.objectContaining({
-          email: 'user@example.com',
-          used: false,
-        }),
+        email: 'user@example.com',
+        used: 0,
       }),
     );
   });
@@ -83,21 +83,14 @@ describe('verifyMagicLink', () => {
 
   it('returns email when a valid token is found', async () => {
     const futureDate = new Date(Date.now() + 3_600_000).toISOString();
-    mockQuery
-      .mockResolvedValueOnce({
-        data: [
-          {
-            id: 'link-1',
-            email: 'user@example.com',
-            redirect_url: null,
-            used: false,
-            expires_at: futureDate,
-          },
-        ],
-        error: null,
-        status: 200,
-      })
-      .mockResolvedValueOnce({ data: null, error: null, status: 200 });
+    mockDbQueryOne.mockResolvedValueOnce({
+      id: 'link-1',
+      email: 'user@example.com',
+      redirect_url: null,
+      used: 0,
+      expires_at: futureDate,
+    });
+    mockDbUpdate.mockResolvedValueOnce({ error: null, changes: 1 });
 
     const result = await verifyMagicLink(mockDb, input);
     expect(result.email).toBe('user@example.com');
@@ -105,26 +98,22 @@ describe('verifyMagicLink', () => {
   });
 
   it('throws unauthorized when no matching link is found', async () => {
-    mockQuery.mockResolvedValueOnce({ data: [], error: null, status: 200 });
+    mockDbQueryOne.mockResolvedValueOnce(null);
 
     await expect(verifyMagicLink(mockDb, input)).rejects.toThrow(AppError);
+
+    mockDbQueryOne.mockResolvedValueOnce(null);
     await expect(verifyMagicLink(mockDb, input)).rejects.toThrow('Invalid or expired magic link');
   });
 
   it('throws unauthorized when the link is expired', async () => {
     const pastDate = new Date(Date.now() - 3_600_000).toISOString();
-    mockQuery.mockResolvedValueOnce({
-      data: [
-        {
-          id: 'link-2',
-          email: 'old@example.com',
-          redirect_url: null,
-          used: false,
-          expires_at: pastDate,
-        },
-      ],
-      error: null,
-      status: 200,
+    mockDbQueryOne.mockResolvedValueOnce({
+      id: 'link-2',
+      email: 'old@example.com',
+      redirect_url: null,
+      used: 0,
+      expires_at: pastDate,
     });
 
     await expect(verifyMagicLink(mockDb, input)).rejects.toThrow('Magic link has expired');
@@ -132,33 +121,23 @@ describe('verifyMagicLink', () => {
 
   it('marks the link as used after successful verification', async () => {
     const futureDate = new Date(Date.now() + 3_600_000).toISOString();
-    mockQuery
-      .mockResolvedValueOnce({
-        data: [
-          {
-            id: 'link-3',
-            email: 'mark@example.com',
-            redirect_url: null,
-            used: false,
-            expires_at: futureDate,
-          },
-        ],
-        error: null,
-        status: 200,
-      })
-      .mockResolvedValueOnce({ data: null, error: null, status: 200 });
+    mockDbQueryOne.mockResolvedValueOnce({
+      id: 'link-3',
+      email: 'mark@example.com',
+      redirect_url: null,
+      used: 0,
+      expires_at: futureDate,
+    });
+    mockDbUpdate.mockResolvedValueOnce({ error: null, changes: 1 });
 
     await verifyMagicLink(mockDb, input);
 
-    expect(mockQuery).toHaveBeenCalledTimes(2);
-    expect(mockQuery).toHaveBeenLastCalledWith(
+    expect(mockDbUpdate).toHaveBeenCalledWith(
       mockDb,
       'magic_links',
-      expect.objectContaining({
-        method: 'PATCH',
-        query: 'id=eq.link-3',
-        body: expect.objectContaining({ used: true }),
-      }),
+      expect.objectContaining({ used: 1 }),
+      'id = ?',
+      ['link-3'],
     );
   });
 });
@@ -170,9 +149,8 @@ describe('createPhoneOtp', () => {
   const input = { phone: '+15551234567' };
 
   it('returns expires_at', async () => {
-    mockQuery
-      .mockResolvedValueOnce({ data: [], error: null, status: 200 }) // rate limit check
-      .mockResolvedValueOnce({ data: null, error: null, status: 201 }); // insert
+    mockDbQuery.mockResolvedValueOnce({ data: [], error: null }); // rate limit check
+    mockDbInsert.mockResolvedValueOnce({ error: null }); // insert
 
     const result = await createPhoneOtp(mockDb, mockEnv, input);
     expect(result.expires_at).toBeDefined();
@@ -180,10 +158,9 @@ describe('createPhoneOtp', () => {
   });
 
   it('throws rateLimited when a recent OTP exists', async () => {
-    mockQuery.mockResolvedValueOnce({
+    mockDbQuery.mockResolvedValueOnce({
       data: [{ id: 'recent-otp' }],
       error: null,
-      status: 200,
     });
 
     try {
@@ -197,23 +174,18 @@ describe('createPhoneOtp', () => {
   });
 
   it('creates an OTP record in the phone_otps table', async () => {
-    mockQuery
-      .mockResolvedValueOnce({ data: [], error: null, status: 200 })
-      .mockResolvedValueOnce({ data: null, error: null, status: 201 });
+    mockDbQuery.mockResolvedValueOnce({ data: [], error: null });
+    mockDbInsert.mockResolvedValueOnce({ error: null });
 
     await createPhoneOtp(mockDb, mockEnv, input);
 
-    expect(mockQuery).toHaveBeenCalledTimes(2);
-    expect(mockQuery).toHaveBeenLastCalledWith(
+    expect(mockDbInsert).toHaveBeenCalledWith(
       mockDb,
       'phone_otps',
       expect.objectContaining({
-        method: 'POST',
-        body: expect.objectContaining({
-          phone: '+15551234567',
-          attempts: 0,
-          verified: false,
-        }),
+        phone: '+15551234567',
+        attempts: 0,
+        verified: 0,
       }),
     );
   });
@@ -231,21 +203,17 @@ describe('verifyPhoneOtp', () => {
     const { sha256Hex } = await import('@project-sites/shared');
     const otpHash = await sha256Hex('123456');
 
-    mockQuery
-      .mockResolvedValueOnce({
-        data: [{ id: 'otp-1', otp_hash: otpHash, attempts: 0 }],
-        error: null,
-        status: 200,
-      })
-      .mockResolvedValueOnce({ data: null, error: null, status: 200 }) // increment attempts
-      .mockResolvedValueOnce({ data: null, error: null, status: 200 }); // mark verified
+    mockDbQueryOne.mockResolvedValueOnce({ id: 'otp-1', otp_hash: otpHash, attempts: 0 });
+    mockDbUpdate
+      .mockResolvedValueOnce({ error: null, changes: 1 }) // increment attempts
+      .mockResolvedValueOnce({ error: null, changes: 1 }); // mark verified
 
     const result = await verifyPhoneOtp(mockDb, { phone, otp: '123456' });
     expect(result).toEqual({ verified: true });
   });
 
   it('throws unauthorized when no pending OTP is found', async () => {
-    mockQuery.mockResolvedValueOnce({ data: [], error: null, status: 200 });
+    mockDbQueryOne.mockResolvedValueOnce(null);
 
     await expect(verifyPhoneOtp(mockDb, { phone, otp: '123456' })).rejects.toThrow(
       'No pending OTP found',
@@ -253,11 +221,7 @@ describe('verifyPhoneOtp', () => {
   });
 
   it('throws rateLimited when max attempts are exceeded', async () => {
-    mockQuery.mockResolvedValueOnce({
-      data: [{ id: 'otp-2', otp_hash: 'some-hash', attempts: 3 }],
-      error: null,
-      status: 200,
-    });
+    mockDbQueryOne.mockResolvedValueOnce({ id: 'otp-2', otp_hash: 'some-hash', attempts: 3 });
 
     await expect(verifyPhoneOtp(mockDb, { phone, otp: '123456' })).rejects.toThrow(
       'Too many OTP attempts',
@@ -265,13 +229,12 @@ describe('verifyPhoneOtp', () => {
   });
 
   it('throws unauthorized when the OTP hash does not match', async () => {
-    mockQuery
-      .mockResolvedValueOnce({
-        data: [{ id: 'otp-3', otp_hash: 'definitely-wrong-hash', attempts: 0 }],
-        error: null,
-        status: 200,
-      })
-      .mockResolvedValueOnce({ data: null, error: null, status: 200 }); // increment attempts
+    mockDbQueryOne.mockResolvedValueOnce({
+      id: 'otp-3',
+      otp_hash: 'definitely-wrong-hash',
+      attempts: 0,
+    });
+    mockDbUpdate.mockResolvedValueOnce({ error: null, changes: 1 }); // increment attempts
 
     await expect(verifyPhoneOtp(mockDb, { phone, otp: '999999' })).rejects.toThrow('Invalid OTP');
   });
@@ -282,7 +245,7 @@ describe('verifyPhoneOtp', () => {
 // ---------------------------------------------------------------------------
 describe('createGoogleOAuthState', () => {
   beforeEach(() => {
-    mockQuery.mockResolvedValue({ data: null, error: null, status: 201 });
+    mockDbInsert.mockResolvedValue({ error: null });
   });
 
   it('returns an authUrl containing accounts.google.com', async () => {
@@ -298,15 +261,12 @@ describe('createGoogleOAuthState', () => {
   it('stores the state in the oauth_states table', async () => {
     const result = await createGoogleOAuthState(mockDb, mockEnv);
 
-    expect(mockQuery).toHaveBeenCalledWith(
+    expect(mockDbInsert).toHaveBeenCalledWith(
       mockDb,
       'oauth_states',
       expect.objectContaining({
-        method: 'POST',
-        body: expect.objectContaining({
-          state: result.state,
-          provider: 'google',
-        }),
+        state: result.state,
+        provider: 'google',
       }),
     );
   });
@@ -329,15 +289,14 @@ describe('handleGoogleOAuthCallback', () => {
   it('returns email and user info on successful callback', async () => {
     const futureDate = new Date(Date.now() + 600_000).toISOString();
 
-    // supabaseQuery: find state
-    mockQuery
-      .mockResolvedValueOnce({
-        data: [{ id: 'state-1', state: 'valid-state', expires_at: futureDate }],
-        error: null,
-        status: 200,
-      })
-      // supabaseQuery: delete used state
-      .mockResolvedValueOnce({ data: null, error: null, status: 204 });
+    // dbQueryOne: find state
+    mockDbQueryOne.mockResolvedValueOnce({
+      id: 'state-1',
+      state: 'valid-state',
+      expires_at: futureDate,
+    });
+    // dbExecute: delete used state
+    mockDbExecute.mockResolvedValueOnce({ error: null, changes: 1 });
 
     // global.fetch: token exchange
     (global.fetch as jest.Mock)
@@ -367,7 +326,7 @@ describe('handleGoogleOAuthCallback', () => {
   });
 
   it('throws unauthorized when the state is not found', async () => {
-    mockQuery.mockResolvedValueOnce({ data: [], error: null, status: 200 });
+    mockDbQueryOne.mockResolvedValueOnce(null);
 
     await expect(handleGoogleOAuthCallback(mockDb, mockEnv, 'code', 'bad-state')).rejects.toThrow(
       'Invalid OAuth state',
@@ -377,10 +336,10 @@ describe('handleGoogleOAuthCallback', () => {
   it('throws unauthorized when the state is expired', async () => {
     const pastDate = new Date(Date.now() - 600_000).toISOString();
 
-    mockQuery.mockResolvedValueOnce({
-      data: [{ id: 'state-2', state: 'expired-state', expires_at: pastDate }],
-      error: null,
-      status: 200,
+    mockDbQueryOne.mockResolvedValueOnce({
+      id: 'state-2',
+      state: 'expired-state',
+      expires_at: pastDate,
     });
 
     await expect(
@@ -394,7 +353,7 @@ describe('handleGoogleOAuthCallback', () => {
 // ---------------------------------------------------------------------------
 describe('createSession', () => {
   beforeEach(() => {
-    mockQuery.mockResolvedValue({ data: null, error: null, status: 201 });
+    mockDbInsert.mockResolvedValue({ error: null });
   });
 
   it('returns a 64-character hex token and expires_at', async () => {
@@ -407,16 +366,13 @@ describe('createSession', () => {
   it('creates a session record in the sessions table', async () => {
     await createSession(mockDb, 'user-id-2', 'Chrome on macOS', '192.168.1.1');
 
-    expect(mockQuery).toHaveBeenCalledWith(
+    expect(mockDbInsert).toHaveBeenCalledWith(
       mockDb,
       'sessions',
       expect.objectContaining({
-        method: 'POST',
-        body: expect.objectContaining({
-          user_id: 'user-id-2',
-          device_info: 'Chrome on macOS',
-          ip_address: '192.168.1.1',
-        }),
+        user_id: 'user-id-2',
+        device_info: 'Chrome on macOS',
+        ip_address: '192.168.1.1',
       }),
     );
   });
@@ -431,13 +387,12 @@ describe('getSession', () => {
   it('returns session data for a valid token', async () => {
     const futureDate = new Date(Date.now() + 86_400_000).toISOString();
 
-    mockQuery
-      .mockResolvedValueOnce({
-        data: [{ id: 'sess-1', user_id: 'user-1', expires_at: futureDate }],
-        error: null,
-        status: 200,
-      })
-      .mockResolvedValueOnce({ data: null, error: null, status: 200 }); // update last_active_at
+    mockDbQueryOne.mockResolvedValueOnce({
+      id: 'sess-1',
+      user_id: 'user-1',
+      expires_at: futureDate,
+    });
+    mockDbUpdate.mockResolvedValueOnce({ error: null, changes: 1 }); // update last_active_at
 
     const result = await getSession(mockDb, token);
 
@@ -449,7 +404,7 @@ describe('getSession', () => {
   });
 
   it('returns null when no session matches the token', async () => {
-    mockQuery.mockResolvedValueOnce({ data: [], error: null, status: 200 });
+    mockDbQueryOne.mockResolvedValueOnce(null);
 
     const result = await getSession(mockDb, token);
     expect(result).toBeNull();
@@ -458,10 +413,10 @@ describe('getSession', () => {
   it('returns null when the session is expired', async () => {
     const pastDate = new Date(Date.now() - 86_400_000).toISOString();
 
-    mockQuery.mockResolvedValueOnce({
-      data: [{ id: 'sess-2', user_id: 'user-2', expires_at: pastDate }],
-      error: null,
-      status: 200,
+    mockDbQueryOne.mockResolvedValueOnce({
+      id: 'sess-2',
+      user_id: 'user-2',
+      expires_at: pastDate,
     });
 
     const result = await getSession(mockDb, token);
@@ -473,32 +428,31 @@ describe('getSession', () => {
 // revokeSession
 // ---------------------------------------------------------------------------
 describe('revokeSession', () => {
-  it('calls PATCH with deleted_at set on the sessions table', async () => {
-    mockQuery.mockResolvedValue({ data: null, error: null, status: 200 });
+  it('calls dbUpdate with deleted_at set on the sessions table', async () => {
+    mockDbUpdate.mockResolvedValue({ error: null, changes: 1 });
 
     await revokeSession(mockDb, 'sess-to-revoke');
 
-    expect(mockQuery).toHaveBeenCalledWith(
+    expect(mockDbUpdate).toHaveBeenCalledWith(
       mockDb,
       'sessions',
       expect.objectContaining({
-        method: 'PATCH',
-        query: 'id=eq.sess-to-revoke',
-        body: expect.objectContaining({
-          deleted_at: expect.any(String),
-        }),
+        deleted_at: expect.any(String),
       }),
+      'id = ?',
+      ['sess-to-revoke'],
     );
   });
 
-  it('passes updated_at alongside deleted_at', async () => {
-    mockQuery.mockResolvedValue({ data: null, error: null, status: 200 });
+  it('passes a valid ISO date as deleted_at', async () => {
+    mockDbUpdate.mockResolvedValue({ error: null, changes: 1 });
 
     await revokeSession(mockDb, 'sess-99');
 
-    const callBody = mockQuery.mock.calls[0][2]?.body as Record<string, unknown>;
-    expect(callBody.updated_at).toBeDefined();
-    expect(callBody.deleted_at).toBeDefined();
+    const updates = mockDbUpdate.mock.calls[0][2] as Record<string, unknown>;
+    expect(updates.deleted_at).toBeDefined();
+    // updated_at is added internally by dbUpdate, not by the service
+    expect(() => new Date(updates.deleted_at as string).toISOString()).not.toThrow();
   });
 });
 
@@ -507,7 +461,7 @@ describe('revokeSession', () => {
 // ---------------------------------------------------------------------------
 describe('getUserSessions', () => {
   it('returns an empty array when no sessions exist', async () => {
-    mockQuery.mockResolvedValueOnce({ data: [], error: null, status: 200 });
+    mockDbQuery.mockResolvedValueOnce({ data: [], error: null });
 
     const result = await getUserSessions(mockDb, 'user-no-sessions');
     expect(result).toEqual([]);
@@ -528,7 +482,7 @@ describe('getUserSessions', () => {
         created_at: new Date().toISOString(),
       },
     ];
-    mockQuery.mockResolvedValueOnce({ data: sessions, error: null, status: 200 });
+    mockDbQuery.mockResolvedValueOnce({ data: sessions, error: null });
 
     const result = await getUserSessions(mockDb, 'user-with-sessions');
 

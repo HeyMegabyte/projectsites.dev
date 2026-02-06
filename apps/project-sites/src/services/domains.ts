@@ -1,3 +1,37 @@
+/**
+ * @module domains
+ * @description Domain provisioning service using Cloudflare for SaaS.
+ *
+ * Manages both free subdomains (`slug-sites.megabyte.space`) and custom
+ * CNAME domains for paid plans. Integrates with the Cloudflare Custom
+ * Hostnames API for SSL provisioning and verification.
+ *
+ * ## Hostname Lifecycle
+ *
+ * ```
+ * provisionFreeDomain / provisionCustomDomain
+ *   → CF API: create custom hostname
+ *   → D1: INSERT into hostnames (status = pending|active)
+ *   → Cron: verifyPendingHostnames checks CF status
+ *   → D1: UPDATE status to active|verification_failed
+ * ```
+ *
+ * ## Table: `hostnames`
+ *
+ * | Column                  | Type   | Description                      |
+ * | ----------------------- | ------ | -------------------------------- |
+ * | `id`                    | TEXT   | UUID primary key                 |
+ * | `org_id`                | TEXT   | Owning organization              |
+ * | `site_id`               | TEXT   | Associated site                  |
+ * | `hostname`              | TEXT   | Full domain (unique)             |
+ * | `type`                  | TEXT   | `free_subdomain` or `custom_cname` |
+ * | `status`                | TEXT   | pending / active / verification_failed |
+ * | `cf_custom_hostname_id` | TEXT?  | Cloudflare hostname resource ID  |
+ * | `ssl_status`            | TEXT   | pending / active / error         |
+ *
+ * @packageDocumentation
+ */
+
 import {
   DOMAINS,
   ENTITLEMENTS,
@@ -6,14 +40,12 @@ import {
   conflict,
   type HostnameState,
 } from '@project-sites/shared';
-import type { SupabaseClient } from './db.js';
-import { supabaseQuery } from './db.js';
+import { dbQuery, dbQueryOne, dbInsert, dbUpdate } from './db.js';
 import type { Env } from '../types/env.js';
 
 /**
- * Domain provisioning service using Cloudflare for SaaS custom hostnames.
+ * Domain provisioner interface for dependency injection / testing.
  */
-
 export interface DomainProvisioner {
   provisionFreeDomain(opts: {
     org_id: string;
@@ -37,7 +69,17 @@ export interface DomainProvisioner {
 }
 
 /**
- * Create a Cloudflare for SaaS custom hostname.
+ * Create a Cloudflare for SaaS custom hostname via the API.
+ *
+ * @param env      - Worker environment (needs `CF_API_TOKEN`, `CF_ZONE_ID`).
+ * @param hostname - The fully-qualified domain to provision.
+ * @returns Cloudflare hostname ID, status, and SSL status.
+ * @throws {badRequest} If the Cloudflare API call fails.
+ *
+ * @example
+ * ```ts
+ * const { cf_id, status, ssl_status } = await createCustomHostname(env, 'example.com');
+ * ```
  */
 export async function createCustomHostname(
   env: Env,
@@ -56,9 +98,7 @@ export async function createCustomHostname(
         ssl: {
           method: 'http',
           type: 'dv',
-          settings: {
-            min_tls_version: '1.2',
-          },
+          settings: { min_tls_version: '1.2' },
         },
       }),
     },
@@ -70,11 +110,7 @@ export async function createCustomHostname(
   }
 
   const data = (await response.json()) as {
-    result: {
-      id: string;
-      status: string;
-      ssl: { status: string };
-    };
+    result: { id: string; status: string; ssl: { status: string } };
   };
 
   return {
@@ -85,7 +121,12 @@ export async function createCustomHostname(
 }
 
 /**
- * Check the status of a custom hostname.
+ * Check the verification status of a custom hostname.
+ *
+ * @param env                 - Worker environment.
+ * @param cfCustomHostnameId  - Cloudflare hostname resource ID.
+ * @returns Current status, SSL status, and any verification errors.
+ * @throws {notFound} If the hostname doesn't exist in Cloudflare.
  */
 export async function checkHostnameStatus(
   env: Env,
@@ -106,11 +147,7 @@ export async function checkHostnameStatus(
   }
 
   const data = (await response.json()) as {
-    result: {
-      status: string;
-      ssl: { status: string };
-      verification_errors?: string[];
-    };
+    result: { status: string; ssl: { status: string }; verification_errors?: string[] };
   };
 
   return {
@@ -121,16 +158,18 @@ export async function checkHostnameStatus(
 }
 
 /**
- * Delete a custom hostname.
+ * Delete a custom hostname from Cloudflare.
+ *
+ * @param env                 - Worker environment.
+ * @param cfCustomHostnameId  - Cloudflare hostname resource ID.
+ * @throws {badRequest} If deletion fails (404 is silently ignored).
  */
 export async function deleteCustomHostname(env: Env, cfCustomHostnameId: string): Promise<void> {
   const response = await fetch(
     `https://api.cloudflare.com/client/v4/zones/${env.CF_ZONE_ID}/custom_hostnames/${cfCustomHostnameId}`,
     {
       method: 'DELETE',
-      headers: {
-        Authorization: `Bearer ${env.CF_API_TOKEN}`,
-      },
+      headers: { Authorization: `Bearer ${env.CF_API_TOKEN}` },
     },
   );
 
@@ -141,45 +180,60 @@ export async function deleteCustomHostname(env: Env, cfCustomHostnameId: string)
 }
 
 /**
- * Provision a free subdomain for a site (e.g., slug-sites.megabyte.space).
+ * Provision a free subdomain for a site (e.g. `slug-sites.megabyte.space`).
+ *
+ * If the hostname already exists in D1, returns its current status without
+ * creating a duplicate.
+ *
+ * @param db   - D1Database binding.
+ * @param env  - Worker environment.
+ * @param opts - Organization, site, and slug.
+ * @returns The provisioned hostname and its status.
+ *
+ * @example
+ * ```ts
+ * const { hostname, status } = await provisionFreeDomain(env.DB, env, {
+ *   org_id: orgId,
+ *   site_id: siteId,
+ *   slug: 'vitos-mens-salon',
+ * });
+ * // hostname = 'vitos-mens-salon-sites.megabyte.space'
+ * ```
  */
 export async function provisionFreeDomain(
-  db: SupabaseClient,
+  db: D1Database,
   env: Env,
   opts: { org_id: string; site_id: string; slug: string },
 ): Promise<{ hostname: string; status: HostnameState }> {
   const hostname = `${opts.slug}${DOMAINS.SITES_SUFFIX}`;
 
   // Check if already exists
-  const existing = await supabaseQuery<Array<{ id: string; status: string }>>(db, 'hostnames', {
-    query: `hostname=eq.${encodeURIComponent(hostname)}&deleted_at=is.null&select=id,status`,
-  });
+  const existing = await dbQueryOne<{ id: string; status: string }>(
+    db,
+    'SELECT id, status FROM hostnames WHERE hostname = ? AND deleted_at IS NULL',
+    [hostname],
+  );
 
-  if (existing.data && existing.data.length > 0) {
-    return { hostname, status: existing.data[0]!.status as HostnameState };
+  if (existing) {
+    return { hostname, status: existing.status as HostnameState };
   }
 
   // Create CF custom hostname
   const cfResult = await createCustomHostname(env, hostname);
 
   // Store in DB
-  await supabaseQuery(db, 'hostnames', {
-    method: 'POST',
-    body: {
-      id: crypto.randomUUID(),
-      org_id: opts.org_id,
-      site_id: opts.site_id,
-      hostname,
-      type: 'free_subdomain',
-      status: cfResult.status === 'active' ? 'active' : 'pending',
-      cf_custom_hostname_id: cfResult.cf_id,
-      ssl_status: cfResult.ssl_status,
-      verification_errors: null,
-      last_verified_at: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      deleted_at: null,
-    },
+  await dbInsert(db, 'hostnames', {
+    id: crypto.randomUUID(),
+    org_id: opts.org_id,
+    site_id: opts.site_id,
+    hostname,
+    type: 'free_subdomain',
+    status: cfResult.status === 'active' ? 'active' : 'pending',
+    cf_custom_hostname_id: cfResult.cf_id,
+    ssl_status: cfResult.ssl_status,
+    verification_errors: null,
+    last_verified_at: new Date().toISOString(),
+    deleted_at: null,
   });
 
   return {
@@ -190,27 +244,49 @@ export async function provisionFreeDomain(
 
 /**
  * Provision a custom CNAME domain for a paid site.
+ *
+ * Enforces the per-org domain limit from entitlements and checks for
+ * duplicate hostnames before calling the Cloudflare API.
+ *
+ * @param db   - D1Database binding.
+ * @param env  - Worker environment.
+ * @param opts - Organization, site, and desired hostname.
+ * @returns The provisioned hostname and its status.
+ * @throws {conflict} If the domain limit is reached or hostname exists.
+ *
+ * @example
+ * ```ts
+ * const { hostname, status } = await provisionCustomDomain(env.DB, env, {
+ *   org_id: orgId,
+ *   site_id: siteId,
+ *   hostname: 'www.example.com',
+ * });
+ * ```
  */
 export async function provisionCustomDomain(
-  db: SupabaseClient,
+  db: D1Database,
   env: Env,
   opts: { org_id: string; site_id: string; hostname: string },
 ): Promise<{ hostname: string; status: HostnameState }> {
   // Check domain limit
-  const existingDomains = await supabaseQuery<Array<{ id: string }>>(db, 'hostnames', {
-    query: `org_id=eq.${opts.org_id}&type=eq.custom_cname&deleted_at=is.null&select=id`,
-  });
+  const { data: existingDomains } = await dbQuery<{ id: string }>(
+    db,
+    'SELECT id FROM hostnames WHERE org_id = ? AND type = ? AND deleted_at IS NULL',
+    [opts.org_id, 'custom_cname'],
+  );
 
-  if (existingDomains.data && existingDomains.data.length >= ENTITLEMENTS.paid.maxCustomDomains) {
+  if (existingDomains.length >= ENTITLEMENTS.paid.maxCustomDomains) {
     throw conflict(`Maximum custom domains (${ENTITLEMENTS.paid.maxCustomDomains}) reached`);
   }
 
   // Check if hostname already exists
-  const existing = await supabaseQuery<Array<{ id: string }>>(db, 'hostnames', {
-    query: `hostname=eq.${encodeURIComponent(opts.hostname)}&deleted_at=is.null&select=id`,
-  });
+  const existing = await dbQueryOne<{ id: string }>(
+    db,
+    'SELECT id FROM hostnames WHERE hostname = ? AND deleted_at IS NULL',
+    [opts.hostname],
+  );
 
-  if (existing.data && existing.data.length > 0) {
+  if (existing) {
     throw conflict(`Hostname ${opts.hostname} already registered`);
   }
 
@@ -218,23 +294,18 @@ export async function provisionCustomDomain(
   const cfResult = await createCustomHostname(env, opts.hostname);
 
   // Store in DB
-  await supabaseQuery(db, 'hostnames', {
-    method: 'POST',
-    body: {
-      id: crypto.randomUUID(),
-      org_id: opts.org_id,
-      site_id: opts.site_id,
-      hostname: opts.hostname,
-      type: 'custom_cname',
-      status: cfResult.status === 'active' ? 'active' : 'pending',
-      cf_custom_hostname_id: cfResult.cf_id,
-      ssl_status: cfResult.ssl_status,
-      verification_errors: null,
-      last_verified_at: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      deleted_at: null,
-    },
+  await dbInsert(db, 'hostnames', {
+    id: crypto.randomUUID(),
+    org_id: opts.org_id,
+    site_id: opts.site_id,
+    hostname: opts.hostname,
+    type: 'custom_cname',
+    status: cfResult.status === 'active' ? 'active' : 'pending',
+    cf_custom_hostname_id: cfResult.cf_id,
+    ssl_status: cfResult.ssl_status,
+    verification_errors: null,
+    last_verified_at: new Date().toISOString(),
+    deleted_at: null,
   });
 
   return {
@@ -245,39 +316,41 @@ export async function provisionCustomDomain(
 
 /**
  * Get all hostnames for a site.
+ *
+ * @param db     - D1Database binding.
+ * @param siteId - The site to query hostnames for.
+ * @returns Array of hostname records.
  */
 export async function getSiteHostnames(
-  db: SupabaseClient,
+  db: D1Database,
   siteId: string,
 ): Promise<
-  Array<{
+  Array<{ id: string; hostname: string; type: string; status: string; ssl_status: string }>
+> {
+  const { data } = await dbQuery<{
     id: string;
     hostname: string;
     type: string;
     status: string;
     ssl_status: string;
-  }>
-> {
-  const result = await supabaseQuery<
-    Array<{
-      id: string;
-      hostname: string;
-      type: string;
-      status: string;
-      ssl_status: string;
-    }>
-  >(db, 'hostnames', {
-    query: `site_id=eq.${siteId}&deleted_at=is.null&select=id,hostname,type,status,ssl_status&order=created_at.asc`,
-  });
+  }>(
+    db,
+    'SELECT id, hostname, type, status, ssl_status FROM hostnames WHERE site_id = ? AND deleted_at IS NULL ORDER BY created_at ASC',
+    [siteId],
+  );
 
-  return result.data ?? [];
+  return data;
 }
 
 /**
- * Get hostname record by domain name.
+ * Look up a hostname record by its domain name.
+ *
+ * @param db       - D1Database binding.
+ * @param hostname - The full domain to look up.
+ * @returns Hostname record or `null`.
  */
 export async function getHostnameByDomain(
-  db: SupabaseClient,
+  db: D1Database,
   hostname: string,
 ): Promise<{
   id: string;
@@ -286,38 +359,47 @@ export async function getHostnameByDomain(
   type: string;
   status: string;
 } | null> {
-  const result = await supabaseQuery<
-    Array<{
-      id: string;
-      site_id: string;
-      org_id: string;
-      type: string;
-      status: string;
-    }>
-  >(db, 'hostnames', {
-    query: `hostname=eq.${encodeURIComponent(hostname)}&deleted_at=is.null&select=id,site_id,org_id,type,status`,
-  });
-
-  return result.data?.[0] ?? null;
+  return dbQueryOne<{
+    id: string;
+    site_id: string;
+    org_id: string;
+    type: string;
+    status: string;
+  }>(
+    db,
+    'SELECT id, site_id, org_id, type, status FROM hostnames WHERE hostname = ? AND deleted_at IS NULL',
+    [hostname],
+  );
 }
 
 /**
- * Verify pending hostnames (scheduled cron job).
+ * Verify all pending hostnames against Cloudflare (scheduled cron job).
+ *
+ * Iterates over hostnames with `status = 'pending'`, checks their Cloudflare
+ * verification state, and updates D1 accordingly.
+ *
+ * @param db  - D1Database binding.
+ * @param env - Worker environment.
+ * @returns Count of verified and failed hostnames.
  */
 export async function verifyPendingHostnames(
-  db: SupabaseClient,
+  db: D1Database,
   env: Env,
 ): Promise<{ verified: number; failed: number }> {
-  const pending = await supabaseQuery<
-    Array<{ id: string; cf_custom_hostname_id: string; hostname: string }>
-  >(db, 'hostnames', {
-    query: `status=eq.pending&deleted_at=is.null&select=id,cf_custom_hostname_id,hostname`,
-  });
+  const { data: pending } = await dbQuery<{
+    id: string;
+    cf_custom_hostname_id: string;
+    hostname: string;
+  }>(
+    db,
+    'SELECT id, cf_custom_hostname_id, hostname FROM hostnames WHERE status = ? AND deleted_at IS NULL',
+    ['pending'],
+  );
 
   let verified = 0;
   let failed = 0;
 
-  for (const record of pending.data ?? []) {
+  for (const record of pending) {
     if (!record.cf_custom_hostname_id) continue;
 
     try {
@@ -330,18 +412,21 @@ export async function verifyPendingHostnames(
             ? 'verification_failed'
             : 'pending';
 
-      await supabaseQuery(db, 'hostnames', {
-        method: 'PATCH',
-        query: `id=eq.${record.id}`,
-        body: {
+      await dbUpdate(
+        db,
+        'hostnames',
+        {
           status: newStatus,
           ssl_status: status.ssl_status,
           verification_errors:
-            status.verification_errors.length > 0 ? status.verification_errors : null,
+            status.verification_errors.length > 0
+              ? JSON.stringify(status.verification_errors)
+              : null,
           last_verified_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
         },
-      });
+        'id = ?',
+        [record.id],
+      );
 
       if (newStatus === 'active') verified++;
       if (newStatus === 'verification_failed') failed++;

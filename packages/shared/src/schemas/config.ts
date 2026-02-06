@@ -15,11 +15,6 @@ export const envConfigSchema = z
   .object({
     ENVIRONMENT: environmentSchema,
 
-    // Supabase
-    SUPABASE_URL: z.string().url(),
-    SUPABASE_ANON_KEY: z.string().min(1),
-    SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
-
     // Stripe
     STRIPE_SECRET_KEY: z.string().min(1),
     STRIPE_PUBLISHABLE_KEY: z.string().min(1),

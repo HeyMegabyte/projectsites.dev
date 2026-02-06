@@ -1,3 +1,38 @@
+/**
+ * @module auth
+ * @description Passwordless authentication service for Project Sites.
+ *
+ * Supports three sign-in methods:
+ *
+ * | Method       | Flow                                        | Table          |
+ * | ------------ | ------------------------------------------- | -------------- |
+ * | Magic Link   | Email → click link → verify token hash      | `magic_links`  |
+ * | Phone OTP    | SMS → enter 6-digit code → verify OTP hash  | `phone_otps`   |
+ * | Google OAuth | Redirect → consent → exchange code → user   | `oauth_states` |
+ *
+ * Sessions are stored in the `sessions` table with SHA-256 hashed tokens.
+ * All database access uses Cloudflare D1 via parameterized SQL.
+ *
+ * @example
+ * ```ts
+ * import * as authService from '../services/auth.js';
+ *
+ * // Magic link flow
+ * const { token, expires_at } = await authService.createMagicLink(env.DB, env, { email });
+ * const { email } = await authService.verifyMagicLink(env.DB, { token });
+ *
+ * // Phone OTP flow
+ * await authService.createPhoneOtp(env.DB, env, { phone: '+15551234567' });
+ * const { verified } = await authService.verifyPhoneOtp(env.DB, { phone, otp: '123456' });
+ *
+ * // Session management
+ * const { token } = await authService.createSession(env.DB, userId);
+ * const session = await authService.getSession(env.DB, token);
+ * ```
+ *
+ * @packageDocumentation
+ */
+
 import {
   AUTH,
   randomHex,
@@ -15,12 +50,25 @@ import {
   badRequest,
   rateLimited,
 } from '@project-sites/shared';
-import type { SupabaseClient } from './db.js';
-import { supabaseQuery } from './db.js';
+import { dbQuery, dbInsert, dbUpdate, dbExecute, dbQueryOne } from './db.js';
 import type { Env } from '../types/env.js';
 
 /**
- * Send an email via SendGrid v3 API.
+ * Send a transactional email via the SendGrid v3 API.
+ *
+ * Gracefully skips if `SENDGRID_API_KEY` is not configured (logs a warning).
+ *
+ * @param env  - Worker environment (needs `SENDGRID_API_KEY`).
+ * @param opts - Email parameters (to, subject, html body).
+ *
+ * @example
+ * ```ts
+ * await sendEmail(env, {
+ *   to: 'user@example.com',
+ *   subject: 'Sign in to Project Sites',
+ *   html: '<h1>Click here</h1>',
+ * });
+ * ```
  */
 async function sendEmail(
   env: Env,
@@ -67,7 +115,10 @@ async function sendEmail(
 }
 
 /**
- * Build the magic link email HTML.
+ * Build styled HTML for the magic-link email.
+ *
+ * @param verifyUrl - Full URL the user clicks to verify (includes token).
+ * @returns Complete HTML document string.
  */
 function buildMagicLinkEmail(verifyUrl: string): string {
   return `
@@ -86,11 +137,26 @@ function buildMagicLinkEmail(verifyUrl: string): string {
 }
 
 /**
- * Create a magic link for passwordless email auth.
- * Stores token hash in DB; sends email via SendGrid.
+ * Create a magic link for passwordless email authentication.
+ *
+ * Generates a random token, stores its SHA-256 hash in D1, and sends the
+ * plaintext token to the user's email via SendGrid.
+ *
+ * @param db    - D1Database binding.
+ * @param env   - Worker environment.
+ * @param input - Must include `email`; optionally `redirect_url`.
+ * @returns The plaintext token (for tests) and expiry timestamp.
+ *
+ * @example
+ * ```ts
+ * const { expires_at } = await createMagicLink(env.DB, env, {
+ *   email: 'brian@megabyte.space',
+ *   redirect_url: 'https://sites.megabyte.space/',
+ * });
+ * ```
  */
 export async function createMagicLink(
-  db: SupabaseClient,
+  db: D1Database,
   env: Env,
   input: CreateMagicLink,
 ): Promise<{ token: string; expires_at: string }> {
@@ -102,19 +168,14 @@ export async function createMagicLink(
     Date.now() + AUTH.MAGIC_LINK_EXPIRY_HOURS * 60 * 60 * 1000,
   ).toISOString();
 
-  await supabaseQuery(db, 'magic_links', {
-    method: 'POST',
-    body: {
-      id: crypto.randomUUID(),
-      email: validated.email,
-      token_hash: tokenHash,
-      redirect_url: validated.redirect_url ?? null,
-      expires_at: expiresAt,
-      used: false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      deleted_at: null,
-    },
+  await dbInsert(db, 'magic_links', {
+    id: crypto.randomUUID(),
+    email: validated.email,
+    token_hash: tokenHash,
+    redirect_url: validated.redirect_url ?? null,
+    expires_at: expiresAt,
+    used: 0,
+    deleted_at: null,
   });
 
   // Build verify URL and send email
@@ -134,29 +195,36 @@ export async function createMagicLink(
 }
 
 /**
- * Verify a magic link token.
- * Returns the associated email if valid and not expired/used.
+ * Verify a magic-link token.
+ *
+ * Hashes the incoming token, looks it up in D1, checks expiry, and marks
+ * it as used. Returns the associated email and optional redirect URL.
+ *
+ * @param db    - D1Database binding.
+ * @param input - Must include `token` (plaintext from email link).
+ * @returns The email and redirect_url associated with the link.
+ * @throws {unauthorized} If the token is invalid, expired, or already used.
+ *
+ * @example
+ * ```ts
+ * const { email, redirect_url } = await verifyMagicLink(env.DB, { token });
+ * ```
  */
 export async function verifyMagicLink(
-  db: SupabaseClient,
+  db: D1Database,
   input: VerifyMagicLink,
 ): Promise<{ email: string; redirect_url: string | null }> {
   const validated = verifyMagicLinkSchema.parse(input);
   const tokenHash = await sha256Hex(validated.token);
 
-  const result = await supabaseQuery<
-    Array<{
-      id: string;
-      email: string;
-      redirect_url: string | null;
-      used: boolean;
-      expires_at: string;
-    }>
-  >(db, 'magic_links', {
-    query: `token_hash=eq.${tokenHash}&used=eq.false&select=id,email,redirect_url,used,expires_at`,
-  });
+  const link = await dbQueryOne<{
+    id: string;
+    email: string;
+    redirect_url: string | null;
+    used: number;
+    expires_at: string;
+  }>(db, 'SELECT id, email, redirect_url, used, expires_at FROM magic_links WHERE token_hash = ? AND used = 0', [tokenHash]);
 
-  const link = result.data?.[0];
   if (!link) {
     throw unauthorized('Invalid or expired magic link');
   }
@@ -166,32 +234,44 @@ export async function verifyMagicLink(
   }
 
   // Mark as used
-  await supabaseQuery(db, 'magic_links', {
-    method: 'PATCH',
-    query: `id=eq.${link.id}`,
-    body: { used: true, updated_at: new Date().toISOString() },
-  });
+  await dbUpdate(db, 'magic_links', { used: 1 }, 'id = ?', [link.id]);
 
   return { email: link.email, redirect_url: link.redirect_url };
 }
 
 /**
- * Create a phone OTP for 2FA.
+ * Create a phone OTP for two-factor authentication.
+ *
+ * Rate-limited to one OTP per phone number per 60 seconds.
+ * In non-production environments, the OTP is logged to console for testing.
+ *
+ * @param db    - D1Database binding.
+ * @param env   - Worker environment.
+ * @param input - Must include `phone` in E.164 format (e.g. `+15551234567`).
+ * @returns Expiry timestamp.
+ * @throws {rateLimited} If another OTP was requested within the last 60 s.
+ *
+ * @example
+ * ```ts
+ * const { expires_at } = await createPhoneOtp(env.DB, env, { phone: '+15551234567' });
+ * ```
  */
 export async function createPhoneOtp(
-  db: SupabaseClient,
+  db: D1Database,
   env: Env,
   input: CreatePhoneOtp,
 ): Promise<{ expires_at: string }> {
   const validated = createPhoneOtpSchema.parse(input);
 
   // Rate limit: check recent OTPs for this phone
-  const recentQuery = `phone=eq.${encodeURIComponent(validated.phone)}&created_at=gt.${new Date(Date.now() - 60000).toISOString()}&select=id`;
-  const recent = await supabaseQuery<Array<{ id: string }>>(db, 'phone_otps', {
-    query: recentQuery,
-  });
+  const cutoff = new Date(Date.now() - 60000).toISOString();
+  const { data: recent } = await dbQuery<{ id: string }>(
+    db,
+    'SELECT id FROM phone_otps WHERE phone = ? AND created_at > ?',
+    [validated.phone, cutoff],
+  );
 
-  if (recent.data && recent.data.length >= 1) {
+  if (recent.length >= 1) {
     throw rateLimited('Please wait before requesting another OTP');
   }
 
@@ -199,19 +279,14 @@ export async function createPhoneOtp(
   const otpHash = await sha256Hex(otp);
   const expiresAt = new Date(Date.now() + AUTH.OTP_EXPIRY_MINUTES * 60 * 1000).toISOString();
 
-  await supabaseQuery(db, 'phone_otps', {
-    method: 'POST',
-    body: {
-      id: crypto.randomUUID(),
-      phone: validated.phone,
-      otp_hash: otpHash,
-      attempts: 0,
-      expires_at: expiresAt,
-      verified: false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      deleted_at: null,
-    },
+  await dbInsert(db, 'phone_otps', {
+    id: crypto.randomUUID(),
+    phone: validated.phone,
+    otp_hash: otpHash,
+    attempts: 0,
+    expires_at: expiresAt,
+    verified: 0,
+    deleted_at: null,
   });
 
   // In production: send OTP via SMS provider
@@ -231,24 +306,41 @@ export async function createPhoneOtp(
 }
 
 /**
- * Verify a phone OTP.
+ * Verify a phone OTP code.
+ *
+ * Finds the most recent unexpired OTP for the phone number, increments the
+ * attempt counter, and compares the SHA-256 hash. Locks out after
+ * {@link AUTH.OTP_MAX_ATTEMPTS} failed attempts.
+ *
+ * @param db    - D1Database binding.
+ * @param input - Must include `phone` and `otp` (6-digit string).
+ * @returns `{ verified: true }` on success.
+ * @throws {unauthorized} If no OTP is pending or the code is wrong.
+ * @throws {rateLimited} If max attempts exceeded.
+ *
+ * @example
+ * ```ts
+ * const { verified } = await verifyPhoneOtp(env.DB, {
+ *   phone: '+15551234567',
+ *   otp: '483920',
+ * });
+ * ```
  */
 export async function verifyPhoneOtp(
-  db: SupabaseClient,
+  db: D1Database,
   input: VerifyPhoneOtp,
 ): Promise<{ verified: boolean }> {
   const validated = verifyPhoneOtpSchema.parse(input);
   const otpHash = await sha256Hex(validated.otp);
+  const now = new Date().toISOString();
 
   // Find matching unexpired OTP
-  const query = `phone=eq.${encodeURIComponent(validated.phone)}&verified=eq.false&expires_at=gt.${new Date().toISOString()}&order=created_at.desc&limit=1&select=id,otp_hash,attempts`;
-  const result = await supabaseQuery<Array<{ id: string; otp_hash: string; attempts: number }>>(
+  const record = await dbQueryOne<{ id: string; otp_hash: string; attempts: number }>(
     db,
-    'phone_otps',
-    { query },
+    'SELECT id, otp_hash, attempts FROM phone_otps WHERE phone = ? AND verified = 0 AND expires_at > ? ORDER BY created_at DESC LIMIT 1',
+    [validated.phone, now],
   );
 
-  const record = result.data?.[0];
   if (!record) {
     throw unauthorized('No pending OTP found');
   }
@@ -259,56 +351,59 @@ export async function verifyPhoneOtp(
   }
 
   // Increment attempts
-  await supabaseQuery(db, 'phone_otps', {
-    method: 'PATCH',
-    query: `id=eq.${record.id}`,
-    body: {
-      attempts: record.attempts + 1,
-      updated_at: new Date().toISOString(),
-    },
-  });
+  await dbUpdate(db, 'phone_otps', { attempts: record.attempts + 1 }, 'id = ?', [record.id]);
 
   if (record.otp_hash !== otpHash) {
     throw unauthorized('Invalid OTP');
   }
 
   // Mark as verified
-  await supabaseQuery(db, 'phone_otps', {
-    method: 'PATCH',
-    query: `id=eq.${record.id}`,
-    body: { verified: true, updated_at: new Date().toISOString() },
-  });
+  await dbUpdate(db, 'phone_otps', { verified: 1 }, 'id = ?', [record.id]);
 
   return { verified: true };
 }
 
 /**
- * Create Google OAuth state for CSRF protection.
+ * Create a Google OAuth state token for CSRF protection.
+ *
+ * Generates a random state string, stores it in D1 with a 10-minute expiry,
+ * and returns the full Google OAuth consent URL.
+ *
+ * @param db          - D1Database binding.
+ * @param env         - Worker environment (needs `GOOGLE_CLIENT_ID`, `ENVIRONMENT`).
+ * @param redirectUrl - Optional URL to redirect to after auth completes.
+ * @returns The Google auth URL and the state token.
+ *
+ * @example
+ * ```ts
+ * const { authUrl, state } = await createGoogleOAuthState(env.DB, env);
+ * return c.redirect(authUrl);
+ * ```
  */
 export async function createGoogleOAuthState(
-  db: SupabaseClient,
+  db: D1Database,
   env: Env,
   redirectUrl?: string,
 ): Promise<{ authUrl: string; state: string }> {
   const state = randomHex(32);
 
-  await supabaseQuery(db, 'oauth_states', {
-    method: 'POST',
-    body: {
-      id: crypto.randomUUID(),
-      state,
-      provider: 'google',
-      redirect_url: redirectUrl ?? null,
-      expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // 10 min
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      deleted_at: null,
-    },
+  await dbInsert(db, 'oauth_states', {
+    id: crypto.randomUUID(),
+    state,
+    provider: 'google',
+    redirect_url: redirectUrl ?? null,
+    expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // 10 min
+    deleted_at: null,
   });
+
+  const callbackBase =
+    env.ENVIRONMENT === 'production'
+      ? 'https://sites.megabyte.space'
+      : 'https://sites-staging.megabyte.space';
 
   const params = new URLSearchParams({
     client_id: env.GOOGLE_CLIENT_ID,
-    redirect_uri: `${env.SUPABASE_URL.replace('.supabase.co', '')}/api/auth/google/callback`,
+    redirect_uri: `${callbackBase}/api/auth/google/callback`,
     response_type: 'code',
     scope: 'openid email profile',
     state,
@@ -323,25 +418,38 @@ export async function createGoogleOAuthState(
 }
 
 /**
- * Handle Google OAuth callback.
- * Exchanges code for tokens and creates/links user.
+ * Handle the Google OAuth callback.
+ *
+ * Validates the state token, exchanges the authorization code for an access
+ * token, fetches the user's profile, and returns their info.
+ *
+ * @param db    - D1Database binding.
+ * @param env   - Worker environment.
+ * @param code  - Authorization code from Google.
+ * @param state - State token for CSRF validation.
+ * @returns User profile (email, display_name, avatar_url).
+ * @throws {unauthorized} If state is invalid or expired.
+ * @throws {badRequest} If token exchange or profile fetch fails.
+ *
+ * @example
+ * ```ts
+ * const { email, display_name, avatar_url } =
+ *   await handleGoogleOAuthCallback(env.DB, env, code, state);
+ * ```
  */
 export async function handleGoogleOAuthCallback(
-  db: SupabaseClient,
+  db: D1Database,
   env: Env,
   code: string,
   state: string,
 ): Promise<{ email: string; display_name: string | null; avatar_url: string | null }> {
   // Verify state
-  const stateResult = await supabaseQuery<Array<{ id: string; state: string; expires_at: string }>>(
+  const stateRecord = await dbQueryOne<{ id: string; state: string; expires_at: string }>(
     db,
-    'oauth_states',
-    {
-      query: `state=eq.${state}&provider=eq.google&select=id,state,expires_at`,
-    },
+    'SELECT id, state, expires_at FROM oauth_states WHERE state = ? AND provider = ?',
+    [state, 'google'],
   );
 
-  const stateRecord = stateResult.data?.[0];
   if (!stateRecord) {
     throw unauthorized('Invalid OAuth state');
   }
@@ -351,12 +459,14 @@ export async function handleGoogleOAuthCallback(
   }
 
   // Delete used state
-  await supabaseQuery(db, 'oauth_states', {
-    method: 'DELETE',
-    query: `id=eq.${stateRecord.id}`,
-  });
+  await dbExecute(db, 'DELETE FROM oauth_states WHERE id = ?', [stateRecord.id]);
 
   // Exchange code for tokens
+  const callbackBase =
+    env.ENVIRONMENT === 'production'
+      ? 'https://sites.megabyte.space'
+      : 'https://sites-staging.megabyte.space';
+
   const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -365,7 +475,7 @@ export async function handleGoogleOAuthCallback(
       client_secret: env.GOOGLE_CLIENT_SECRET,
       code,
       grant_type: 'authorization_code',
-      redirect_uri: `${env.SUPABASE_URL.replace('.supabase.co', '')}/api/auth/google/callback`,
+      redirect_uri: `${callbackBase}/api/auth/google/callback`,
     }),
   });
 
@@ -399,9 +509,24 @@ export async function handleGoogleOAuthCallback(
 
 /**
  * Create a session for an authenticated user.
+ *
+ * Generates a random token, stores its SHA-256 hash in D1. The plaintext
+ * token is returned to the client (typically as a cookie or Bearer header).
+ *
+ * @param db         - D1Database binding.
+ * @param userId     - Authenticated user's ID.
+ * @param deviceInfo - Optional device/browser fingerprint.
+ * @param ipAddress  - Optional client IP address.
+ * @returns Plaintext token and expiry.
+ *
+ * @example
+ * ```ts
+ * const { token, expires_at } = await createSession(env.DB, user.id);
+ * c.header('Set-Cookie', `session=${token}; HttpOnly; Secure; Path=/`);
+ * ```
  */
 export async function createSession(
-  db: SupabaseClient,
+  db: D1Database,
   userId: string,
   deviceInfo?: string,
   ipAddress?: string,
@@ -412,30 +537,37 @@ export async function createSession(
     Date.now() + AUTH.SESSION_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
   ).toISOString();
 
-  await supabaseQuery(db, 'sessions', {
-    method: 'POST',
-    body: {
-      id: crypto.randomUUID(),
-      user_id: userId,
-      token_hash: tokenHash,
-      device_info: deviceInfo ?? null,
-      ip_address: ipAddress ?? null,
-      expires_at: expiresAt,
-      last_active_at: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      deleted_at: null,
-    },
+  await dbInsert(db, 'sessions', {
+    id: crypto.randomUUID(),
+    user_id: userId,
+    token_hash: tokenHash,
+    device_info: deviceInfo ?? null,
+    ip_address: ipAddress ?? null,
+    expires_at: expiresAt,
+    last_active_at: new Date().toISOString(),
+    deleted_at: null,
   });
 
   return { token, expires_at: expiresAt };
 }
 
 /**
- * Get session by token.
+ * Retrieve a session by its plaintext token.
+ *
+ * Hashes the token, looks it up, validates expiry, and bumps `last_active_at`.
+ *
+ * @param db    - D1Database binding.
+ * @param token - Plaintext session token from the client.
+ * @returns Session data or `null` if invalid/expired.
+ *
+ * @example
+ * ```ts
+ * const session = await getSession(env.DB, req.headers.get('Authorization'));
+ * if (!session) return c.json({ error: 'Unauthorized' }, 401);
+ * ```
  */
 export async function getSession(
-  db: SupabaseClient,
+  db: D1Database,
   token: string,
 ): Promise<{
   id: string;
@@ -444,15 +576,12 @@ export async function getSession(
 } | null> {
   const tokenHash = await sha256Hex(token);
 
-  const result = await supabaseQuery<Array<{ id: string; user_id: string; expires_at: string }>>(
+  const session = await dbQueryOne<{ id: string; user_id: string; expires_at: string }>(
     db,
-    'sessions',
-    {
-      query: `token_hash=eq.${tokenHash}&deleted_at=is.null&select=id,user_id,expires_at`,
-    },
+    'SELECT id, user_id, expires_at FROM sessions WHERE token_hash = ? AND deleted_at IS NULL',
+    [tokenHash],
   );
 
-  const session = result.data?.[0];
   if (!session) return null;
 
   if (new Date(session.expires_at) < new Date()) {
@@ -460,40 +589,56 @@ export async function getSession(
   }
 
   // Update last_active_at
-  await supabaseQuery(db, 'sessions', {
-    method: 'PATCH',
-    query: `id=eq.${session.id}`,
-    body: { last_active_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  });
+  await dbUpdate(db, 'sessions', { last_active_at: new Date().toISOString() }, 'id = ?', [session.id]);
 
   return session;
 }
 
 /**
- * Revoke a specific session.
+ * Revoke (soft-delete) a session.
+ *
+ * @param db        - D1Database binding.
+ * @param sessionId - The session ID to revoke.
+ *
+ * @example
+ * ```ts
+ * await revokeSession(env.DB, session.id);
+ * ```
  */
-export async function revokeSession(db: SupabaseClient, sessionId: string): Promise<void> {
-  await supabaseQuery(db, 'sessions', {
-    method: 'PATCH',
-    query: `id=eq.${sessionId}`,
-    body: { deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  });
+export async function revokeSession(db: D1Database, sessionId: string): Promise<void> {
+  await dbUpdate(db, 'sessions', { deleted_at: new Date().toISOString() }, 'id = ?', [sessionId]);
 }
 
 /**
- * Get all active sessions for a user.
+ * List all active (non-expired, non-deleted) sessions for a user.
+ *
+ * @param db     - D1Database binding.
+ * @param userId - The user whose sessions to retrieve.
+ * @returns Array of session summaries sorted by most recent activity.
+ *
+ * @example
+ * ```ts
+ * const sessions = await getUserSessions(env.DB, userId);
+ * // [{ id, device_info, last_active_at, created_at }, ...]
+ * ```
  */
 export async function getUserSessions(
-  db: SupabaseClient,
+  db: D1Database,
   userId: string,
 ): Promise<
   Array<{ id: string; device_info: string | null; last_active_at: string; created_at: string }>
 > {
-  const result = await supabaseQuery<
-    Array<{ id: string; device_info: string | null; last_active_at: string; created_at: string }>
-  >(db, 'sessions', {
-    query: `user_id=eq.${userId}&deleted_at=is.null&expires_at=gt.${new Date().toISOString()}&select=id,device_info,last_active_at,created_at&order=last_active_at.desc`,
-  });
+  const now = new Date().toISOString();
+  const { data } = await dbQuery<{
+    id: string;
+    device_info: string | null;
+    last_active_at: string;
+    created_at: string;
+  }>(
+    db,
+    'SELECT id, device_info, last_active_at, created_at FROM sessions WHERE user_id = ? AND deleted_at IS NULL AND expires_at > ? ORDER BY last_active_at DESC',
+    [userId, now],
+  );
 
-  return result.data ?? [];
+  return data;
 }

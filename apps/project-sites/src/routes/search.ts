@@ -1,7 +1,30 @@
+/**
+ * @module routes/search
+ * @description Public search and site-creation routes for the homepage SPA.
+ *
+ * These endpoints power the interactive homepage flow:
+ *
+ * ```
+ * Screen 1 (Search)   → GET  /api/search/businesses   → Google Places proxy
+ * Screen 1 (Lookup)   → GET  /api/sites/lookup         → check existing site by place_id/slug
+ * Screen 3 (Create)   → POST /api/sites/create-from-search → create site + enqueue AI workflow
+ * ```
+ *
+ * ## Route Map
+ *
+ * | Method | Path                           | Auth?  | Description                          |
+ * | ------ | ------------------------------ | ------ | ------------------------------------ |
+ * | GET    | `/api/search/businesses`       | No     | Proxy Google Places Text Search API  |
+ * | GET    | `/api/sites/lookup`            | No     | Look up existing site by place_id    |
+ * | POST   | `/api/sites/create-from-search`| Yes    | Create a site and queue generation   |
+ *
+ * @packageDocumentation
+ */
+
 import { Hono } from 'hono';
 import type { Env, Variables } from '../types/env.js';
 import { badRequest, unauthorized } from '@project-sites/shared';
-import { createServiceClient, supabaseQuery } from '../services/db.js';
+import { dbInsert, dbQuery, dbQueryOne } from '../services/db.js';
 import { writeAuditLog } from '../services/audit.js';
 
 const search = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -54,6 +77,45 @@ search.get('/api/search/businesses', async (c) => {
   return c.json({ data });
 });
 
+// ─── Site Search (pre-built) ─────────────────────────────────
+
+interface SiteSearchRow {
+  id: string;
+  slug: string;
+  business_name: string;
+  business_address: string | null;
+  google_place_id: string | null;
+  status: string;
+  current_build_version: string | null;
+}
+
+search.get('/api/sites/search', async (c) => {
+  const q = c.req.query('q');
+
+  if (!q || q.trim().length < 2) {
+    return c.json({ data: [] });
+  }
+
+  const searchTerm = `%${q.trim()}%`;
+  const { data } = await dbQuery<SiteSearchRow>(
+    c.env.DB,
+    'SELECT id, slug, business_name, business_address, google_place_id, status, current_build_version FROM sites WHERE business_name LIKE ? AND deleted_at IS NULL ORDER BY CASE WHEN status = \'published\' THEN 0 ELSE 1 END, created_at DESC LIMIT 5',
+    [searchTerm],
+  );
+
+  return c.json({
+    data: data.map((site) => ({
+      site_id: site.id,
+      slug: site.slug,
+      business_name: site.business_name,
+      business_address: site.business_address,
+      google_place_id: site.google_place_id,
+      status: site.status,
+      has_build: site.current_build_version !== null,
+    })),
+  });
+});
+
 // ─── Site Lookup ────────────────────────────────────────────
 
 interface SiteRow {
@@ -71,29 +133,25 @@ search.get('/api/sites/lookup', async (c) => {
     throw badRequest('Missing required query parameter: place_id or slug');
   }
 
-  const db = createServiceClient(c.env);
-
-  let query: string;
+  let site: SiteRow | null;
 
   if (placeId) {
-    query = `google_place_id=eq.${placeId}&deleted_at=is.null&select=id,slug,status,current_build_version`;
+    site = await dbQueryOne<SiteRow>(
+      c.env.DB,
+      'SELECT id, slug, status, current_build_version FROM sites WHERE google_place_id = ? AND deleted_at IS NULL',
+      [placeId],
+    );
   } else {
-    query = `slug=eq.${slug}&deleted_at=is.null&select=id,slug,status,current_build_version`;
+    site = await dbQueryOne<SiteRow>(
+      c.env.DB,
+      'SELECT id, slug, status, current_build_version FROM sites WHERE slug = ? AND deleted_at IS NULL',
+      [slug!],
+    );
   }
 
-  const result = await supabaseQuery<SiteRow[]>(db, 'sites', { query });
-
-  if (result.error) {
-    throw badRequest(`Lookup failed: ${result.error}`);
-  }
-
-  const rows = result.data ?? [];
-
-  if (rows.length === 0) {
+  if (!site) {
     return c.json({ data: { exists: false } });
   }
-
-  const site = rows[0]!;
 
   return c.json({
     data: {
@@ -128,8 +186,6 @@ search.post('/api/sites/create-from-search', async (c) => {
     throw badRequest('Missing required field: business_name');
   }
 
-  const db = createServiceClient(c.env);
-
   const slug = body.business_name
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
@@ -152,15 +208,10 @@ search.post('/api/sites/create-from-search', async (c) => {
     status: 'queued',
     lighthouse_score: null,
     lighthouse_last_run: null,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
     deleted_at: null,
   };
 
-  const result = await supabaseQuery(db, 'sites', {
-    method: 'POST',
-    body: site,
-  });
+  const result = await dbInsert(c.env.DB, 'sites', site);
 
   if (result.error) {
     throw badRequest(`Failed to create site: ${result.error}`);
@@ -178,7 +229,7 @@ search.post('/api/sites/create-from-search', async (c) => {
   }
 
   // Log audit
-  await writeAuditLog(db, {
+  await writeAuditLog(c.env.DB, {
     org_id: orgId,
     actor_id: c.get('userId') ?? null,
     action: 'site.created_from_search',

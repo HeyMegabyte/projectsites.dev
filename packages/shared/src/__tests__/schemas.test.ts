@@ -463,9 +463,6 @@ describe('createWorkflowJobSchema', () => {
 describe('envConfigSchema', () => {
   const validConfig = {
     ENVIRONMENT: 'test',
-    SUPABASE_URL: 'https://supabase.example.com',
-    SUPABASE_ANON_KEY: 'test-anon-key',
-    SUPABASE_SERVICE_ROLE_KEY: 'test-service-role-key',
     STRIPE_SECRET_KEY: 'sk_test_abc123',
     STRIPE_PUBLISHABLE_KEY: 'pk_test_abc123',
     STRIPE_WEBHOOK_SECRET: 'whsec_test',
@@ -516,10 +513,6 @@ describe('envConfigSchema', () => {
 
   it('rejects missing required fields', () => {
     expect(() => envConfigSchema.parse({ ENVIRONMENT: 'test' })).toThrow();
-  });
-
-  it('rejects invalid SUPABASE_URL', () => {
-    expect(() => envConfigSchema.parse({ ...validConfig, SUPABASE_URL: 'not-a-url' })).toThrow();
   });
 
   it('defaults METERING_PROVIDER to internal', () => {

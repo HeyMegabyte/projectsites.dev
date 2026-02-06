@@ -1,27 +1,74 @@
+/**
+ * @module audit
+ * @description Append-only audit log service for Project Sites.
+ *
+ * Records all significant state changes: auth events, permission changes,
+ * billing mutations, site operations, and webhook processing decisions.
+ * Logs are org-scoped and ordered by `created_at DESC` for pagination.
+ *
+ * ## Table: `audit_logs`
+ *
+ * | Column         | Type   | Description                          |
+ * | -------------- | ------ | ------------------------------------ |
+ * | `id`           | TEXT   | UUID primary key                     |
+ * | `org_id`       | TEXT   | Organization that owns the log entry |
+ * | `actor_id`     | TEXT?  | User who performed the action        |
+ * | `action`       | TEXT   | Dot-notation event (e.g. `site.created`) |
+ * | `target_type`  | TEXT?  | Entity type affected                 |
+ * | `target_id`    | TEXT?  | Entity ID affected                   |
+ * | `metadata_json`| TEXT?  | Arbitrary JSON context               |
+ * | `request_id`   | TEXT?  | Correlation ID for distributed trace |
+ * | `created_at`   | TEXT   | ISO-8601 timestamp                   |
+ *
+ * @example
+ * ```ts
+ * import { writeAuditLog, getAuditLogs } from '../services/audit.js';
+ *
+ * await writeAuditLog(env.DB, {
+ *   org_id: orgId,
+ *   actor_id: userId,
+ *   action: 'site.created',
+ *   target_type: 'site',
+ *   target_id: siteId,
+ *   request_id: c.get('requestId'),
+ * });
+ *
+ * const { data } = await getAuditLogs(env.DB, orgId, { limit: 25, offset: 0 });
+ * ```
+ *
+ * @packageDocumentation
+ */
+
 import type { CreateAuditLog } from '@project-sites/shared';
 import { createAuditLogSchema } from '@project-sites/shared';
-import type { SupabaseClient } from './db.js';
-import { supabaseQuery } from './db.js';
+import { dbInsert, dbQuery } from './db.js';
 
 /**
- * Append-only audit log service.
- * Logs auth events, permission changes, billing changes, deletes, admin actions,
- * and webhook processing decisions.
+ * Write an audit log entry to D1.
+ *
+ * Failures are logged but **never throw** — audit logging must not break
+ * the request flow.
+ *
+ * @param db    - D1Database binding.
+ * @param entry - Audit log fields (validated via Zod).
  */
-export async function writeAuditLog(db: SupabaseClient, entry: CreateAuditLog): Promise<void> {
+export async function writeAuditLog(db: D1Database, entry: CreateAuditLog): Promise<void> {
   const validated = createAuditLogSchema.parse(entry);
 
-  const { error } = await supabaseQuery(db, 'audit_logs', {
-    method: 'POST',
-    body: {
-      ...validated,
-      created_at: new Date().toISOString(),
-    },
+  const { error } = await dbInsert(db, 'audit_logs', {
+    id: crypto.randomUUID(),
+    org_id: validated.org_id,
+    actor_id: validated.actor_id ?? null,
+    action: validated.action,
+    target_type: validated.target_type ?? null,
+    target_id: validated.target_id ?? null,
+    metadata_json: validated.metadata_json ? JSON.stringify(validated.metadata_json) : null,
+    ip_address: null,
+    request_id: validated.request_id ?? null,
+    created_at: new Date().toISOString(),
   });
 
   if (error) {
-    // Audit log failures should not break the request flow.
-    // Log the error for investigation but don't throw.
     console.error(
       JSON.stringify({
         level: 'error',
@@ -39,16 +86,25 @@ export async function writeAuditLog(db: SupabaseClient, entry: CreateAuditLog): 
 }
 
 /**
- * Query audit logs for an org.
+ * Query audit logs for an organization with pagination.
+ *
+ * @param db      - D1Database binding.
+ * @param orgId   - Organization ID to filter by.
+ * @param options - Pagination options (`limit` defaults to 50, `offset` to 0).
+ * @returns Paginated array of audit log entries.
  */
 export async function getAuditLogs(
-  db: SupabaseClient,
+  db: D1Database,
   orgId: string,
   options: { limit?: number; offset?: number } = {},
 ): Promise<{ data: unknown[]; error: string | null }> {
   const { limit = 50, offset = 0 } = options;
-  const query = `org_id=eq.${orgId}&order=created_at.desc&limit=${limit}&offset=${offset}`;
 
-  const result = await supabaseQuery<unknown[]>(db, 'audit_logs', { query });
-  return { data: result.data ?? [], error: result.error };
+  const result = await dbQuery<unknown>(
+    db,
+    'SELECT * FROM audit_logs WHERE org_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?',
+    [orgId, limit, offset],
+  );
+
+  return { data: result.data, error: result.error };
 }

@@ -1,3 +1,32 @@
+/**
+ * @module index
+ * @description Main entry point for the Project Sites Cloudflare Worker.
+ *
+ * Configures global middleware, mounts route modules, handles the
+ * catch-all site-serving logic, and exports the Workers fetch/queue/scheduled
+ * handlers.
+ *
+ * ## Middleware Stack (applied to every request)
+ *
+ * | Order | Middleware          | Purpose                              |
+ * | ----- | ------------------- | ------------------------------------ |
+ * | 1     | `requestId`         | Generate `X-Request-ID` header       |
+ * | 2     | `payloadLimit`      | Reject oversized request bodies      |
+ * | 3     | `securityHeaders`   | Set CSP, HSTS, X-Frame-Options       |
+ * | 4     | `cors` (API only)   | CORS for `/api/*` endpoints          |
+ * | 5     | `errorHandler`      | Catch + format errors as JSON        |
+ *
+ * ## Routing Priority
+ *
+ * 1. Health check (`/health`)
+ * 2. API routes (`/api/*`)
+ * 3. Search routes (`/api/search/*`, `/api/sites/lookup`, etc.)
+ * 4. Webhook routes (`/webhooks/*`)
+ * 5. Catch-all: marketing site or subdomain site serving
+ *
+ * @packageDocumentation
+ */
+
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import type { Env, Variables } from './types/env.js';
@@ -9,8 +38,8 @@ import { health } from './routes/health.js';
 import { api } from './routes/api.js';
 import { search } from './routes/search.js';
 import { webhooks } from './routes/webhooks.js';
-import { createServiceClient } from './services/db.js';
 import { resolveSite, serveSiteFromR2 } from './services/site_serving.js';
+import { dbUpdate } from './services/db.js';
 import { registerAllPrompts } from './services/ai_workflows.js';
 import { DOMAINS } from '@project-sites/shared';
 
@@ -115,9 +144,8 @@ app.all('*', async (c) => {
     );
   }
 
-  // Resolve the site from hostname
-  const db = createServiceClient(c.env);
-  const site = await resolveSite(c.env, db, hostname);
+  // Resolve the site from hostname using D1
+  const site = await resolveSite(c.env, c.env.DB, hostname);
 
   if (!site) {
     return c.json(
@@ -155,6 +183,9 @@ export default {
 
   /**
    * Queue consumer handler for workflow jobs.
+   *
+   * Processes queued `generate_site` jobs by running the v2 AI workflow,
+   * uploading results to R2, and updating the site record in D1.
    */
   async queue(batch: MessageBatch, env: Env): Promise<void> {
     for (const message of batch.messages) {
@@ -171,17 +202,6 @@ export default {
 
         if (payload.job_name === 'generate_site') {
           const { runSiteGenerationWorkflowV2 } = await import('./services/ai_workflows.js');
-          const { supabaseQuery } = await import('./services/db.js');
-          const db = {
-            url: env.SUPABASE_URL,
-            headers: {
-              apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-              Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-              'Content-Type': 'application/json',
-              Prefer: 'return=representation',
-            },
-            fetch: globalThis.fetch.bind(globalThis),
-          };
 
           const result = await runSiteGenerationWorkflowV2(env, {
             businessName: String(payload.business_name ?? ''),
@@ -224,16 +244,17 @@ export default {
             ),
           ]);
 
-          // Update site record
-          await supabaseQuery(db, 'sites', {
-            method: 'PATCH',
-            query: `id=eq.${siteId}`,
-            body: {
+          // Update site record in D1
+          await dbUpdate(
+            env.DB,
+            'sites',
+            {
               status: 'published',
               current_build_version: version,
-              updated_at: new Date().toISOString(),
             },
-          });
+            'id = ?',
+            [siteId],
+          );
 
           console.warn(
             JSON.stringify({
@@ -264,7 +285,12 @@ export default {
   },
 
   /**
-   * Scheduled handler for periodic tasks.
+   * Scheduled handler for periodic tasks (cron triggers).
+   *
+   * Planned tasks:
+   * - Verify pending custom hostnames via Cloudflare API
+   * - Dunning checks for past-due subscriptions
+   * - Analytics rollup
    */
   async scheduled(_event: ScheduledEvent, _env: Env, _ctx: ExecutionContext): Promise<void> {
     // TODO: Implement scheduled tasks

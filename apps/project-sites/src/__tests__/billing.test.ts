@@ -1,5 +1,8 @@
 jest.mock('../services/db.js', () => ({
-  supabaseQuery: jest.fn(),
+  dbQuery: jest.fn().mockResolvedValue({ data: [], error: null }),
+  dbQueryOne: jest.fn().mockResolvedValue(null),
+  dbInsert: jest.fn().mockResolvedValue({ error: null }),
+  dbUpdate: jest.fn().mockResolvedValue({ error: null, changes: 1 }),
 }));
 
 jest.mock('@project-sites/shared', () => {
@@ -10,7 +13,7 @@ jest.mock('@project-sites/shared', () => {
   };
 });
 
-import { supabaseQuery } from '../services/db.js';
+import { dbQueryOne, dbInsert, dbUpdate } from '../services/db.js';
 import {
   getOrCreateStripeCustomer,
   createCheckoutSession,
@@ -23,7 +26,9 @@ import {
   createBillingPortalSession,
 } from '../services/billing.js';
 
-const mockQuery = supabaseQuery as jest.MockedFunction<typeof supabaseQuery>;
+const mockQueryOne = dbQueryOne as jest.MockedFunction<typeof dbQueryOne>;
+const mockInsert = dbInsert as jest.MockedFunction<typeof dbInsert>;
+const mockUpdate = dbUpdate as jest.MockedFunction<typeof dbUpdate>;
 
 const mockEnv = {
   STRIPE_SECRET_KEY: 'sk_test_123',
@@ -32,7 +37,7 @@ const mockEnv = {
   SALE_WEBHOOK_SECRET: undefined,
 } as any;
 
-const mockDb = { url: 'https://test.supabase.co', headers: {}, fetch: jest.fn() } as any;
+const mockDb = {} as D1Database;
 
 const originalFetch = global.fetch;
 
@@ -50,22 +55,18 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 describe('getOrCreateStripeCustomer', () => {
   it('returns existing customer ID when subscription has one', async () => {
-    mockQuery.mockResolvedValueOnce({
-      data: [{ id: 'sub_1', stripe_customer_id: 'cus_existing' }],
-      error: null,
-      status: 200,
-    });
+    mockQueryOne.mockResolvedValueOnce({ id: 'sub_1', stripe_customer_id: 'cus_existing' });
 
     const result = await getOrCreateStripeCustomer(mockDb, mockEnv, 'org_1', 'a@b.com');
 
     expect(result).toEqual({ stripe_customer_id: 'cus_existing' });
-    expect(mockQuery).toHaveBeenCalledTimes(1);
+    expect(mockQueryOne).toHaveBeenCalledTimes(1);
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
   it('creates new Stripe customer when none exists', async () => {
-    mockQuery.mockResolvedValueOnce({ data: [], error: null, status: 200 });
-    mockQuery.mockResolvedValueOnce({ data: null, error: null, status: 201 });
+    mockQueryOne.mockResolvedValueOnce(null);
+    mockInsert.mockResolvedValueOnce({ error: null });
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
@@ -80,25 +81,22 @@ describe('getOrCreateStripeCustomer', () => {
       'https://api.stripe.com/v1/customers',
       expect.objectContaining({ method: 'POST' }),
     );
-    // Should upsert subscription record
-    expect(mockQuery).toHaveBeenCalledTimes(2);
-    expect(mockQuery).toHaveBeenLastCalledWith(
+    // Should insert subscription record
+    expect(mockInsert).toHaveBeenCalledTimes(1);
+    expect(mockInsert).toHaveBeenCalledWith(
       mockDb,
       'subscriptions',
       expect.objectContaining({
-        method: 'POST',
-        body: expect.objectContaining({
-          org_id: 'org_1',
-          stripe_customer_id: 'cus_new',
-          plan: 'free',
-          status: 'active',
-        }),
+        org_id: 'org_1',
+        stripe_customer_id: 'cus_new',
+        plan: 'free',
+        status: 'active',
       }),
     );
   });
 
   it('throws on Stripe API failure', async () => {
-    mockQuery.mockResolvedValueOnce({ data: [], error: null, status: 200 });
+    mockQueryOne.mockResolvedValueOnce(null);
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: false,
@@ -124,11 +122,7 @@ describe('createCheckoutSession', () => {
   };
 
   function mockExistingCustomer() {
-    mockQuery.mockResolvedValueOnce({
-      data: [{ id: 'sub_1', stripe_customer_id: 'cus_existing' }],
-      error: null,
-      status: 200,
-    });
+    mockQueryOne.mockResolvedValueOnce({ id: 'sub_1', stripe_customer_id: 'cus_existing' });
   }
 
   it('returns checkout_url and session_id on success', async () => {
@@ -184,7 +178,7 @@ describe('createCheckoutSession', () => {
 // ---------------------------------------------------------------------------
 describe('handleCheckoutCompleted', () => {
   it('updates subscription to paid/active', async () => {
-    mockQuery.mockResolvedValueOnce({ data: null, error: null, status: 200 });
+    mockUpdate.mockResolvedValueOnce({ error: null, changes: 1 });
 
     await handleCheckoutCompleted(mockDb, mockEnv, {
       customer: 'cus_1',
@@ -192,19 +186,17 @@ describe('handleCheckoutCompleted', () => {
       metadata: { org_id: 'org_1' },
     });
 
-    expect(mockQuery).toHaveBeenCalledWith(
+    expect(mockUpdate).toHaveBeenCalledWith(
       mockDb,
       'subscriptions',
       expect.objectContaining({
-        method: 'PATCH',
-        query: 'org_id=eq.org_1',
-        body: expect.objectContaining({
-          plan: 'paid',
-          status: 'active',
-          stripe_subscription_id: 'sub_1',
-          dunning_stage: 0,
-        }),
+        plan: 'paid',
+        status: 'active',
+        stripe_subscription_id: 'sub_1',
+        dunning_stage: 0,
       }),
+      'org_id = ?',
+      ['org_1'],
     );
   });
 
@@ -225,7 +217,7 @@ describe('handleCheckoutCompleted', () => {
       SALE_WEBHOOK_SECRET: 'whsec_test',
     };
 
-    mockQuery.mockResolvedValueOnce({ data: null, error: null, status: 200 });
+    mockUpdate.mockResolvedValueOnce({ error: null, changes: 1 });
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: true });
 
@@ -262,7 +254,7 @@ describe('handleCheckoutCompleted', () => {
 // ---------------------------------------------------------------------------
 describe('handleSubscriptionUpdated', () => {
   it('updates subscription status and period dates', async () => {
-    mockQuery.mockResolvedValueOnce({ data: null, error: null, status: 200 });
+    mockUpdate.mockResolvedValueOnce({ error: null, changes: 1 });
 
     const periodStart = 1700000000;
     const periodEnd = 1702592000;
@@ -276,19 +268,17 @@ describe('handleSubscriptionUpdated', () => {
       metadata: { org_id: 'org_1' },
     });
 
-    expect(mockQuery).toHaveBeenCalledWith(
+    expect(mockUpdate).toHaveBeenCalledWith(
       mockDb,
       'subscriptions',
       expect.objectContaining({
-        method: 'PATCH',
-        query: 'org_id=eq.org_1',
-        body: expect.objectContaining({
-          status: 'active',
-          cancel_at_period_end: false,
-          current_period_start: new Date(periodStart * 1000).toISOString(),
-          current_period_end: new Date(periodEnd * 1000).toISOString(),
-        }),
+        status: 'active',
+        cancel_at_period_end: 0,
+        current_period_start: new Date(periodStart * 1000).toISOString(),
+        current_period_end: new Date(periodEnd * 1000).toISOString(),
       }),
+      'org_id = ?',
+      ['org_1'],
     );
   });
 
@@ -303,11 +293,11 @@ describe('handleSubscriptionUpdated', () => {
     });
 
     expect(result).toBeUndefined();
-    expect(mockQuery).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   it('passes cancel_at_period_end correctly', async () => {
-    mockQuery.mockResolvedValueOnce({ data: null, error: null, status: 200 });
+    mockUpdate.mockResolvedValueOnce({ error: null, changes: 1 });
 
     await handleSubscriptionUpdated(mockDb, {
       id: 'sub_1',
@@ -318,14 +308,14 @@ describe('handleSubscriptionUpdated', () => {
       metadata: { org_id: 'org_1' },
     });
 
-    expect(mockQuery).toHaveBeenCalledWith(
+    expect(mockUpdate).toHaveBeenCalledWith(
       mockDb,
       'subscriptions',
       expect.objectContaining({
-        body: expect.objectContaining({
-          cancel_at_period_end: true,
-        }),
+        cancel_at_period_end: 1,
       }),
+      'org_id = ?',
+      ['org_1'],
     );
   });
 });
@@ -335,25 +325,23 @@ describe('handleSubscriptionUpdated', () => {
 // ---------------------------------------------------------------------------
 describe('handleSubscriptionDeleted', () => {
   it('sets plan=free, status=canceled', async () => {
-    mockQuery.mockResolvedValueOnce({ data: null, error: null, status: 200 });
+    mockUpdate.mockResolvedValueOnce({ error: null, changes: 1 });
 
     await handleSubscriptionDeleted(mockDb, {
       id: 'sub_1',
       metadata: { org_id: 'org_1' },
     });
 
-    expect(mockQuery).toHaveBeenCalledWith(
+    expect(mockUpdate).toHaveBeenCalledWith(
       mockDb,
       'subscriptions',
       expect.objectContaining({
-        method: 'PATCH',
-        query: 'org_id=eq.org_1',
-        body: expect.objectContaining({
-          plan: 'free',
-          status: 'canceled',
-          stripe_subscription_id: null,
-        }),
+        plan: 'free',
+        status: 'canceled',
+        stripe_subscription_id: null,
       }),
+      'org_id = ?',
+      ['org_1'],
     );
   });
 
@@ -364,7 +352,7 @@ describe('handleSubscriptionDeleted', () => {
     });
 
     expect(result).toBeUndefined();
-    expect(mockQuery).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 });
 
@@ -373,23 +361,21 @@ describe('handleSubscriptionDeleted', () => {
 // ---------------------------------------------------------------------------
 describe('handlePaymentFailed', () => {
   it('sets status=past_due', async () => {
-    mockQuery.mockResolvedValueOnce({ data: null, error: null, status: 200 });
+    mockUpdate.mockResolvedValueOnce({ error: null, changes: 1 });
 
     await handlePaymentFailed(mockDb, {
       subscription: 'sub_1',
       metadata: { org_id: 'org_1' },
     });
 
-    expect(mockQuery).toHaveBeenCalledWith(
+    expect(mockUpdate).toHaveBeenCalledWith(
       mockDb,
       'subscriptions',
       expect.objectContaining({
-        method: 'PATCH',
-        query: 'org_id=eq.org_1',
-        body: expect.objectContaining({
-          status: 'past_due',
-        }),
+        status: 'past_due',
       }),
+      'org_id = ?',
+      ['org_1'],
     );
   });
 
@@ -400,7 +386,7 @@ describe('handlePaymentFailed', () => {
     });
 
     expect(result).toBeUndefined();
-    expect(mockQuery).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 });
 
@@ -409,11 +395,7 @@ describe('handlePaymentFailed', () => {
 // ---------------------------------------------------------------------------
 describe('getOrgEntitlements', () => {
   it('returns paid entitlements when sub is paid+active', async () => {
-    mockQuery.mockResolvedValueOnce({
-      data: [{ plan: 'paid', status: 'active' }],
-      error: null,
-      status: 200,
-    });
+    mockQueryOne.mockResolvedValueOnce({ plan: 'paid', status: 'active' });
 
     const result = await getOrgEntitlements(mockDb, 'org_1');
 
@@ -428,11 +410,7 @@ describe('getOrgEntitlements', () => {
   });
 
   it('returns free entitlements when sub is free', async () => {
-    mockQuery.mockResolvedValueOnce({
-      data: [{ plan: 'free', status: 'active' }],
-      error: null,
-      status: 200,
-    });
+    mockQueryOne.mockResolvedValueOnce({ plan: 'free', status: 'active' });
 
     const result = await getOrgEntitlements(mockDb, 'org_1');
 
@@ -447,11 +425,7 @@ describe('getOrgEntitlements', () => {
   });
 
   it('returns free entitlements when no subscription found', async () => {
-    mockQuery.mockResolvedValueOnce({
-      data: [],
-      error: null,
-      status: 200,
-    });
+    mockQueryOne.mockResolvedValueOnce(null);
 
     const result = await getOrgEntitlements(mockDb, 'org_1');
 
@@ -471,24 +445,29 @@ describe('getOrgEntitlements', () => {
 // ---------------------------------------------------------------------------
 describe('getOrgSubscription', () => {
   it('returns subscription data when found', async () => {
-    const sub = {
+    mockQueryOne.mockResolvedValueOnce({
+      plan: 'paid',
+      status: 'active',
+      stripe_customer_id: 'cus_1',
+      stripe_subscription_id: 'sub_1',
+      cancel_at_period_end: 0,
+      current_period_end: '2024-12-31T00:00:00Z',
+    });
+
+    const result = await getOrgSubscription(mockDb, 'org_1');
+
+    expect(result).toEqual({
       plan: 'paid',
       status: 'active',
       stripe_customer_id: 'cus_1',
       stripe_subscription_id: 'sub_1',
       cancel_at_period_end: false,
       current_period_end: '2024-12-31T00:00:00Z',
-    };
-
-    mockQuery.mockResolvedValueOnce({ data: [sub], error: null, status: 200 });
-
-    const result = await getOrgSubscription(mockDb, 'org_1');
-
-    expect(result).toEqual(sub);
+    });
   });
 
   it('returns null when not found', async () => {
-    mockQuery.mockResolvedValueOnce({ data: [], error: null, status: 200 });
+    mockQueryOne.mockResolvedValueOnce(null);
 
     const result = await getOrgSubscription(mockDb, 'org_1');
 

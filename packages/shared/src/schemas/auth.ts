@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { baseFields, emailSchema, phoneSchema, uuidSchema } from './base.js';
 
-/** User schema (linked to Supabase Auth user) */
+/** User schema */
 export const userSchema = z.object({
   id: baseFields.id,
   email: emailSchema.nullable(),
