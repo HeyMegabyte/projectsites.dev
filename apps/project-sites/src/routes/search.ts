@@ -60,8 +60,19 @@ search.get('/api/search/businesses', async (c) => {
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    throw badRequest(`Google Places API error: ${errorText}`);
+    const errorText = await response.text().catch(() => '');
+    console.warn(
+      JSON.stringify({
+        level: 'error',
+        service: 'search',
+        message: 'Google Places API error',
+        status: response.status,
+        body: errorText.slice(0, 500),
+        query: q,
+      }),
+    );
+    // Return empty results instead of erroring so the UI still works
+    return c.json({ data: [] });
   }
 
   const json = (await response.json()) as GooglePlacesResponse;

@@ -5,7 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Project Sites - Your Website, Handled. Finally.</title>
   <meta name="description" content="AI-powered websites for small businesses. Search for your business and get a professional site in minutes.">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#x1f680;</text></svg>">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/icon-16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/icon-180.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <meta name="theme-color" content="#0a0a1a">
   <link href="https://releases.transloadit.com/uppy/v4.12.1/uppy.min.css" rel="stylesheet">
   <style>
     /* ======================================================
@@ -150,7 +154,7 @@
       letter-spacing: -0.01em;
       cursor: pointer;
     }
-    .logo svg { flex-shrink: 0; }
+    .logo img, .logo svg { flex-shrink: 0; }
     .logo em {
       font-style: normal;
       color: var(--accent);
@@ -297,8 +301,9 @@
     .search-spinner {
       position: absolute;
       right: 18px;
-      top: 50%;
-      transform: translateY(-50%);
+      top: 0;
+      bottom: 0;
+      margin: auto;
       width: 20px;
       height: 20px;
       border: 2px solid var(--border);
@@ -313,10 +318,12 @@
     .search-dropdown {
       position: absolute;
       top: 100%;
+      margin-top: -2px;
       left: 0;
       right: 0;
       background: var(--bg-card);
       border: 1px solid var(--border-hover);
+      border-top: none;
       border-radius: 0 0 var(--radius) var(--radius);
       max-height: 400px;
       overflow-y: auto;
@@ -1140,10 +1147,7 @@
   <header class="header">
     <div class="header-inner">
       <a class="logo" onclick="navigateTo('search')">
-        <svg width="26" height="26" viewBox="0 0 28 28" fill="none">
-          <rect width="28" height="28" rx="6" fill="#64ffda"/>
-          <path d="M8 14l4 4 8-8" stroke="#0a0a1a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+        <img src="/logo.svg" alt="Project Sites" width="28" height="28" style="flex-shrink:0">
         Project <em>Sites</em>
       </a>
     </div>
@@ -1585,7 +1589,7 @@
       </div>
       <div class="footer-bottom">
         <span>&copy; 2025 Megabyte LLC</span>
-        <span>Powered by <a href="https://www.cloudflare.com" target="_blank" rel="noopener noreferrer">Cloudflare</a></span>
+        <span>Powered by <a href="https://megabyte.space" target="_blank" rel="noopener noreferrer">Megabyte Labs</a></span>
       </div>
     </div>
   </footer>
@@ -1938,10 +1942,35 @@
       redirectTo('/api/auth/google?redirect_url=' + encodeURIComponent(redirectUrl));
     }
 
+    /** Normalize a phone number to E.164 format (+1XXXXXXXXXX for US). */
+    function normalizePhone(raw) {
+      var digits = raw.replace(/[^0-9]/g, '');
+      if (digits.length === 10) return '+1' + digits;
+      if (digits.length === 11 && digits[0] === '1') return '+' + digits;
+      if (raw.startsWith('+')) return '+' + digits;
+      return '+' + digits;
+    }
+
+    /** Extract a human-readable error message from an API error response. */
+    function extractErrorMsg(d, fallback) {
+      if (!d) return fallback;
+      if (typeof d === 'string') return d;
+      if (typeof d.message === 'string') return d.message;
+      if (d.error && typeof d.error === 'string') return d.error;
+      if (d.error && typeof d.error.message === 'string') return d.error.message;
+      return fallback;
+    }
+
     function sendPhoneOtp() {
-      var phone = document.getElementById('phone-input').value.trim();
-      if (!phone) {
+      var raw = document.getElementById('phone-input').value.trim();
+      if (!raw) {
         showMsg('phone-send-msg', 'error', 'Please enter your phone number.');
+        return;
+      }
+      var phone = normalizePhone(raw);
+      var digitsOnly = phone.replace(/[^0-9]/g, '');
+      if (digitsOnly.length < 10 || digitsOnly.length > 15) {
+        showMsg('phone-send-msg', 'error', 'Please enter a valid phone number (e.g. 4123453338 or +14123453338).');
         return;
       }
 
@@ -1956,13 +1985,12 @@
         body: JSON.stringify({ phone: phone })
       })
         .then(function(res) {
-          if (!res.ok) return res.json().then(function(d) { throw new Error(d.error || 'Failed to send code'); });
+          if (!res.ok) return res.json().then(function(d) { throw new Error(extractErrorMsg(d, 'Failed to send code')); });
           return res.json();
         })
         .then(function(data) {
           btn.disabled = false;
           btn.textContent = 'Send Verification Code';
-          // Show OTP step
           document.getElementById('phone-step-input').style.display = 'none';
           document.getElementById('phone-step-otp').style.display = 'block';
           document.getElementById('otp-input').focus();
@@ -1990,17 +2018,18 @@
       fetch('/api/auth/phone/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: state._phoneNumber, code: code })
+        body: JSON.stringify({ phone: state._phoneNumber, otp: code })
       })
         .then(function(res) {
-          if (!res.ok) return res.json().then(function(d) { throw new Error(d.error || 'Invalid code'); });
+          if (!res.ok) return res.json().then(function(d) { throw new Error(extractErrorMsg(d, 'Invalid code')); });
           return res.json();
         })
         .then(function(data) {
           btn.disabled = false;
           btn.textContent = 'Verify Code';
+          var d = data.data || data;
           state.session = {
-            token: data.token || data.access_token || '',
+            token: d.token || data.token || data.access_token || '',
             identifier: state._phoneNumber
           };
 
@@ -2035,7 +2064,7 @@
         body: JSON.stringify({ email: email })
       })
         .then(function(res) {
-          if (!res.ok) return res.json().then(function(d) { throw new Error(d.error || 'Failed to send link'); });
+          if (!res.ok) return res.json().then(function(d) { throw new Error(extractErrorMsg(d, 'Failed to send link')); });
           return res.json();
         })
         .then(function(data) {

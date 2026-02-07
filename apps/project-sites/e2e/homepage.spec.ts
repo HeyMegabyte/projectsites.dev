@@ -359,8 +359,8 @@ test.describe('Footer', () => {
     await expect(footer.locator('a[href*="facebook.com"]')).toBeVisible();
   });
 
-  test('has Powered by Cloudflare attribution', async ({ page }) => {
+  test('has Powered by Megabyte Labs attribution', async ({ page }) => {
     const footer = page.locator('footer');
-    await expect(footer.getByText(/powered by cloudflare/i)).toBeVisible();
+    await expect(footer.getByText(/powered by megabyte labs/i)).toBeVisible();
   });
 });

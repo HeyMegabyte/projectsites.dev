@@ -165,14 +165,13 @@ describe('GET /api/search/businesses', () => {
     expect(body.data).toEqual([]);
   });
 
-  it('handles Google API errors gracefully and returns 400', async () => {
+  it('handles Google API errors gracefully and returns empty results', async () => {
     mockFetch.mockResolvedValueOnce(new Response('API key invalid', { status: 403 }));
 
     const res = await makeRequest('/api/search/businesses?q=test');
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.error.code).toBe('BAD_REQUEST');
-    expect(body.error.message).toContain('Google Places API error');
+    expect(body.data).toEqual([]);
   });
 });
 
