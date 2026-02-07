@@ -1,3 +1,42 @@
+/**
+ * @module schemas
+ * @packageDocumentation
+ *
+ * Zod validation schemas and their inferred TypeScript types for every
+ * domain entity in the platform. Each sub-module covers one bounded context
+ * and exports both the runtime schema and a corresponding `type` alias.
+ *
+ * | Sub-module    | Key exports                                                                  |
+ * | ------------- | ---------------------------------------------------------------------------- |
+ * | `base`        | `baseFields`, `uuidSchema`, `slugSchema`, `emailSchema`, `phoneSchema`, `paginationSchema`, `errorEnvelopeSchema`, `successEnvelopeSchema` |
+ * | `org`         | `orgSchema`, `createOrgSchema`, `membershipSchema` + `Org`, `Membership`     |
+ * | `site`        | `siteSchema`, `createSiteSchema`, `updateSiteSchema`, `confidenceAttributeSchema`, `researchDataSchema` + inferred types |
+ * | `billing`     | `subscriptionSchema`, `entitlementsSchema`, `createCheckoutSessionSchema`, `saleWebhookPayloadSchema` + `Subscription`, `Entitlements` |
+ * | `auth`        | `userSchema`, `sessionSchema`, `createMagicLinkSchema`, `verifyPhoneOtpSchema`, `loginResponseSchema` + `User`, `Session`, `LoginResponse` |
+ * | `audit`       | `auditLogSchema`, `createAuditLogSchema` + `AuditLog`                        |
+ * | `webhook`     | `webhookEventSchema`, `webhookIngestionSchema` + `WebhookEvent`              |
+ * | `workflow`    | `workflowJobSchema`, `createWorkflowJobSchema`, `jobEnvelopeSchema` + `WorkflowJob`, `JobEnvelope` |
+ * | `config`      | `envConfigSchema`, `environmentSchema`, `validateEnvConfig` + `EnvConfig`, `Environment` |
+ * | `analytics`   | `analyticsDailySchema`, `funnelEventSchema`, `usageEventSchema` + inferred types |
+ * | `hostname`    | `hostnameRecordSchema`, `createHostnameSchema`, `hostnameStatusSchema` + `HostnameRecord`, `HostnameStatus` |
+ * | `api`         | `apiErrorCodes`, `apiErrorSchema`, `healthCheckSchema` + `ApiErrorCode`, `ApiError`, `HealthCheck` |
+ *
+ * @example
+ * ```ts
+ * import {
+ *   createSiteSchema,
+ *   type CreateSite,
+ *   subscriptionSchema,
+ *   envConfigSchema,
+ * } from '@bolt/shared/schemas';
+ *
+ * // Validate an incoming request body
+ * const body: CreateSite = createSiteSchema.parse(request.body);
+ *
+ * // Validate environment variables at Worker boot
+ * const env = envConfigSchema.parse(process.env);
+ * ```
+ */
 export * from './base.js';
 export * from './org.js';
 export * from './site.js';
