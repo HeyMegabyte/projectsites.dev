@@ -128,11 +128,28 @@ app.all('*', async (c) => {
         jpg: 'image/jpeg',
         svg: 'image/svg+xml',
         ico: 'image/x-icon',
+        xml: 'application/xml',
+        webmanifest: 'application/manifest+json',
+        txt: 'text/plain',
       };
+
+      // For HTML, inject runtime env vars (PostHog key, Stripe publishable key)
+      if (ext === 'html') {
+        let html = await marketingAsset.text();
+        const phKey = c.env.POSTHOG_API_KEY ?? 'none';
+        html = html.replace('</head>', `<meta name="x-posthog-key" content="${phKey}">\n</head>`);
+        return new Response(html, {
+          headers: {
+            'Content-Type': 'text/html',
+            'Cache-Control': 'public, max-age=60',
+          },
+        });
+      }
+
       return new Response(marketingAsset.body, {
         headers: {
           'Content-Type': mimeTypes[ext] ?? 'application/octet-stream',
-          'Cache-Control': 'public, max-age=60',
+          'Cache-Control': 'public, max-age=3600',
         },
       });
     }
