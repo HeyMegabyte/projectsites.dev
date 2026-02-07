@@ -19,8 +19,8 @@
  * ## Routing Priority
  *
  * 1. Health check (`/health`)
- * 2. API routes (`/api/*`)
- * 3. Search routes (`/api/search/*`, `/api/sites/lookup`, etc.)
+ * 2. Search routes (`/api/search/*`, `/api/sites/lookup`, `/api/sites/search`)
+ * 3. API routes (`/api/*`) — includes `/api/sites/:id` param routes
  * 4. Webhook routes (`/webhooks/*`)
  * 5. Catch-all: marketing site or subdomain site serving
  *
@@ -95,8 +95,8 @@ app.onError(errorHandler);
 // ─── Mount Routes ────────────────────────────────────────────
 
 app.route('/', health);
+app.route('/', search);  // Must come before api so /api/sites/search wins over /api/sites/:id
 app.route('/', api);
-app.route('/', search);
 app.route('/', webhooks);
 
 // ─── Site Serving (catch-all for subdomain routing) ──────────
