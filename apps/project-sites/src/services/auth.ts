@@ -385,6 +385,10 @@ export async function createGoogleOAuthState(
   env: Env,
   redirectUrl?: string,
 ): Promise<{ authUrl: string; state: string }> {
+  if (!env.GOOGLE_CLIENT_ID) {
+    throw badRequest('Google OAuth is not configured. GOOGLE_CLIENT_ID secret is missing.');
+  }
+
   const state = randomHex(32);
 
   await dbInsert(db, 'oauth_states', {

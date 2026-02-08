@@ -1307,60 +1307,426 @@
     }
     .footer-bottom a:hover { color: var(--accent); }
 
-    /* ── Mobile comparison cards (replaces table at ≤720px) ── */
-    .comparison-cards { display: none; }
+    /* ── Hero CTAs ────────────────────────────────── */
+    .hero-ctas {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      margin-top: 24px;
+      animation: fadeInUp 0.6s ease 0.45s both;
+    }
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-secondary);
+      border: 1.5px solid var(--border);
+      padding: 12px 24px;
+      border-radius: var(--radius);
+      font-size: 0.95rem;
+      font-weight: 600;
+      font-family: var(--font);
+      cursor: pointer;
+      text-decoration: none;
+      transition: color var(--transition), border-color var(--transition);
+    }
+    .btn-ghost:hover {
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+    .hero-clarify {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin-top: 12px;
+      animation: fadeInUp 0.6s ease 0.5s both;
+    }
+    .hero-clarify strong { color: var(--accent); font-weight: 600; }
 
-    @media (max-width: 720px) {
-      .comparison-table { display: none; }
-      .comparison-cards {
-        display: flex;
-        flex-direction: column;
-        gap: 16px;
-      }
-      .compare-card {
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: var(--radius-lg);
-        overflow: hidden;
-      }
-      .compare-card.compare-highlight {
-        border-color: var(--accent);
-        box-shadow: 0 0 24px rgba(100,255,218,0.08);
-      }
-      .compare-card-header {
-        padding: 16px 20px;
-        font-weight: 700;
-        font-size: 1rem;
-        background: var(--bg-secondary);
-        color: var(--text-secondary);
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-      }
-      .compare-highlight .compare-card-header {
-        color: var(--accent);
-        background: rgba(100,255,218,0.06);
-      }
-      .compare-card-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 12px 20px;
-        border-bottom: 1px solid var(--border);
-        font-size: 0.9rem;
-      }
-      .compare-card-row:last-child { border-bottom: none; }
-      .compare-card-label {
-        font-weight: 600;
-        color: var(--text-primary);
-      }
-      .compare-card-value {
-        color: var(--text-secondary);
-        text-align: right;
-      }
-      .compare-highlight .compare-card-value {
-        color: var(--accent);
-        font-weight: 600;
-      }
+    /* ── Proof / Gallery ─────────────────────────── */
+    #proof { padding: 80px 0 60px; }
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      margin-bottom: 48px;
+    }
+    .site-thumb {
+      position: relative;
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      aspect-ratio: 16/10;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      transition: transform var(--transition), box-shadow var(--transition);
+      cursor: pointer;
+    }
+    .site-thumb:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-accent);
+    }
+    .site-thumb-preview {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+    .site-thumb-bar {
+      height: 28px;
+      background: var(--bg-secondary);
+      display: flex;
+      align-items: center;
+      padding: 0 10px;
+      gap: 5px;
+    }
+    .site-thumb-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      opacity: 0.4;
+    }
+    .site-thumb-body {
+      flex: 1;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .site-thumb-hero-block {
+      height: 40%;
+      border-radius: 6px;
+      opacity: 0.7;
+    }
+    .site-thumb-line {
+      height: 6px;
+      border-radius: 3px;
+      background: var(--border);
+    }
+    .site-thumb-line.short { width: 60%; }
+    .site-thumb-label {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 10px 14px;
+      background: linear-gradient(transparent, rgba(10,10,26,0.95));
+    }
+    .site-thumb-name {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .site-thumb-industry {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Testimonials */
+    .testimonials-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+    .testimonial-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 28px 24px;
+    }
+    .testimonial-stars {
+      color: #fbbf24;
+      font-size: 0.9rem;
+      margin-bottom: 12px;
+      letter-spacing: 2px;
+    }
+    .testimonial-quote {
+      font-size: 0.92rem;
+      color: var(--text-secondary);
+      line-height: 1.7;
+      margin-bottom: 16px;
+      font-style: italic;
+    }
+    .testimonial-author {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .testimonial-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.85rem;
+      color: var(--bg-primary);
+      flex-shrink: 0;
+    }
+    .testimonial-name {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .testimonial-role {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    /* ── What's Handled (value prop) ─────────────── */
+    #handled { padding: 60px 0; }
+    .handled-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+    .handled-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 32px 24px;
+      text-align: center;
+    }
+    .handled-card .handled-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 14px;
+      background: var(--accent-dim);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+    }
+    .handled-card .handled-icon svg {
+      width: 28px;
+      height: 28px;
+      color: var(--accent);
+    }
+    .handled-card h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .handled-card p {
+      font-size: 0.88rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+    .handled-summary {
+      text-align: center;
+      margin-top: 32px;
+      padding: 24px;
+      background: var(--accent-dim);
+      border: 1px solid rgba(100,255,218,0.15);
+      border-radius: var(--radius-lg);
+      font-size: 0.95rem;
+      color: var(--text-primary);
+      line-height: 1.7;
+    }
+    .handled-summary strong { color: var(--accent); }
+
+    /* ── Done-for-you vs DIY ─────────────────────── */
+    #dvd { padding: 60px 0; }
+    .dvd-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    .dvd-column {
+      background: var(--bg-card);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+    .dvd-column.dvd-highlight {
+      border: 2px solid var(--accent);
+      box-shadow: var(--shadow-accent);
+    }
+    .dvd-column.dvd-other {
+      border: 1px solid var(--border);
+    }
+    .dvd-header {
+      padding: 20px 24px;
+      font-weight: 700;
+      font-size: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .dvd-highlight .dvd-header {
+      background: rgba(100,255,218,0.06);
+      color: var(--accent);
+    }
+    .dvd-other .dvd-header {
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
+    }
+    .dvd-list {
+      padding: 16px 24px 24px;
+      list-style: none;
+    }
+    .dvd-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 0;
+      font-size: 0.9rem;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      line-height: 1.5;
+    }
+    .dvd-list li:last-child { border-bottom: none; }
+    .dvd-list li svg {
+      flex-shrink: 0;
+      width: 18px;
+      height: 18px;
+      margin-top: 2px;
+    }
+    .dvd-highlight .dvd-list li svg { color: var(--accent); }
+    .dvd-other .dvd-list li svg { color: var(--text-muted); }
+    .dvd-highlight .dvd-list li { color: var(--text-primary); }
+    .dvd-other .dvd-list li { color: var(--text-secondary); }
+
+    /* ── FAQ ──────────────────────────────────────── */
+    #faq { padding: 60px 0; }
+    .faq-list {
+      max-width: 740px;
+      margin: 0 auto;
+    }
+    .faq-item {
+      border-bottom: 1px solid var(--border);
+    }
+    .faq-question {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 0;
+      background: none;
+      border: none;
+      color: var(--text-primary);
+      font-size: 1rem;
+      font-weight: 600;
+      font-family: var(--font);
+      cursor: pointer;
+      text-align: left;
+      line-height: 1.5;
+      transition: color var(--transition);
+    }
+    .faq-question:hover { color: var(--accent); }
+    .faq-question svg {
+      flex-shrink: 0;
+      width: 20px;
+      height: 20px;
+      color: var(--text-muted);
+      transition: transform var(--transition);
+    }
+    .faq-item.open .faq-question svg {
+      transform: rotate(180deg);
+    }
+    .faq-answer {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+    }
+    .faq-item.open .faq-answer {
+      max-height: 400px;
+    }
+    .faq-answer-inner {
+      padding: 0 0 20px;
+      font-size: 0.92rem;
+      color: var(--text-secondary);
+      line-height: 1.7;
+    }
+
+    /* ── Pricing (updated) ───────────────────────── */
+    .pricing-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+    .pricing-toggle-label {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .pricing-toggle-label.active { color: var(--text-primary); font-weight: 700; }
+    .pricing-toggle-switch {
+      width: 48px;
+      height: 26px;
+      border-radius: 13px;
+      background: var(--bg-card);
+      border: 2px solid var(--border);
+      position: relative;
+      cursor: pointer;
+      transition: background var(--transition), border-color var(--transition);
+    }
+    .pricing-toggle-switch.annual {
+      background: var(--accent-dim);
+      border-color: var(--accent);
+    }
+    .pricing-toggle-switch::after {
+      content: '';
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--text-secondary);
+      top: 2px;
+      left: 2px;
+      transition: transform var(--transition), background var(--transition);
+    }
+    .pricing-toggle-switch.annual::after {
+      transform: translateX(22px);
+      background: var(--accent);
+    }
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      max-width: 840px;
+      margin: 0 auto;
+    }
+    .pricing-card-free {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 36px 28px;
+      text-align: center;
+    }
+    .pricing-save-badge {
+      display: inline-block;
+      background: var(--success);
+      color: var(--bg-primary);
+      font-size: 0.72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 3px 10px;
+      border-radius: 12px;
+      margin-left: 8px;
+    }
+    .pricing-guarantee {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 24px;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+    .pricing-guarantee svg {
+      width: 16px;
+      height: 16px;
+      color: var(--success);
+      flex-shrink: 0;
+    }
+    .pricing-original {
+      text-decoration: line-through;
+      color: var(--text-muted);
+      font-size: 1.2rem;
+      margin-right: 4px;
     }
 
     /* ── Responsive (marketing) ───────────────────── */
@@ -1368,7 +1734,16 @@
       .steps-row { grid-template-columns: 1fr; }
       .features-grid { grid-template-columns: 1fr; }
       .feature-card:last-child { grid-column: auto; }
+      .gallery-grid { grid-template-columns: repeat(2, 1fr); }
+      .testimonials-grid { grid-template-columns: 1fr; }
+      .handled-grid { grid-template-columns: 1fr; }
+      .dvd-grid { grid-template-columns: 1fr; }
+      .pricing-grid { grid-template-columns: 1fr; max-width: 440px; }
       .pricing-card { padding: 36px 24px; }
+      .hero-ctas { flex-direction: column; gap: 10px; }
+    }
+    @media (max-width: 480px) {
+      .gallery-grid { grid-template-columns: 1fr; }
     }
   </style>
 
@@ -1410,7 +1785,7 @@
     <div id="screen-search" class="screen screen-search active">
       <div class="hero-brand">
         <h1>Your Website &mdash;<br><span class="gradient-text">Handled. Finally.</span></h1>
-        <p class="tagline">AI-powered websites for small businesses. Search and claim yours in minutes.</p>
+        <p class="tagline">We build, launch, and maintain your business website so you don't have to.</p>
       </div>
 
       <div class="search-wrapper">
@@ -1424,7 +1799,7 @@
             type="text"
             id="search-input"
             class="search-input"
-            placeholder="Search for your business..."
+            placeholder="Enter your business name..."
             autocomplete="off"
             spellcheck="false"
           />
@@ -1434,7 +1809,12 @@
         <div id="search-dropdown" class="search-dropdown"></div>
       </div>
 
-      <p class="search-hint">Search by business name to get started, or build a custom site from scratch.</p>
+      <p class="search-hint">Search for your business to generate a free preview &mdash; no account or credit card required.</p>
+
+      <div class="hero-ctas">
+        <a href="#proof" class="btn-ghost">See examples &darr;</a>
+      </div>
+      <p class="hero-clarify"><strong>Free preview</strong> includes a full AI-generated site. Pay only when you're ready to go live.</p>
 
       <div id="search-error" class="msg msg-error"></div>
 
@@ -1443,211 +1823,385 @@
            ========================================== -->
       <div class="marketing-sections">
 
+        <!-- Example Sites Gallery + Testimonials -->
+        <section id="proof">
+          <h2 class="section-title">Sites We've Built</h2>
+          <p class="section-subtitle">Real businesses, real websites &mdash; generated in minutes, not months.</p>
+
+          <div class="gallery-grid">
+            <div class="site-thumb">
+              <div class="site-thumb-preview">
+                <div class="site-thumb-bar"><span class="site-thumb-dot"></span><span class="site-thumb-dot"></span><span class="site-thumb-dot"></span></div>
+                <div class="site-thumb-body">
+                  <div class="site-thumb-hero-block" style="background:linear-gradient(135deg,#065f46,#10b981)"></div>
+                  <div class="site-thumb-line" style="width:75%"></div>
+                  <div class="site-thumb-line short"></div>
+                </div>
+              </div>
+              <div class="site-thumb-label"><div class="site-thumb-name">Greenleaf Landscaping</div><div class="site-thumb-industry">Landscaping</div></div>
+            </div>
+            <div class="site-thumb">
+              <div class="site-thumb-preview">
+                <div class="site-thumb-bar"><span class="site-thumb-dot"></span><span class="site-thumb-dot"></span><span class="site-thumb-dot"></span></div>
+                <div class="site-thumb-body">
+                  <div class="site-thumb-hero-block" style="background:linear-gradient(135deg,#1e3a5f,#3b82f6)"></div>
+                  <div class="site-thumb-line" style="width:80%"></div>
+                  <div class="site-thumb-line short"></div>
+                </div>
+              </div>
+              <div class="site-thumb-label"><div class="site-thumb-name">Precision Plumbing Co.</div><div class="site-thumb-industry">Home Services</div></div>
+            </div>
+            <div class="site-thumb">
+              <div class="site-thumb-preview">
+                <div class="site-thumb-bar"><span class="site-thumb-dot"></span><span class="site-thumb-dot"></span><span class="site-thumb-dot"></span></div>
+                <div class="site-thumb-body">
+                  <div class="site-thumb-hero-block" style="background:linear-gradient(135deg,#7c2d12,#f97316)"></div>
+                  <div class="site-thumb-line" style="width:70%"></div>
+                  <div class="site-thumb-line short"></div>
+                </div>
+              </div>
+              <div class="site-thumb-label"><div class="site-thumb-name">Bella's Italian Kitchen</div><div class="site-thumb-industry">Restaurant</div></div>
+            </div>
+            <div class="site-thumb">
+              <div class="site-thumb-preview">
+                <div class="site-thumb-bar"><span class="site-thumb-dot"></span><span class="site-thumb-dot"></span><span class="site-thumb-dot"></span></div>
+                <div class="site-thumb-body">
+                  <div class="site-thumb-hero-block" style="background:linear-gradient(135deg,#581c87,#a855f7)"></div>
+                  <div class="site-thumb-line" style="width:85%"></div>
+                  <div class="site-thumb-line short"></div>
+                </div>
+              </div>
+              <div class="site-thumb-label"><div class="site-thumb-name">Serenity Spa &amp; Wellness</div><div class="site-thumb-industry">Health &amp; Beauty</div></div>
+            </div>
+            <div class="site-thumb">
+              <div class="site-thumb-preview">
+                <div class="site-thumb-bar"><span class="site-thumb-dot"></span><span class="site-thumb-dot"></span><span class="site-thumb-dot"></span></div>
+                <div class="site-thumb-body">
+                  <div class="site-thumb-hero-block" style="background:linear-gradient(135deg,#1e3a5f,#06b6d4)"></div>
+                  <div class="site-thumb-line" style="width:72%"></div>
+                  <div class="site-thumb-line short"></div>
+                </div>
+              </div>
+              <div class="site-thumb-label"><div class="site-thumb-name">Summit Auto Repair</div><div class="site-thumb-industry">Automotive</div></div>
+            </div>
+            <div class="site-thumb">
+              <div class="site-thumb-preview">
+                <div class="site-thumb-bar"><span class="site-thumb-dot"></span><span class="site-thumb-dot"></span><span class="site-thumb-dot"></span></div>
+                <div class="site-thumb-body">
+                  <div class="site-thumb-hero-block" style="background:linear-gradient(135deg,#4a1d96,#ec4899)"></div>
+                  <div class="site-thumb-line" style="width:78%"></div>
+                  <div class="site-thumb-line short"></div>
+                </div>
+              </div>
+              <div class="site-thumb-label"><div class="site-thumb-name">Swift Tax Advisors</div><div class="site-thumb-industry">Professional Services</div></div>
+            </div>
+          </div>
+
+          <h3 class="section-title" style="font-size:1.4rem; margin-bottom:8px;">What Business Owners Say</h3>
+          <p class="section-subtitle">Join hundreds of small businesses that stopped worrying about their website.</p>
+
+          <div class="testimonials-grid">
+            <div class="testimonial-card">
+              <div class="testimonial-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+              <p class="testimonial-quote">"I searched my business name and had a professional website in under 10 minutes. I've been paying a web guy $200/month for years &mdash; wish I found this sooner."</p>
+              <div class="testimonial-author">
+                <div class="testimonial-avatar" style="background:#10b981">MR</div>
+                <div>
+                  <div class="testimonial-name">Maria R.</div>
+                  <div class="testimonial-role">Owner, Greenleaf Landscaping</div>
+                </div>
+              </div>
+            </div>
+            <div class="testimonial-card">
+              <div class="testimonial-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+              <p class="testimonial-quote">"The AI actually researched my business and wrote accurate copy. I changed two sentences and went live. Best part: I never have to think about updates."</p>
+              <div class="testimonial-author">
+                <div class="testimonial-avatar" style="background:#3b82f6">JT</div>
+                <div>
+                  <div class="testimonial-name">James T.</div>
+                  <div class="testimonial-role">Owner, Precision Plumbing Co.</div>
+                </div>
+              </div>
+            </div>
+            <div class="testimonial-card">
+              <div class="testimonial-stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+              <p class="testimonial-quote">"I tried Wix and Squarespace but never finished building my site. With Project Sites, it was done for me. I just approved it and went live the same day."</p>
+              <div class="testimonial-author">
+                <div class="testimonial-avatar" style="background:#a855f7">SK</div>
+                <div>
+                  <div class="testimonial-name">Sarah K.</div>
+                  <div class="testimonial-role">Owner, Serenity Spa &amp; Wellness</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <!-- How It Works -->
         <section id="how-it-works">
           <h2 class="section-title">How It Works</h2>
-          <p class="section-subtitle">Three simple steps to a professional website for your business.</p>
+          <p class="section-subtitle">Three steps. Five minutes. Zero technical skills required.</p>
           <div class="steps-row">
             <div class="step-card">
               <div class="step-number">1</div>
-              <h3>Tell Us About Your Business</h3>
-              <p>Search for your business or describe what you need. Our AI gathers everything it needs to build the perfect site.</p>
+              <h3>Search for Your Business</h3>
+              <p>Type your business name above. We pull in your info from Google and start building a preview instantly &mdash; no account needed.</p>
             </div>
             <div class="step-card">
               <div class="step-number">2</div>
-              <h3>AI Builds Your Site</h3>
-              <p>In minutes, our AI researches your business, generates content, and builds a mobile-first website with SEO baked in.</p>
+              <h3>Review Your AI-Built Site</h3>
+              <p>Our AI researches your business, writes original content, and designs a mobile-first site with local SEO built in. Review and request changes.</p>
             </div>
             <div class="step-card">
               <div class="step-number">3</div>
-              <h3>Go Live with Your Domain</h3>
-              <p>Your site goes live instantly on a free subdomain. Upgrade to add a custom domain and remove branding.</p>
+              <h3>Go Live &mdash; We Handle the Rest</h3>
+              <p>Approve your site and it goes live. We maintain it, keep it updated, and handle any change requests. You focus on your business.</p>
             </div>
           </div>
         </section>
 
-        <!-- Features / Selling Points -->
-        <section id="features">
-          <h2 class="section-title">Everything You Need</h2>
-          <p class="section-subtitle">Built-in features that would cost thousands from a web agency.</p>
-          <div class="features-grid">
-            <div class="feature-card">
-              <div class="feature-icon">
+        <!-- What's Handled (value prop) -->
+        <section id="handled">
+          <h2 class="section-title">What "Handled" Actually Means</h2>
+          <p class="section-subtitle">We set it up, keep it updated, and you can request changes anytime.</p>
+
+          <div class="handled-grid">
+            <div class="handled-card">
+              <div class="handled-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+                  <path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
                 </svg>
               </div>
-              <h3>AI-Generated Content</h3>
-              <p>Unique, SEO-optimized copy written specifically for your business. No templates, no generic filler.</p>
+              <h3>Unlimited Change Requests</h3>
+              <p>Need to update your hours, add a new service, or change a photo? Just tell us. Most changes go live within 24 hours.</p>
             </div>
-            <div class="feature-card">
-              <div class="feature-icon">
+            <div class="handled-card">
+              <div class="handled-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                 </svg>
               </div>
-              <h3>Custom Domains</h3>
-              <p>Use your own domain with automatic SSL. Free subdomain included on every plan.</p>
+              <h3>Security &amp; Uptime</h3>
+              <p>SSL certificates, DDoS protection, and 99.9% uptime &mdash; all included. We monitor your site so you never have to worry.</p>
             </div>
-            <div class="feature-card">
-              <div class="feature-icon">
+            <div class="handled-card">
+              <div class="handled-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><path d="M12 18h.01"/>
+                  <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
                 </svg>
               </div>
-              <h3>Mobile-First Design</h3>
-              <p>Every site is optimized for mobile from the start. Fast load times on every device.</p>
+              <h3>Local SEO Basics</h3>
+              <p>NAP consistency, schema markup, meta tags, sitemap, and indexability &mdash; all configured out of the box for local search visibility.</p>
             </div>
-            <div class="feature-card">
-              <div class="feature-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/>
-                </svg>
-              </div>
-              <h3>Built-in Analytics</h3>
-              <p>Track visitors, page views, and conversions. Know exactly how your site is performing.</p>
+          </div>
+
+          <div class="handled-summary">
+            <strong>In short:</strong> You tell us what to change, we do it. You never touch code, fight with a page builder, or worry about hosting. That's what "handled" means.
+          </div>
+        </section>
+
+        <!-- Done-for-you vs DIY -->
+        <section id="dvd">
+          <h2 class="section-title">Done-for-You vs. DIY</h2>
+          <p class="section-subtitle">Other platforms give you tools. We give you a finished website &mdash; and keep it running.</p>
+
+          <div class="dvd-grid">
+            <div class="dvd-column dvd-highlight">
+              <div class="dvd-header">Project Sites (Done-for-You)</div>
+              <ul class="dvd-list">
+                <li>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  AI writes your content from real business data
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  Site designed and launched in minutes
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  Unlimited change requests &mdash; we do the work
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  Hosting, SSL, domain, SEO &mdash; all included
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  Ongoing maintenance handled for you
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  No technical skills required &mdash; ever
+                </li>
+              </ul>
+            </div>
+            <div class="dvd-column dvd-other">
+              <div class="dvd-header">DIY Builders (Squarespace, Wix, etc.)</div>
+              <ul class="dvd-list">
+                <li>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  You write all content yourself (AI assist available)
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  Hours to days learning the builder + designing
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  Every update is your responsibility
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  Domain, SEO plugins, and extras cost more
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  You manage updates, security, and performance
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  Requires learning a page builder interface
+                </li>
+              </ul>
             </div>
           </div>
         </section>
 
-        <!-- Competitor Comparison -->
-        <section id="comparison">
-          <h2 class="section-title">How We Compare</h2>
-          <p class="section-subtitle">See why Project Sites is the smartest choice for small businesses.</p>
-          <table class="comparison-table">
-            <thead>
-              <tr>
-                <th></th>
-                <th class="highlight">Project Sites</th>
-                <th>Squarespace</th>
-                <th>Wix</th>
-                <th>WordPress</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Price</td>
-                <td class="highlight">$50/mo</td>
-                <td>$16&ndash;$49/mo</td>
-                <td>$17&ndash;$159/mo</td>
-                <td>$25&ndash;$45/mo + hosting</td>
-              </tr>
-              <tr>
-                <td>Setup Time</td>
-                <td class="highlight">~5 minutes</td>
-                <td>Hours&ndash;days</td>
-                <td>Hours&ndash;days</td>
-                <td>Days&ndash;weeks</td>
-              </tr>
-              <tr>
-                <td>AI Content</td>
-                <td class="highlight"><span class="check-icon">&#10003;</span> Full site</td>
-                <td><span class="cross-icon">&mdash;</span></td>
-                <td><span class="cross-icon">Limited</span></td>
-                <td><span class="cross-icon">&mdash;</span></td>
-              </tr>
-              <tr>
-                <td>Custom Domain</td>
-                <td class="highlight"><span class="check-icon">&#10003;</span> Included</td>
-                <td><span class="check-icon">&#10003;</span></td>
-                <td><span class="check-icon">&#10003;</span></td>
-                <td><span class="check-icon">&#10003;</span></td>
-              </tr>
-              <tr>
-                <td>Skills Required</td>
-                <td class="highlight">None</td>
-                <td>Some</td>
-                <td>Some</td>
-                <td>Technical</td>
-              </tr>
-              <tr>
-                <td>Maintenance</td>
-                <td class="highlight"><span class="check-icon">&#10003;</span> Handled</td>
-                <td>Self-managed</td>
-                <td>Self-managed</td>
-                <td>Self-managed</td>
-              </tr>
-            </tbody>
-          </table>
+        <!-- FAQ -->
+        <section id="faq">
+          <h2 class="section-title">Frequently Asked Questions</h2>
+          <p class="section-subtitle">Everything you need to know before getting started.</p>
 
-          <!-- Mobile-friendly cards (shown ≤720px, table hidden) -->
-          <div class="comparison-cards">
-            <div class="compare-card compare-highlight">
-              <div class="compare-card-header">Project Sites</div>
-              <div class="compare-card-row"><span class="compare-card-label">Price</span><span class="compare-card-value">$50/mo</span></div>
-              <div class="compare-card-row"><span class="compare-card-label">Setup Time</span><span class="compare-card-value">~5 minutes</span></div>
-              <div class="compare-card-row"><span class="compare-card-label">AI Content</span><span class="compare-card-value"><span class="check-icon">&#10003;</span> Full site</span></div>
-              <div class="compare-card-row"><span class="compare-card-label">Custom Domain</span><span class="compare-card-value"><span class="check-icon">&#10003;</span> Included</span></div>
-              <div class="compare-card-row"><span class="compare-card-label">Skills Required</span><span class="compare-card-value">None</span></div>
-              <div class="compare-card-row"><span class="compare-card-label">Maintenance</span><span class="compare-card-value"><span class="check-icon">&#10003;</span> Handled</span></div>
+          <div class="faq-list">
+            <div class="faq-item">
+              <button class="faq-question" onclick="toggleFaq(this)">
+                How accurate is the AI-generated content?
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              <div class="faq-answer"><div class="faq-answer-inner">Our AI researches your business using Google, public listings, and any info you provide. It generates original, accurate content specific to your services, location, and industry. You review everything before going live and can request unlimited changes.</div></div>
             </div>
-            <div class="compare-card">
-              <div class="compare-card-header">Squarespace</div>
-              <div class="compare-card-row"><span class="compare-card-label">Price</span><span class="compare-card-value">$16&ndash;$49/mo</span></div>
-              <div class="compare-card-row"><span class="compare-card-label">Setup Time</span><span class="compare-card-value">Hours&ndash;days</span></div>
-              <div class="compare-card-row"><span class="compare-card-label">AI Content</span><span class="compare-card-value">&mdash;</span></div>
-              <div class="compare-card-row"><span class="compare-card-label">Custom Domain</span><span class="compare-card-value"><span class="check-icon">&#10003;</span></span></div>
-              <div class="compare-card-row"><span class="compare-card-label">Skills Required</span><span class="compare-card-value">Some</span></div>
-              <div class="compare-card-row"><span class="compare-card-label">Maintenance</span><span class="compare-card-value">Self-managed</span></div>
+            <div class="faq-item">
+              <button class="faq-question" onclick="toggleFaq(this)">
+                Can I edit the content myself?
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              <div class="faq-answer"><div class="faq-answer-inner">Yes. You can request any changes &mdash; text, images, layout, colors &mdash; and we'll make them for you, typically within 24 hours. You never need to learn a page builder or write code.</div></div>
             </div>
-            <div class="compare-card">
-              <div class="compare-card-header">Wix</div>
-              <div class="compare-card-row"><span class="compare-card-label">Price</span><span class="compare-card-value">$17&ndash;$159/mo</span></div>
-              <div class="compare-card-row"><span class="compare-card-label">Setup Time</span><span class="compare-card-value">Hours&ndash;days</span></div>
-              <div class="compare-card-row"><span class="compare-card-label">AI Content</span><span class="compare-card-value">Limited</span></div>
-              <div class="compare-card-row"><span class="compare-card-label">Custom Domain</span><span class="compare-card-value"><span class="check-icon">&#10003;</span></span></div>
-              <div class="compare-card-row"><span class="compare-card-label">Skills Required</span><span class="compare-card-value">Some</span></div>
-              <div class="compare-card-row"><span class="compare-card-label">Maintenance</span><span class="compare-card-value">Self-managed</span></div>
+            <div class="faq-item">
+              <button class="faq-question" onclick="toggleFaq(this)">
+                What if my business info is wrong online?
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              <div class="faq-answer"><div class="faq-answer-inner">No problem. After the AI generates your site, you can provide corrections and additional context. We'll update the content to match the real details of your business. The preview is a starting point, not the final product.</div></div>
             </div>
-            <div class="compare-card">
-              <div class="compare-card-header">WordPress</div>
-              <div class="compare-card-row"><span class="compare-card-label">Price</span><span class="compare-card-value">$25&ndash;$45/mo + hosting</span></div>
-              <div class="compare-card-row"><span class="compare-card-label">Setup Time</span><span class="compare-card-value">Days&ndash;weeks</span></div>
-              <div class="compare-card-row"><span class="compare-card-label">AI Content</span><span class="compare-card-value">&mdash;</span></div>
-              <div class="compare-card-row"><span class="compare-card-label">Custom Domain</span><span class="compare-card-value"><span class="check-icon">&#10003;</span></span></div>
-              <div class="compare-card-row"><span class="compare-card-label">Skills Required</span><span class="compare-card-value">Technical</span></div>
-              <div class="compare-card-row"><span class="compare-card-label">Maintenance</span><span class="compare-card-value">Self-managed</span></div>
+            <div class="faq-item">
+              <button class="faq-question" onclick="toggleFaq(this)">
+                Do I own the website and content?
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              <div class="faq-answer"><div class="faq-answer-inner">Yes. All content generated for your site belongs to you. If you cancel, you can request an export of your site's content. Your business data is never shared or sold.</div></div>
+            </div>
+            <div class="faq-item">
+              <button class="faq-question" onclick="toggleFaq(this)">
+                Can I use my own domain or transfer my site out?
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              <div class="faq-answer"><div class="faq-answer-inner">Absolutely. Every paid plan includes a custom domain with automatic SSL. You can bring your own domain or register a new one. If you ever want to leave, we'll help you export your content.</div></div>
+            </div>
+            <div class="faq-item">
+              <button class="faq-question" onclick="toggleFaq(this)">
+                What happens if I cancel?
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              <div class="faq-answer"><div class="faq-answer-inner">You can cancel anytime with no penalty. Your site stays live through the end of your billing period. We offer a 14-day money-back guarantee on your first payment &mdash; if it's not right for you, you get a full refund.</div></div>
+            </div>
+            <div class="faq-item">
+              <button class="faq-question" onclick="toggleFaq(this)">
+                What's included in the free preview?
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              <div class="faq-answer"><div class="faq-answer-inner">The free preview gives you a fully AI-generated website for your business &mdash; no account or credit card required. You can see exactly what your site will look like before paying anything. Pay only when you're ready to publish with a custom domain.</div></div>
             </div>
           </div>
         </section>
 
         <!-- Pricing -->
         <section id="pricing">
-          <h2 class="section-title">Simple Pricing</h2>
-          <p class="section-subtitle">One plan. Everything included. Cancel anytime.</p>
-          <div class="pricing-card">
-            <div class="plan-label">All-Inclusive</div>
-            <div class="pricing-price">$50<span>/mo</span></div>
-            <p class="pricing-desc">Everything you need to run a professional business website.</p>
-            <ul class="pricing-features">
-              <li>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                AI-generated content &amp; design
-              </li>
-              <li>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                Custom domain + SSL included
-              </li>
-              <li>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                Mobile-first, SEO-optimized
-              </li>
-              <li>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                Built-in analytics dashboard
-              </li>
-              <li>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                Unlimited updates &amp; maintenance
-              </li>
-              <li>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                Cancel anytime &mdash; no lock-in
-              </li>
-            </ul>
-            <button class="btn btn-accent btn-large btn-full" onclick="searchInput.focus(); window.scrollTo({top:0,behavior:'smooth'})">
-              Get Started Free
-            </button>
+          <h2 class="section-title">Simple, Transparent Pricing</h2>
+          <p class="section-subtitle">Start free. Pay only when you're ready to go live.</p>
+
+          <div id="pricing-toggle" class="pricing-toggle">
+            <span class="pricing-toggle-label active" id="toggle-monthly">Monthly</span>
+            <div class="pricing-toggle-switch" id="toggle-switch" onclick="togglePricing()"></div>
+            <span class="pricing-toggle-label" id="toggle-annual">Annual <span class="pricing-save-badge">Save $120</span></span>
+          </div>
+
+          <div class="pricing-grid">
+            <div class="pricing-card-free">
+              <div class="plan-label" style="background:var(--bg-secondary); color:var(--text-secondary);">Free Preview</div>
+              <div class="pricing-price">$0</div>
+              <p class="pricing-desc">See your AI-generated site before committing.</p>
+              <ul class="pricing-features">
+                <li>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  Full AI-generated website preview
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  No account or credit card required
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  Hosted on free subdomain
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  Includes "Powered by Project Sites" banner
+                </li>
+              </ul>
+              <button class="btn btn-secondary-outline btn-large btn-full" onclick="searchInput.focus(); window.scrollTo({top:0,behavior:'smooth'})">
+                Generate Free Preview
+              </button>
+            </div>
+
+            <div class="pricing-card">
+              <div class="plan-label">All-Inclusive</div>
+              <div class="pricing-price" id="pricing-amount">$50<span>/mo</span></div>
+              <p class="pricing-desc" id="pricing-desc-text">Everything you need to run a professional business website.</p>
+              <ul class="pricing-features">
+                <li>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  AI-generated content &amp; design
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  Custom domain + SSL included
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  Mobile-first, SEO-optimized
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  Built-in analytics dashboard
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  Unlimited updates &amp; maintenance
+                </li>
+                <li>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  No branding &mdash; 100% your brand
+                </li>
+              </ul>
+              <button class="btn btn-accent btn-large btn-full" onclick="searchInput.focus(); window.scrollTo({top:0,behavior:'smooth'})">
+                Get Started
+              </button>
+              <div class="pricing-guarantee">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                14-day money-back guarantee &mdash; cancel anytime
+              </div>
+            </div>
           </div>
         </section>
 
@@ -1804,11 +2358,11 @@
 
         <div id="build-msg" class="msg"></div>
 
-        <button class="back-link" onclick="navigateTo('signin')">
+        <button class="back-link" onclick="navigateTo('search')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="m15 18-6-6 6-6"/>
           </svg>
-          Back
+          Back to search
         </button>
       </div>
     </div>
@@ -1849,8 +2403,10 @@
   <footer class="site-footer">
     <div class="footer-inner">
       <div class="footer-links">
-        <a href="https://megabyte.space/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
-        <a href="https://megabyte.space/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a>
+        <a href="/legal/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+        <a href="/legal/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a>
+        <a href="/legal/content-policy" target="_blank" rel="noopener noreferrer">Content Policy</a>
+        <a href="mailto:support@megabyte.space">Support</a>
         <a href="mailto:hey@megabyte.space">Contact</a>
       </div>
       <div class="footer-social">
@@ -2099,7 +2655,8 @@
       // Check if a site already exists
       var placeId = biz.place_id || biz.id || '';
       if (!placeId) {
-        navigateTo('signin');
+        // No place_id - go directly to details (sign-in deferred to build)
+        navigateTo('details');
         return;
       }
 
@@ -2115,8 +2672,8 @@
           hideMsg('search-error');
           var site = json && json.data ? json.data : json;
           if (!site || site.exists === false) {
-            // No existing site -> sign in
-            navigateTo('signin');
+            // No existing site -> go to details (sign-in deferred)
+            navigateTo('details');
             return;
           }
 
@@ -2129,13 +2686,14 @@
           } else if (site.status === 'queued' || site.status === 'building') {
             navigateTo('waiting');
           } else {
-            navigateTo('signin');
+            // Draft or other - go to details
+            navigateTo('details');
           }
         })
         .catch(function(err) {
           hideMsg('search-error');
-          // On error, just proceed to sign-in
-          navigateTo('signin');
+          // On error, just proceed to details
+          navigateTo('details');
         });
     }
 
@@ -2175,7 +2733,8 @@
         posthog.capture('custom_website_selected');
       }
 
-      navigateTo('signin');
+      // Go directly to details - sign-in deferred to build
+      navigateTo('details');
     }
 
     /* ===========================================================
@@ -2215,6 +2774,11 @@
       }
       if (screen === 'details') {
         updateDetailsScreen();
+        // If we have a session and a pending build, auto-submit
+        if (state._pendingBuild && state.session && state.session.token) {
+          state._pendingBuild = false;
+          setTimeout(function() { submitBuild(); }, 100);
+        }
       }
       if (screen === 'waiting') {
         updateWaitingScreen();
@@ -2437,6 +3001,13 @@
     }
 
     function submitBuild() {
+      // If not signed in, require sign-in first, then auto-build after callback
+      if (!state.session || !state.session.token) {
+        state._pendingBuild = true;
+        navigateTo('signin');
+        return;
+      }
+
       var additionalContext = document.getElementById('details-textarea').value.trim();
       var btn = document.getElementById('build-btn');
 
@@ -2614,6 +3185,7 @@
           // Restore any selected business from sessionStorage
           var savedBiz = sessionStorage.getItem('ps_selected_business');
           var savedMode = sessionStorage.getItem('ps_mode');
+          var savedPendingBuild = sessionStorage.getItem('ps_pending_build');
           if (savedBiz) {
             try {
               state.selectedBusiness = JSON.parse(savedBiz);
@@ -2622,18 +3194,25 @@
             sessionStorage.removeItem('ps_selected_business');
             sessionStorage.removeItem('ps_mode');
           }
+          if (savedPendingBuild) {
+            state._pendingBuild = true;
+            sessionStorage.removeItem('ps_pending_build');
+          }
 
           navigateTo('details');
         }
       }
     })();
 
-    // Save business selection before Google redirect
+    // Save business selection + pending build before Google redirect
     var origSignInWithGoogle = signInWithGoogle;
     signInWithGoogle = function() {
       if (state.selectedBusiness) {
         sessionStorage.setItem('ps_selected_business', JSON.stringify(state.selectedBusiness));
         sessionStorage.setItem('ps_mode', state.mode);
+      }
+      if (state._pendingBuild) {
+        sessionStorage.setItem('ps_pending_build', '1');
       }
       origSignInWithGoogle();
     };
@@ -2647,6 +3226,51 @@
         searchInput.blur();
       }
     });
+
+    /* ===========================================================
+       FAQ Accordion
+       =========================================================== */
+    function toggleFaq(btn) {
+      var item = btn.parentElement;
+      var wasOpen = item.classList.contains('open');
+      // Close all
+      var allItems = document.querySelectorAll('.faq-item');
+      for (var i = 0; i < allItems.length; i++) {
+        allItems[i].classList.remove('open');
+      }
+      // Toggle clicked
+      if (!wasOpen) {
+        item.classList.add('open');
+      }
+    }
+
+    /* ===========================================================
+       Pricing Toggle (monthly/annual)
+       =========================================================== */
+    var pricingIsAnnual = false;
+
+    function togglePricing() {
+      pricingIsAnnual = !pricingIsAnnual;
+      var sw = document.getElementById('toggle-switch');
+      var monthlyLabel = document.getElementById('toggle-monthly');
+      var annualLabel = document.getElementById('toggle-annual');
+      var amount = document.getElementById('pricing-amount');
+      var desc = document.getElementById('pricing-desc-text');
+
+      if (pricingIsAnnual) {
+        sw.classList.add('annual');
+        monthlyLabel.classList.remove('active');
+        annualLabel.classList.add('active');
+        amount.innerHTML = '<span class="pricing-original">$600</span>$480<span>/yr</span>';
+        desc.textContent = 'Save $120/year (2 months free). Billed annually.';
+      } else {
+        sw.classList.remove('annual');
+        monthlyLabel.classList.add('active');
+        annualLabel.classList.remove('active');
+        amount.innerHTML = '$50<span>/mo</span>';
+        desc.textContent = 'Everything you need to run a professional business website.';
+      }
+    }
 
     /* ===========================================================
        Init
