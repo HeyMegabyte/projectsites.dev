@@ -73,7 +73,7 @@ afterEach(() => {
 // ─── Google Places response helpers ─────────────────────────────────────────
 
 function makePlacesResponse(
-  places: Array<{ id: string; name: string; address: string; types?: string[] }>,
+  places: Array<{ id: string; name: string; address: string; types?: string[]; lat?: number; lng?: number }>,
 ) {
   return {
     places: places.map((p) => ({
@@ -81,6 +81,7 @@ function makePlacesResponse(
       displayName: { text: p.name, languageCode: 'en' },
       formattedAddress: p.address,
       types: p.types ?? ['establishment'],
+      ...(p.lat != null && p.lng != null ? { location: { latitude: p.lat, longitude: p.lng } } : {}),
     })),
   };
 }
@@ -124,12 +125,16 @@ describe('GET /api/search/businesses', () => {
       name: 'Coffee House',
       address: '123 Main St',
       types: ['establishment'],
+      lat: null,
+      lng: null,
     });
     expect(body.data[1]).toEqual({
       place_id: 'place_2',
       name: 'Tea Room',
       address: '456 Oak Ave',
       types: ['cafe', 'food'],
+      lat: null,
+      lng: null,
     });
 
     expect(mockFetch).toHaveBeenCalledTimes(1);

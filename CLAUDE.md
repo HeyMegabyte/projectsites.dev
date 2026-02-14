@@ -51,6 +51,75 @@ bolt.diy/
 └── .github/workflows/            # CI/CD pipelines
 ```
 
+## MANDATORY: Test-Driven Development (TDD)
+
+> **ALL development in this repository MUST follow strict Test-Driven Development.**
+> This is NON-NEGOTIABLE. No feature, bug fix, or refactor may be merged without tests.
+
+### TDD Workflow (Red → Green → Refactor)
+
+1. **Write failing tests FIRST** — Before writing any implementation code, write unit tests that describe the expected behavior. Run them and confirm they fail.
+2. **Write the minimum code to pass** — Implement just enough to make the tests pass.
+3. **Refactor** — Clean up the implementation while keeping all tests green.
+4. **Write E2E tests** — After the unit tests pass, write Playwright E2E tests that cover the full user flow (see below).
+5. **All tests must pass** — Run `npm test` in both `packages/shared/` and `apps/project-sites/`, plus `npx playwright test` for E2E, before considering any work complete.
+
+### Unit Test Requirements
+- Every new function, route handler, or service method MUST have corresponding unit tests
+- Test the happy path AND error/edge cases (invalid input, unauthorized, rate limiting, etc.)
+- Mock external dependencies (D1, fetch, KV, R2) — never call real APIs in unit tests
+- Minimum coverage expectation: all branches of new code must be tested
+
+### E2E Test Requirements (Playwright)
+- Every user-facing feature MUST have E2E tests that cover the **complete user flow**
+- E2E flows should cover realistic scenarios end-to-end:
+  - Loading the marketing homepage
+  - Searching for a business
+  - Selecting a result from the dropdown
+  - Navigating to the details screen
+  - Signing in (Google OAuth or Email Magic Link)
+  - Triggering a website build
+  - Verifying the waiting/progress screen
+  - Verifying the built site is accessible
+- E2E test files live in `apps/project-sites/e2e/`
+- Use the custom fixture from `e2e/fixtures.ts` (blocks external CDN requests)
+- Run with: `npx playwright test` in `apps/project-sites/`
+
+### Test Commands
+```bash
+# Unit tests
+cd apps/project-sites && npm test
+cd packages/shared && npm test
+
+# E2E tests
+cd apps/project-sites && npx playwright test
+
+# All checks (unit + typecheck + lint + format)
+cd apps/project-sites && npm run check
+cd packages/shared && npm run check
+```
+
+## MANDATORY: Auto-Deploy After Each Session
+
+> **After completing all changes**, you MUST deploy to staging (and production if on main).
+> If `CLOUDFLARE_API_KEY` and `CLOUDFLARE_EMAIL` are not set as environment variables,
+> **ask the user to provide them** before deploying.
+
+### Deploy Checklist
+1. Run all unit tests (`npm test` in both packages) — all must pass
+2. Run E2E tests (`npx playwright test`) — all must pass
+3. Run typecheck (`npm run typecheck`) — no errors
+4. Run lint (`npm run lint`) — no errors
+5. Deploy to staging: `cd apps/project-sites && npx wrangler deploy --env staging`
+6. Upload marketing homepage: `npx wrangler r2 object put project-sites-staging/marketing/index.html --file public/index.html --content-type text/html --remote`
+7. If on main branch, also deploy to production after verifying staging
+
+### Deployment Credentials
+- **CLOUDFLARE_API_KEY** and **CLOUDFLARE_EMAIL** must be set as env vars for `wrangler deploy`
+- If not available, **ASK THE USER** for these credentials before deploying
+- **NEVER** modify secrets that are already set in the Cloudflare dashboard (Stripe keys, SendGrid, Google OAuth, etc.)
+- Only use `wrangler secret put` when explicitly asked to set a NEW secret
+
 ## Critical Development Patterns
 
 ### Git / File Operations
@@ -72,7 +141,7 @@ bolt.diy/
 ### Testing
 - **Jest config MUST be `.cjs`** (not `.js` or `.ts`) because `"type": "module"`
 - Jest needs `moduleNameMapper: { '^(\\.{1,2}/.*)\\.js$': '$1' }` for TS imports
-- Test counts: 527 worker tests (25 suites) + 367 shared tests (6 suites) + E2E
+- Test counts: worker tests (25 suites) + shared tests (6 suites) + E2E (6 files)
 - Run: `npm test` in `apps/project-sites/` or `packages/shared/`
 - E2E: Playwright, run with `npx playwright test` in `apps/project-sites/`
 
@@ -105,7 +174,7 @@ npm run check         # All of the above
 | Background | Cloudflare Workflows | AI site generation pipeline |
 | AI | Cloudflare Workers AI | LLM inference (Llama 3.1) |
 | Payments | Stripe | Checkout, subscriptions, webhooks |
-| Email | SendGrid | Magic links, transactional |
+| Email | Resend / SendGrid | Magic links, transactional |
 | Analytics | PostHog (server-side) | Funnel events |
 | Errors | Sentry (HTTP API) | Exception tracking |
 

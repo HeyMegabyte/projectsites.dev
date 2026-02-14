@@ -67,7 +67,7 @@ export function capture(
 export function trackAuth(
   env: Env,
   ctx: ExecutionContext,
-  method: 'magic_link' | 'phone_otp' | 'google_oauth',
+  method: 'magic_link' | 'google_oauth',
   step: 'requested' | 'verified' | 'failed',
   distinctId: string,
   extra?: Record<string, unknown>,

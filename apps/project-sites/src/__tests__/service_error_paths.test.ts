@@ -10,8 +10,6 @@ import { dbQuery, dbQueryOne, dbInsert, dbUpdate, dbExecute } from '../services/
 import {
   createMagicLink,
   verifyMagicLink,
-  createPhoneOtp,
-  verifyPhoneOtp,
   createGoogleOAuthState,
   handleGoogleOAuthCallback,
   createSession,
@@ -129,75 +127,6 @@ describe('Auth Service Error Paths', () => {
         'id = ?',
         ['link-valid'],
       );
-    });
-  });
-
-  describe('createPhoneOtp', () => {
-    const input = { phone: '+15551234567' };
-
-    it('throws rateLimited when a recent OTP exists for this phone', async () => {
-      mockQuery.mockResolvedValueOnce({
-        data: [{ id: 'recent-otp' }],
-        error: null,
-      });
-
-      const err = await createPhoneOtp(mockDb, mockEnv, input).catch((e: unknown) => e);
-
-      expect(err).toBeInstanceOf(AppError);
-      expect((err as AppError).statusCode).toBe(429);
-      expect((err as AppError).message).toBe('Please wait before requesting another OTP');
-    });
-
-    it('does NOT log OTP in production environment', async () => {
-      const prodEnv = { ...mockEnv, ENVIRONMENT: 'production' };
-      mockQuery.mockResolvedValueOnce({ data: [], error: null });
-      mockInsert.mockResolvedValueOnce({ error: null });
-
-      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-
-      await createPhoneOtp(mockDb, prodEnv, input);
-
-      expect(warnSpy).not.toHaveBeenCalled();
-      warnSpy.mockRestore();
-    });
-  });
-
-  describe('verifyPhoneOtp', () => {
-    const phone = '+15551234567';
-
-    it('throws unauthorized when no pending OTP found', async () => {
-      mockQueryOne.mockResolvedValueOnce(null);
-
-      const err = await verifyPhoneOtp(mockDb, { phone, otp: '123456' }).catch((e: unknown) => e);
-
-      expect(err).toBeInstanceOf(AppError);
-      expect((err as AppError).statusCode).toBe(401);
-      expect((err as AppError).message).toBe('No pending OTP found');
-    });
-
-    it('throws rateLimited when max attempts exceeded (attempts >= 3)', async () => {
-      mockQueryOne.mockResolvedValueOnce({ id: 'otp-maxed', otp_hash: 'some-hash', attempts: 3 });
-
-      const err = await verifyPhoneOtp(mockDb, { phone, otp: '123456' }).catch((e: unknown) => e);
-
-      expect(err).toBeInstanceOf(AppError);
-      expect((err as AppError).statusCode).toBe(429);
-      expect((err as AppError).message).toBe('Too many OTP attempts');
-    });
-
-    it('throws unauthorized when OTP hash does not match', async () => {
-      mockQueryOne.mockResolvedValueOnce({
-        id: 'otp-wrong',
-        otp_hash: 'definitely-wrong-hash',
-        attempts: 0,
-      });
-      mockUpdate.mockResolvedValueOnce({ error: null, changes: 1 }); // increment attempts
-
-      const err = await verifyPhoneOtp(mockDb, { phone, otp: '999999' }).catch((e: unknown) => e);
-
-      expect(err).toBeInstanceOf(AppError);
-      expect((err as AppError).statusCode).toBe(401);
-      expect((err as AppError).message).toBe('Invalid OTP');
     });
   });
 

@@ -12,7 +12,7 @@
  * | `org`         | `orgSchema`, `createOrgSchema`, `membershipSchema` + `Org`, `Membership`     |
  * | `site`        | `siteSchema`, `createSiteSchema`, `updateSiteSchema`, `confidenceAttributeSchema`, `researchDataSchema` + inferred types |
  * | `billing`     | `subscriptionSchema`, `entitlementsSchema`, `createCheckoutSessionSchema`, `saleWebhookPayloadSchema` + `Subscription`, `Entitlements` |
- * | `auth`        | `userSchema`, `sessionSchema`, `createMagicLinkSchema`, `verifyPhoneOtpSchema`, `loginResponseSchema` + `User`, `Session`, `LoginResponse` |
+ * | `auth`        | `userSchema`, `sessionSchema`, `createMagicLinkSchema`, `loginResponseSchema` + `User`, `Session`, `LoginResponse` |
  * | `audit`       | `auditLogSchema`, `createAuditLogSchema` + `AuditLog`                        |
  * | `webhook`     | `webhookEventSchema`, `webhookIngestionSchema` + `WebhookEvent`              |
  * | `workflow`    | `workflowJobSchema`, `createWorkflowJobSchema`, `jobEnvelopeSchema` + `WorkflowJob`, `JobEnvelope` |

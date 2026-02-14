@@ -14,7 +14,7 @@ import {
 import { createOrgSchema, membershipSchema } from '../schemas/org';
 import { createSiteSchema, siteSchema } from '../schemas/site';
 import { createCheckoutSessionSchema, entitlementsSchema, saleWebhookPayloadSchema } from '../schemas/billing';
-import { createMagicLinkSchema, verifyPhoneOtpSchema, googleOAuthCallbackSchema } from '../schemas/auth';
+import { createMagicLinkSchema, googleOAuthCallbackSchema } from '../schemas/auth';
 import { createAuditLogSchema } from '../schemas/audit';
 import { webhookIngestionSchema } from '../schemas/webhook';
 import { createWorkflowJobSchema, jobEnvelopeSchema } from '../schemas/workflow';
@@ -284,22 +284,6 @@ describe('createMagicLinkSchema', () => {
 
   it('rejects invalid email', () => {
     expect(() => createMagicLinkSchema.parse({ email: 'invalid' })).toThrow();
-  });
-});
-
-describe('verifyPhoneOtpSchema', () => {
-  it('accepts valid OTP', () => {
-    const result = verifyPhoneOtpSchema.parse({ phone: '+14155551234', otp: '123456' });
-    expect(result.otp).toBe('123456');
-  });
-
-  it('rejects non-6-digit OTP', () => {
-    expect(() => verifyPhoneOtpSchema.parse({ phone: '+14155551234', otp: '12345' })).toThrow();
-    expect(() => verifyPhoneOtpSchema.parse({ phone: '+14155551234', otp: '1234567' })).toThrow();
-  });
-
-  it('rejects non-numeric OTP', () => {
-    expect(() => verifyPhoneOtpSchema.parse({ phone: '+14155551234', otp: 'abcdef' })).toThrow();
   });
 });
 

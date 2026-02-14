@@ -12,8 +12,6 @@
  * | POST   | `/api/auth/magic-link`            | Request a magic-link email    |
  * | GET    | `/api/auth/magic-link/verify`     | Verify a magic-link token (email click) |
  * | POST   | `/api/auth/magic-link/verify`     | Verify a magic-link token (API)  |
- * | POST   | `/api/auth/phone/otp`             | Request a phone OTP           |
- * | POST   | `/api/auth/phone/verify`          | Verify a phone OTP            |
  * | GET    | `/api/auth/google`                | Start Google OAuth flow       |
  * | GET    | `/api/auth/google/callback`       | Google OAuth callback         |
  * | POST   | `/api/sites`                      | Create a new site             |
@@ -36,8 +34,6 @@ import {
   createSiteSchema,
   createCheckoutSessionSchema,
   createMagicLinkSchema,
-  createPhoneOtpSchema,
-  verifyPhoneOtpSchema,
   verifyMagicLinkSchema,
   createHostnameSchema,
   badRequest,
@@ -122,33 +118,6 @@ api.post('/api/auth/magic-link/verify', async (c) => {
     data: {
       token: session.token,
       email: result.email,
-      user_id: user.user_id,
-      org_id: user.org_id,
-    },
-  });
-});
-
-api.post('/api/auth/phone/otp', async (c) => {
-  const body = await c.req.json();
-  const validated = createPhoneOtpSchema.parse(body);
-  const result = await authService.createPhoneOtp(c.env.DB, c.env, validated);
-  posthog.trackAuth(c.env, c.executionCtx, 'phone_otp', 'requested', validated.phone);
-  return c.json({ data: result });
-});
-
-api.post('/api/auth/phone/verify', async (c) => {
-  const body = await c.req.json();
-  const validated = verifyPhoneOtpSchema.parse(body);
-  await authService.verifyPhoneOtp(c.env.DB, validated);
-
-  const user = await authService.findOrCreateUser(c.env.DB, { phone: validated.phone });
-  const session = await authService.createSession(c.env.DB, user.user_id);
-
-  posthog.trackAuth(c.env, c.executionCtx, 'phone_otp', 'verified', validated.phone);
-  return c.json({
-    data: {
-      token: session.token,
-      expires_at: session.expires_at,
       user_id: user.user_id,
       org_id: user.org_id,
     },

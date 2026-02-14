@@ -102,14 +102,6 @@ export interface Env {
   /** SendGrid v3 API key for transactional email. Fallback provider. */
   SENDGRID_API_KEY?: string;
 
-  // ── Twilio (SMS) ────────────────────────────────────────────
-  /** Twilio Account SID for SMS delivery. */
-  TWILIO_ACCOUNT_SID?: string;
-  /** Twilio Auth Token. */
-  TWILIO_AUTH_TOKEN?: string;
-  /** Twilio phone number (E.164 format, e.g. +15551234567). */
-  TWILIO_PHONE_NUMBER?: string;
-
   // ── Chatwoot (Support Chat) ───────────────────────────────
   /** Chatwoot instance API URL. */
   CHATWOOT_API_URL?: string;

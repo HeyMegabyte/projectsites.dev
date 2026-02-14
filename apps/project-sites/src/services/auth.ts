@@ -2,12 +2,11 @@
  * @module auth
  * @description Passwordless authentication service for Project Sites.
  *
- * Supports three sign-in methods:
+ * Supports two sign-in methods:
  *
  * | Method       | Flow                                        | Table          |
  * | ------------ | ------------------------------------------- | -------------- |
  * | Magic Link   | Email → click link → verify token hash      | `magic_links`  |
- * | Phone OTP    | SMS → enter 6-digit code → verify OTP hash  | `phone_otps`   |
  * | Google OAuth | Redirect → consent → exchange code → user   | `oauth_states` |
  *
  * Sessions are stored in the `sessions` table with SHA-256 hashed tokens.
@@ -21,10 +20,6 @@
  * const { token, expires_at } = await authService.createMagicLink(env.DB, env, { email });
  * const { email } = await authService.verifyMagicLink(env.DB, { token });
  *
- * // Phone OTP flow
- * await authService.createPhoneOtp(env.DB, env, { phone: '+15551234567' });
- * const { verified } = await authService.verifyPhoneOtp(env.DB, { phone, otp: '123456' });
- *
  * // Session management
  * const { token } = await authService.createSession(env.DB, userId);
  * const session = await authService.getSession(env.DB, token);
@@ -36,19 +31,13 @@
 import {
   AUTH,
   randomHex,
-  generateOtp,
   sha256Hex,
   type CreateMagicLink,
   type VerifyMagicLink,
-  type CreatePhoneOtp,
-  type VerifyPhoneOtp,
   createMagicLinkSchema,
   verifyMagicLinkSchema,
-  createPhoneOtpSchema,
-  verifyPhoneOtpSchema,
   unauthorized,
   badRequest,
-  rateLimited,
 } from '@project-sites/shared';
 import { dbQuery, dbInsert, dbUpdate, dbExecute, dbQueryOne } from './db.js';
 import type { Env } from '../types/env.js';
@@ -154,6 +143,11 @@ async function sendViaSendGrid(
       from: { email: 'noreply@megabyte.space', name: 'Project Sites' },
       subject: opts.subject,
       content: [{ type: 'text/html', value: opts.html }],
+      tracking_settings: {
+        click_tracking: { enable: false, enable_text: false },
+        open_tracking: { enable: false },
+        subscription_tracking: { enable: false },
+      },
     }),
   });
 
@@ -183,68 +177,6 @@ async function sendViaSendGrid(
 }
 
 /**
- * Send an SMS via Twilio REST API.
- *
- * @throws {badRequest} If Twilio is not configured or the API call fails.
- */
-async function sendSms(
-  env: Env,
-  opts: { to: string; body: string },
-): Promise<void> {
-  if (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN || !env.TWILIO_PHONE_NUMBER) {
-    console.warn(
-      JSON.stringify({
-        level: 'warn',
-        service: 'auth',
-        message: 'Twilio credentials not set, cannot send SMS',
-        to: opts.to,
-      }),
-    );
-    throw badRequest('SMS delivery is not configured. Please contact support.');
-  }
-
-  const url = `https://api.twilio.com/2010-04-01/Accounts/${env.TWILIO_ACCOUNT_SID}/Messages.json`;
-  const auth = btoa(`${env.TWILIO_ACCOUNT_SID}:${env.TWILIO_AUTH_TOKEN}`);
-
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      Authorization: `Basic ${auth}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({
-      To: opts.to,
-      From: env.TWILIO_PHONE_NUMBER,
-      Body: opts.body,
-    }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    console.warn(
-      JSON.stringify({
-        level: 'error',
-        service: 'auth',
-        message: 'Twilio API error',
-        status: res.status,
-        body: text.slice(0, 500),
-        to: opts.to,
-      }),
-    );
-    throw badRequest(`Failed to send SMS (status ${res.status}). Please try again.`);
-  }
-
-  console.warn(
-    JSON.stringify({
-      level: 'info',
-      service: 'auth',
-      message: 'SMS sent successfully',
-      to: opts.to,
-    }),
-  );
-}
-
-/**
  * Build styled HTML for the magic-link email.
  *
  * @param verifyUrl - Full URL the user clicks to verify (includes token).
@@ -259,7 +191,7 @@ function buildMagicLinkEmail(verifyUrl: string): string {
   <div style="max-width:480px;margin:0 auto;background:#161635;border-radius:12px;padding:40px;border:1px solid rgba(100,255,218,0.1);">
     <h1 style="color:#64ffda;font-size:24px;margin:0 0 16px;">Sign in to Project Sites</h1>
     <p style="color:#94a3b8;line-height:1.6;margin:0 0 24px;">Click the button below to sign in. This link expires in ${AUTH.MAGIC_LINK_EXPIRY_HOURS} hour(s).</p>
-    <a href="${verifyUrl}" style="display:inline-block;background:linear-gradient(135deg,#64ffda,#7c3aed);color:#0a0a1a;font-weight:700;padding:14px 32px;border-radius:8px;text-decoration:none;font-size:16px;">Sign In</a>
+    <a href="${verifyUrl}" style="display:inline-block;background:linear-gradient(135deg,#64ffda,#7c3aed);color:#ffffff;font-weight:700;padding:14px 32px;border-radius:8px;text-decoration:none;font-size:16px;">Sign In</a>
     <p style="color:#64748b;font-size:13px;margin:24px 0 0;">If you did not request this link, you can safely ignore this email.</p>
   </div>
 </body>
@@ -367,123 +299,6 @@ export async function verifyMagicLink(
   await dbUpdate(db, 'magic_links', { used: 1 }, 'id = ?', [link.id]);
 
   return { email: link.email, redirect_url: link.redirect_url };
-}
-
-/**
- * Create a phone OTP for two-factor authentication.
- *
- * Rate-limited to one OTP per phone number per 60 seconds.
- * In non-production environments, the OTP is logged to console for testing.
- *
- * @param db    - D1Database binding.
- * @param env   - Worker environment.
- * @param input - Must include `phone` in E.164 format (e.g. `+15551234567`).
- * @returns Expiry timestamp.
- * @throws {rateLimited} If another OTP was requested within the last 60 s.
- *
- * @example
- * ```ts
- * const { expires_at } = await createPhoneOtp(env.DB, env, { phone: '+15551234567' });
- * ```
- */
-export async function createPhoneOtp(
-  db: D1Database,
-  env: Env,
-  input: CreatePhoneOtp,
-): Promise<{ expires_at: string }> {
-  const validated = createPhoneOtpSchema.parse(input);
-
-  // Rate limit: check recent OTPs for this phone
-  const cutoff = new Date(Date.now() - 60000).toISOString();
-  const { data: recent } = await dbQuery<{ id: string }>(
-    db,
-    'SELECT id FROM phone_otps WHERE phone = ? AND created_at > ?',
-    [validated.phone, cutoff],
-  );
-
-  if (recent.length >= 1) {
-    throw rateLimited('Please wait before requesting another OTP');
-  }
-
-  const otp = generateOtp(AUTH.OTP_LENGTH);
-  const otpHash = await sha256Hex(otp);
-  const expiresAt = new Date(Date.now() + AUTH.OTP_EXPIRY_MINUTES * 60 * 1000).toISOString();
-
-  await dbInsert(db, 'phone_otps', {
-    id: crypto.randomUUID(),
-    phone: validated.phone,
-    otp_hash: otpHash,
-    attempts: 0,
-    expires_at: expiresAt,
-    verified: 0,
-    deleted_at: null,
-  });
-
-  // Send OTP via SMS
-  await sendSms(env, {
-    to: validated.phone,
-    body: `Your Project Sites verification code is: ${otp}\n\nThis code expires in ${AUTH.OTP_EXPIRY_MINUTES} minutes. Do not share this code with anyone.`,
-  });
-
-  return { expires_at: expiresAt };
-}
-
-/**
- * Verify a phone OTP code.
- *
- * Finds the most recent unexpired OTP for the phone number, increments the
- * attempt counter, and compares the SHA-256 hash. Locks out after
- * {@link AUTH.OTP_MAX_ATTEMPTS} failed attempts.
- *
- * @param db    - D1Database binding.
- * @param input - Must include `phone` and `otp` (6-digit string).
- * @returns `{ verified: true }` on success.
- * @throws {unauthorized} If no OTP is pending or the code is wrong.
- * @throws {rateLimited} If max attempts exceeded.
- *
- * @example
- * ```ts
- * const { verified } = await verifyPhoneOtp(env.DB, {
- *   phone: '+15551234567',
- *   otp: '483920',
- * });
- * ```
- */
-export async function verifyPhoneOtp(
-  db: D1Database,
-  input: VerifyPhoneOtp,
-): Promise<{ verified: boolean }> {
-  const validated = verifyPhoneOtpSchema.parse(input);
-  const otpHash = await sha256Hex(validated.otp);
-  const now = new Date().toISOString();
-
-  // Find matching unexpired OTP
-  const record = await dbQueryOne<{ id: string; otp_hash: string; attempts: number }>(
-    db,
-    'SELECT id, otp_hash, attempts FROM phone_otps WHERE phone = ? AND verified = 0 AND expires_at > ? ORDER BY created_at DESC LIMIT 1',
-    [validated.phone, now],
-  );
-
-  if (!record) {
-    throw unauthorized('No pending OTP found');
-  }
-
-  // Check max attempts
-  if (record.attempts >= AUTH.OTP_MAX_ATTEMPTS) {
-    throw rateLimited('Too many OTP attempts');
-  }
-
-  // Increment attempts
-  await dbUpdate(db, 'phone_otps', { attempts: record.attempts + 1 }, 'id = ?', [record.id]);
-
-  if (record.otp_hash !== otpHash) {
-    throw unauthorized('Invalid OTP');
-  }
-
-  // Mark as verified
-  await dbUpdate(db, 'phone_otps', { verified: 1 }, 'id = ?', [record.id]);
-
-  return { verified: true };
 }
 
 /**
@@ -778,7 +593,7 @@ export async function getUserSessions(
  * with the user as `owner` and `billing_admin`.
  *
  * @param db   - D1Database binding.
- * @param opts - Lookup/creation parameters. At least one of `email` or `phone` is required.
+ * @param opts - Lookup/creation parameters. `email` is required.
  * @returns The user's ID, org ID, and whether the user was newly created.
  *
  * @example
@@ -791,22 +606,16 @@ export async function getUserSessions(
  */
 export async function findOrCreateUser(
   db: D1Database,
-  opts: { email?: string; phone?: string; display_name?: string; avatar_url?: string },
+  opts: { email?: string; display_name?: string; avatar_url?: string },
 ): Promise<{ user_id: string; org_id: string; is_new: boolean }> {
-  // Look up existing user by email or phone
-  let existingUser: { id: string; email: string | null; phone: string | null } | null = null;
+  // Look up existing user by email
+  let existingUser: { id: string; email: string | null } | null = null;
 
   if (opts.email) {
-    existingUser = await dbQueryOne<{ id: string; email: string | null; phone: string | null }>(
+    existingUser = await dbQueryOne<{ id: string; email: string | null }>(
       db,
-      'SELECT id, email, phone FROM users WHERE email = ? AND deleted_at IS NULL',
+      'SELECT id, email FROM users WHERE email = ? AND deleted_at IS NULL',
       [opts.email],
-    );
-  } else if (opts.phone) {
-    existingUser = await dbQueryOne<{ id: string; email: string | null; phone: string | null }>(
-      db,
-      'SELECT id, email, phone FROM users WHERE phone = ? AND deleted_at IS NULL',
-      [opts.phone],
     );
   }
 
@@ -826,12 +635,11 @@ export async function findOrCreateUser(
   }
 
   // Create new user
-  const now = new Date().toISOString();
   const userId = crypto.randomUUID();
   const orgId = crypto.randomUUID();
   const membershipId = crypto.randomUUID();
 
-  const identifier = opts.email ?? opts.phone ?? 'user';
+  const identifier = opts.email ?? 'user';
   const slugBase = opts.email
     ? opts.email.split('@')[0]!.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').substring(0, 63)
     : identifier.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').substring(0, 63);
@@ -841,7 +649,7 @@ export async function findOrCreateUser(
   await dbInsert(db, 'users', {
     id: userId,
     email: opts.email ?? null,
-    phone: opts.phone ?? null,
+    phone: null,
     display_name: opts.display_name ?? null,
     avatar_url: opts.avatar_url ?? null,
     deleted_at: null,
@@ -849,7 +657,7 @@ export async function findOrCreateUser(
 
   await dbInsert(db, 'orgs', {
     id: orgId,
-    name: opts.email ?? opts.phone ?? 'Personal',
+    name: opts.email ?? 'Personal',
     slug,
     deleted_at: null,
   });

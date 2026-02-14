@@ -352,52 +352,6 @@ const server = http.createServer(async (req, res) => {
     return sendJson(res, 200, { data: [] });
   }
 
-  // ─── Phone OTP Send ───────────────────────────────────
-  if (pathname === '/api/auth/phone/otp' && method === 'POST') {
-    let body;
-    try {
-      const raw = await readBody(req);
-      body = raw ? JSON.parse(raw) : {};
-    } catch {
-      body = {};
-    }
-    if (!body.phone || body.phone.replace(/[^0-9]/g, '').length < 10) {
-      return sendJson(res, 400, {
-        error: { code: 'BAD_REQUEST', message: 'Invalid phone number', request_id: requestId },
-      });
-    }
-    if (!global.__e2ePhoneOtps) global.__e2ePhoneOtps = {};
-    global.__e2ePhoneOtps[body.phone] = '123456';
-    return sendJson(res, 200, {
-      data: { expires_at: new Date(Date.now() + 600000).toISOString() },
-    });
-  }
-
-  // ─── Phone OTP Verify ─────────────────────────────────
-  if (pathname === '/api/auth/phone/verify' && method === 'POST') {
-    let body;
-    try {
-      const raw = await readBody(req);
-      body = raw ? JSON.parse(raw) : {};
-    } catch {
-      body = {};
-    }
-    const storedOtp = (global.__e2ePhoneOtps || {})[body.phone];
-    if (!storedOtp || storedOtp !== body.otp) {
-      return sendJson(res, 400, {
-        error: { code: 'BAD_REQUEST', message: 'Invalid or expired OTP', request_id: requestId },
-      });
-    }
-    return sendJson(res, 200, {
-      data: {
-        token: `e2e-phone-token-${crypto.randomUUID()}`,
-        expires_at: new Date(Date.now() + 86400000).toISOString(),
-        user_id: `user-e2e-${crypto.randomUUID()}`,
-        org_id: `org-e2e-${crypto.randomUUID()}`,
-      },
-    });
-  }
-
   // ─── Auth endpoints ─────────────────────────────────
   if (pathname === '/api/auth/magic-link' && method === 'POST') {
     let body;

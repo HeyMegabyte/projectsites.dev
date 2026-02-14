@@ -1,11 +1,11 @@
 import { z } from 'zod';
-import { baseFields, emailSchema, phoneSchema, uuidSchema } from './base.js';
+import { baseFields, emailSchema, uuidSchema } from './base.js';
 
 /** User schema */
 export const userSchema = z.object({
   id: baseFields.id,
   email: emailSchema.nullable(),
-  phone: phoneSchema.nullable(),
+  phone: z.string().max(20).nullable(),
   display_name: z.string().max(200).nullable(),
   avatar_url: z.string().url().max(2048).nullable(),
   created_at: baseFields.created_at,
@@ -39,21 +39,6 @@ export const verifyMagicLinkSchema = z.object({
   token: z.string().min(32).max(512),
 });
 
-/** Create phone OTP request */
-export const createPhoneOtpSchema = z.object({
-  phone: phoneSchema,
-  turnstile_token: z.string().max(2048).optional(),
-});
-
-/** Verify phone OTP */
-export const verifyPhoneOtpSchema = z.object({
-  phone: phoneSchema,
-  otp: z
-    .string()
-    .length(6)
-    .regex(/^\d{6}$/, 'OTP must be 6 digits'),
-});
-
 /** Google OAuth initiation */
 export const createGoogleOAuthSchema = z.object({
   redirect_url: z.string().url().max(2048).optional(),
@@ -79,7 +64,5 @@ export type User = z.infer<typeof userSchema>;
 export type Session = z.infer<typeof sessionSchema>;
 export type CreateMagicLink = z.infer<typeof createMagicLinkSchema>;
 export type VerifyMagicLink = z.infer<typeof verifyMagicLinkSchema>;
-export type CreatePhoneOtp = z.infer<typeof createPhoneOtpSchema>;
-export type VerifyPhoneOtp = z.infer<typeof verifyPhoneOtpSchema>;
 export type GoogleOAuthCallback = z.infer<typeof googleOAuthCallbackSchema>;
 export type LoginResponse = z.infer<typeof loginResponseSchema>;

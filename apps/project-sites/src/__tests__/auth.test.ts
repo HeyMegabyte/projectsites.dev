@@ -10,8 +10,6 @@ import { dbQuery, dbQueryOne, dbInsert, dbUpdate, dbExecute } from '../services/
 import {
   createMagicLink,
   verifyMagicLink,
-  createPhoneOtp,
-  verifyPhoneOtp,
   createGoogleOAuthState,
   handleGoogleOAuthCallback,
   createSession,
@@ -32,9 +30,6 @@ const mockEnv = {
   GOOGLE_CLIENT_ID: 'test-google-client-id',
   GOOGLE_CLIENT_SECRET: 'test-google-client-secret',
   RESEND_API_KEY: 'test-resend-api-key',
-  TWILIO_ACCOUNT_SID: 'test-twilio-sid',
-  TWILIO_AUTH_TOKEN: 'test-twilio-token',
-  TWILIO_PHONE_NUMBER: '+15550000000',
 } as any;
 
 const mockDb = {} as D1Database;
@@ -43,7 +38,7 @@ const originalFetch = global.fetch;
 
 beforeEach(() => {
   jest.clearAllMocks();
-  // Default: mock fetch to return 200 for email/SMS sends
+  // Default: mock fetch to return 200 for email sends
   global.fetch = jest.fn().mockResolvedValue(
     new Response(JSON.stringify({ id: 'mock-msg-id' }), {
       status: 200,
@@ -156,104 +151,6 @@ describe('verifyMagicLink', () => {
       'id = ?',
       ['link-3'],
     );
-  });
-});
-
-// ---------------------------------------------------------------------------
-// createPhoneOtp
-// ---------------------------------------------------------------------------
-describe('createPhoneOtp', () => {
-  const input = { phone: '+15551234567' };
-
-  it('returns expires_at', async () => {
-    mockDbQuery.mockResolvedValueOnce({ data: [], error: null }); // rate limit check
-    mockDbInsert.mockResolvedValueOnce({ error: null }); // insert
-
-    const result = await createPhoneOtp(mockDb, mockEnv, input);
-    expect(result.expires_at).toBeDefined();
-    expect(new Date(result.expires_at).getTime()).toBeGreaterThan(Date.now());
-  });
-
-  it('throws rateLimited when a recent OTP exists', async () => {
-    mockDbQuery.mockResolvedValueOnce({
-      data: [{ id: 'recent-otp' }],
-      error: null,
-    });
-
-    try {
-      await createPhoneOtp(mockDb, mockEnv, input);
-      fail('Expected rateLimited error to be thrown');
-    } catch (err) {
-      expect(err).toBeInstanceOf(AppError);
-      expect((err as AppError).message).toBe('Please wait before requesting another OTP');
-      expect((err as AppError).statusCode).toBe(429);
-    }
-  });
-
-  it('creates an OTP record in the phone_otps table', async () => {
-    mockDbQuery.mockResolvedValueOnce({ data: [], error: null });
-    mockDbInsert.mockResolvedValueOnce({ error: null });
-
-    await createPhoneOtp(mockDb, mockEnv, input);
-
-    expect(mockDbInsert).toHaveBeenCalledWith(
-      mockDb,
-      'phone_otps',
-      expect.objectContaining({
-        phone: '+15551234567',
-        attempts: 0,
-        verified: 0,
-      }),
-    );
-  });
-});
-
-// ---------------------------------------------------------------------------
-// verifyPhoneOtp
-// ---------------------------------------------------------------------------
-describe('verifyPhoneOtp', () => {
-  const phone = '+15551234567';
-
-  it('returns { verified: true } when the OTP hash matches', async () => {
-    // We need a real sha256 hash of the OTP to match at runtime.
-    // Compute the sha256 of '123456' using Web Crypto to set up the mock.
-    const { sha256Hex } = await import('@project-sites/shared');
-    const otpHash = await sha256Hex('123456');
-
-    mockDbQueryOne.mockResolvedValueOnce({ id: 'otp-1', otp_hash: otpHash, attempts: 0 });
-    mockDbUpdate
-      .mockResolvedValueOnce({ error: null, changes: 1 }) // increment attempts
-      .mockResolvedValueOnce({ error: null, changes: 1 }); // mark verified
-
-    const result = await verifyPhoneOtp(mockDb, { phone, otp: '123456' });
-    expect(result).toEqual({ verified: true });
-  });
-
-  it('throws unauthorized when no pending OTP is found', async () => {
-    mockDbQueryOne.mockResolvedValueOnce(null);
-
-    await expect(verifyPhoneOtp(mockDb, { phone, otp: '123456' })).rejects.toThrow(
-      'No pending OTP found',
-    );
-  });
-
-  it('throws rateLimited when max attempts are exceeded', async () => {
-    mockDbQueryOne.mockResolvedValueOnce({ id: 'otp-2', otp_hash: 'some-hash', attempts: 3 });
-
-    await expect(verifyPhoneOtp(mockDb, { phone, otp: '123456' })).rejects.toThrow(
-      'Too many OTP attempts',
-    );
-  });
-
-  it('throws unauthorized when the OTP hash does not match', async () => {
-    mockDbQueryOne.mockResolvedValueOnce({
-      id: 'otp-3',
-      otp_hash: 'definitely-wrong-hash',
-      attempts: 0,
-    });
-    mockDbUpdate.mockResolvedValueOnce({ error: null, changes: 1 }); // increment attempts
-
-    await expect(verifyPhoneOtp(mockDb, { phone, otp: '999999' })).rejects.toThrow('Invalid OTP');
   });
 });
 

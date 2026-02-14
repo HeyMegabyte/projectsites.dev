@@ -368,20 +368,25 @@ test.describe('AI Workflow: Step Verification', () => {
 // Full UI flow: Search → Auth → Build → Workflow → Published
 
 test.describe('AI Workflow: Golden Path with Workflow', () => {
-  test('Search → Phone Auth → Build → Workflow triggers and creates site', async ({ page }) => {
+  test('Search → Email Auth → Build → Workflow triggers and creates site', async ({ page }) => {
     const { apiCalls, setWorkflowState } = await setupGoldenPathMocks(page);
 
-    // Mock phone OTP send/verify
-    await page.route('**/api/auth/phone/otp', (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          data: { expires_at: new Date(Date.now() + 600000).toISOString() },
-        }),
-      }),
-    );
-    await page.route('**/api/auth/phone/verify', (route) =>
+    // Mock magic link send
+    await page.route('**/api/auth/magic-link', (route) => {
+      // Only intercept POST (send), not GET (verify callback)
+      if (route.request().method() === 'POST') {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: { expires_at: new Date(Date.now() + 600000).toISOString() },
+          }),
+        });
+      }
+      return route.continue();
+    });
+    // Mock magic link verify callback
+    await page.route('**/api/auth/magic-link/verify*', (route) =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -420,7 +425,7 @@ test.describe('AI Workflow: Golden Path with Workflow', () => {
       .first()
       .click();
 
-    // ── Step 2: Details screen → Build → Sign-in → Phone OTP ──
+    // ── Step 2: Details screen → Build → Sign-in → Email Magic Link ──
     await expect(page.locator('#screen-details')).toBeVisible({ timeout: 10_000 });
 
     const textarea = page.locator('#details-textarea');
@@ -438,18 +443,19 @@ test.describe('AI Workflow: Golden Path with Workflow', () => {
       timeout: 10_000,
     });
 
-    await page.getByRole('button', { name: /phone/i }).click();
-    const phoneInput = page.locator('#phone-input');
-    await expect(phoneInput).toBeVisible();
-    await phoneInput.fill('+12175551234');
-    await page.locator('#phone-send-btn').click();
+    await page.getByRole('button', { name: /email/i }).click();
+    const emailInput = page.locator('#email-input');
+    await expect(emailInput).toBeVisible();
+    await emailInput.fill('test@example.com');
+    await page.locator('#email-send-btn').click();
 
-    const otpInput = page.locator('#otp-input');
-    await expect(otpInput).toBeVisible({ timeout: 10_000 });
-    await otpInput.fill('123456');
-    await page.locator('#otp-verify-btn').click();
+    // Simulate magic link callback by setting session directly in page state
+    await page.evaluate((token) => {
+      (window as any).state = (window as any).state || {};
+      (window as any).state.session = { token };
+    }, MOCK_TOKEN);
 
-    // After phone verify: auto-navigates to details → auto-submits build
+    // After magic link verify: auto-navigates to details → auto-submits build
 
     // ── Step 4: Waiting screen shows workflow in progress ──
     await expect(page.getByText(/building your website/i)).toBeVisible({ timeout: 10_000 });

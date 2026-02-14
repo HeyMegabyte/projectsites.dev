@@ -2240,50 +2240,11 @@
 
           <div class="signin-divider">or</div>
 
-          <button class="signin-btn" onclick="showSigninPanel('phone')">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><path d="M12 18h.01"/>
-            </svg>
-            Sign in with Phone
-          </button>
-
           <button class="signin-btn" onclick="showSigninPanel('email')">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
             </svg>
             Sign in with Email
-          </button>
-        </div>
-
-        <!-- Phone panel -->
-        <div id="signin-phone-panel" class="signin-panel">
-          <div id="phone-step-input">
-            <div class="input-group">
-              <label for="phone-input">Phone Number</label>
-              <input type="tel" id="phone-input" class="input-field" placeholder="+1 (555) 123-4567" />
-            </div>
-            <button class="btn btn-accent btn-full" id="phone-send-btn" onclick="sendPhoneOtp()">
-              Send Verification Code
-            </button>
-            <div id="phone-send-msg" class="msg"></div>
-          </div>
-
-          <div id="phone-step-otp" style="display:none;">
-            <div class="input-group">
-              <label for="otp-input">Verification Code</label>
-              <input type="text" id="otp-input" class="input-field" placeholder="123456" maxlength="6" inputmode="numeric" pattern="[0-9]*" />
-            </div>
-            <button class="btn btn-accent btn-full" id="otp-verify-btn" onclick="verifyPhoneOtp()">
-              Verify Code
-            </button>
-            <div id="phone-verify-msg" class="msg"></div>
-          </div>
-
-          <button class="back-link" onclick="showSigninPanel('main')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="m15 18-6-6 6-6"/>
-            </svg>
-            Back to sign-in options
           </button>
         </div>
 
@@ -2353,6 +2314,7 @@
           <textarea
             id="details-textarea"
             class="input-field"
+            maxlength="5000"
             placeholder="Tell us about your business, what services you offer, preferred style, brand colors, or any specific features you'd like on your website..."
           ></textarea>
         </div>
@@ -2469,7 +2431,7 @@
       session: null,          // { token, identifier }
       siteId: null,
       slug: null,
-      signinPanel: 'main',   // 'main' | 'phone' | 'email'
+      signinPanel: 'main',   // 'main' | 'email'
       userLat: null,
       userLng: null
     };
@@ -2615,9 +2577,48 @@
         });
     }
 
+    /** Calculate distance in km between two lat/lng points using Haversine formula. */
+    function haversineKm(lat1, lng1, lat2, lng2) {
+      var R = 6371;
+      var dLat = (lat2 - lat1) * Math.PI / 180;
+      var dLng = (lng2 - lng1) * Math.PI / 180;
+      var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLng / 2) * Math.sin(dLng / 2);
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    /** Format distance for display. */
+    function formatDistance(km) {
+      var miles = km * 0.621371;
+      if (miles < 0.1) return '< 0.1 mi';
+      if (miles < 10) return miles.toFixed(1) + ' mi';
+      return Math.round(miles) + ' mi';
+    }
+
     function renderDropdown() {
       var html = '';
       var preBuilt = state.preBuiltResults || [];
+
+      // Sort Google Places results by distance when location is available
+      var results = state.searchResults || [];
+      if (state.userLat !== null && state.userLng !== null && results.length > 0) {
+        results = results.slice().sort(function(a, b) {
+          var distA = (a.lat != null && a.lng != null)
+            ? haversineKm(state.userLat, state.userLng, a.lat, a.lng)
+            : Infinity;
+          var distB = (b.lat != null && b.lng != null)
+            ? haversineKm(state.userLat, state.userLng, b.lat, b.lng)
+            : Infinity;
+          return distA - distB;
+        });
+        // Attach distance for display
+        for (var k = 0; k < results.length; k++) {
+          if (results[k].lat != null && results[k].lng != null) {
+            results[k]._distance = haversineKm(state.userLat, state.userLng, results[k].lat, results[k].lng);
+          }
+        }
+      }
 
       // Pre-built sites first (already generated)
       for (var j = 0; j < preBuilt.length; j++) {
@@ -2635,9 +2636,12 @@
               + '</div>';
       }
 
-      // Google Places results
-      for (var i = 0; i < state.searchResults.length; i++) {
-        var r = state.searchResults[i];
+      // Google Places results (sorted by distance when location available)
+      // Update state.searchResults to match sorted order so selectBusiness(index) works
+      state.searchResults = results;
+      for (var i = 0; i < results.length; i++) {
+        var r = results[i];
+        var distLabel = (r._distance != null) ? ' <span style="color:var(--text-muted);font-size:0.75rem;margin-left:6px">' + formatDistance(r._distance) + '</span>' : '';
         html += '<div class="search-result" onclick="selectBusiness(' + i + ')">'
               +   '<div class="search-result-icon">'
               +     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
@@ -2645,7 +2649,7 @@
               +     '</svg>'
               +   '</div>'
               +   '<div class="search-result-text">'
-              +     '<div class="search-result-name">' + escapeHtml(r.name || r.business_name || '') + '</div>'
+              +     '<div class="search-result-name">' + escapeHtml(r.name || r.business_name || '') + distLabel + '</div>'
               +     '<div class="search-result-address">' + escapeHtml(r.address || r.formatted_address || r.street_address || '') + '</div>'
               +   '</div>'
               + '</div>';
@@ -2777,21 +2781,15 @@
       state.signinPanel = panel;
 
       var methodsEl = document.getElementById('signin-methods');
-      var phonePanel = document.getElementById('signin-phone-panel');
       var emailPanel = document.getElementById('signin-email-panel');
       var backToSearch = document.getElementById('signin-back-to-search');
 
       methodsEl.style.display = 'none';
-      phonePanel.classList.remove('active');
       emailPanel.classList.remove('active');
 
       if (panel === 'main') {
         methodsEl.style.display = 'flex';
         backToSearch.style.display = '';
-      } else if (panel === 'phone') {
-        phonePanel.classList.add('active');
-        backToSearch.style.display = 'none';
-        document.getElementById('phone-input').focus();
       } else if (panel === 'email') {
         emailPanel.classList.add('active');
         backToSearch.style.display = 'none';
@@ -2828,15 +2826,6 @@
       redirectTo('/api/auth/google?redirect_url=' + encodeURIComponent(redirectUrl));
     }
 
-    /** Normalize a phone number to E.164 format (+1XXXXXXXXXX for US). */
-    function normalizePhone(raw) {
-      var digits = raw.replace(/[^0-9]/g, '');
-      if (digits.length === 10) return '+1' + digits;
-      if (digits.length === 11 && digits[0] === '1') return '+' + digits;
-      if (raw.startsWith('+')) return '+' + digits;
-      return '+' + digits;
-    }
-
     /** Extract a human-readable error message from an API error response. */
     function extractErrorMsg(d, fallback) {
       if (!d) return fallback;
@@ -2847,95 +2836,15 @@
       return fallback;
     }
 
-    function sendPhoneOtp() {
-      var raw = document.getElementById('phone-input').value.trim();
-      if (!raw) {
-        showMsg('phone-send-msg', 'error', 'Please enter your phone number.');
-        return;
-      }
-      var phone = normalizePhone(raw);
-      var digitsOnly = phone.replace(/[^0-9]/g, '');
-      if (digitsOnly.length < 10 || digitsOnly.length > 15) {
-        showMsg('phone-send-msg', 'error', 'Please enter a valid phone number (e.g. 4123453338 or +14123453338).');
-        return;
-      }
-
-      var btn = document.getElementById('phone-send-btn');
-      btn.disabled = true;
-      btn.innerHTML = 'Sending <span class="loading-dots"><span></span><span></span><span></span></span>';
-      hideMsg('phone-send-msg');
-
-      fetch('/api/auth/phone/otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phone })
-      })
-        .then(function(res) {
-          if (!res.ok) return res.json().then(function(d) { throw new Error(extractErrorMsg(d, 'Failed to send code')); });
-          return res.json();
-        })
-        .then(function(data) {
-          btn.disabled = false;
-          btn.textContent = 'Send Verification Code';
-          document.getElementById('phone-step-input').style.display = 'none';
-          document.getElementById('phone-step-otp').style.display = 'block';
-          document.getElementById('otp-input').focus();
-          state._phoneNumber = phone;
-        })
-        .catch(function(err) {
-          btn.disabled = false;
-          btn.textContent = 'Send Verification Code';
-          showMsg('phone-send-msg', 'error', err.message || 'Failed to send verification code. Please try again.');
-        });
-    }
-
-    function verifyPhoneOtp() {
-      var code = document.getElementById('otp-input').value.trim();
-      if (!code || code.length < 4) {
-        showMsg('phone-verify-msg', 'error', 'Please enter the verification code.');
-        return;
-      }
-
-      var btn = document.getElementById('otp-verify-btn');
-      btn.disabled = true;
-      btn.innerHTML = 'Verifying <span class="loading-dots"><span></span><span></span><span></span></span>';
-      hideMsg('phone-verify-msg');
-
-      fetch('/api/auth/phone/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: state._phoneNumber, otp: code })
-      })
-        .then(function(res) {
-          if (!res.ok) return res.json().then(function(d) { throw new Error(extractErrorMsg(d, 'Invalid code')); });
-          return res.json();
-        })
-        .then(function(data) {
-          btn.disabled = false;
-          btn.textContent = 'Verify Code';
-          var d = data.data || data;
-          state.session = {
-            token: d.token || data.token || data.access_token || '',
-            identifier: state._phoneNumber
-          };
-
-          if (typeof posthog !== 'undefined' && posthog.capture) {
-            posthog.capture('signin_phone_success');
-          }
-
-          navigateTo('details');
-        })
-        .catch(function(err) {
-          btn.disabled = false;
-          btn.textContent = 'Verify Code';
-          showMsg('phone-verify-msg', 'error', err.message || 'Verification failed. Please try again.');
-        });
-    }
-
     function sendMagicLink() {
-      var email = document.getElementById('email-input').value.trim();
-      if (!email || !email.includes('@')) {
+      var email = document.getElementById('email-input').value.trim().toLowerCase();
+      var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!email || !emailRegex.test(email)) {
         showMsg('email-send-msg', 'error', 'Please enter a valid email address.');
+        return;
+      }
+      if (email.length > 254) {
+        showMsg('email-send-msg', 'error', 'Email address is too long.');
         return;
       }
 
@@ -3041,8 +2950,16 @@
         return;
       }
 
-      var additionalContext = document.getElementById('details-textarea').value.trim();
+      var rawContext = document.getElementById('details-textarea').value.trim();
+      // Client-side sanitization: strip HTML tags and limit length
+      var additionalContext = rawContext.replace(/<[^>]*>/g, '').slice(0, 5000);
       var btn = document.getElementById('build-btn');
+
+      // Validate additional context doesn't contain script injection
+      if (/<script/i.test(rawContext) || /javascript:/i.test(rawContext)) {
+        showMsg('build-msg', 'error', 'Invalid characters detected in your input. Please remove any HTML or script tags.');
+        return;
+      }
 
       btn.disabled = true;
       btn.innerHTML = 'Building <span class="loading-dots"><span></span><span></span><span></span></span>';

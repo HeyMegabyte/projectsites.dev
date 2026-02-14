@@ -38,7 +38,7 @@ async function stubRedirects(page: Page): Promise<() => Promise<string[]>> {
 
 // ─── GRANULAR FULL FLOW: Every Micro-Step ────────────────────
 
-test.describe('Granular Full Flow: Search → Select → Details → Build → Sign-In → OTP → Waiting', () => {
+test.describe('Granular Full Flow: Search → Select → Details → Build → Sign-In → Email → Waiting', () => {
   test('Verifies every single micro-interaction from page load to waiting screen', async ({ page }) => {
     // ────────────────────────────────────────────────────────
     // STEP 1: Open the page and verify initial state
@@ -190,107 +190,87 @@ test.describe('Granular Full Flow: Search → Select → Details → Build → S
     await expect(page.getByRole('heading', { name: /sign in/i })).toBeVisible();
     await expect(page.locator('.signin-subtitle')).toContainText(/create your account/i);
 
-    // All three sign-in method buttons visible (main panel)
+    // Sign-in method buttons visible (main panel)
     const googleBtn = page.getByRole('button', { name: /google/i });
-    const phoneBtn = page.getByRole('button', { name: /phone/i });
     const emailBtn = page.getByRole('button', { name: /email/i });
     await expect(googleBtn).toBeVisible();
-    await expect(phoneBtn).toBeVisible();
     await expect(emailBtn).toBeVisible();
 
-    // Phone and email panels should NOT be active yet
-    await expect(page.locator('#signin-phone-panel')).not.toHaveClass(/active/);
+    // Email panel should NOT be active yet
     await expect(page.locator('#signin-email-panel')).not.toHaveClass(/active/);
 
     // ────────────────────────────────────────────────────────
-    // STEP 8: Click "Sign in with Phone" button
+    // STEP 8: Click "Sign in with Email" button
     // ────────────────────────────────────────────────────────
-    await phoneBtn.click();
+    await emailBtn.click();
 
-    // Phone panel becomes active, methods panel hides
-    await expect(page.locator('#signin-phone-panel')).toHaveClass(/active/);
+    // Email panel becomes active, methods panel hides
+    await expect(page.locator('#signin-email-panel')).toHaveClass(/active/);
 
-    // Phone input step is visible, OTP step is hidden
-    await expect(page.locator('#phone-step-input')).toBeVisible();
-    await expect(page.locator('#phone-step-otp')).not.toBeVisible();
+    // Email input step is visible, sent step is hidden
+    await expect(page.locator('#email-step-input')).toBeVisible();
+    await expect(page.locator('#email-step-sent')).not.toBeVisible();
 
-    // Phone input field is visible and focused
-    const phoneInput = page.locator('#phone-input');
-    await expect(phoneInput).toBeVisible();
-    await expect(phoneInput).toHaveAttribute('placeholder', '+1 (555) 123-4567');
-    await expect(phoneInput).toHaveValue('');
+    // Email input field is visible
+    const emailInput = page.locator('#email-input');
+    await expect(emailInput).toBeVisible();
+    await expect(emailInput).toHaveAttribute('placeholder', 'you@example.com');
+    await expect(emailInput).toHaveAttribute('type', 'email');
+    await expect(emailInput).toHaveValue('');
 
     // Send button is visible and enabled
-    const sendBtn = page.locator('#phone-send-btn');
+    const sendBtn = page.locator('#email-send-btn');
     await expect(sendBtn).toBeVisible();
     await expect(sendBtn).toBeEnabled();
-    await expect(sendBtn).toContainText('Send Verification Code');
+    await expect(sendBtn).toContainText('Send Magic Link');
 
     // ────────────────────────────────────────────────────────
-    // STEP 9: Enter phone number and send OTP
+    // STEP 9: Enter email and send magic link
     // ────────────────────────────────────────────────────────
-    await phoneInput.fill('+19735551234');
-    await expect(phoneInput).toHaveValue('+19735551234');
+    await emailInput.fill('test@example.com');
+    await expect(emailInput).toHaveValue('test@example.com');
 
-    // Intercept the OTP API call
-    const otpPromise = page.waitForResponse((resp) =>
-      resp.url().includes('/api/auth/phone/otp') && resp.status() === 200,
+    // Intercept the magic link API call
+    const magicLinkPromise = page.waitForResponse((resp) =>
+      resp.url().includes('/api/auth/magic-link') && resp.status() === 200,
     );
 
     await sendBtn.click();
 
-    // Send button should show "Sending" loading state briefly
-    // (it resets quickly, so we just wait for the API response)
-    const otpResp = await otpPromise;
-    const otpJson = await otpResp.json();
-    expect(otpJson.data).toHaveProperty('expires_at');
+    // Verify API call succeeds
+    const mlResp = await magicLinkPromise;
+    const mlJson = await mlResp.json();
+    expect(mlJson.data).toHaveProperty('expires_at');
 
     // ────────────────────────────────────────────────────────
-    // STEP 10: Verify OTP input appears (phone step transitions)
+    // STEP 10: Verify "Check your email" confirmation
     // ────────────────────────────────────────────────────────
-    // After successful OTP send: phone-step-input hides, phone-step-otp shows
-    await expect(page.locator('#phone-step-input')).not.toBeVisible({ timeout: 5_000 });
-    await expect(page.locator('#phone-step-otp')).toBeVisible();
-
-    // OTP input field
-    const otpInput = page.locator('#otp-input');
-    await expect(otpInput).toBeVisible();
-    await expect(otpInput).toHaveAttribute('placeholder', '123456');
-    await expect(otpInput).toHaveAttribute('maxlength', '6');
-    await expect(otpInput).toHaveAttribute('inputmode', 'numeric');
-    await expect(otpInput).toHaveValue('');
-
-    // Verify button
-    const verifyBtn = page.locator('#otp-verify-btn');
-    await expect(verifyBtn).toBeVisible();
-    await expect(verifyBtn).toBeEnabled();
-    await expect(verifyBtn).toContainText('Verify Code');
+    // After successful send: email-step-input hides, email-step-sent shows
+    await expect(page.locator('#email-step-input')).not.toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('#email-step-sent')).toBeVisible();
+    await expect(page.getByText(/check your email/i)).toBeVisible();
 
     // ────────────────────────────────────────────────────────
-    // STEP 11: Enter OTP code and verify
+    // STEP 11: Simulate magic link callback (user clicks link in email)
     // ────────────────────────────────────────────────────────
-    await otpInput.fill('123456');
-    await expect(otpInput).toHaveValue('123456');
+    // Save state to sessionStorage before navigating away
+    await page.evaluate(() => {
+      const s = (window as any).state;
+      if (s.selectedBusiness) {
+        sessionStorage.setItem('ps_selected_business', JSON.stringify(s.selectedBusiness));
+        sessionStorage.setItem('ps_mode', s.mode);
+      }
+      sessionStorage.setItem('ps_pending_build', '1');
+    });
 
-    // Intercept the verify API call
-    const verifyPromise = page.waitForResponse((resp) =>
-      resp.url().includes('/api/auth/phone/verify') && resp.status() === 200,
-    );
-
-    await verifyBtn.click();
-
-    // Verify API call succeeds and returns a token
-    const verifyResp = await verifyPromise;
-    const verifyJson = await verifyResp.json();
-    expect(verifyJson.data).toHaveProperty('token');
-    expect(verifyJson.data).toHaveProperty('user_id');
-    expect(verifyJson.data).toHaveProperty('org_id');
+    // Navigate as if user clicked magic link in email
+    await page.goto('/?token=e2e-magic-link-token&email=test@example.com&auth_callback=email');
 
     // ────────────────────────────────────────────────────────
     // STEP 12: Auto-navigation back to details, auto-submit build
     // ────────────────────────────────────────────────────────
-    // After verify: verifyPhoneOtp sets state.session → navigateTo('details')
-    // navigateTo wrapper detects _pendingBuild + session.token → auto-calls submitBuild()
+    // After callback: handleAuthCallback sets state.session → restores business
+    // → navigateTo('details') → wrapper detects _pendingBuild → auto-calls submitBuild()
     // submitBuild sends POST /api/sites/create-from-search with auth header
 
     // Intercept the create-from-search API call
@@ -332,9 +312,9 @@ test.describe('Granular Full Flow: Search → Select → Details → Build → S
     await expect(page.locator('.waiting-anim-ring')).toHaveCount(3);
     await expect(page.locator('.waiting-anim-icon')).toBeVisible();
 
-    // Contact line shows signed-in identity (phone number)
+    // Contact line shows signed-in identity (email)
     const contactEl = page.locator('#waiting-contact');
-    await expect(contactEl).toContainText('+19735551234');
+    await expect(contactEl).toContainText('test@example.com');
 
     // ────────────────────────────────────────────────────────
     // STEP 14: Verify internal state via JS evaluation
@@ -446,10 +426,9 @@ test.describe('Granular Full Flow: Google OAuth Sign-In', () => {
     await expect(page.getByRole('heading', { name: /sign in/i })).toBeVisible();
     await expect(page.locator('.signin-subtitle')).toContainText(/create your account/i);
 
-    // All three sign-in buttons visible
+    // Sign-in buttons visible
     const googleBtn = page.getByRole('button', { name: /google/i });
     await expect(googleBtn).toBeVisible();
-    await expect(page.getByRole('button', { name: /phone/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /email/i })).toBeVisible();
 
     // ────────────────────────────────────────────────────────
@@ -643,14 +622,12 @@ test.describe('Granular Full Flow: Email Magic Link Sign-In', () => {
     await expect(page.getByRole('heading', { name: /sign in/i })).toBeVisible();
     await expect(page.locator('.signin-subtitle')).toContainText(/create your account/i);
 
-    // All three buttons visible on main panel
+    // Sign-in buttons visible on main panel
     await expect(page.getByRole('button', { name: /google/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /phone/i })).toBeVisible();
     const emailBtn = page.getByRole('button', { name: /email/i });
     await expect(emailBtn).toBeVisible();
 
-    // Phone and email panels not active yet
-    await expect(page.locator('#signin-phone-panel')).not.toHaveClass(/active/);
+    // Email panel not active yet
     await expect(page.locator('#signin-email-panel')).not.toHaveClass(/active/);
 
     // ────────────────────────────────────────────────────────
@@ -812,72 +789,6 @@ test.describe('Granular Full Flow: Email Magic Link Sign-In', () => {
   });
 });
 
-// ─── FULL FLOW: Phone OTP ─────────────────────────────────────
-
-test.describe('Full Flow: Phone OTP Sign-In', () => {
-  test('Search → Details → Build → Phone OTP → Auto-submit → Waiting', async ({ page }) => {
-    // This test uses the E2E server's built-in mocks for search, lookup,
-    // phone OTP, phone verify, and create-from-search. No Playwright
-    // route overrides needed.
-
-    await page.goto('/');
-    const getRedirects = await stubRedirects(page);
-
-    // ── 1. Search and select a business ──────────────────
-    await searchAndSelect(page, 'Test Pizza', 'Test Pizza');
-
-    // ── 2. Should land on Details screen (NOT sign-in) ───
-    await expect(page.locator('#screen-details')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByRole('heading', { name: /tell us more/i })).toBeVisible();
-
-    // Business badge should show selected business
-    await expect(page.locator('#badge-biz-name')).toContainText('Test Pizza');
-    await expect(page.locator('#badge-biz-addr')).toContainText('123 Main St');
-
-    // ── 3. Fill details and click Build ──────────────────
-    await page.locator('#details-textarea').fill(
-      'Family-owned pizza restaurant since 1985. Wood-fired oven, fresh ingredients.',
-    );
-    await page.locator('#build-btn').click();
-
-    // ── 4. Should redirect to Sign-In (not authenticated) ─
-    await expect(page.locator('#screen-signin')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByRole('heading', { name: /sign in/i })).toBeVisible();
-
-    // All three sign-in options visible
-    await expect(page.getByRole('button', { name: /google/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /phone/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /email/i })).toBeVisible();
-
-    // ── 5. Sign in with Phone ────────────────────────────
-    await page.getByRole('button', { name: /phone/i }).click();
-    await expect(page.locator('#phone-input')).toBeVisible();
-
-    // Enter phone number and send OTP
-    await page.locator('#phone-input').fill('+19735551234');
-    await page.locator('#phone-send-btn').click();
-
-    // OTP input should appear (phone step transitions)
-    await expect(page.locator('#otp-input')).toBeVisible({ timeout: 10_000 });
-
-    // Enter the mock OTP code (E2E server accepts '123456')
-    await page.locator('#otp-input').fill('123456');
-    await page.locator('#otp-verify-btn').click();
-
-    // ── 6. After verify: auto-navigates to details, auto-submits build ──
-    // The deferred sign-in flow: verifyPhoneOtp → navigateTo('details')
-    // → wrapper detects _pendingBuild → auto-calls submitBuild()
-    // → submitBuild has session now → creates site → navigateTo('waiting')
-
-    await expect(page.locator('#screen-waiting')).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText(/building your website/i)).toBeVisible();
-    await expect(page.getByText(/few minutes/i)).toBeVisible();
-
-    // Verify waiting screen has status indicators
-    await expect(page.locator('.status-dot')).toBeVisible();
-  });
-});
-
 // ─── FULL FLOW: Email Magic Link ──────────────────────────────
 
 test.describe('Full Flow: Email Magic Link Sign-In', () => {
@@ -973,7 +884,7 @@ test.describe('Full Flow: Google OAuth Sign-In', () => {
 // ─── FULL FLOW: Custom Website ────────────────────────────────
 
 test.describe('Full Flow: Custom Website', () => {
-  test('Search → Custom option → Details (custom mode) → Phone → Waiting', async ({ page }) => {
+  test('Search → Custom option → Details (custom mode) → Email → Waiting', async ({ page }) => {
     await page.goto('/');
     await stubRedirects(page);
 
@@ -998,14 +909,23 @@ test.describe('Full Flow: Custom Website', () => {
     );
     await page.locator('#build-btn').click();
 
-    // ── 3. Sign-in with phone ────────────────────────────
+    // ── 3. Sign-in with email ────────────────────────────
     await expect(page.locator('#screen-signin')).toBeVisible({ timeout: 10_000 });
-    await page.getByRole('button', { name: /phone/i }).click();
-    await page.locator('#phone-input').fill('+12125559876');
-    await page.locator('#phone-send-btn').click();
-    await expect(page.locator('#otp-input')).toBeVisible({ timeout: 10_000 });
-    await page.locator('#otp-input').fill('123456');
-    await page.locator('#otp-verify-btn').click();
+    await page.getByRole('button', { name: /email/i }).click();
+    await page.locator('#email-input').fill('test@example.com');
+    await page.locator('#email-send-btn').click();
+    await expect(page.getByText(/check your email/i)).toBeVisible({ timeout: 10_000 });
+
+    // Simulate magic link callback
+    await page.evaluate(() => {
+      const s = (window as any).state;
+      if (s.selectedBusiness) {
+        sessionStorage.setItem('ps_selected_business', JSON.stringify(s.selectedBusiness));
+        sessionStorage.setItem('ps_mode', s.mode);
+      }
+      sessionStorage.setItem('ps_pending_build', '1');
+    });
+    await page.goto('/?token=e2e-magic-link-token&email=test@example.com&auth_callback=email');
 
     // ── 4. Auto-submit → Waiting ─────────────────────────
     await expect(page.locator('#screen-waiting')).toBeVisible({ timeout: 15_000 });
@@ -1096,42 +1016,6 @@ test.describe('Full Flow: Pre-Authenticated User', () => {
 // ─── FULL FLOW: Validation & Error Handling ──────────────────
 
 test.describe('Full Flow: Validation and Errors', () => {
-  test('Phone: empty number, invalid number, wrong OTP - then success', async ({ page }) => {
-    await page.goto('/');
-    await stubRedirects(page);
-
-    await searchAndSelect(page, 'Error Test', 'Error Test');
-    await expect(page.locator('#screen-details')).toBeVisible({ timeout: 10_000 });
-    await page.locator('#details-textarea').fill('Testing error handling.');
-    await page.locator('#build-btn').click();
-    await expect(page.locator('#screen-signin')).toBeVisible({ timeout: 10_000 });
-    await page.getByRole('button', { name: /phone/i }).click();
-
-    // ── Empty phone number ───────────────────────────────
-    await page.locator('#phone-send-btn').click();
-    await expect(page.locator('#phone-send-msg')).toContainText(/phone number/i);
-
-    // ── Invalid short phone number ───────────────────────
-    await page.locator('#phone-input').fill('123');
-    await page.locator('#phone-send-btn').click();
-    await expect(page.locator('#phone-send-msg')).toBeVisible();
-
-    // ── Valid phone → OTP sent ───────────────────────────
-    await page.locator('#phone-input').fill('+19735551111');
-    await page.locator('#phone-send-btn').click();
-    await expect(page.locator('#otp-input')).toBeVisible({ timeout: 10_000 });
-
-    // ── Wrong OTP code ───────────────────────────────────
-    await page.locator('#otp-input').fill('000000');
-    await page.locator('#otp-verify-btn').click();
-    await expect(page.locator('#phone-verify-msg')).toBeVisible({ timeout: 5_000 });
-
-    // ── Correct OTP → success → waiting ──────────────────
-    await page.locator('#otp-input').fill('123456');
-    await page.locator('#otp-verify-btn').click();
-    await expect(page.locator('#screen-waiting')).toBeVisible({ timeout: 15_000 });
-  });
-
   test('Email: empty, invalid format, valid - then check-your-email', async ({ page }) => {
     await page.goto('/');
     await stubRedirects(page);
@@ -1360,36 +1244,6 @@ test.describe('API Integration', () => {
     expect(createJson.data).toHaveProperty('site_id');
     expect(createJson.data).toHaveProperty('slug');
     expect(createJson.data).toHaveProperty('workflow_instance_id');
-
-    // ── Phone OTP API ────────────────────────────────────
-    const otpRes = await request.post('/api/auth/phone/otp', {
-      data: { phone: '+19735551234' },
-      headers: { 'Content-Type': 'application/json' },
-    });
-    expect(otpRes.status()).toBe(200);
-
-    // Invalid phone returns 400
-    const badPhone = await request.post('/api/auth/phone/otp', {
-      data: { phone: '123' },
-      headers: { 'Content-Type': 'application/json' },
-    });
-    expect(badPhone.status()).toBe(400);
-
-    // Phone verify with correct OTP
-    const verifyRes = await request.post('/api/auth/phone/verify', {
-      data: { phone: '+19735551234', otp: '123456' },
-      headers: { 'Content-Type': 'application/json' },
-    });
-    expect(verifyRes.status()).toBe(200);
-    const verifyJson = await verifyRes.json();
-    expect(verifyJson.data).toHaveProperty('token');
-
-    // Phone verify with wrong OTP
-    const wrongOtp = await request.post('/api/auth/phone/verify', {
-      data: { phone: '+19735551234', otp: '000000' },
-      headers: { 'Content-Type': 'application/json' },
-    });
-    expect(wrongOtp.status()).toBe(400);
 
     // ── Magic link API ───────────────────────────────────
     const mlRes = await request.post('/api/auth/magic-link', {

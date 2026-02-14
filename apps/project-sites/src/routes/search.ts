@@ -23,7 +23,7 @@
 
 import { Hono } from 'hono';
 import type { Env, Variables } from '../types/env.js';
-import { badRequest, unauthorized } from '@project-sites/shared';
+import { badRequest, unauthorized, sanitizeHtml, stripHtml } from '@project-sites/shared';
 import { dbInsert, dbQuery, dbQueryOne } from '../services/db.js';
 import { writeAuditLog } from '../services/audit.js';
 
@@ -36,6 +36,7 @@ interface GooglePlace {
   displayName?: { text: string; languageCode?: string };
   formattedAddress?: string;
   types?: string[];
+  location?: { latitude: number; longitude: number };
 }
 
 interface GooglePlacesResponse {
@@ -72,7 +73,7 @@ search.get('/api/search/businesses', async (c) => {
     headers: {
       'Content-Type': 'application/json',
       'X-Goog-Api-Key': c.env.GOOGLE_PLACES_API_KEY,
-      'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.id,places.types',
+      'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.id,places.types,places.location',
     },
     body: JSON.stringify(requestBody),
   });
@@ -107,6 +108,8 @@ search.get('/api/search/businesses', async (c) => {
     name: place.displayName?.text ?? '',
     address: place.formattedAddress ?? '',
     types: place.types ?? [],
+    lat: place.location?.latitude ?? null,
+    lng: place.location?.longitude ?? null,
   }));
 
   return c.json({ data });
@@ -258,11 +261,30 @@ search.post('/api/sites/create-from-search', async (c) => {
     throw badRequest('Missing required field: business_name (or business.name)');
   }
 
-  if (mode) {
-    console.warn(`[create-from-search] mode=${mode}, business=${businessName}`);
+  // Validate and sanitize text inputs
+  if (businessName.length > 200) {
+    throw badRequest('Business name must be 200 characters or fewer');
   }
 
-  const slug = businessName
+  const additionalContext = body.additional_context
+    ? sanitizeHtml(String(body.additional_context).slice(0, 5000))
+    : null;
+
+  if (businessAddress && String(businessAddress).length > 500) {
+    throw badRequest('Business address must be 500 characters or fewer');
+  }
+
+  // Strip HTML tags from business name
+  const sanitizedName = stripHtml(businessName).trim();
+  if (!sanitizedName) {
+    throw badRequest('Business name cannot be empty after sanitization');
+  }
+
+  if (mode) {
+    console.warn(`[create-from-search] mode=${mode}, business=${sanitizedName}`);
+  }
+
+  const slug = sanitizedName
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
@@ -274,7 +296,7 @@ search.post('/api/sites/create-from-search', async (c) => {
     id: siteId,
     org_id: orgId,
     slug,
-    business_name: businessName,
+    business_name: sanitizedName,
     business_phone: businessPhone,
     business_email: null,
     business_address: businessAddress ?? null,
@@ -301,11 +323,11 @@ search.post('/api/sites/create-from-search', async (c) => {
       params: {
         siteId,
         slug,
-        businessName,
+        businessName: sanitizedName,
         businessAddress: businessAddress ?? undefined,
         businessPhone: businessPhone ?? undefined,
         googlePlaceId: googlePlaceId ?? undefined,
-        additionalContext: body.additional_context ?? undefined,
+        additionalContext: additionalContext ?? undefined,
         orgId: orgId,
       },
     });
@@ -315,9 +337,9 @@ search.post('/api/sites/create-from-search', async (c) => {
     await c.env.QUEUE.send({
       job_name: 'generate_site',
       site_id: siteId,
-      business_name: businessName,
+      business_name: sanitizedName,
       google_place_id: googlePlaceId ?? null,
-      additional_context: body.additional_context ?? null,
+      additional_context: additionalContext,
     });
   }
 
@@ -329,7 +351,7 @@ search.post('/api/sites/create-from-search', async (c) => {
     target_type: 'site',
     target_id: siteId,
     metadata_json: {
-      business_name: businessName,
+      business_name: sanitizedName,
       google_place_id: googlePlaceId ?? null,
       mode,
     },

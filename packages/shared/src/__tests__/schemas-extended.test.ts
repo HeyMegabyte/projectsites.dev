@@ -7,7 +7,7 @@
  * jobEnvelopeSchema, hostnameRecordSchema, hostnameStatusSchema,
  * analyticsDailySchema, funnelEventSchema, usageEventSchema,
  * apiErrorSchema, userSchema, sessionSchema, verifyMagicLinkSchema,
- * createPhoneOtpSchema, loginResponseSchema
+ * loginResponseSchema
  */
 
 import { z } from 'zod';
@@ -19,7 +19,6 @@ import {
   userSchema,
   sessionSchema,
   verifyMagicLinkSchema,
-  createPhoneOtpSchema,
   createGoogleOAuthSchema,
   loginResponseSchema,
 } from '../schemas/auth';
@@ -1054,12 +1053,12 @@ describe('userSchema', () => {
     ).toThrow();
   });
 
-  it('rejects invalid phone format', () => {
+  it('rejects phone over 20 characters', () => {
     expect(() =>
       userSchema.parse({
         id: UUID,
         email: null,
-        phone: '555-1234',
+        phone: '+1234567890123456789012345',
         display_name: null,
         avatar_url: null,
         created_at: NOW,
@@ -1145,36 +1144,6 @@ describe('verifyMagicLinkSchema', () => {
 
   it('rejects missing token', () => {
     expect(() => verifyMagicLinkSchema.parse({})).toThrow();
-  });
-});
-
-// ─── createPhoneOtpSchema ────────────────────────────────────
-
-describe('createPhoneOtpSchema', () => {
-  it('accepts valid phone with optional turnstile', () => {
-    const result = createPhoneOtpSchema.parse({
-      phone: '+14155551234',
-      turnstile_token: 'cf-turnstile-token-xyz',
-    });
-    expect(result.phone).toBe('+14155551234');
-  });
-
-  it('accepts phone without turnstile', () => {
-    const result = createPhoneOtpSchema.parse({ phone: '+14155551234' });
-    expect(result.phone).toBe('+14155551234');
-  });
-
-  it('rejects invalid phone', () => {
-    expect(() => createPhoneOtpSchema.parse({ phone: '555-1234' })).toThrow();
-  });
-
-  it('rejects turnstile token over 2048 chars', () => {
-    expect(() =>
-      createPhoneOtpSchema.parse({
-        phone: '+14155551234',
-        turnstile_token: 'x'.repeat(2049),
-      }),
-    ).toThrow();
   });
 });
 
