@@ -10,7 +10,8 @@
  * | Method | Path                              | Description                   |
  * | ------ | --------------------------------- | ----------------------------- |
  * | POST   | `/api/auth/magic-link`            | Request a magic-link email    |
- * | POST   | `/api/auth/magic-link/verify`     | Verify a magic-link token     |
+ * | GET    | `/api/auth/magic-link/verify`     | Verify a magic-link token (email click) |
+ * | POST   | `/api/auth/magic-link/verify`     | Verify a magic-link token (API)  |
  * | POST   | `/api/auth/phone/otp`             | Request a phone OTP           |
  * | POST   | `/api/auth/phone/verify`          | Verify a phone OTP            |
  * | GET    | `/api/auth/google`                | Start Google OAuth flow       |
@@ -60,6 +61,42 @@ api.post('/api/auth/magic-link', async (c) => {
   return c.json({ data: { expires_at: result.expires_at } });
 });
 
+// GET handler: user clicks the magic link in their email → verify & redirect to homepage
+api.get('/api/auth/magic-link/verify', async (c) => {
+  const token = c.req.query('token');
+  if (!token) {
+    return c.redirect('/?error=missing_token');
+  }
+
+  try {
+    const validated = verifyMagicLinkSchema.parse({ token });
+    const result = await authService.verifyMagicLink(c.env.DB, validated);
+
+    const user = await authService.findOrCreateUser(c.env.DB, { email: result.email });
+    const session = await authService.createSession(c.env.DB, user.user_id);
+
+    if (result.redirect_url) {
+      const redirectTarget = new URL(result.redirect_url);
+      redirectTarget.searchParams.set('token', session.token);
+      redirectTarget.searchParams.set('email', result.email);
+      redirectTarget.searchParams.set('auth_callback', 'email');
+      return c.redirect(redirectTarget.toString());
+    }
+
+    // Default: redirect to homepage with auth params
+    const baseUrl =
+      c.env.ENVIRONMENT === 'production'
+        ? 'https://sites.megabyte.space'
+        : 'https://sites-staging.megabyte.space';
+    return c.redirect(
+      `${baseUrl}/?token=${encodeURIComponent(session.token)}&email=${encodeURIComponent(result.email)}&auth_callback=email`,
+    );
+  } catch {
+    return c.redirect('/?error=invalid_or_expired_link');
+  }
+});
+
+// POST handler: programmatic API verification
 api.post('/api/auth/magic-link/verify', async (c) => {
   const body = await c.req.json();
   const validated = verifyMagicLinkSchema.parse(body);
