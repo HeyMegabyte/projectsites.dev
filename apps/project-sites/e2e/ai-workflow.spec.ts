@@ -14,7 +14,8 @@
  * @packageDocumentation
  */
 
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from './fixtures.js';
+import type { Page } from '@playwright/test';
 
 // ─── Constants ──────────────────────────────────────────────
 
@@ -405,7 +406,7 @@ test.describe('AI Workflow: Golden Path with Workflow', () => {
     });
 
     // ── Step 1: Search and select business ────────────────
-    const input = page.getByPlaceholder(/Search for your business/);
+    const input = page.getByPlaceholder(/Enter your business name/);
     await input.click();
     await input.pressSequentially('Workflow Test Bakery', { delay: 20 });
 
@@ -419,7 +420,20 @@ test.describe('AI Workflow: Golden Path with Workflow', () => {
       .first()
       .click();
 
-    // ── Step 2: Sign in with phone ────────────────────────
+    // ── Step 2: Details screen → Build → Sign-in → Phone OTP ──
+    await expect(page.locator('#screen-details')).toBeVisible({ timeout: 10_000 });
+
+    const textarea = page.locator('#details-textarea');
+    await textarea.fill(
+      'Artisan bakery specializing in sourdough, pastries, and custom cakes. ' +
+        'Family-owned since 2010.',
+    );
+
+    const buildBtn = page.locator('#build-btn');
+    await expect(buildBtn).toBeVisible();
+    await buildBtn.click();
+
+    // Build triggers sign-in (deferred flow)
     await expect(page.getByRole('heading', { name: /sign in/i })).toBeVisible({
       timeout: 10_000,
     });
@@ -435,18 +449,7 @@ test.describe('AI Workflow: Golden Path with Workflow', () => {
     await otpInput.fill('123456');
     await page.locator('#otp-verify-btn').click();
 
-    // ── Step 3: Fill details and submit ───────────────────
-    await expect(page.locator('#screen-details')).toBeVisible({ timeout: 10_000 });
-
-    const textarea = page.locator('#details-textarea');
-    await textarea.fill(
-      'Artisan bakery specializing in sourdough, pastries, and custom cakes. ' +
-        'Family-owned since 2010.',
-    );
-
-    const buildBtn = page.locator('#build-btn');
-    await expect(buildBtn).toBeVisible();
-    await buildBtn.click();
+    // After phone verify: auto-navigates to details → auto-submits build
 
     // ── Step 4: Waiting screen shows workflow in progress ──
     await expect(page.getByText(/building your website/i)).toBeVisible({ timeout: 10_000 });

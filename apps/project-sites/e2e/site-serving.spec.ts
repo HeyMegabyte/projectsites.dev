@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures.js';
 
 test.describe('Site Serving', () => {
   test('returns 404 for unknown subdomains', async ({ request }) => {

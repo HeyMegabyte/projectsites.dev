@@ -3071,7 +3071,7 @@
         body: JSON.stringify(payload)
       })
         .then(function(res) {
-          if (!res.ok) return res.json().then(function(d) { throw new Error(d.error || 'Failed to create site'); });
+          if (!res.ok) return res.json().then(function(d) { throw new Error((d.error && d.error.message) || d.error || 'Failed to create site'); });
           return res.json();
         })
         .then(function(data) {
