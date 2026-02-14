@@ -96,8 +96,10 @@ export interface Env {
   /** Cloudflare zone ID for `megabyte.space`. */
   CF_ZONE_ID: string;
 
-  // ── SendGrid (Email) ──────────────────────────────────────
-  /** SendGrid v3 API key for transactional email. Optional until configured. */
+  // ── Email (Resend / SendGrid) ────────────────────────────
+  /** Resend API key for transactional email. Preferred provider. */
+  RESEND_API_KEY?: string;
+  /** SendGrid v3 API key for transactional email. Fallback provider. */
   SENDGRID_API_KEY?: string;
 
   // ── Twilio (SMS) ────────────────────────────────────────────

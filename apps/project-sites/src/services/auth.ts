@@ -54,11 +54,12 @@ import { dbQuery, dbInsert, dbUpdate, dbExecute, dbQueryOne } from './db.js';
 import type { Env } from '../types/env.js';
 
 /**
- * Send a transactional email via the SendGrid v3 API.
+ * Send a transactional email via Resend (preferred) or SendGrid (fallback).
  *
- * Gracefully skips if `SENDGRID_API_KEY` is not configured (logs a warning).
+ * Tries `RESEND_API_KEY` first, then falls back to `SENDGRID_API_KEY`.
+ * Throws if neither provider is configured.
  *
- * @param env  - Worker environment (needs `SENDGRID_API_KEY`).
+ * @param env  - Worker environment (needs `RESEND_API_KEY` or `SENDGRID_API_KEY`).
  * @param opts - Email parameters (to, subject, html body).
  *
  * @example
@@ -74,22 +75,78 @@ async function sendEmail(
   env: Env,
   opts: { to: string; subject: string; html: string },
 ): Promise<void> {
-  if (!env.SENDGRID_API_KEY) {
+  if (env.RESEND_API_KEY) {
+    return sendViaResend(env.RESEND_API_KEY, opts);
+  }
+
+  if (env.SENDGRID_API_KEY) {
+    return sendViaSendGrid(env.SENDGRID_API_KEY, opts);
+  }
+
+  console.warn(
+    JSON.stringify({
+      level: 'warn',
+      service: 'auth',
+      message: 'No email provider configured (RESEND_API_KEY or SENDGRID_API_KEY)',
+      to: opts.to,
+    }),
+  );
+  throw badRequest('Email delivery is not configured. Please contact support.');
+}
+
+/** Send email via Resend REST API. */
+async function sendViaResend(
+  apiKey: string,
+  opts: { to: string; subject: string; html: string },
+): Promise<void> {
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: 'Project Sites <noreply@megabyte.space>',
+      to: [opts.to],
+      subject: opts.subject,
+      html: opts.html,
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
     console.warn(
       JSON.stringify({
-        level: 'warn',
+        level: 'error',
         service: 'auth',
-        message: 'SENDGRID_API_KEY not set, skipping email send',
+        message: 'Resend API error',
+        status: res.status,
+        body: text.slice(0, 500),
         to: opts.to,
       }),
     );
-    throw badRequest('Email delivery is not configured. Please contact support.');
+    throw badRequest(`Failed to send email (status ${res.status}). Please try again.`);
   }
 
+  console.warn(
+    JSON.stringify({
+      level: 'info',
+      service: 'auth',
+      message: 'Email sent via Resend',
+      to: opts.to,
+    }),
+  );
+}
+
+/** Send email via SendGrid v3 API. */
+async function sendViaSendGrid(
+  apiKey: string,
+  opts: { to: string; subject: string; html: string },
+): Promise<void> {
   const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${env.SENDGRID_API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -119,7 +176,7 @@ async function sendEmail(
     JSON.stringify({
       level: 'info',
       service: 'auth',
-      message: 'Email sent successfully',
+      message: 'Email sent via SendGrid',
       to: opts.to,
     }),
   );

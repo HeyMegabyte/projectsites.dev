@@ -31,12 +31,29 @@ const mockEnv = {
   ENVIRONMENT: 'staging',
   GOOGLE_CLIENT_ID: 'test-google-client-id',
   GOOGLE_CLIENT_SECRET: 'test-google-client-secret',
+  RESEND_API_KEY: 'test-resend-api-key',
+  TWILIO_ACCOUNT_SID: 'test-twilio-sid',
+  TWILIO_AUTH_TOKEN: 'test-twilio-token',
+  TWILIO_PHONE_NUMBER: '+15550000000',
 } as any;
 
 const mockDb = {} as D1Database;
 
+const originalFetch = global.fetch;
+
 beforeEach(() => {
   jest.clearAllMocks();
+  // Default: mock fetch to return 200 for email/SMS sends
+  global.fetch = jest.fn().mockResolvedValue(
+    new Response(JSON.stringify({ id: 'mock-msg-id' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }),
+  );
+});
+
+afterEach(() => {
+  global.fetch = originalFetch;
 });
 
 // ---------------------------------------------------------------------------
@@ -276,16 +293,6 @@ describe('createGoogleOAuthState', () => {
 // handleGoogleOAuthCallback
 // ---------------------------------------------------------------------------
 describe('handleGoogleOAuthCallback', () => {
-  const originalFetch = global.fetch;
-
-  beforeEach(() => {
-    global.fetch = jest.fn();
-  });
-
-  afterEach(() => {
-    global.fetch = originalFetch;
-  });
-
   it('returns email and user info on successful callback', async () => {
     const futureDate = new Date(Date.now() + 600_000).toISOString();
 
