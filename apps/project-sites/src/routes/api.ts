@@ -49,6 +49,8 @@ import * as authService from '../services/auth.js';
 import * as billingService from '../services/billing.js';
 import * as domainService from '../services/domains.js';
 import * as auditService from '../services/audit.js';
+import * as posthog from '../lib/posthog.js';
+import { captureError } from '../lib/sentry.js';
 
 const api = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -58,6 +60,7 @@ api.post('/api/auth/magic-link', async (c) => {
   const body = await c.req.json();
   const validated = createMagicLinkSchema.parse(body);
   const result = await authService.createMagicLink(c.env.DB, c.env, validated);
+  posthog.trackAuth(c.env, c.executionCtx, 'magic_link', 'requested', validated.email);
   return c.json({ data: { expires_at: result.expires_at } });
 });
 
@@ -88,10 +91,13 @@ api.get('/api/auth/magic-link/verify', async (c) => {
       c.env.ENVIRONMENT === 'production'
         ? 'https://sites.megabyte.space'
         : 'https://sites-staging.megabyte.space';
+    posthog.trackAuth(c.env, c.executionCtx, 'magic_link', 'verified', result.email);
     return c.redirect(
       `${baseUrl}/?token=${encodeURIComponent(session.token)}&email=${encodeURIComponent(result.email)}&auth_callback=email`,
     );
-  } catch {
+  } catch (err) {
+    captureError(c, err, { route: 'magic-link-verify-get' });
+    posthog.trackAuth(c.env, c.executionCtx, 'magic_link', 'failed', 'unknown');
     return c.redirect('/?error=invalid_or_expired_link');
   }
 });
@@ -126,6 +132,7 @@ api.post('/api/auth/phone/otp', async (c) => {
   const body = await c.req.json();
   const validated = createPhoneOtpSchema.parse(body);
   const result = await authService.createPhoneOtp(c.env.DB, c.env, validated);
+  posthog.trackAuth(c.env, c.executionCtx, 'phone_otp', 'requested', validated.phone);
   return c.json({ data: result });
 });
 
@@ -137,6 +144,7 @@ api.post('/api/auth/phone/verify', async (c) => {
   const user = await authService.findOrCreateUser(c.env.DB, { phone: validated.phone });
   const session = await authService.createSession(c.env.DB, user.user_id);
 
+  posthog.trackAuth(c.env, c.executionCtx, 'phone_otp', 'verified', validated.phone);
   return c.json({
     data: {
       token: session.token,
@@ -179,6 +187,7 @@ api.get('/api/auth/google/callback', async (c) => {
   const redirectTarget = new URL(result.redirect_url ?? baseUrl);
   redirectTarget.searchParams.set('token', session.token);
   redirectTarget.searchParams.set('email', result.email);
+  posthog.trackAuth(c.env, c.executionCtx, 'google_oauth', 'verified', result.email);
   return c.redirect(redirectTarget.toString());
 });
 

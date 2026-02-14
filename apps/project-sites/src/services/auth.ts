@@ -83,7 +83,7 @@ async function sendEmail(
         to: opts.to,
       }),
     );
-    return;
+    throw badRequest('Email delivery is not configured. Please contact support.');
   }
 
   const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
@@ -109,9 +109,82 @@ async function sendEmail(
         message: 'SendGrid API error',
         status: res.status,
         body: text.slice(0, 500),
+        to: opts.to,
       }),
     );
+    throw badRequest(`Failed to send email (status ${res.status}). Please try again.`);
   }
+
+  console.warn(
+    JSON.stringify({
+      level: 'info',
+      service: 'auth',
+      message: 'Email sent successfully',
+      to: opts.to,
+    }),
+  );
+}
+
+/**
+ * Send an SMS via Twilio REST API.
+ *
+ * @throws {badRequest} If Twilio is not configured or the API call fails.
+ */
+async function sendSms(
+  env: Env,
+  opts: { to: string; body: string },
+): Promise<void> {
+  if (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN || !env.TWILIO_PHONE_NUMBER) {
+    console.warn(
+      JSON.stringify({
+        level: 'warn',
+        service: 'auth',
+        message: 'Twilio credentials not set, cannot send SMS',
+        to: opts.to,
+      }),
+    );
+    throw badRequest('SMS delivery is not configured. Please contact support.');
+  }
+
+  const url = `https://api.twilio.com/2010-04-01/Accounts/${env.TWILIO_ACCOUNT_SID}/Messages.json`;
+  const auth = btoa(`${env.TWILIO_ACCOUNT_SID}:${env.TWILIO_AUTH_TOKEN}`);
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${auth}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      To: opts.to,
+      From: env.TWILIO_PHONE_NUMBER,
+      Body: opts.body,
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    console.warn(
+      JSON.stringify({
+        level: 'error',
+        service: 'auth',
+        message: 'Twilio API error',
+        status: res.status,
+        body: text.slice(0, 500),
+        to: opts.to,
+      }),
+    );
+    throw badRequest(`Failed to send SMS (status ${res.status}). Please try again.`);
+  }
+
+  console.warn(
+    JSON.stringify({
+      level: 'info',
+      service: 'auth',
+      message: 'SMS sent successfully',
+      to: opts.to,
+    }),
+  );
 }
 
 /**
@@ -289,18 +362,11 @@ export async function createPhoneOtp(
     deleted_at: null,
   });
 
-  // In production: send OTP via SMS provider
-  // For now, log for testing (OTP is NOT logged in production)
-  if (env.ENVIRONMENT !== 'production') {
-    console.warn(
-      JSON.stringify({
-        level: 'debug',
-        service: 'auth',
-        message: 'OTP generated (non-production only)',
-        phone: validated.phone,
-      }),
-    );
-  }
+  // Send OTP via SMS
+  await sendSms(env, {
+    to: validated.phone,
+    body: `Your Project Sites verification code is: ${otp}\n\nThis code expires in ${AUTH.OTP_EXPIRY_MINUTES} minutes. Do not share this code with anyone.`,
+  });
 
   return { expires_at: expiresAt };
 }
