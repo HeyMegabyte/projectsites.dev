@@ -10,20 +10,27 @@
   <meta name="author" content="Brian Zalewski">
   <meta name="copyright" content="Megabyte LLC">
   <meta name="robots" content="index, follow">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
   <meta name="format-detection" content="telephone=no">
   <meta name="HandheldFriendly" content="True">
   <meta name="MobileOptimized" content="400">
+  <meta name="contact" content="help@megabyte.space">
+  <meta name="geography" content="USA">
+  <meta itemprop="image" content="https://sites.megabyte.space/icon-512.png">
 
   <!-- Favicons & App Icons -->
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="icon" type="image/svg+xml" href="/logo-icon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/icon-16.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="/icon-180.png">
+  <link rel="apple-touch-icon" type="image/png" sizes="180x180" href="/icon-180.png">
+  <link rel="mask-icon" href="/logo-icon.svg" color="#64ffda">
   <link rel="manifest" href="/site.webmanifest">
 
   <!-- Mobile Web App -->
   <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Project Sites">
   <meta name="application-name" content="Project Sites">
@@ -34,6 +41,9 @@
   <meta name="msapplication-starturl" content="https://sites.megabyte.space">
   <meta name="msapplication-tap-highlight" content="no">
   <meta name="msapplication-tooltip" content="Project Sites: AI-powered websites for small businesses">
+  <meta name="msapplication-task" content="name=Home;action-uri=https://sites.megabyte.space;icon-uri=https://sites.megabyte.space/favicon.ico">
+  <meta name="msapplication-task" content="name=Privacy Policy;action-uri=https://sites.megabyte.space/privacy;icon-uri=https://sites.megabyte.space/favicon.ico">
+  <meta name="msapplication-task" content="name=Terms of Service;action-uri=https://sites.megabyte.space/terms;icon-uri=https://sites.megabyte.space/favicon.ico">
   <meta name="theme-color" content="#0a0a1a">
 
   <!-- Open Graph -->
@@ -106,7 +116,7 @@
     ],
     "softwareVersion": "1.0.0",
     "thumbnailUrl": "https://sites.megabyte.space/icon-180.png",
-    "copyrightYear": 2025,
+    "copyrightYear": 2026,
     "copyrightHolder": "Megabyte LLC",
     "creator": "Brian Zalewski"
   }
@@ -138,11 +148,42 @@
       "streetAddress": "63 James Street"
     },
     "sameAs": [
-      "https://github.com/megabyte-labs",
+      "https://github.com/HeyMegabyte",
       "https://gitlab.com/megabyte-labs",
-      "https://linkedin.com/company/megabyte-labs"
+      "https://linkedin.com/company/megabyte-labs",
+      "https://www.youtube.com/@HeyMegabyte",
+      "https://x.com/HeyMegabyte",
+      "https://www.instagram.com/heymegabyteofficial/",
+      "https://www.facebook.com/HeyMegabyte"
     ]
   }
+  </script>
+
+  <!-- JSON-LD: Legal Pages -->
+  <script type="application/ld+json">
+  [
+    {
+      "@context": "http://schema.org",
+      "@type": "Article",
+      "url": "https://sites.megabyte.space/privacy",
+      "headline": "Privacy Policy",
+      "image": { "@list": [{ "@type": "ImageObject", "url": "https://sites.megabyte.space/icon-512.png" }] }
+    },
+    {
+      "@context": "http://schema.org",
+      "@type": "Article",
+      "url": "https://sites.megabyte.space/terms",
+      "headline": "Terms of Service",
+      "image": { "@list": [{ "@type": "ImageObject", "url": "https://sites.megabyte.space/icon-512.png" }] }
+    },
+    {
+      "@context": "http://schema.org",
+      "@type": "Article",
+      "url": "https://sites.megabyte.space/content",
+      "headline": "Content Policy",
+      "image": { "@list": [{ "@type": "ImageObject", "url": "https://sites.megabyte.space/icon-512.png" }] }
+    }
+  ]
   </script>
 
   <!-- Preconnect to key CDNs -->
@@ -773,6 +814,77 @@
     }
 
     /* ======================================================
+       Location Permission Modal
+       ====================================================== */
+    .location-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.3s ease;
+    }
+    .location-modal {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 32px;
+      max-width: 400px;
+      width: 90%;
+      text-align: center;
+      animation: fadeInScale 0.3s ease;
+    }
+    .location-modal-icon {
+      margin-bottom: 16px;
+      color: var(--accent);
+    }
+    .location-modal h3 {
+      color: var(--text-primary);
+      font-size: 1.15rem;
+      margin-bottom: 8px;
+    }
+    .location-modal p {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+    .location-modal-actions {
+      display: flex;
+      gap: 12px;
+    }
+    .location-modal-actions button {
+      flex: 1;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: var(--transition);
+    }
+    .location-modal-actions .btn-allow {
+      background: linear-gradient(135deg, var(--accent), var(--secondary));
+      color: #fff;
+    }
+    .location-modal-actions .btn-allow:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-accent);
+    }
+    .location-modal-actions .btn-skip {
+      background: var(--bg-input);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+    }
+    .location-modal-actions .btn-skip:hover {
+      border-color: var(--border-hover);
+      color: var(--text-primary);
+    }
+
+    /* ======================================================
        Loading dots
        ====================================================== */
     .loading-dots {
@@ -985,10 +1097,81 @@
     }
     @media (max-width: 380px) {
       .header { padding: 0 16px; }
-      .screen-search, .screen-signin, .screen-details, .screen-waiting {
+      .screen-search, .screen-signin, .screen-details, .screen-waiting, .screen-legal {
         padding: 16px;
       }
     }
+
+    /* ======================================================
+       Legal Pages (Privacy, Terms, Content Policy)
+       ====================================================== */
+    .screen-legal {
+      padding: 40px 24px 80px;
+      min-height: auto;
+    }
+    .screen-legal.active {
+      justify-content: flex-start;
+      align-items: flex-start;
+    }
+    .legal-container {
+      max-width: 760px;
+      width: 100%;
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+    }
+    .legal-container h2 {
+      font-size: 2rem;
+      font-weight: 800;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, var(--accent), var(--secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .legal-container .legal-updated {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      margin-bottom: 32px;
+    }
+    .legal-container h3 {
+      color: var(--accent);
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin: 28px 0 12px;
+    }
+    .legal-container p,
+    .legal-container li {
+      color: var(--text-secondary);
+      font-size: 0.92rem;
+      line-height: 1.7;
+      margin-bottom: 12px;
+    }
+    .legal-container ul {
+      padding-left: 20px;
+      margin-bottom: 16px;
+    }
+    .legal-container a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .legal-container a:hover {
+      text-decoration: underline;
+    }
+    .legal-back {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 0;
+      margin-bottom: 24px;
+      transition: color 0.2s;
+    }
+    .legal-back:hover { color: var(--accent); }
 
     /* ======================================================
        Marketing Sections (visible on search screen)
@@ -2260,11 +2443,11 @@
           </div>
 
           <div id="email-step-sent" style="display:none;">
-            <div class="msg msg-success visible" style="text-align:center; margin-top:0;">
+            <div class="msg msg-success visible" style="text-align:center; margin-top:12px;">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle; margin-right:6px;">
                 <rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
               </svg>
-              Check your email for a sign-in link. You can close this tab.
+              Check your email for a sign-in link. You can also try a different email above.
             </div>
           </div>
 
@@ -2369,13 +2552,251 @@
 
   </div>
 
+  <!-- ==========================================
+       Screen: Privacy Policy
+       ========================================== -->
+  <div id="screen-privacy" class="screen screen-legal">
+    <div class="legal-container">
+      <button class="legal-back" onclick="navigateToLegal(null)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        Back to home
+      </button>
+      <h2>Privacy Policy</h2>
+      <p class="legal-updated">Last updated: February 15, 2026</p>
+
+      <h3>1. Introduction</h3>
+      <p>Megabyte LLC ("we," "us," or "our") operates Project Sites (sites.megabyte.space). This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our service.</p>
+
+      <h3>2. Information We Collect</h3>
+      <p>We collect information you provide directly to us:</p>
+      <ul>
+        <li><strong>Account Information:</strong> Email address when you sign in via magic link or Google OAuth.</li>
+        <li><strong>Business Information:</strong> Business name, address, and other details you provide for website generation.</li>
+        <li><strong>Uploaded Content:</strong> Logos, photos, documents, and other files you upload.</li>
+        <li><strong>Usage Data:</strong> Pages viewed, features used, and interactions with the service.</li>
+      </ul>
+
+      <h3>3. How We Use Your Information</h3>
+      <ul>
+        <li>Generate and host your website</li>
+        <li>Authenticate your identity and manage your account</li>
+        <li>Process payments and manage subscriptions</li>
+        <li>Send transactional emails (sign-in links, build notifications)</li>
+        <li>Improve our service through anonymized analytics</li>
+        <li>Respond to support requests</li>
+      </ul>
+
+      <h3>4. Information Sharing</h3>
+      <p>We do not sell your personal information. We may share information with:</p>
+      <ul>
+        <li><strong>Service Providers:</strong> Cloudflare (hosting), Stripe (payments), Resend/SendGrid (email delivery), PostHog (analytics), Google (business search).</li>
+        <li><strong>Legal Requirements:</strong> When required by law, subpoena, or legal process.</li>
+        <li><strong>Business Transfers:</strong> In connection with a merger, acquisition, or sale of assets.</li>
+      </ul>
+
+      <h3>5. Data Storage and Security</h3>
+      <p>Your data is stored on Cloudflare's global network using D1 (database), R2 (file storage), and KV (caching). We use encryption in transit (TLS) and at rest. Session tokens are hashed using SHA-256 before storage.</p>
+
+      <h3>6. Your Rights</h3>
+      <p>You may request to:</p>
+      <ul>
+        <li>Access, correct, or delete your personal data</li>
+        <li>Export your data in a portable format</li>
+        <li>Opt out of analytics tracking</li>
+        <li>Delete your account and all associated data</li>
+      </ul>
+      <p>Contact us at <a href="mailto:privacy@megabyte.space">privacy@megabyte.space</a> to exercise these rights.</p>
+
+      <h3>7. Cookies and Tracking</h3>
+      <p>We use session tokens stored in your browser's sessionStorage (not cookies) for authentication. PostHog analytics collects anonymized usage data. You can opt out by enabling Do Not Track in your browser.</p>
+
+      <h3>8. Location Data</h3>
+      <p>We may request your browser's geolocation to provide distance-based search results. This data is used only during your session and is never stored on our servers.</p>
+
+      <h3>9. Children's Privacy</h3>
+      <p>Our service is not intended for children under 13. We do not knowingly collect information from children under 13.</p>
+
+      <h3>10. Changes to This Policy</h3>
+      <p>We may update this policy from time to time. We will notify you of material changes by posting the updated policy on this page with a new "Last updated" date.</p>
+
+      <h3>11. Contact Us</h3>
+      <p>Megabyte LLC<br>63 James Street, Morristown, NJ 07960<br>Email: <a href="mailto:privacy@megabyte.space">privacy@megabyte.space</a></p>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       Screen: Terms of Service
+       ========================================== -->
+  <div id="screen-terms" class="screen screen-legal">
+    <div class="legal-container">
+      <button class="legal-back" onclick="navigateToLegal(null)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        Back to home
+      </button>
+      <h2>Terms of Service</h2>
+      <p class="legal-updated">Last updated: February 15, 2026</p>
+
+      <h3>1. Acceptance of Terms</h3>
+      <p>By accessing or using Project Sites (sites.megabyte.space), operated by Megabyte LLC, you agree to be bound by these Terms of Service. If you do not agree, do not use the service.</p>
+
+      <h3>2. Description of Service</h3>
+      <p>Project Sites is an AI-powered website generation and hosting platform. We use artificial intelligence to create professional websites for small businesses based on business information you provide.</p>
+
+      <h3>3. Account Registration</h3>
+      <ul>
+        <li>You must provide a valid email address to create an account.</li>
+        <li>You are responsible for maintaining the security of your account credentials.</li>
+        <li>You must be at least 18 years old or have parental consent to use the service.</li>
+        <li>One person or entity may not maintain more than one free account.</li>
+      </ul>
+
+      <h3>4. Free and Paid Plans</h3>
+      <ul>
+        <li><strong>Free Plan:</strong> Includes AI-generated website with a Project Sites promotional bar. Hosted on a subdomain (slug-sites.megabyte.space).</li>
+        <li><strong>Paid Plan ($50/month or $480/year):</strong> Removes promotional bar, enables custom domains, priority support, and advanced features.</li>
+        <li>Payments are processed by Stripe. Subscriptions renew automatically unless cancelled.</li>
+        <li>Refunds are available within 14 days of initial purchase if you are not satisfied.</li>
+      </ul>
+
+      <h3>5. Acceptable Use</h3>
+      <p>You agree not to use the service to:</p>
+      <ul>
+        <li>Violate any applicable laws or regulations</li>
+        <li>Host malicious content, malware, or phishing pages</li>
+        <li>Infringe on intellectual property rights of others</li>
+        <li>Distribute spam or unsolicited communications</li>
+        <li>Impersonate another person or entity</li>
+        <li>Attempt to circumvent rate limits, security measures, or access controls</li>
+        <li>Host content that promotes violence, discrimination, or illegal activities</li>
+      </ul>
+
+      <h3>6. Content Ownership</h3>
+      <ul>
+        <li>You retain ownership of content you upload (logos, photos, text).</li>
+        <li>AI-generated website code and design are licensed to you for use with the service.</li>
+        <li>You grant us a limited license to host and serve your content as part of the service.</li>
+        <li>We may showcase your site (with branding removed) in marketing materials unless you opt out.</li>
+      </ul>
+
+      <h3>7. Service Availability</h3>
+      <p>We strive for 99.9% uptime but do not guarantee uninterrupted service. We are not liable for downtime due to maintenance, infrastructure issues, or circumstances beyond our control.</p>
+
+      <h3>8. Termination</h3>
+      <ul>
+        <li>You may delete your account at any time by contacting support.</li>
+        <li>We may suspend or terminate accounts that violate these terms.</li>
+        <li>Upon termination, your site will be taken offline and data deleted within 30 days.</li>
+      </ul>
+
+      <h3>9. Limitation of Liability</h3>
+      <p>To the maximum extent permitted by law, Megabyte LLC shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising from your use of the service. Our total liability shall not exceed the amount you paid us in the 12 months preceding the claim.</p>
+
+      <h3>10. Governing Law</h3>
+      <p>These terms are governed by the laws of the State of New Jersey, United States. Any disputes shall be resolved in the courts of Morris County, New Jersey.</p>
+
+      <h3>11. Changes to Terms</h3>
+      <p>We may modify these terms at any time. Continued use after changes constitutes acceptance of the new terms.</p>
+
+      <h3>12. Contact</h3>
+      <p>Megabyte LLC<br>63 James Street, Morristown, NJ 07960<br>Email: <a href="mailto:legal@megabyte.space">legal@megabyte.space</a></p>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       Screen: Content Policy
+       ========================================== -->
+  <div id="screen-content" class="screen screen-legal">
+    <div class="legal-container">
+      <button class="legal-back" onclick="navigateToLegal(null)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        Back to home
+      </button>
+      <h2>Content Policy</h2>
+      <p class="legal-updated">Last updated: February 15, 2026</p>
+
+      <h3>1. Overview</h3>
+      <p>This Content Policy outlines what content is and is not allowed on websites generated and hosted by Project Sites. We reserve the right to remove content or suspend accounts that violate this policy.</p>
+
+      <h3>2. Prohibited Content</h3>
+      <p>The following content is not allowed on any Project Sites-hosted website:</p>
+      <ul>
+        <li><strong>Illegal Content:</strong> Anything that violates local, state, federal, or international law.</li>
+        <li><strong>Harmful Content:</strong> Content that promotes violence, self-harm, terrorism, or extremism.</li>
+        <li><strong>Hate Speech:</strong> Content that attacks individuals or groups based on race, ethnicity, religion, gender, sexual orientation, disability, or national origin.</li>
+        <li><strong>Adult Content:</strong> Explicit sexual content or pornography.</li>
+        <li><strong>Fraud and Deception:</strong> Phishing, scam websites, counterfeit goods, or misleading health/financial claims.</li>
+        <li><strong>Malware:</strong> Code designed to harm, exploit, or gain unauthorized access to systems.</li>
+        <li><strong>Intellectual Property Violations:</strong> Content that infringes on copyrights, trademarks, or other IP rights.</li>
+        <li><strong>Privacy Violations:</strong> Doxxing, non-consensual intimate imagery, or unauthorized disclosure of personal information.</li>
+        <li><strong>Spam:</strong> Deceptive SEO, link farms, or auto-generated content designed to manipulate search rankings.</li>
+      </ul>
+
+      <h3>3. AI-Generated Content Guidelines</h3>
+      <p>Websites generated by our AI must:</p>
+      <ul>
+        <li>Accurately represent the business or entity they describe</li>
+        <li>Not contain fabricated reviews, testimonials, or credentials</li>
+        <li>Include factual information based on publicly available data</li>
+        <li>Clearly indicate AI involvement if required by applicable regulations</li>
+      </ul>
+
+      <h3>4. User-Uploaded Content</h3>
+      <p>When uploading logos, photos, or documents:</p>
+      <ul>
+        <li>You must have the right to use all uploaded content</li>
+        <li>Images must not contain prohibited content as described above</li>
+        <li>File uploads are scanned for malware and inappropriate content</li>
+        <li>Maximum file size: 10MB per file, 5 files per submission</li>
+      </ul>
+
+      <h3>5. Reporting Violations</h3>
+      <p>If you encounter content that violates this policy, please report it to <a href="mailto:abuse@megabyte.space">abuse@megabyte.space</a> with:</p>
+      <ul>
+        <li>The URL of the offending website</li>
+        <li>A description of the violation</li>
+        <li>Any supporting evidence</li>
+      </ul>
+
+      <h3>6. Enforcement</h3>
+      <ul>
+        <li><strong>First Violation:</strong> Warning and request to remove offending content within 48 hours.</li>
+        <li><strong>Second Violation:</strong> Temporary suspension of the site (7 days).</li>
+        <li><strong>Severe or Repeated Violations:</strong> Permanent account termination and content removal.</li>
+        <li><strong>Illegal Content:</strong> Immediate removal and report to appropriate authorities.</li>
+      </ul>
+
+      <h3>7. Appeals</h3>
+      <p>If you believe your content was removed in error, contact <a href="mailto:appeals@megabyte.space">appeals@megabyte.space</a>. We will review appeals within 5 business days.</p>
+
+      <h3>8. Contact</h3>
+      <p>Megabyte LLC<br>63 James Street, Morristown, NJ 07960<br>Email: <a href="mailto:abuse@megabyte.space">abuse@megabyte.space</a></p>
+    </div>
+  </div>
+
+  <!-- Location Permission Modal -->
+  <div id="location-modal" class="location-modal-overlay" style="display:none;">
+    <div class="location-modal">
+      <div class="location-modal-icon">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+        </svg>
+      </div>
+      <h3>Enable location for better results?</h3>
+      <p>We can show businesses near you and sort results by distance. Your location is never stored or shared.</p>
+      <div class="location-modal-actions">
+        <button class="btn-skip" onclick="dismissLocationModal()">Skip</button>
+        <button class="btn-allow" onclick="allowLocation()">Allow</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Footer -->
   <footer class="site-footer">
     <div class="footer-inner">
       <div class="footer-links">
-        <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
-        <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a>
-        <a href="/content" target="_blank" rel="noopener noreferrer">Content Policy</a>
+        <a href="/privacy" onclick="event.preventDefault();navigateToLegal('privacy')">Privacy Policy</a>
+        <a href="/terms" onclick="event.preventDefault();navigateToLegal('terms')">Terms of Service</a>
+        <a href="/content" onclick="event.preventDefault();navigateToLegal('content')">Content Policy</a>
         <a href="mailto:support@megabyte.space">Support</a>
         <a href="mailto:hey@megabyte.space">Contact</a>
       </div>
@@ -2406,7 +2827,7 @@
         </a>
       </div>
       <div class="footer-bottom">
-        <span>&copy; 2025 Megabyte LLC</span>
+        <span>&copy; 2026 Megabyte LLC</span>
         <span>Powered by <a href="https://megabyte.space" target="_blank" rel="noopener noreferrer">Megabyte Labs</a></span>
       </div>
     </div>
@@ -2434,16 +2855,27 @@
       userLng: null
     };
 
-    // Request browser geolocation for better local search results
+    // Request browser geolocation after 5-second delay with custom modal
+    function dismissLocationModal() {
+      document.getElementById('location-modal').style.display = 'none';
+    }
+    function allowLocation() {
+      document.getElementById('location-modal').style.display = 'none';
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          function(pos) {
+            state.userLat = pos.coords.latitude;
+            state.userLng = pos.coords.longitude;
+          },
+          function() { /* user denied or unavailable - that's fine */ },
+          { timeout: 5000, maximumAge: 300000 }
+        );
+      }
+    }
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        function(pos) {
-          state.userLat = pos.coords.latitude;
-          state.userLng = pos.coords.longitude;
-        },
-        function() { /* user denied or unavailable - that's fine */ },
-        { timeout: 5000, maximumAge: 300000 }
-      );
+      setTimeout(function() {
+        document.getElementById('location-modal').style.display = 'flex';
+      }, 5000);
     }
 
     var searchDebounceTimer = null;
@@ -2489,6 +2921,49 @@
         stopPolling();
       }
     }
+
+    /* ===========================================================
+       Legal Page Navigation (SPA routing)
+       =========================================================== */
+    var _prevScreen = 'search';
+    function navigateToLegal(page) {
+      if (page) {
+        _prevScreen = state.screen;
+        navigateTo(page);
+        window.history.pushState({ legal: page }, '', '/' + page);
+        window.scrollTo(0, 0);
+      } else {
+        navigateTo(_prevScreen || 'search');
+        window.history.pushState({}, '', '/');
+        window.scrollTo(0, 0);
+      }
+    }
+
+    // Handle browser back/forward for legal pages
+    window.addEventListener('popstate', function(e) {
+      if (e.state && e.state.legal) {
+        state.screen = e.state.legal;
+        render();
+      } else {
+        var path = window.location.pathname;
+        if (path === '/privacy' || path === '/terms' || path === '/content') {
+          state.screen = path.slice(1);
+          render();
+        } else {
+          state.screen = _prevScreen || 'search';
+          render();
+        }
+      }
+    });
+
+    // Deep-link: if URL is /privacy, /terms, or /content on page load
+    (function handleLegalDeepLink() {
+      var path = window.location.pathname;
+      if (path === '/privacy' || path === '/terms' || path === '/content') {
+        state.screen = path.slice(1);
+        render();
+      }
+    })();
 
     /* ===========================================================
        Search Logic
@@ -2863,7 +3338,7 @@
         .then(function(data) {
           btn.disabled = false;
           btn.textContent = 'Send Magic Link';
-          document.getElementById('email-step-input').style.display = 'none';
+          // Keep input visible so user can sign in with a different email
           document.getElementById('email-step-sent').style.display = 'block';
 
           // Store session for optimistic flow (real auth comes via redirect)
