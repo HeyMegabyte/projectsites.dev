@@ -115,6 +115,90 @@ search.get('/api/search/businesses', async (c) => {
   return c.json({ data });
 });
 
+// ─── Google Places Address Autocomplete ──────────────────────
+
+interface AutocompleteSuggestion {
+  placePrediction?: {
+    placeId: string;
+    text?: { text: string };
+    structuredFormat?: {
+      mainText?: { text: string };
+      secondaryText?: { text: string };
+    };
+  };
+}
+
+interface AutocompleteResponse {
+  suggestions?: AutocompleteSuggestion[];
+}
+
+search.get('/api/search/address', async (c) => {
+  const q = c.req.query('q');
+
+  if (!q || q.trim().length < 2) {
+    return c.json({ data: [] });
+  }
+
+  const requestBody: Record<string, unknown> = {
+    input: q,
+    includedPrimaryTypes: ['street_address', 'subpremise', 'premise', 'route', 'locality', 'sublocality'],
+  };
+
+  // Optional location bias
+  const lat = c.req.query('lat');
+  const lng = c.req.query('lng');
+  if (lat && lng) {
+    const latitude = parseFloat(lat);
+    const longitude = parseFloat(lng);
+    if (!isNaN(latitude) && !isNaN(longitude)) {
+      requestBody.locationBias = {
+        circle: {
+          center: { latitude, longitude },
+          radius: 50000.0,
+        },
+      };
+    }
+  }
+
+  const response = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': c.env.GOOGLE_PLACES_API_KEY,
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    console.warn(
+      JSON.stringify({
+        level: 'error',
+        service: 'search',
+        message: 'Google Places Autocomplete API error',
+        status: response.status,
+        body: errorText.slice(0, 500),
+        query: q,
+      }),
+    );
+    return c.json({ data: [] });
+  }
+
+  const json = (await response.json()) as AutocompleteResponse;
+  const suggestions = (json.suggestions ?? []).slice(0, 8);
+
+  const data = suggestions
+    .filter((s) => s.placePrediction)
+    .map((s) => ({
+      place_id: s.placePrediction!.placeId,
+      description: s.placePrediction!.text?.text ?? '',
+      main_text: s.placePrediction!.structuredFormat?.mainText?.text ?? '',
+      secondary_text: s.placePrediction!.structuredFormat?.secondaryText?.text ?? '',
+    }));
+
+  return c.json({ data });
+});
+
 // ─── Site Search (pre-built) ─────────────────────────────────
 
 interface SiteSearchRow {

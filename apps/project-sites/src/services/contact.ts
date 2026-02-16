@@ -143,6 +143,9 @@ function buildContactNotificationEmail(data: ContactForm): string {
 <head><meta charset="utf-8"></head>
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:transparent;color:#e2e8f0;padding:40px 20px;">
   <div style="max-width:560px;margin:0 auto;background:#161635;border-radius:12px;padding:40px;border:1px solid rgba(80,165,219,0.1);">
+    <div style="text-align:center;margin-bottom:24px;">
+      <img src="https://sites.megabyte.space/logo-header.png" alt="Project Sites" style="max-height:44px;max-width:260px;height:auto;" />
+    </div>
     <h1 style="color:#50a5db;font-size:24px;margin:0 0 20px;">New Contact Form Submission</h1>
     <table style="width:100%;color:#94a3b8;font-size:14px;line-height:1.8;border-collapse:collapse;">
       <tr><td style="font-weight:700;color:#e2e8f0;padding:6px 16px 6px 0;vertical-align:top;">Name:</td><td style="padding:6px 0;">${escapeHtml(data.name)}</td></tr>
@@ -164,6 +167,9 @@ function buildContactConfirmationEmail(data: ContactForm): string {
 <head><meta charset="utf-8"></head>
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:transparent;color:#e2e8f0;padding:40px 20px;">
   <div style="max-width:480px;margin:0 auto;background:#161635;border-radius:12px;padding:40px;border:1px solid rgba(80,165,219,0.1);">
+    <div style="text-align:center;margin-bottom:24px;">
+      <img src="https://sites.megabyte.space/logo-header.png" alt="Project Sites" style="max-height:44px;max-width:260px;height:auto;" />
+    </div>
     <h1 style="color:#50a5db;font-size:24px;margin:0 0 16px;">Thanks for reaching out!</h1>
     <p style="color:#94a3b8;line-height:1.6;margin:0 0 12px;">Hi ${escapeHtml(data.name)},</p>
     <p style="color:#94a3b8;line-height:1.6;margin:0 0 24px;">We've received your message and will get back to you shortly. Here's a copy of what you sent:</p>

@@ -966,6 +966,79 @@
       font-size: 0.78rem;
       color: var(--text-muted);
     }
+    .selected-business-badge .badge-dismiss {
+      margin-left: auto;
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      border: none;
+      background: rgba(255,255,255,0.06);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: background var(--transition), color var(--transition);
+      padding: 0;
+    }
+    .selected-business-badge .badge-dismiss:hover {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--error);
+    }
+
+    /* ── Address Autocomplete Dropdown ────────── */
+    .address-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: var(--bg-card);
+      border: 1px solid var(--border-hover);
+      border-top: none;
+      border-radius: 0 0 var(--radius) var(--radius);
+      max-height: 280px;
+      overflow-y: auto;
+      z-index: 50;
+      display: none;
+      box-shadow: var(--shadow-lg);
+    }
+    .address-dropdown.open { display: block; animation: fadeInScale 0.15s ease; }
+    .address-item {
+      padding: 12px 16px;
+      cursor: pointer;
+      transition: background var(--transition);
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .address-item:last-child { border-bottom: none; }
+    .address-item:hover { background: var(--bg-card-hover); }
+    .address-item-icon {
+      flex-shrink: 0;
+      color: var(--accent);
+      opacity: 0.7;
+    }
+    .address-item-text {
+      flex: 1;
+      min-width: 0;
+    }
+    .address-item-main {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .address-item-secondary {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
 
     .uppy-section {
       margin: 20px 0;
@@ -1115,6 +1188,11 @@
     .screen-legal.active {
       justify-content: flex-start;
       align-items: flex-start;
+    }
+    /* When a legal/content page is active, unset .app min-height so
+       the page height follows the content naturally. */
+    .app:has(.screen-legal.active) {
+      min-height: unset;
     }
     .legal-container {
       max-width: 760px;
@@ -2502,17 +2580,23 @@
             <div class="badge-name" id="badge-biz-name"></div>
             <div class="badge-addr" id="badge-biz-addr"></div>
           </div>
+          <button class="badge-dismiss" onclick="dismissBusinessBadge()" title="Remove selection">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
         </div>
 
         <!-- Manual business info (shown when no business selected from search) -->
         <div id="details-manual-fields" style="display:none;">
           <div class="input-group">
-            <label for="business-name-input">Business Name</label>
-            <input type="text" id="business-name-input" class="input-field" placeholder="e.g. Vito's Men's Salon" maxlength="200" />
+            <label for="business-name-input">Business Name <span style="color:var(--accent);">*</span></label>
+            <input type="text" id="business-name-input" class="input-field" placeholder="e.g. Vito's Men's Salon" maxlength="200" required />
           </div>
-          <div class="input-group">
-            <label for="business-address-input">Business Address (optional)</label>
-            <input type="text" id="business-address-input" class="input-field" placeholder="e.g. 74 N Beverwyck Rd, Lake Hiawatha, NJ 07034" maxlength="500" />
+          <div class="input-group" style="position:relative;">
+            <label for="business-address-input">Business Address <span style="color:var(--accent);">*</span></label>
+            <input type="text" id="business-address-input" class="input-field" placeholder="Start typing an address..." maxlength="500" autocomplete="off" required />
+            <div id="address-dropdown" class="address-dropdown"></div>
           </div>
         </div>
 
@@ -2920,7 +3004,8 @@
 
     // Request browser geolocation with custom modal
     // Only show if: (1) geolocation is supported, (2) user hasn't declined before,
-    // (3) location isn't already available
+    // (3) location isn't already available, (4) we're on the homepage with search input visible,
+    // (5) no modal/overlay is open, (6) permission hasn't already been granted
     function dismissLocationModal() {
       document.getElementById('location-modal').style.display = 'none';
       try { localStorage.setItem('ps_location_declined', '1'); } catch(e) { /* private browsing */ }
@@ -2938,16 +3023,66 @@
         );
       }
     }
+
+    /** Check whether geolocation prompt should be shown. */
+    function shouldShowLocationPrompt() {
+      // Must be on homepage search screen and input visible (no modal overlay)
+      if (state.screen !== 'search') return false;
+      var searchScreen = document.getElementById('screen-search');
+      if (!searchScreen || !searchScreen.classList.contains('active')) return false;
+      var searchEl = document.getElementById('search-input');
+      if (!searchEl || searchEl.offsetParent === null) return false;
+      // Don't show if dropdown is open (user is actively searching)
+      var dropdown = document.getElementById('search-dropdown');
+      if (dropdown && dropdown.classList.contains('open')) return false;
+      return true;
+    }
+
     if (navigator.geolocation && !state.userLat) {
       var declined = false;
       try { declined = localStorage.getItem('ps_location_declined') === '1'; } catch(e) { /* private browsing */ }
       if (!declined) {
-        setTimeout(function() {
-          // Re-check: location may have been set by the time the timeout fires
-          if (!state.userLat) {
-            document.getElementById('location-modal').style.display = 'flex';
-          }
-        }, 5000);
+        // First check if permission was already granted (skip prompt entirely)
+        var permChecked = false;
+        if (navigator.permissions && navigator.permissions.query) {
+          navigator.permissions.query({ name: 'geolocation' }).then(function(result) {
+            permChecked = true;
+            if (result.state === 'granted') {
+              // Already granted - silently get location without prompt
+              navigator.geolocation.getCurrentPosition(
+                function(pos) {
+                  state.userLat = pos.coords.latitude;
+                  state.userLng = pos.coords.longitude;
+                },
+                function() {},
+                { timeout: 5000, maximumAge: 300000 }
+              );
+            } else if (result.state === 'prompt') {
+              // Permission not yet decided - show our custom modal after delay
+              setTimeout(function() {
+                if (!state.userLat && shouldShowLocationPrompt()) {
+                  document.getElementById('location-modal').style.display = 'flex';
+                }
+              }, 5000);
+            }
+            // If 'denied', do nothing
+          }).catch(function() {
+            // Permissions API not available - fall back to timer
+            setTimeout(function() {
+              if (!state.userLat && shouldShowLocationPrompt()) {
+                document.getElementById('location-modal').style.display = 'flex';
+              }
+            }, 5000);
+          });
+        }
+        // Fallback for browsers without Permissions API
+        if (!navigator.permissions || !navigator.permissions.query) {
+          setTimeout(function() {
+            if (!state.userLat && shouldShowLocationPrompt()) {
+              document.getElementById('location-modal').style.display = 'flex';
+            }
+          }, 5000);
+        }
       }
     }
 
@@ -3403,6 +3538,18 @@
       btn.innerHTML = 'Sending <span class="loading-dots"><span></span><span></span><span></span></span>';
       hideMsg('email-send-msg');
 
+      // Save business selection to localStorage before sending magic link
+      // so when the user clicks the link (possibly in a new tab), we can restore it
+      if (state.selectedBusiness) {
+        try {
+          localStorage.setItem('ps_selected_business', JSON.stringify(state.selectedBusiness));
+          localStorage.setItem('ps_mode', state.mode);
+        } catch(e) { /* private browsing */ }
+      }
+      if (state._pendingBuild) {
+        try { localStorage.setItem('ps_pending_build', '1'); } catch(e) {}
+      }
+
       fetch('/api/auth/magic-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -3465,6 +3612,108 @@
           manualFields.style.display = 'block';
         }
       }
+    }
+
+    /** Dismiss the business badge: clear selection and show manual fields. */
+    function dismissBusinessBadge() {
+      state.selectedBusiness = null;
+      state.mode = 'custom';
+      var badgeEl = document.getElementById('details-business-badge');
+      var manualFields = document.getElementById('details-manual-fields');
+      var titleEl = document.getElementById('details-title');
+      var subtitleEl = document.getElementById('details-subtitle');
+      if (badgeEl) badgeEl.style.display = 'none';
+      if (manualFields) manualFields.style.display = 'block';
+      if (titleEl) titleEl.textContent = 'Tell us about your business';
+      if (subtitleEl) subtitleEl.textContent = 'Enter your business details and we\'ll build your website.';
+    }
+
+    /* ===========================================================
+       Address Autocomplete (Google Places)
+       =========================================================== */
+    var addressDebounceTimer = null;
+    var addressDropdown = document.getElementById('address-dropdown');
+    var addressInput = document.getElementById('business-address-input');
+
+    if (addressInput) {
+      addressInput.addEventListener('input', function() {
+        var q = addressInput.value.trim();
+        clearTimeout(addressDebounceTimer);
+        if (q.length < 3) {
+          closeAddressDropdown();
+          return;
+        }
+        addressDebounceTimer = setTimeout(function() {
+          fetchAddressSuggestions(q);
+        }, 250);
+      });
+
+      addressInput.addEventListener('focus', function() {
+        if (addressInput.value.trim().length >= 3 && addressDropdown.children.length > 0) {
+          addressDropdown.classList.add('open');
+        }
+      });
+
+      // Close on click outside
+      document.addEventListener('click', function(e) {
+        if (!e.target.closest('#business-address-input') && !e.target.closest('#address-dropdown')) {
+          closeAddressDropdown();
+        }
+      });
+    }
+
+    function fetchAddressSuggestions(query) {
+      var url = '/api/search/address?q=' + encodeURIComponent(query);
+      if (state.userLat !== null && state.userLng !== null) {
+        url += '&lat=' + state.userLat + '&lng=' + state.userLng;
+      }
+      fetch(url)
+        .then(function(res) { return res.json(); })
+        .then(function(d) {
+          var items = d.data || [];
+          renderAddressDropdown(items);
+        })
+        .catch(function() {
+          closeAddressDropdown();
+        });
+    }
+
+    function renderAddressDropdown(items) {
+      if (!items.length) {
+        closeAddressDropdown();
+        return;
+      }
+      var html = '';
+      for (var i = 0; i < items.length; i++) {
+        var item = items[i];
+        html += '<div class="address-item" onclick="selectAddress(' + i + ')" data-description="' + escapeHtml(item.description) + '">'
+              +   '<div class="address-item-icon">'
+              +     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+              +       '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>'
+              +     '</svg>'
+              +   '</div>'
+              +   '<div class="address-item-text">'
+              +     '<div class="address-item-main">' + escapeHtml(item.main_text || item.description) + '</div>'
+              +     (item.secondary_text ? '<div class="address-item-secondary">' + escapeHtml(item.secondary_text) + '</div>' : '')
+              +   '</div>'
+              + '</div>';
+      }
+      addressDropdown.innerHTML = html;
+      addressDropdown.classList.add('open');
+      // Store items for selection
+      addressDropdown._items = items;
+    }
+
+    function selectAddress(index) {
+      var items = addressDropdown._items || [];
+      if (items[index]) {
+        addressInput.value = items[index].description || items[index].main_text;
+      }
+      closeAddressDropdown();
+    }
+
+    function closeAddressDropdown() {
+      if (addressDropdown) addressDropdown.classList.remove('open');
     }
 
     function initUppy() {
@@ -3537,9 +3786,19 @@
       } else {
         var manualName = document.getElementById('business-name-input').value.trim();
         var manualAddr = document.getElementById('business-address-input').value.trim();
-        if (manualName) {
-          payload.business = { name: manualName, address: manualAddr || undefined };
+        if (!manualName) {
+          showMsg('build-msg', 'error', 'Please enter your business name.');
+          btn.disabled = false;
+          btn.textContent = 'Build My Website';
+          return;
         }
+        if (!manualAddr) {
+          showMsg('build-msg', 'error', 'Please enter your business address.');
+          btn.disabled = false;
+          btn.textContent = 'Build My Website';
+          return;
+        }
+        payload.business = { name: manualName, address: manualAddr };
       }
 
       var headers = { 'Content-Type': 'application/json' };
@@ -3693,10 +3952,11 @@
           var cleanUrl = window.location.pathname;
           window.history.replaceState({}, document.title, cleanUrl);
 
-          // Restore any selected business from sessionStorage
-          var savedBiz = sessionStorage.getItem('ps_selected_business');
-          var savedMode = sessionStorage.getItem('ps_mode');
-          var savedPendingBuild = sessionStorage.getItem('ps_pending_build');
+          // Restore any selected business from sessionStorage (Google OAuth)
+          // or localStorage (magic link - may open in new tab)
+          var savedBiz = sessionStorage.getItem('ps_selected_business') || localStorage.getItem('ps_selected_business');
+          var savedMode = sessionStorage.getItem('ps_mode') || localStorage.getItem('ps_mode');
+          var savedPendingBuild = sessionStorage.getItem('ps_pending_build') || localStorage.getItem('ps_pending_build');
           if (savedBiz) {
             try {
               state.selectedBusiness = JSON.parse(savedBiz);
@@ -3704,10 +3964,15 @@
             } catch (e) { /* ignore */ }
             sessionStorage.removeItem('ps_selected_business');
             sessionStorage.removeItem('ps_mode');
+            try {
+              localStorage.removeItem('ps_selected_business');
+              localStorage.removeItem('ps_mode');
+            } catch(e) {}
           }
           if (savedPendingBuild) {
             state._pendingBuild = true;
             sessionStorage.removeItem('ps_pending_build');
+            try { localStorage.removeItem('ps_pending_build'); } catch(e) {}
           }
 
           navigateTo('details');

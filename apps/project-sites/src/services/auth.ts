@@ -205,6 +205,9 @@ function buildMagicLinkEmail(verifyUrl: string): string {
 <head><meta charset="utf-8"></head>
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:transparent;color:#e2e8f0;padding:40px 20px;">
   <div style="max-width:480px;margin:0 auto;background:#161635;border-radius:12px;padding:40px;border:1px solid rgba(80,165,219,0.1);">
+    <div style="text-align:center;margin-bottom:24px;">
+      <img src="https://sites.megabyte.space/logo-header.png" alt="Project Sites" style="max-height:44px;max-width:260px;height:auto;" />
+    </div>
     <h1 style="color:#50a5db;font-size:24px;margin:0 0 16px;">Sign in to Project Sites</h1>
     <p style="color:#94a3b8;line-height:1.6;margin:0 0 24px;">Click the button below to sign in. This link expires in ${AUTH.MAGIC_LINK_EXPIRY_HOURS} hour(s).</p>
     <a href="${verifyUrl}" style="display:inline-block;background:linear-gradient(135deg,#50a5db,#7c3aed);color:#ffffff;font-weight:700;padding:14px 32px;border-radius:8px;text-decoration:none;font-size:16px;">Sign In</a>
