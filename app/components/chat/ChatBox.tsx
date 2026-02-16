@@ -307,20 +307,22 @@ export const ChatBox: React.FC<ChatBoxProps> = (props) => {
                 {props.chatMode === 'discuss' ? <span>Discuss</span> : <span />}
               </IconButton>
             )}
-            <span className="hidden">
-              <IconButton
-                title="Model Settings"
-                className={classNames('transition-all flex items-center gap-1', {
-                  'bg-bolt-elements-item-backgroundAccent text-bolt-elements-item-contentAccent': true,
-                  'bg-bolt-elements-item-backgroundDefault text-bolt-elements-item-contentDefault': false,
+            <IconButton
+              title="Model Settings"
+              className={classNames('transition-all flex items-center gap-1', {
+                'bg-bolt-elements-item-backgroundAccent text-bolt-elements-item-contentAccent':
+                  !props.isModelSettingsCollapsed,
+              })}
+              onClick={() => props.setIsModelSettingsCollapsed(!props.isModelSettingsCollapsed)}
+              disabled={!props.providerList || props.providerList.length === 0}
+            >
+              <div
+                className={classNames('i-ph:caret-right text-lg transition-transform', {
+                  'rotate-90': !props.isModelSettingsCollapsed,
                 })}
-                onClick={() => props.setIsModelSettingsCollapsed(!props.isModelSettingsCollapsed)}
-                disabled={!props.providerList || props.providerList.length === 0}
-              >
-                <div className="i-ph:caret-right text-lg" />
-                <span className="text-xs">{props.model}</span>
-              </IconButton>
-            </span>
+              />
+              <span className="text-xs">{props.model}</span>
+            </IconButton>
           </div>
           {props.input.length > 3 ? (
             <div className="text-xs text-bolt-elements-textTertiary">
