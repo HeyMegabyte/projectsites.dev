@@ -20,6 +20,7 @@ import { cubicEasingFn } from '~/utils/easings';
 import { renderLogger } from '~/utils/logger';
 import { EditorPanel } from './EditorPanel';
 import { Preview } from './Preview';
+import { DeployPanel } from './DeployPanel';
 import useViewport from '~/lib/hooks';
 
 import { usePreviewStore } from '~/lib/stores/previews';
@@ -55,7 +56,28 @@ const sliderOptions: SliderOptions<WorkbenchViewType> = {
     value: 'preview',
     text: 'Preview',
   },
+  extra: {
+    value: 'deploy',
+    text: 'Deploy',
+  },
 };
+
+const VIEW_ORDER: WorkbenchViewType[] = ['code', 'diff', 'preview', 'deploy'];
+
+function getViewX(view: WorkbenchViewType, selectedView: WorkbenchViewType): string {
+  const viewIndex = VIEW_ORDER.indexOf(view);
+  const selectedIndex = VIEW_ORDER.indexOf(selectedView);
+
+  if (viewIndex < selectedIndex) {
+    return '-100%';
+  }
+
+  if (viewIndex > selectedIndex) {
+    return '100%';
+  }
+
+  return '0%';
+}
 
 const workbenchVariants = {
   closed: {
@@ -503,7 +525,7 @@ export const Workbench = memo(
                   />
                 </div>
                 <div className="relative flex-1 overflow-hidden">
-                  <View initial={{ x: '0%' }} animate={{ x: selectedView === 'code' ? '0%' : '-100%' }}>
+                  <View initial={{ x: '0%' }} animate={{ x: getViewX('code', selectedView) }}>
                     <EditorPanel
                       editorDocument={currentDocument}
                       isStreaming={isStreaming}
@@ -518,14 +540,14 @@ export const Workbench = memo(
                       onFileReset={onFileReset}
                     />
                   </View>
-                  <View
-                    initial={{ x: '100%' }}
-                    animate={{ x: selectedView === 'diff' ? '0%' : selectedView === 'code' ? '100%' : '-100%' }}
-                  >
+                  <View initial={{ x: '100%' }} animate={{ x: getViewX('diff', selectedView) }}>
                     <DiffView fileHistory={fileHistory} setFileHistory={setFileHistory} />
                   </View>
-                  <View initial={{ x: '100%' }} animate={{ x: selectedView === 'preview' ? '0%' : '100%' }}>
+                  <View initial={{ x: '100%' }} animate={{ x: getViewX('preview', selectedView) }}>
                     <Preview setSelectedElement={setSelectedElement} />
+                  </View>
+                  <View initial={{ x: '100%' }} animate={{ x: getViewX('deploy', selectedView) }}>
+                    <DeployPanel />
                   </View>
                 </div>
               </div>

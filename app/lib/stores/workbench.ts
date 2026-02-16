@@ -33,7 +33,7 @@ export type ArtifactUpdateState = Pick<ArtifactState, 'title' | 'closed'>;
 
 type Artifacts = MapStore<Record<string, ArtifactState>>;
 
-export type WorkbenchViewType = 'code' | 'diff' | 'preview';
+export type WorkbenchViewType = 'code' | 'diff' | 'preview' | 'deploy';
 
 export class WorkbenchStore {
   #previewsStore = new PreviewsStore(webcontainer);
@@ -607,6 +607,20 @@ export class WorkbenchStore {
   #getArtifact(id: string) {
     const artifacts = this.artifacts.get();
     return artifacts[id];
+  }
+
+  /**
+   * Public wrapper to read project site metadata from WebContainer.
+   */
+  async getProjectSiteMeta(): Promise<{ slug: string; version: string; url: string } | null> {
+    return this.#readProjectSiteMeta();
+  }
+
+  /**
+   * Get the Project Sites worker URL (public accessor).
+   */
+  getProjectSitesBaseUrl(): string {
+    return this.#getProjectSitesUrl();
   }
 
   /**
