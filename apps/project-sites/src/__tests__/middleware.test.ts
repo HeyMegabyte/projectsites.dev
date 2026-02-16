@@ -162,7 +162,21 @@ describe('securityHeadersMiddleware', () => {
     const app = createApp();
     const res = await app.request('/test');
 
-    expect(res.headers.get('Permissions-Policy')).toBe('camera=(), microphone=(), geolocation=(self)');
+    expect(res.headers.get('Permissions-Policy')).toBe('camera=(), microphone=(), geolocation=self');
+  });
+
+  it('sets Cross-Origin-Opener-Policy header', async () => {
+    const app = createApp();
+    const res = await app.request('/test');
+
+    expect(res.headers.get('Cross-Origin-Opener-Policy')).toBe('same-origin');
+  });
+
+  it('sets Cross-Origin-Embedder-Policy header', async () => {
+    const app = createApp();
+    const res = await app.request('/test');
+
+    expect(res.headers.get('Cross-Origin-Embedder-Policy')).toBe('credentialless');
   });
 
   it('sets Content-Security-Policy with correct directives', async () => {

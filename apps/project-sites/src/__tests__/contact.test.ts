@@ -223,3 +223,106 @@ describe('handleContactForm – email providers', () => {
     ).rejects.toThrow();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Coverage: escapeHtml, email content, boundary values
+// ---------------------------------------------------------------------------
+describe('handleContactForm – coverage gaps', () => {
+  it('escapes all HTML special characters in notification email', async () => {
+    const input = {
+      name: 'A & B "test" <user>',
+      email: 'test@example.com',
+      message: 'Chars: & < > " should all be escaped properly',
+    };
+    await handleContactForm(mockEnv, input);
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body.html).toContain('&amp;');
+    expect(body.html).toContain('&lt;');
+    expect(body.html).toContain('&gt;');
+    expect(body.html).toContain('&quot;');
+    expect(body.html).not.toContain('<user>');
+  });
+
+  it('notification email contains all form fields', async () => {
+    const input = {
+      name: 'Alice',
+      email: 'alice@example.com',
+      phone: '+15551234567',
+      message: 'Please contact me about your premium plan.',
+    };
+    await handleContactForm(mockEnv, input);
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body.html).toContain('Alice');
+    expect(body.html).toContain('alice@example.com');
+    expect(body.html).toContain('+15551234567');
+    expect(body.html).toContain('premium plan');
+    expect(body.subject).toContain('Alice');
+    expect(body.reply_to).toBe('alice@example.com');
+  });
+
+  it('confirmation email contains user name and message copy', async () => {
+    const input = {
+      name: 'Bob',
+      email: 'bob@example.com',
+      message: 'I would like a demo of the platform.',
+    };
+    await handleContactForm(mockEnv, input);
+
+    const body = JSON.parse(mockFetch.mock.calls[1][1].body);
+    expect(body.html).toContain('Bob');
+    expect(body.html).toContain('demo of the platform');
+    expect(body.subject).toContain('received your message');
+    expect(body.to).toEqual(['bob@example.com']);
+  });
+
+  it('notification email omits phone row when not provided', async () => {
+    const input = {
+      name: 'Charlie',
+      email: 'charlie@test.com',
+      message: 'No phone number here.',
+    };
+    await handleContactForm(mockEnv, input);
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body.html).not.toContain('Phone:');
+  });
+
+  it('accepts name at boundary (200 chars)', async () => {
+    const input = {
+      name: 'A'.repeat(200),
+      email: 'test@example.com',
+      message: 'Testing maximum name length boundary.',
+    };
+    await handleContactForm(mockEnv, input);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('accepts message at minimum boundary (10 chars)', async () => {
+    const input = {
+      name: 'Test',
+      email: 'test@example.com',
+      message: '1234567890',
+    };
+    await handleContactForm(mockEnv, input);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('sends via SendGrid only when Resend key is missing', async () => {
+    const sendGridOnlyEnv = {
+      ENVIRONMENT: 'staging',
+      SENDGRID_API_KEY: 'test-sendgrid-key',
+    } as any;
+
+    await handleContactForm(sendGridOnlyEnv, {
+      name: 'Test',
+      email: 'test@example.com',
+      message: 'Testing SendGrid-only path.',
+    });
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(mockFetch.mock.calls[0][0]).toBe('https://api.sendgrid.com/v3/mail/send');
+    expect(mockFetch.mock.calls[1][0]).toBe('https://api.sendgrid.com/v3/mail/send');
+  });
+});

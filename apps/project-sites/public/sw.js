@@ -1,4 +1,4 @@
-var CACHE_NAME = 'project-sites-v1';
+var CACHE_NAME = 'project-sites-v2';
 var ASSETS_TO_CACHE = [
   '/',
   '/logo-header.png',
@@ -46,7 +46,8 @@ self.addEventListener('fetch', function(event) {
     event.respondWith(
       caches.open(CACHE_NAME).then(function(cache) {
         return cache.match('/').then(function(cached) {
-          var fetchPromise = fetch(event.request).then(function(response) {
+          // Always revalidate from '/' (SPA entry point) regardless of the navigation URL
+          var fetchPromise = fetch('/').then(function(response) {
             if (response.ok) {
               cache.put('/', response.clone());
             }

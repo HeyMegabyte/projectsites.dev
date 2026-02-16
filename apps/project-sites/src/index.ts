@@ -117,9 +117,46 @@ app.all('*', async (c) => {
     const marketingPath = `marketing${path === '/' ? '/index.html' : path}`;
     let marketingAsset = await c.env.SITES_BUCKET.get(marketingPath);
 
-    // If no extension in path, try appending .html (e.g. /privacy → marketing/privacy.html)
+    // SSR routing: for extension-less paths (/privacy, /terms, /content, /contact),
+    // serve index.html with the correct screen pre-activated (server-side rendering)
     if (!marketingAsset && !path.includes('.') && path !== '/') {
-      marketingAsset = await c.env.SITES_BUCKET.get(`marketing${path}.html`);
+      const spaAsset = await c.env.SITES_BUCKET.get('marketing/index.html');
+      if (spaAsset) {
+        let spaHtml = await spaAsset.text();
+        const spaPhKey = c.env.POSTHOG_API_KEY ?? 'none';
+        spaHtml = spaHtml.replace('</head>', `<meta name="x-posthog-key" content="${spaPhKey}">\n</head>`);
+
+        // SSR: pre-activate the target screen so the page renders correctly without JS
+        const screenName = path.slice(1); // '/privacy' → 'privacy'
+        const screenTitles: Record<string, string> = {
+          privacy: 'Privacy Policy - Project Sites',
+          terms: 'Terms of Service - Project Sites',
+          content: 'Content Policy - Project Sites',
+          contact: 'Contact Us - Project Sites',
+        };
+
+        // Hide the default search screen, show the target screen
+        spaHtml = spaHtml.replace(
+          'id="screen-search" class="screen screen-search active"',
+          'id="screen-search" class="screen screen-search"',
+        );
+        spaHtml = spaHtml.replace(
+          `id="screen-${screenName}" class="screen screen-legal"`,
+          `id="screen-${screenName}" class="screen screen-legal active"`,
+        );
+
+        // Update <title> for SEO
+        if (screenTitles[screenName]) {
+          spaHtml = spaHtml.replace(/<title>[^<]*<\/title>/, `<title>${screenTitles[screenName]}</title>`);
+        }
+
+        return new Response(spaHtml, {
+          headers: {
+            'Content-Type': 'text/html',
+            'Cache-Control': 'public, max-age=60',
+          },
+        });
+      }
     }
 
     if (marketingAsset) {
@@ -158,22 +195,6 @@ app.all('*', async (c) => {
           'Cache-Control': 'public, max-age=3600',
         },
       });
-    }
-
-    // SPA fallback: serve index.html for client-side routes (/content, /contact, etc.)
-    if (!path.includes('.') || path === '/') {
-      const spaFallback = await c.env.SITES_BUCKET.get('marketing/index.html');
-      if (spaFallback) {
-        let spaHtml = await spaFallback.text();
-        const spaPhKey = c.env.POSTHOG_API_KEY ?? 'none';
-        spaHtml = spaHtml.replace('</head>', `<meta name="x-posthog-key" content="${spaPhKey}">\n</head>`);
-        return new Response(spaHtml, {
-          headers: {
-            'Content-Type': 'text/html',
-            'Cache-Control': 'public, max-age=60',
-          },
-        });
-      }
     }
 
     // Final fallback: return JSON info when no static assets deployed at all

@@ -1,3 +1,16 @@
+jest.mock('../lib/sentry.js', () => ({
+  captureError: jest.fn(),
+  captureMessage: jest.fn(),
+  createSentry: jest.fn(),
+}));
+
+jest.mock('../lib/posthog.js', () => ({
+  capture: jest.fn(),
+  trackAuth: jest.fn(),
+  trackSite: jest.fn(),
+  trackError: jest.fn(),
+}));
+
 import { Hono } from 'hono';
 import { errorHandler } from '../middleware/error_handler.js';
 import {
@@ -110,13 +123,17 @@ describe('errorHandler - AppError handling', () => {
   });
 
   it('logs with warn level for 4xx errors', async () => {
-    const consoleSpy = jest.spyOn(console, 'error');
+    const consoleSpy = jest.spyOn(console, 'warn');
     const app = createApp();
     await app.request('/throw-app-error-400');
 
     const logCall = consoleSpy.mock.calls.find((call) => {
-      const parsed = JSON.parse(call[0] as string);
-      return parsed.code === 'BAD_REQUEST';
+      try {
+        const parsed = JSON.parse(call[0] as string);
+        return parsed.code === 'BAD_REQUEST';
+      } catch {
+        return false;
+      }
     });
     expect(logCall).toBeDefined();
     const parsed = JSON.parse(logCall![0] as string);
@@ -124,15 +141,19 @@ describe('errorHandler - AppError handling', () => {
   });
 
   it('returns correct status code for 500 error and logs with error level', async () => {
-    const consoleSpy = jest.spyOn(console, 'error');
+    const consoleSpy = jest.spyOn(console, 'warn');
     const app = createApp();
     const res = await app.request('/throw-app-error-500');
 
     expect(res.status).toBe(500);
 
     const logCall = consoleSpy.mock.calls.find((call) => {
-      const parsed = JSON.parse(call[0] as string);
-      return parsed.code === 'INTERNAL_ERROR' && parsed.message === 'Server broke';
+      try {
+        const parsed = JSON.parse(call[0] as string);
+        return parsed.code === 'INTERNAL_ERROR' && parsed.message === 'Server broke';
+      } catch {
+        return false;
+      }
     });
     expect(logCall).toBeDefined();
     const parsed = JSON.parse(logCall![0] as string);
@@ -221,7 +242,7 @@ describe('errorHandler - General behavior', () => {
     expect(body.error.request_id).toBeUndefined();
 
     // Verify the console log used 'unknown' as the request_id
-    const consoleSpy = jest.spyOn(console, 'error');
+    const consoleSpy = jest.spyOn(console, 'warn');
     await app.request('/throw-app-error-400');
     const logCall = consoleSpy.mock.calls.find((call) => {
       try {

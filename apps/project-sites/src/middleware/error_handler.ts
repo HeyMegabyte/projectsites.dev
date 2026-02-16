@@ -18,6 +18,14 @@ export const errorHandler: ErrorHandler<{
   const url = c.req.url;
   const method = c.req.method;
 
+  // Safely access executionCtx (not available in test environments)
+  let ctx: ExecutionContext | undefined;
+  try {
+    ctx = c.executionCtx;
+  } catch {
+    // executionCtx not available outside Workers runtime
+  }
+
   // AppError: known typed errors
   if (err instanceof AppError) {
     console.warn(
@@ -35,19 +43,24 @@ export const errorHandler: ErrorHandler<{
     // Report 5xx to Sentry
     if (err.statusCode >= 500) {
       captureError(c, err, { code: err.code, url, method });
-      posthog.trackError(c.env, c.executionCtx, err.code, err.message, {
-        request_id: requestId,
-        status: err.statusCode,
-        url,
-      });
+      if (ctx) {
+        posthog.trackError(c.env, ctx, err.code, err.message, {
+          request_id: requestId,
+          status: err.statusCode,
+          url,
+        });
+      }
     }
 
     return c.json(err.toJSON(), err.statusCode as 400);
   }
 
-  // ZodError: validation failures
-  if (err instanceof ZodError) {
-    const issues = err.issues.map((i) => ({
+  // ZodError: validation failures (duck-type check handles multiple zod instances in monorepo)
+  const isZodError = err instanceof ZodError ||
+    (err && typeof err === 'object' && 'issues' in err && Array.isArray((err as ZodError).issues));
+  if (isZodError) {
+    const zodErr = err as ZodError;
+    const issues = zodErr.issues.map((i) => ({
       path: i.path.join('.'),
       message: i.message,
     }));
@@ -95,10 +108,12 @@ export const errorHandler: ErrorHandler<{
 
   // Always report unknown errors to Sentry
   captureError(c, err, { url, method, request_id: requestId });
-  posthog.trackError(c.env, c.executionCtx, 'INTERNAL_ERROR', errorMessage, {
-    request_id: requestId,
-    url,
-  });
+  if (ctx) {
+    posthog.trackError(c.env, ctx, 'INTERNAL_ERROR', errorMessage, {
+      request_id: requestId,
+      url,
+    });
+  }
 
   return c.json(
     {
