@@ -609,6 +609,174 @@ export class WorkbenchStore {
     return artifacts[id];
   }
 
+  /**
+   * Get the Project Sites worker URL based on the current environment.
+   */
+  #getProjectSitesUrl(): string {
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname;
+
+      if (hostname === 'bolt.megabyte.space') {
+        return 'https://sites.megabyte.space';
+      }
+    }
+
+    return 'https://sites-staging.megabyte.space';
+  }
+
+  /**
+   * Read the existing slug from .bolt/project-site.json in the WebContainer.
+   */
+  async #readProjectSiteMeta(): Promise<{ slug: string; version: string; url: string } | null> {
+    try {
+      const wc = await webcontainer;
+      const content = await wc.fs.readFile('.bolt/project-site.json', 'utf-8');
+
+      return JSON.parse(content);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Write slug metadata to .bolt/project-site.json in the WebContainer.
+   */
+  async #writeProjectSiteMeta(meta: { slug: string; version: string; url: string }): Promise<void> {
+    const wc = await webcontainer;
+    await wc.fs.mkdir('.bolt', { recursive: true });
+    await wc.fs.writeFile('.bolt/project-site.json', JSON.stringify(meta, null, 2));
+  }
+
+  /**
+   * Gather dist/ files from the WebContainer for publishing.
+   * Falls back to build/, then all files if no build output found.
+   */
+  #gatherPublishFiles(): { path: string; content: string }[] {
+    const files = this.files.get();
+    const result: { path: string; content: string }[] = [];
+
+    // Try dist/ first
+    for (const [filePath, dirent] of Object.entries(files)) {
+      if (dirent?.type === 'file' && !dirent.isBinary) {
+        const relativePath = extractRelativePath(filePath);
+
+        if (relativePath.startsWith('dist/')) {
+          result.push({
+            path: relativePath.replace(/^dist\//, ''),
+            content: dirent.content,
+          });
+        }
+      }
+    }
+
+    if (result.length > 0) {
+      return result;
+    }
+
+    // Try build/ as fallback
+    for (const [filePath, dirent] of Object.entries(files)) {
+      if (dirent?.type === 'file' && !dirent.isBinary) {
+        const relativePath = extractRelativePath(filePath);
+
+        if (relativePath.startsWith('build/')) {
+          result.push({
+            path: relativePath.replace(/^build\//, ''),
+            content: dirent.content,
+          });
+        }
+      }
+    }
+
+    if (result.length > 0) {
+      return result;
+    }
+
+    // Final fallback: check for index.html at root → upload all files
+    const hasRootIndex = Object.entries(files).some(([filePath, dirent]) => {
+      if (dirent?.type !== 'file') {
+        return false;
+      }
+
+      const rel = extractRelativePath(filePath);
+
+      return rel === 'index.html';
+    });
+
+    if (hasRootIndex) {
+      for (const [filePath, dirent] of Object.entries(files)) {
+        if (dirent?.type === 'file' && !dirent.isBinary) {
+          const relativePath = extractRelativePath(filePath);
+
+          // Skip node_modules, .git, and other non-deployable paths
+          if (
+            relativePath.startsWith('node_modules/') ||
+            relativePath.startsWith('.git/') ||
+            relativePath.startsWith('.bolt/') ||
+            relativePath === 'package-lock.json' ||
+            relativePath === 'tsconfig.json'
+          ) {
+            continue;
+          }
+
+          result.push({ path: relativePath, content: dirent.content });
+        }
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Save the current project to Project Sites (R2).
+   * Uploads dist/ files and chat export, generates slug via AI if needed.
+   */
+  async saveToProjectSites(
+    chatData: { messages: unknown[]; description?: string; exportDate: string } | null,
+  ): Promise<{ slug: string; url: string }> {
+    const publishFiles = this.#gatherPublishFiles();
+
+    if (publishFiles.length === 0) {
+      throw new Error('No files to publish. Build your project first (npm run build) or ensure index.html exists.');
+    }
+
+    // Check for existing slug
+    const existingMeta = await this.#readProjectSiteMeta();
+
+    const baseUrl = this.#getProjectSitesUrl();
+
+    const payload = {
+      files: publishFiles,
+      chat: chatData ?? {
+        messages: [],
+        description: description.value ?? 'Untitled',
+        exportDate: new Date().toISOString(),
+      },
+      slug: existingMeta?.slug ?? null,
+    };
+
+    const response = await fetch(`${baseUrl}/api/publish/bolt`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: { message: 'Unknown error' } }));
+
+      throw new Error(
+        (error as { error: { message: string } }).error?.message ?? `Publish failed (${response.status})`,
+      );
+    }
+
+    const result = (await response.json()) as { data: { slug: string; version: string; url: string } };
+    const { slug, version, url } = result.data;
+
+    // Persist slug to WebContainer
+    await this.#writeProjectSiteMeta({ slug, version, url });
+
+    return { slug, url };
+  }
+
   async downloadZip() {
     const zip = new JSZip();
     const files = this.files.get();

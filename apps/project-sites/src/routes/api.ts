@@ -36,6 +36,7 @@ import {
   createMagicLinkSchema,
   verifyMagicLinkSchema,
   createHostnameSchema,
+  DOMAINS,
   badRequest,
   notFound,
   forbidden,
@@ -405,6 +406,202 @@ api.get('/api/audit-logs', async (c) => {
   const result = await auditService.getAuditLogs(c.env.DB, orgId, { limit, offset });
   return c.json({ data: result.data });
 });
+
+// ─── Bolt Publish Route ─────────────────────────────────────
+
+/**
+ * Publish a bolt.diy project to Project Sites R2 storage.
+ *
+ * Accepts dist/ files and chat export, generates a slug via AI if needed,
+ * and makes the site available at {slug}-sites.megabyte.space.
+ *
+ * No auth required — bolt.diy users publish freely under the "free" plan.
+ */
+api.post('/api/publish/bolt', async (c) => {
+  const body = await c.req.json();
+  const { files, chat, slug: existingSlug } = body as {
+    files: { path: string; content: string }[];
+    chat: { messages: unknown[]; description?: string; exportDate: string };
+    slug: string | null;
+  };
+
+  if (!files || !Array.isArray(files) || files.length === 0) {
+    throw badRequest('No files provided');
+  }
+
+  // Determine slug
+  let slug: string;
+
+  if (existingSlug) {
+    slug = existingSlug;
+  } else {
+    slug = await generateSlugFromChat(c.env, chat);
+    slug = await ensureUniqueSlug(c.env, slug);
+  }
+
+  // Generate version
+  const version = new Date().toISOString().replace(/[:.]/g, '-');
+
+  // MIME type map for content-type headers
+  const mimeTypes: Record<string, string> = {
+    html: 'text/html',
+    css: 'text/css',
+    js: 'application/javascript',
+    mjs: 'application/javascript',
+    json: 'application/json',
+    png: 'image/png',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    gif: 'image/gif',
+    svg: 'image/svg+xml',
+    ico: 'image/x-icon',
+    webp: 'image/webp',
+    woff: 'font/woff',
+    woff2: 'font/woff2',
+    ttf: 'font/ttf',
+    xml: 'application/xml',
+    txt: 'text/plain',
+    webmanifest: 'application/manifest+json',
+  };
+
+  // Upload all dist files to R2
+  const uploads: Promise<R2Object>[] = files.map((f) => {
+    const ext = f.path.split('.').pop()?.toLowerCase() ?? '';
+    const contentType = mimeTypes[ext] ?? 'application/octet-stream';
+
+    return c.env.SITES_BUCKET.put(
+      `sites/${slug}/${version}/${f.path}`,
+      f.content,
+      { httpMetadata: { contentType } },
+    );
+  });
+
+  // Store chat export as meta file (not publicly served)
+  uploads.push(
+    c.env.SITES_BUCKET.put(
+      `sites/${slug}/${version}/_meta/chat.json`,
+      JSON.stringify(chat, null, 2),
+      { httpMetadata: { contentType: 'application/json' } },
+    ),
+  );
+
+  // Write/update manifest with current version
+  uploads.push(
+    c.env.SITES_BUCKET.put(
+      `sites/${slug}/_manifest.json`,
+      JSON.stringify({
+        current_version: version,
+        slug,
+        updated_at: new Date().toISOString(),
+        source: 'bolt',
+      }),
+      { httpMetadata: { contentType: 'application/json' } },
+    ),
+  );
+
+  await Promise.all(uploads);
+
+  // Invalidate KV cache for this slug's hostname
+  const hostSuffix = c.env.ENVIRONMENT === 'production'
+    ? DOMAINS.SITES_SUFFIX
+    : DOMAINS.SITES_STAGING_SUFFIX;
+  const cacheKey = `host:${slug}${hostSuffix}`;
+  await c.env.CACHE_KV.delete(cacheKey);
+
+  const siteUrl = `https://${slug}${hostSuffix}`;
+
+  return c.json({
+    data: {
+      slug,
+      version,
+      url: siteUrl,
+      files_uploaded: files.length,
+    },
+  }, 201);
+});
+
+/**
+ * Generate a slug from chat export data.
+ * Uses the chat description (project title) with simple slugification.
+ * Falls back to Workers AI for complex names, then random suffix.
+ */
+async function generateSlugFromChat(
+  env: Env,
+  chat: { messages?: unknown[]; description?: string },
+): Promise<string> {
+  // 1. Try simple slugification of description
+  if (chat?.description) {
+    const simple = chat.description
+      .toLowerCase()
+      .replace(/'/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .substring(0, 63);
+
+    if (simple && simple.length >= 3) {
+      return simple;
+    }
+  }
+
+  // 2. Try AI slug generation from chat messages
+  try {
+    const messages = (chat?.messages ?? []) as { role?: string; content?: string }[];
+    const firstUserMsg = messages.find((m) => m.role === 'user')?.content ?? '';
+
+    const result = await env.AI.run('@cf/meta/llama-3.1-8b-instruct' as Parameters<typeof env.AI.run>[0], {
+      messages: [
+        {
+          role: 'system',
+          content: 'Generate a short URL slug for a website. Output ONLY the slug, nothing else. Use lowercase letters, numbers, and hyphens. Maximum 3-4 words. Examples: vitos-mens-salon, pizza-palace, janes-bakery',
+        },
+        {
+          role: 'user',
+          content: `Project: ${chat?.description ?? 'Unknown'}\nContext: ${firstUserMsg.substring(0, 300)}`,
+        },
+      ],
+      max_tokens: 50,
+    });
+
+    const response = (result as { response?: string }).response ?? '';
+    const aiSlug = response
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, '')
+      .replace(/--+/g, '-')
+      .replace(/^-|-$/g, '')
+      .substring(0, 63);
+
+    if (aiSlug && aiSlug.length >= 3) {
+      return aiSlug;
+    }
+  } catch {
+    // AI unavailable or failed — fall through to random slug
+  }
+
+  // 3. Fallback: random slug
+  return `site-${Date.now().toString(36)}`;
+}
+
+/**
+ * Ensure the slug is unique by checking R2 for existing manifests.
+ * Appends incrementing suffix if taken.
+ */
+async function ensureUniqueSlug(env: Env, slug: string): Promise<string> {
+  let candidate = slug;
+
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const manifest = await env.SITES_BUCKET.get(`sites/${candidate}/_manifest.json`);
+
+    if (!manifest) {
+      return candidate;
+    }
+
+    candidate = `${slug}-${attempt + 2}`;
+  }
+
+  // All attempts exhausted — use random suffix
+  return `${slug}-${Date.now().toString(36).slice(-4)}`;
+}
 
 // ─── Contact Form Route ─────────────────────────────────────
 

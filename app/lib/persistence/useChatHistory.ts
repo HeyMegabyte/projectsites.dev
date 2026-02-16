@@ -373,6 +373,19 @@ ${value.content}
         }
       }
     },
+    getChatExportData: async (id = urlId) => {
+      if (!db || !id) {
+        return null;
+      }
+
+      const chat = await getMessages(db, id);
+
+      return {
+        messages: chat.messages,
+        description: chat.description,
+        exportDate: new Date().toISOString(),
+      };
+    },
     exportChat: async (id = urlId) => {
       if (!db || !id) {
         return;

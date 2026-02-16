@@ -187,6 +187,27 @@ export async function resolveSite(
       await env.CACHE_KV.put(cacheKey, JSON.stringify(resolved), { expirationTtl: 60 });
       return resolved;
     }
+
+    // R2 fallback: check for bolt-published sites (no D1 record)
+    const manifest = await env.SITES_BUCKET.get(`sites/${slug}/_manifest.json`);
+
+    if (manifest) {
+      try {
+        const data = (await manifest.json()) as { current_version: string };
+        const resolved = {
+          site_id: `bolt-${slug}`,
+          slug,
+          org_id: 'bolt-community',
+          current_build_version: data.current_version,
+          plan: 'free',
+        };
+
+        await env.CACHE_KV.put(cacheKey, JSON.stringify(resolved), { expirationTtl: 60 });
+        return resolved;
+      } catch {
+        // Malformed manifest — treat as not found
+      }
+    }
   }
 
   return null;
@@ -219,6 +240,11 @@ export async function serveSiteFromR2(
   },
   requestPath: string,
 ): Promise<Response> {
+  // Block access to meta files and manifests
+  if (requestPath.startsWith('/_meta/') || requestPath === '/_manifest.json') {
+    return new Response('Not Found', { status: 404 });
+  }
+
   const version = site.current_build_version ?? 'latest';
   const r2Path = `sites/${site.slug}/${version}${requestPath === '/' ? '/index.html' : requestPath}`;
 
