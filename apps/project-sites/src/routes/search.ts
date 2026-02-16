@@ -139,19 +139,15 @@ search.get('/api/search/address', async (c) => {
     return c.json({ data: [] });
   }
 
-  const requestBody: Record<string, unknown> = {
-    input: q,
-    includedPrimaryTypes: ['street_address', 'subpremise', 'premise', 'route', 'locality', 'sublocality'],
-  };
-
-  // Optional location bias
+  // Build location bias if coordinates are provided
   const lat = c.req.query('lat');
   const lng = c.req.query('lng');
+  let locationBias: Record<string, unknown> | undefined;
   if (lat && lng) {
     const latitude = parseFloat(lat);
     const longitude = parseFloat(lng);
     if (!isNaN(latitude) && !isNaN(longitude)) {
-      requestBody.locationBias = {
+      locationBias = {
         circle: {
           center: { latitude, longitude },
           radius: 50000.0,
@@ -160,43 +156,96 @@ search.get('/api/search/address', async (c) => {
     }
   }
 
-  const response = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Goog-Api-Key': c.env.GOOGLE_PLACES_API_KEY,
-    },
-    body: JSON.stringify(requestBody),
-  });
+  // Try Autocomplete API first (no restrictive type filter)
+  const autocompleteBody: Record<string, unknown> = { input: q };
+  if (locationBias) {
+    autocompleteBody.locationBias = locationBias;
+  }
 
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => '');
+  try {
+    const response = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': c.env.GOOGLE_PLACES_API_KEY,
+      },
+      body: JSON.stringify(autocompleteBody),
+    });
+
+    if (response.ok) {
+      const json = (await response.json()) as AutocompleteResponse;
+      const suggestions = (json.suggestions ?? []).slice(0, 8);
+      const data = suggestions
+        .filter((s) => s.placePrediction)
+        .map((s) => ({
+          place_id: s.placePrediction!.placeId,
+          description: s.placePrediction!.text?.text ?? '',
+          main_text: s.placePrediction!.structuredFormat?.mainText?.text ?? '',
+          secondary_text: s.placePrediction!.structuredFormat?.secondaryText?.text ?? '',
+        }));
+
+      if (data.length > 0) {
+        return c.json({ data });
+      }
+    } else {
+      const errorText = await response.text().catch(() => '');
+      console.warn(
+        JSON.stringify({
+          level: 'warn',
+          service: 'search',
+          message: 'Places Autocomplete API failed, falling back to Text Search',
+          status: response.status,
+          body: errorText.slice(0, 500),
+          query: q,
+        }),
+      );
+    }
+  } catch (err) {
     console.warn(
       JSON.stringify({
-        level: 'error',
+        level: 'warn',
         service: 'search',
-        message: 'Google Places Autocomplete API error',
-        status: response.status,
-        body: errorText.slice(0, 500),
+        message: 'Places Autocomplete API exception, falling back to Text Search',
+        error: String(err),
         query: q,
       }),
     );
-    return c.json({ data: [] });
   }
 
-  const json = (await response.json()) as AutocompleteResponse;
-  const suggestions = (json.suggestions ?? []).slice(0, 8);
+  // Fallback: use Text Search API (same API that powers business search)
+  const textSearchBody: Record<string, unknown> = { textQuery: q };
+  if (locationBias) {
+    textSearchBody.locationBias = locationBias;
+  }
 
-  const data = suggestions
-    .filter((s) => s.placePrediction)
-    .map((s) => ({
-      place_id: s.placePrediction!.placeId,
-      description: s.placePrediction!.text?.text ?? '',
-      main_text: s.placePrediction!.structuredFormat?.mainText?.text ?? '',
-      secondary_text: s.placePrediction!.structuredFormat?.secondaryText?.text ?? '',
+  try {
+    const fallbackResponse = await fetch('https://places.googleapis.com/v1/places:searchText', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': c.env.GOOGLE_PLACES_API_KEY,
+        'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.id',
+      },
+      body: JSON.stringify(textSearchBody),
+    });
+
+    if (!fallbackResponse.ok) {
+      return c.json({ data: [] });
+    }
+
+    const fallbackJson = (await fallbackResponse.json()) as GooglePlacesResponse;
+    const places = (fallbackJson.places ?? []).slice(0, 8);
+    const data = places.map((place) => ({
+      place_id: place.id ?? '',
+      description: place.formattedAddress ?? '',
+      main_text: place.displayName?.text ?? '',
+      secondary_text: place.formattedAddress ?? '',
     }));
 
-  return c.json({ data });
+    return c.json({ data });
+  } catch {
+    return c.json({ data: [] });
+  }
 });
 
 // ─── Site Search (pre-built) ─────────────────────────────────
@@ -221,7 +270,7 @@ search.get('/api/sites/search', async (c) => {
   const searchTerm = `%${q.trim()}%`;
   const { data } = await dbQuery<SiteSearchRow>(
     c.env.DB,
-    'SELECT id, slug, business_name, business_address, google_place_id, status, current_build_version FROM sites WHERE business_name LIKE ? AND deleted_at IS NULL ORDER BY CASE WHEN status = \'published\' THEN 0 ELSE 1 END, created_at DESC LIMIT 5',
+    'SELECT id, slug, business_name, business_address, google_place_id, status, current_build_version FROM sites WHERE business_name LIKE ? AND status = \'published\' AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 5',
     [searchTerm],
   );
 

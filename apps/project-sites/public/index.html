@@ -3154,6 +3154,18 @@
               + '</div>';
       }
 
+      // Filter out Google Places results that already appear as pre-built sites
+      var preBuiltPlaceIds = {};
+      for (var p = 0; p < preBuilt.length; p++) {
+        if (preBuilt[p].google_place_id) {
+          preBuiltPlaceIds[preBuilt[p].google_place_id] = true;
+        }
+      }
+      results = results.filter(function(r) {
+        var pid = r.place_id || r.id || '';
+        return !pid || !preBuiltPlaceIds[pid];
+      });
+
       // Google Places results (sorted by distance when location available)
       // Update state.searchResults to match sorted order so selectBusiness(index) works
       state.searchResults = results;
@@ -3260,22 +3272,18 @@
         posthog.capture('prebuilt_site_selected', { slug: site.slug, name: site.business_name });
       }
 
-      // Redirect to the live site if published, or show waiting screen
-      if (site.status === 'published' && site.slug) {
+      // Pre-built search only returns published sites - always redirect to live site
+      if (site.slug) {
         redirectTo('https://' + site.slug + '-sites.megabyte.space');
-      } else if (site.status === 'queued' || site.status === 'building') {
-        state.siteId = site.id || site.site_id;
-        state.slug = site.slug;
-        navigateTo('waiting');
       } else {
-        // Draft or other status - treat as new business selection
+        // Fallback: if somehow no slug, go to details with business pre-populated
         state.selectedBusiness = {
           name: site.business_name,
           address: site.business_address || '',
           place_id: site.google_place_id || ''
         };
         state.mode = 'business';
-        navigateTo('signin');
+        navigateTo('details');
       }
     }
 
@@ -3730,8 +3738,12 @@
         contactEl.textContent = '';
       }
       var refEl = document.getElementById('waiting-reference');
-      if (refEl && state.siteId) {
-        refEl.textContent = 'Reference: ' + state.siteId;
+      if (refEl) {
+        // Show slug or business name instead of raw UUID
+        var refLabel = state.slug || (state.selectedBusiness && (state.selectedBusiness.name || state.selectedBusiness.business_name)) || state.siteId || '';
+        if (refLabel) {
+          refEl.textContent = 'Building: ' + refLabel;
+        }
       }
     }
 
