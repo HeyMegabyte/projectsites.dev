@@ -413,6 +413,100 @@ api.post('/api/sites/:siteId/hostnames', async (c) => {
   return c.json({ data: result }, 201);
 });
 
+// ─── Delete Site ────────────────────────────────────────────
+
+api.delete('/api/sites/:id', async (c) => {
+  const orgId = c.get('orgId');
+  if (!orgId) throw unauthorized('Must be authenticated');
+
+  const siteId = c.req.param('id');
+  const site = await dbQueryOne<Record<string, unknown>>(
+    c.env.DB,
+    'SELECT id, slug FROM sites WHERE id = ? AND org_id = ? AND deleted_at IS NULL',
+    [siteId, orgId],
+  );
+
+  if (!site) {
+    throw notFound('Site not found');
+  }
+
+  // Soft-delete
+  await c.env.DB.prepare('UPDATE sites SET deleted_at = datetime(\'now\'), status = \'archived\' WHERE id = ?').bind(siteId).run();
+
+  // Invalidate KV cache for the site's subdomain
+  const slug = site.slug as string;
+  if (slug) {
+    await c.env.CACHE_KV.delete(`host:${slug}-sites.megabyte.space`).catch(() => {});
+  }
+
+  await auditService.writeAuditLog(c.env.DB, {
+    org_id: orgId,
+    actor_id: c.get('userId') ?? null,
+    action: 'site.deleted',
+    target_type: 'site',
+    metadata_json: { site_id: siteId, slug },
+    request_id: c.get('requestId'),
+  });
+
+  return c.json({ data: { deleted: true } });
+});
+
+// ─── Delete Hostname ────────────────────────────────────────
+
+api.delete('/api/sites/:siteId/hostnames/:hostnameId', async (c) => {
+  const orgId = c.get('orgId');
+  if (!orgId) throw unauthorized('Must be authenticated');
+
+  const siteId = c.req.param('siteId');
+  const hostnameId = c.req.param('hostnameId');
+
+  // Verify ownership
+  const site = await dbQueryOne<Record<string, unknown>>(
+    c.env.DB,
+    'SELECT id FROM sites WHERE id = ? AND org_id = ? AND deleted_at IS NULL',
+    [siteId, orgId],
+  );
+  if (!site) throw notFound('Site not found');
+
+  const hostname = await dbQueryOne<{ id: string; hostname: string }>(
+    c.env.DB,
+    'SELECT id, hostname FROM hostnames WHERE id = ? AND site_id = ?',
+    [hostnameId, siteId],
+  );
+  if (!hostname) throw notFound('Hostname not found');
+
+  await c.env.DB.prepare('DELETE FROM hostnames WHERE id = ?').bind(hostnameId).run();
+
+  // Invalidate KV cache
+  await c.env.CACHE_KV.delete(`host:${hostname.hostname}`).catch(() => {});
+
+  return c.json({ data: { deleted: true } });
+});
+
+// ─── Billing Portal ─────────────────────────────────────────
+
+api.post('/api/billing/portal', async (c) => {
+  const orgId = c.get('orgId');
+  if (!orgId) throw unauthorized('Must be authenticated');
+
+  const body = await c.req.json();
+  const returnUrl = (body as { return_url?: string }).return_url || 'https://sites.megabyte.space';
+
+  // Look up Stripe customer ID for this org
+  const sub = await dbQueryOne<{ stripe_customer_id: string | null }>(
+    c.env.DB,
+    'SELECT stripe_customer_id FROM subscriptions WHERE org_id = ? AND deleted_at IS NULL',
+    [orgId],
+  );
+
+  if (!sub?.stripe_customer_id) {
+    throw badRequest('No billing account found. Please subscribe first.');
+  }
+
+  const result = await billingService.createBillingPortalSession(c.env, sub.stripe_customer_id, returnUrl);
+  return c.json({ data: result });
+});
+
 // ─── Audit Routes ────────────────────────────────────────────
 
 api.get('/api/audit-logs', async (c) => {

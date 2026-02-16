@@ -334,6 +334,346 @@
     }
 
     /* ======================================================
+       Admin Dashboard Panel
+       ====================================================== */
+    .admin-panel {
+      display: none;
+      background: linear-gradient(135deg, rgba(15, 15, 35, 0.95), rgba(10, 10, 26, 0.98));
+      border-bottom: 1px solid var(--border);
+      padding: 24px 0;
+      animation: fadeIn 0.3s ease;
+    }
+    .admin-panel.visible { display: block; }
+    .admin-panel-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+    .admin-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .admin-panel-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .admin-panel-title svg { color: var(--accent); }
+    .admin-panel-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .admin-btn {
+      padding: 7px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    .admin-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(100, 255, 218, 0.05);
+    }
+    .admin-btn-accent {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Site Cards Grid */
+    .site-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 16px;
+    }
+    .site-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      transition: all 0.25s ease;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .site-card:hover {
+      border-color: var(--border-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    }
+    .site-card-preview {
+      height: 100px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, rgba(100, 255, 218, 0.05), rgba(124, 58, 237, 0.08));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+    }
+    .site-card-preview iframe {
+      width: 800px;
+      height: 600px;
+      transform: scale(0.26);
+      transform-origin: top left;
+      pointer-events: none;
+      border: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+    .site-card-preview-placeholder {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+    }
+    .site-card-name {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .site-card-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 4px;
+      width: fit-content;
+    }
+    .site-card-status.published { background: rgba(34, 197, 94, 0.12); color: #22c55e; }
+    .site-card-status.building { background: rgba(251, 191, 36, 0.12); color: #fbbf24; }
+    .site-card-status.draft { background: rgba(148, 163, 184, 0.12); color: #94a3b8; }
+    .site-card-domain {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .site-card-domain a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .site-card-domain a:hover { text-decoration: underline; }
+    .site-card-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: auto;
+    }
+    .site-card-btn {
+      flex: 1;
+      padding: 6px 0;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 0.7rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+    .site-card-btn:hover {
+      border-color: var(--border-hover);
+      color: var(--text-primary);
+    }
+    .site-card-btn.danger:hover {
+      border-color: var(--error);
+      color: var(--error);
+    }
+
+    /* New Site Card */
+    .site-card-new {
+      background: transparent;
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      min-height: 200px;
+    }
+    .site-card-new:hover {
+      border-color: var(--accent);
+      background: rgba(100, 255, 218, 0.03);
+    }
+    .site-card-new svg { color: var(--text-muted); transition: color 0.2s; }
+    .site-card-new:hover svg { color: var(--accent); }
+    .site-card-new span { color: var(--text-muted); font-size: 0.85rem; transition: color 0.2s; }
+    .site-card-new:hover span { color: var(--accent); }
+
+    /* Domain Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 1000;
+      animation: fadeIn 0.15s ease;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.visible { display: flex; }
+    .modal {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      max-width: 500px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      animation: fadeInScale 0.2s ease;
+    }
+    .modal-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 4px;
+      font-size: 1.2rem;
+      line-height: 1;
+    }
+    .modal-close:hover { color: var(--text-primary); }
+    .hostname-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .hostname-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 8px;
+    }
+    .hostname-item-name {
+      font-size: 0.85rem;
+      color: var(--text-primary);
+    }
+    .hostname-item-name a { color: var(--accent); text-decoration: none; }
+    .hostname-item-name a:hover { text-decoration: underline; }
+    .hostname-item-type {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    .hostname-delete-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 4px;
+      transition: color 0.2s;
+    }
+    .hostname-delete-btn:hover { color: var(--error); }
+    .hostname-add-form {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .hostname-add-form input {
+      flex: 1;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-size: 0.85rem;
+    }
+    .hostname-add-form input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .hostname-add-form button {
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--accent);
+      background: rgba(100, 255, 218, 0.1);
+      color: var(--accent);
+      font-size: 0.8rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .hostname-add-form button:hover { background: rgba(100, 255, 218, 0.2); }
+
+    /* Billing info row */
+    .admin-billing-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 16px;
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 10px;
+      flex-wrap: wrap;
+    }
+    .admin-billing-plan {
+      font-size: 0.85rem;
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+    .admin-billing-plan .plan-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      margin-left: 8px;
+    }
+    .plan-badge.free { background: rgba(148, 163, 184, 0.15); color: #94a3b8; }
+    .plan-badge.paid { background: rgba(100, 255, 218, 0.15); color: var(--accent); }
+
+    .admin-empty {
+      text-align: center;
+      padding: 32px 16px;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 600px) {
+      .site-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+      .admin-panel-header { flex-direction: column; align-items: flex-start; }
+      .admin-panel-actions { width: 100%; }
+    }
+
+    /* ======================================================
        Screens Container
        ====================================================== */
     .app {
@@ -2063,6 +2403,70 @@
     </div>
   </header>
 
+  <!-- Admin Dashboard Panel (visible when logged in) -->
+  <div id="admin-panel" class="admin-panel">
+    <div class="admin-panel-inner">
+      <div class="admin-panel-header">
+        <div class="admin-panel-title">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          Your Websites
+        </div>
+        <div class="admin-panel-actions">
+          <button class="admin-btn" id="admin-billing-btn" onclick="openBillingPortal()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+            Manage Billing
+          </button>
+          <button class="admin-btn admin-btn-accent" onclick="navigateTo('search'); document.getElementById('search-input').focus();">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            New Website
+          </button>
+        </div>
+      </div>
+
+      <div id="admin-sites-grid" class="site-grid">
+        <div class="admin-empty">Loading your websites...</div>
+      </div>
+
+      <div id="admin-billing-row" class="admin-billing-row" style="display:none;">
+        <div class="admin-billing-plan" id="admin-plan-label">Plan: <span class="plan-badge free">Free</span></div>
+        <div style="flex:1;"></div>
+        <button class="admin-btn admin-btn-accent" id="admin-upgrade-btn" onclick="openBillingCheckout()" style="display:none;">Upgrade</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Domain Management Modal -->
+  <div id="domain-modal" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-title">
+        <span id="domain-modal-title">Manage Domains</span>
+        <button class="modal-close" onclick="closeDomainModal()">&times;</button>
+      </div>
+      <div id="domain-modal-hostnames" class="hostname-list"></div>
+      <div id="domain-modal-msg" class="msg" style="margin-bottom:12px;"></div>
+      <div class="hostname-add-form">
+        <input type="text" id="domain-add-input" placeholder="e.g. www.mybusiness.com" />
+        <button onclick="addHostname()">Add Domain</button>
+      </div>
+      <p style="font-size:0.7rem;color:var(--text-muted);margin-top:10px;">Custom domains require a paid plan. Point a CNAME to <code>sites.megabyte.space</code>.</p>
+    </div>
+  </div>
+
+  <!-- Delete Confirmation Modal -->
+  <div id="delete-modal" class="modal-overlay">
+    <div class="modal" style="max-width:400px;">
+      <div class="modal-title">
+        <span>Delete Website?</span>
+        <button class="modal-close" onclick="closeDeleteModal()">&times;</button>
+      </div>
+      <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:20px;">This will permanently remove <strong id="delete-modal-name"></strong> and its domains. This cannot be undone.</p>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button class="admin-btn" onclick="closeDeleteModal()">Cancel</button>
+        <button class="admin-btn" style="border-color:var(--error);color:var(--error);" onclick="confirmDeleteSite()">Delete</button>
+      </div>
+    </div>
+  </div>
+
   <!-- App Container -->
   <div class="app">
 
@@ -2801,10 +3205,12 @@
         userEl.textContent = state.session.identifier || 'Signed In';
         userEl.style.display = '';
         btnEl.textContent = 'Sign Out';
+        loadAdminDashboard();
       } else {
         userEl.style.display = 'none';
         userEl.textContent = '';
         btnEl.textContent = 'Sign In';
+        hideAdminDashboard();
       }
     }
 
@@ -2819,7 +3225,340 @@
     function logout() {
       clearSession();
       updateNavAuth();
+      hideAdminDashboard();
       navigateTo('search');
+    }
+
+    /* ===========================================================
+       Admin Dashboard
+       =========================================================== */
+    var adminSites = [];
+    var adminSubscription = null;
+    var adminDomainModalSiteId = null;
+
+    function loadAdminDashboard() {
+      var panel = document.getElementById('admin-panel');
+      if (!panel || !state.session || !state.session.token) return;
+      panel.classList.add('visible');
+
+      var headers = { 'Authorization': 'Bearer ' + state.session.token };
+
+      // Load sites + subscription in parallel
+      var sitesP = fetch('/api/sites', { headers: headers })
+        .then(function(r) { return r.ok ? r.json() : { data: [] }; })
+        .then(function(d) { return d.data || []; })
+        .catch(function() { return []; });
+
+      var subP = fetch('/api/billing/subscription', { headers: headers })
+        .then(function(r) { return r.ok ? r.json() : { data: null }; })
+        .then(function(d) { return d.data || null; })
+        .catch(function() { return null; });
+
+      Promise.all([sitesP, subP]).then(function(results) {
+        adminSites = results[0];
+        adminSubscription = results[1];
+        renderAdminSites();
+        renderAdminBilling();
+      });
+    }
+
+    function hideAdminDashboard() {
+      var panel = document.getElementById('admin-panel');
+      if (panel) panel.classList.remove('visible');
+    }
+
+    function renderAdminSites() {
+      var grid = document.getElementById('admin-sites-grid');
+      if (!grid) return;
+
+      if (!adminSites.length) {
+        grid.innerHTML = '<div class="site-card-new" onclick="navigateTo(\'search\'); document.getElementById(\'search-input\').focus();">'
+          + '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>'
+          + '<span>Create your first website</span>'
+          + '</div>';
+        return;
+      }
+
+      var html = '';
+      for (var i = 0; i < adminSites.length; i++) {
+        var s = adminSites[i];
+        var name = s.business_name || s.slug || 'Unnamed';
+        var status = s.status || 'draft';
+        var slug = s.slug || '';
+        var siteUrl = slug ? 'https://' + slug + '-sites.megabyte.space' : '';
+        var statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
+
+        html += '<div class="site-card">';
+        // Preview
+        html += '<div class="site-card-preview">';
+        if (status === 'published' && siteUrl) {
+          html += '<iframe src="' + escapeHtml(siteUrl) + '" loading="lazy" sandbox tabindex="-1"></iframe>';
+        } else {
+          html += '<div class="site-card-preview-placeholder">';
+          if (status === 'building') {
+            html += '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2v4m0 12v4m-7-10H1m22 0h-4m-2.636-6.364L14.95 7.05m-5.9 9.9l-1.414 1.414m0-12.728L9.05 7.05m5.9 9.9l1.414 1.414"/></svg>';
+          } else {
+            html += '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>';
+          }
+          html += '</div>';
+        }
+        html += '</div>';
+
+        // Info
+        html += '<div class="site-card-name" title="' + escapeHtml(name) + '">' + escapeHtml(name) + '</div>';
+        html += '<div class="site-card-status ' + status + '">';
+        if (status === 'published') html += '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
+        html += statusLabel + '</div>';
+
+        if (siteUrl) {
+          html += '<div class="site-card-domain"><a href="' + escapeHtml(siteUrl) + '" target="_blank">' + escapeHtml(slug) + '-sites.megabyte.space</a></div>';
+        }
+
+        // Actions
+        html += '<div class="site-card-actions">';
+        if (status === 'published' && siteUrl) {
+          html += '<button class="site-card-btn" onclick="window.open(\'' + escapeHtml(siteUrl) + '\', \'_blank\')">Visit</button>';
+        }
+        html += '<button class="site-card-btn" onclick="openDomainModal(\'' + escapeHtml(s.id) + '\', \'' + escapeHtml(name) + '\')">Domains</button>';
+        html += '<button class="site-card-btn danger" onclick="openDeleteModal(\'' + escapeHtml(s.id) + '\', \'' + escapeHtml(name) + '\')">Delete</button>';
+        html += '</div>';
+        html += '</div>';
+      }
+
+      // Add "+" card at the end
+      html += '<div class="site-card-new" onclick="navigateTo(\'search\'); document.getElementById(\'search-input\').focus();">'
+        + '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>'
+        + '<span>New Website</span>'
+        + '</div>';
+
+      grid.innerHTML = html;
+    }
+
+    function renderAdminBilling() {
+      var row = document.getElementById('admin-billing-row');
+      var planLabel = document.getElementById('admin-plan-label');
+      var upgradeBtn = document.getElementById('admin-upgrade-btn');
+      var billingBtn = document.getElementById('admin-billing-btn');
+      if (!row) return;
+
+      row.style.display = 'flex';
+
+      if (adminSubscription && adminSubscription.plan === 'paid' && adminSubscription.status === 'active') {
+        planLabel.innerHTML = 'Plan: <span class="plan-badge paid">Paid</span>';
+        upgradeBtn.style.display = 'none';
+        billingBtn.style.display = '';
+      } else {
+        planLabel.innerHTML = 'Plan: <span class="plan-badge free">Free</span>';
+        upgradeBtn.style.display = '';
+        upgradeBtn.textContent = 'Upgrade to Paid';
+        billingBtn.style.display = adminSubscription && adminSubscription.stripe_customer_id ? '' : 'none';
+      }
+    }
+
+    /* ── Domain Modal ────────────────────────────── */
+
+    function openDomainModal(siteId, siteName) {
+      adminDomainModalSiteId = siteId;
+      document.getElementById('domain-modal-title').textContent = 'Domains: ' + siteName;
+      document.getElementById('domain-modal').classList.add('visible');
+      document.getElementById('domain-add-input').value = '';
+      hideMsg('domain-modal-msg');
+      loadHostnames(siteId);
+    }
+
+    function closeDomainModal() {
+      document.getElementById('domain-modal').classList.remove('visible');
+      adminDomainModalSiteId = null;
+    }
+
+    function loadHostnames(siteId) {
+      var container = document.getElementById('domain-modal-hostnames');
+      container.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:8px;">Loading...</div>';
+
+      fetch('/api/sites/' + siteId + '/hostnames')
+        .then(function(r) { return r.ok ? r.json() : { data: [] }; })
+        .then(function(d) {
+          var hostnames = d.data || [];
+          if (!hostnames.length) {
+            container.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:8px;">No domains configured yet.</div>';
+            return;
+          }
+          var html = '';
+          for (var i = 0; i < hostnames.length; i++) {
+            var h = hostnames[i];
+            var url = 'https://' + h.hostname;
+            var typeLabel = h.type === 'custom_cname' ? 'Custom' : 'Free subdomain';
+            html += '<div class="hostname-item">';
+            html += '<div><div class="hostname-item-name"><a href="' + escapeHtml(url) + '" target="_blank">' + escapeHtml(h.hostname) + '</a></div>';
+            html += '<div class="hostname-item-type">' + typeLabel + '</div></div>';
+            html += '<button class="hostname-delete-btn" onclick="deleteHostname(\'' + escapeHtml(adminDomainModalSiteId) + '\', \'' + escapeHtml(h.id) + '\')" title="Remove">';
+            html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+            html += '</button></div>';
+          }
+          container.innerHTML = html;
+        })
+        .catch(function() {
+          container.innerHTML = '<div style="color:var(--error);font-size:0.85rem;padding:8px;">Failed to load domains.</div>';
+        });
+    }
+
+    function addHostname() {
+      var input = document.getElementById('domain-add-input');
+      var hostname = input.value.trim().toLowerCase();
+      if (!hostname) return;
+
+      var siteId = adminDomainModalSiteId;
+      if (!siteId) return;
+
+      // Determine type: if it ends with sites.megabyte.space, it's free_subdomain
+      var type = hostname.endsWith('sites.megabyte.space') || hostname.endsWith('-sites.megabyte.space')
+        ? 'free_subdomain' : 'custom_cname';
+
+      var headers = { 'Content-Type': 'application/json' };
+      if (state.session && state.session.token) {
+        headers['Authorization'] = 'Bearer ' + state.session.token;
+      }
+
+      fetch('/api/sites/' + siteId + '/hostnames', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({ hostname: hostname, type: type })
+      })
+        .then(function(res) {
+          if (!res.ok) return res.json().then(function(d) { throw new Error(d.error || 'Failed to add domain'); });
+          return res.json();
+        })
+        .then(function() {
+          input.value = '';
+          hideMsg('domain-modal-msg');
+          loadHostnames(siteId);
+        })
+        .catch(function(err) {
+          showMsg('domain-modal-msg', 'error', err.message || 'Failed to add domain');
+        });
+    }
+
+    function deleteHostname(siteId, hostnameId) {
+      var headers = {};
+      if (state.session && state.session.token) {
+        headers['Authorization'] = 'Bearer ' + state.session.token;
+      }
+
+      fetch('/api/sites/' + siteId + '/hostnames/' + hostnameId, {
+        method: 'DELETE',
+        headers: headers
+      })
+        .then(function(res) {
+          if (!res.ok) throw new Error('Failed to delete');
+          loadHostnames(siteId);
+        })
+        .catch(function() {
+          showMsg('domain-modal-msg', 'error', 'Failed to delete domain');
+        });
+    }
+
+    /* ── Delete Modal ────────────────────────────── */
+
+    var deleteModalSiteId = null;
+
+    function openDeleteModal(siteId, siteName) {
+      deleteModalSiteId = siteId;
+      document.getElementById('delete-modal-name').textContent = siteName;
+      document.getElementById('delete-modal').classList.add('visible');
+    }
+
+    function closeDeleteModal() {
+      document.getElementById('delete-modal').classList.remove('visible');
+      deleteModalSiteId = null;
+    }
+
+    function confirmDeleteSite() {
+      if (!deleteModalSiteId) return;
+
+      var headers = {};
+      if (state.session && state.session.token) {
+        headers['Authorization'] = 'Bearer ' + state.session.token;
+      }
+
+      fetch('/api/sites/' + deleteModalSiteId, {
+        method: 'DELETE',
+        headers: headers
+      })
+        .then(function(res) {
+          if (!res.ok) throw new Error('Delete failed');
+          closeDeleteModal();
+          loadAdminDashboard();
+        })
+        .catch(function() {
+          closeDeleteModal();
+        });
+    }
+
+    /* ── Billing Actions ─────────────────────────── */
+
+    function openBillingPortal() {
+      if (!state.session || !state.session.token) return;
+
+      var headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + state.session.token
+      };
+
+      fetch('/api/billing/portal', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({ return_url: window.location.href })
+      })
+        .then(function(res) {
+          if (!res.ok) return res.json().then(function(d) { throw new Error(d.error || 'Failed'); });
+          return res.json();
+        })
+        .then(function(d) {
+          if (d.data && d.data.portal_url) {
+            window.location.href = d.data.portal_url;
+          }
+        })
+        .catch(function(err) {
+          // If no billing account, redirect to checkout instead
+          openBillingCheckout();
+        });
+    }
+
+    function openBillingCheckout() {
+      if (!state.session || !state.session.token) return;
+
+      // Get orgId from /api/auth/me if we don't have it
+      var headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + state.session.token
+      };
+
+      fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + state.session.token } })
+        .then(function(res) { return res.ok ? res.json() : null; })
+        .then(function(d) {
+          if (!d || !d.data || !d.data.org_id) return;
+          return fetch('/api/billing/checkout', {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify({
+              org_id: d.data.org_id,
+              success_url: window.location.origin + '/?billing=success',
+              cancel_url: window.location.origin + '/?billing=cancel'
+            })
+          });
+        })
+        .then(function(res) {
+          if (!res || !res.ok) return;
+          return res.json();
+        })
+        .then(function(d) {
+          if (d && d.data && d.data.checkout_url) {
+            window.location.href = d.data.checkout_url;
+          }
+        })
+        .catch(function() {
+          /* silently fail - billing may not be configured */
+        });
     }
 
     // Restore session from localStorage on page load
