@@ -721,6 +721,9 @@
       min-height: 120px;
       line-height: 1.6;
     }
+    #details-textarea {
+      min-height: 210px;
+    }
 
     .back-link {
       display: inline-flex;
@@ -2915,9 +2918,12 @@
       userLng: null
     };
 
-    // Request browser geolocation after 5-second delay with custom modal
+    // Request browser geolocation with custom modal
+    // Only show if: (1) geolocation is supported, (2) user hasn't declined before,
+    // (3) location isn't already available
     function dismissLocationModal() {
       document.getElementById('location-modal').style.display = 'none';
+      try { localStorage.setItem('ps_location_declined', '1'); } catch(e) { /* private browsing */ }
     }
     function allowLocation() {
       document.getElementById('location-modal').style.display = 'none';
@@ -2932,10 +2938,17 @@
         );
       }
     }
-    if (navigator.geolocation) {
-      setTimeout(function() {
-        document.getElementById('location-modal').style.display = 'flex';
-      }, 5000);
+    if (navigator.geolocation && !state.userLat) {
+      var declined = false;
+      try { declined = localStorage.getItem('ps_location_declined') === '1'; } catch(e) { /* private browsing */ }
+      if (!declined) {
+        setTimeout(function() {
+          // Re-check: location may have been set by the time the timeout fires
+          if (!state.userLat) {
+            document.getElementById('location-modal').style.display = 'flex';
+          }
+        }, 5000);
+      }
     }
 
     var searchDebounceTimer = null;
