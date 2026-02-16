@@ -270,7 +270,7 @@ search.get('/api/sites/search', async (c) => {
   const searchTerm = `%${q.trim()}%`;
   const { data } = await dbQuery<SiteSearchRow>(
     c.env.DB,
-    'SELECT id, slug, business_name, business_address, google_place_id, status, current_build_version FROM sites WHERE business_name LIKE ? AND status = \'published\' AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 5',
+    'SELECT id, slug, business_name, business_address, google_place_id, status, current_build_version FROM sites WHERE business_name LIKE ? AND deleted_at IS NULL ORDER BY CASE WHEN status = \'published\' THEN 0 WHEN status = \'building\' THEN 1 ELSE 2 END, created_at DESC LIMIT 5',
     [searchTerm],
   );
 

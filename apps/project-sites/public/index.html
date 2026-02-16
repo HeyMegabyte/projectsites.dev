@@ -660,6 +660,39 @@
     .plan-badge.free { background: rgba(148, 163, 184, 0.15); color: #94a3b8; }
     .plan-badge.paid { background: rgba(100, 255, 218, 0.15); color: var(--accent); }
 
+    .admin-site-count {
+      font-size: 0.7rem;
+      background: rgba(100, 255, 218, 0.1);
+      color: var(--accent);
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 600;
+    }
+    .admin-sites-usage {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    .site-card-url-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .site-card-copy-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 2px;
+      transition: color 0.2s;
+      flex-shrink: 0;
+    }
+    .site-card-copy-btn:hover { color: var(--accent); }
+    .site-card-copy-btn.copied { color: #22c55e; }
+    .site-card-date {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      opacity: 0.6;
+    }
     .admin-empty {
       text-align: center;
       padding: 32px 16px;
@@ -2406,15 +2439,20 @@
   <!-- Admin Dashboard Panel (visible when logged in) -->
   <div id="admin-panel" class="admin-panel">
     <div class="admin-panel-inner">
+      <!-- Header Row -->
       <div class="admin-panel-header">
         <div class="admin-panel-title">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-          Your Websites
+          <span>Your Websites</span>
+          <span id="admin-site-count" class="admin-site-count"></span>
         </div>
         <div class="admin-panel-actions">
+          <button class="admin-btn" id="admin-refresh-btn" onclick="loadAdminDashboard()" title="Refresh">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          </button>
           <button class="admin-btn" id="admin-billing-btn" onclick="openBillingPortal()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-            Manage Billing
+            Billing
           </button>
           <button class="admin-btn admin-btn-accent" onclick="navigateTo('search'); document.getElementById('search-input').focus();">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -2423,14 +2461,17 @@
         </div>
       </div>
 
+      <!-- Sites Grid -->
       <div id="admin-sites-grid" class="site-grid">
         <div class="admin-empty">Loading your websites...</div>
       </div>
 
+      <!-- Billing Info Row -->
       <div id="admin-billing-row" class="admin-billing-row" style="display:none;">
         <div class="admin-billing-plan" id="admin-plan-label">Plan: <span class="plan-badge free">Free</span></div>
+        <span id="admin-sites-usage" class="admin-sites-usage"></span>
         <div style="flex:1;"></div>
-        <button class="admin-btn admin-btn-accent" id="admin-upgrade-btn" onclick="openBillingCheckout()" style="display:none;">Upgrade</button>
+        <button class="admin-btn admin-btn-accent" id="admin-upgrade-btn" onclick="openBillingCheckout()" style="display:none;">Upgrade to Pro</button>
       </div>
     </div>
   </div>
@@ -3271,6 +3312,12 @@
       var grid = document.getElementById('admin-sites-grid');
       if (!grid) return;
 
+      // Update site count badge
+      var countEl = document.getElementById('admin-site-count');
+      if (countEl) {
+        countEl.textContent = adminSites.length ? adminSites.length + ' site' + (adminSites.length !== 1 ? 's' : '') : '';
+      }
+
       if (!adminSites.length) {
         grid.innerHTML = '<div class="site-card-new" onclick="navigateTo(\'search\'); document.getElementById(\'search-input\').focus();">'
           + '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>'
@@ -3287,37 +3334,56 @@
         var slug = s.slug || '';
         var siteUrl = slug ? 'https://' + slug + '-sites.megabyte.space' : '';
         var statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
+        var created = s.created_at ? new Date(s.created_at).toLocaleDateString() : '';
 
         html += '<div class="site-card">';
-        // Preview
+
+        // Preview thumbnail
         html += '<div class="site-card-preview">';
         if (status === 'published' && siteUrl) {
           html += '<iframe src="' + escapeHtml(siteUrl) + '" loading="lazy" sandbox tabindex="-1"></iframe>';
         } else {
           html += '<div class="site-card-preview-placeholder">';
           if (status === 'building') {
-            html += '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2v4m0 12v4m-7-10H1m22 0h-4m-2.636-6.364L14.95 7.05m-5.9 9.9l-1.414 1.414m0-12.728L9.05 7.05m5.9 9.9l1.414 1.414"/></svg>';
+            html += '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="1.5"><path d="M12 2v4m0 12v4m-7-10H1m22 0h-4m-2.636-6.364L14.95 7.05m-5.9 9.9l-1.414 1.414m0-12.728L9.05 7.05m5.9 9.9l1.414 1.414"/></svg>';
+            html += '<div style="font-size:0.65rem;margin-top:6px;color:#fbbf24;">Building...</div>';
           } else {
-            html += '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>';
+            html += '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>';
+            html += '<div style="font-size:0.65rem;margin-top:6px;">Draft</div>';
           }
           html += '</div>';
         }
         html += '</div>';
 
-        // Info
+        // Site name
         html += '<div class="site-card-name" title="' + escapeHtml(name) + '">' + escapeHtml(name) + '</div>';
+
+        // Status badge
         html += '<div class="site-card-status ' + status + '">';
         if (status === 'published') html += '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
+        if (status === 'building') html += '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>';
         html += statusLabel + '</div>';
 
+        // Domain link with copy button
         if (siteUrl) {
-          html += '<div class="site-card-domain"><a href="' + escapeHtml(siteUrl) + '" target="_blank">' + escapeHtml(slug) + '-sites.megabyte.space</a></div>';
+          var domain = slug + '-sites.megabyte.space';
+          html += '<div class="site-card-url-row">';
+          html += '<div class="site-card-domain"><a href="' + escapeHtml(siteUrl) + '" target="_blank">' + escapeHtml(domain) + '</a></div>';
+          html += '<button class="site-card-copy-btn" onclick="copyUrl(\'' + escapeHtml(siteUrl) + '\', this)" title="Copy URL"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>';
+          html += '</div>';
         }
 
-        // Actions
+        // Created date
+        if (created) {
+          html += '<div class="site-card-date">Created ' + created + '</div>';
+        }
+
+        // Action buttons
         html += '<div class="site-card-actions">';
         if (status === 'published' && siteUrl) {
           html += '<button class="site-card-btn" onclick="window.open(\'' + escapeHtml(siteUrl) + '\', \'_blank\')">Visit</button>';
+        } else if (status === 'building') {
+          html += '<button class="site-card-btn" onclick="state.siteId=\'' + escapeHtml(s.id) + '\';state.slug=\'' + escapeHtml(slug) + '\';navigateTo(\'waiting\');">Status</button>';
         }
         html += '<button class="site-card-btn" onclick="openDomainModal(\'' + escapeHtml(s.id) + '\', \'' + escapeHtml(name) + '\')">Domains</button>';
         html += '<button class="site-card-btn danger" onclick="openDeleteModal(\'' + escapeHtml(s.id) + '\', \'' + escapeHtml(name) + '\')">Delete</button>';
@@ -3325,7 +3391,7 @@
         html += '</div>';
       }
 
-      // Add "+" card at the end
+      // "+" card for creating new site
       html += '<div class="site-card-new" onclick="navigateTo(\'search\'); document.getElementById(\'search-input\').focus();">'
         + '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>'
         + '<span>New Website</span>'
@@ -3334,23 +3400,38 @@
       grid.innerHTML = html;
     }
 
+    function copyUrl(url, btn) {
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(url).then(function() {
+          btn.classList.add('copied');
+          setTimeout(function() { btn.classList.remove('copied'); }, 1500);
+        });
+      }
+    }
+
     function renderAdminBilling() {
       var row = document.getElementById('admin-billing-row');
       var planLabel = document.getElementById('admin-plan-label');
       var upgradeBtn = document.getElementById('admin-upgrade-btn');
       var billingBtn = document.getElementById('admin-billing-btn');
+      var usageEl = document.getElementById('admin-sites-usage');
       if (!row) return;
 
       row.style.display = 'flex';
 
+      var siteCount = adminSites.length;
+      if (usageEl) {
+        usageEl.textContent = siteCount + ' website' + (siteCount !== 1 ? 's' : '') + ' active';
+      }
+
       if (adminSubscription && adminSubscription.plan === 'paid' && adminSubscription.status === 'active') {
-        planLabel.innerHTML = 'Plan: <span class="plan-badge paid">Paid</span>';
+        planLabel.innerHTML = 'Plan: <span class="plan-badge paid">Pro</span>';
         upgradeBtn.style.display = 'none';
         billingBtn.style.display = '';
       } else {
         planLabel.innerHTML = 'Plan: <span class="plan-badge free">Free</span>';
         upgradeBtn.style.display = '';
-        upgradeBtn.textContent = 'Upgrade to Paid';
+        upgradeBtn.textContent = 'Upgrade to Pro';
         billingBtn.style.display = adminSubscription && adminSubscription.stripe_customer_id ? '' : 'none';
       }
     }
@@ -3894,15 +3975,22 @@
       }
 
       // Filter out Google Places results that already appear as pre-built sites
+      // Match by google_place_id first, then by normalized business name as fallback
       var preBuiltPlaceIds = {};
+      var preBuiltNames = {};
       for (var p = 0; p < preBuilt.length; p++) {
         if (preBuilt[p].google_place_id) {
           preBuiltPlaceIds[preBuilt[p].google_place_id] = true;
         }
+        var pbName = (preBuilt[p].business_name || '').toLowerCase().trim();
+        if (pbName) preBuiltNames[pbName] = true;
       }
       results = results.filter(function(r) {
         var pid = r.place_id || r.id || '';
-        return !pid || !preBuiltPlaceIds[pid];
+        if (pid && preBuiltPlaceIds[pid]) return false;
+        var rName = (r.name || r.business_name || '').toLowerCase().trim();
+        if (rName && preBuiltNames[rName]) return false;
+        return true;
       });
 
       // Google Places results (sorted by distance when location available)
@@ -4011,11 +4099,17 @@
         posthog.capture('prebuilt_site_selected', { slug: site.slug, name: site.business_name });
       }
 
-      // Pre-built search only returns published sites - always redirect to live site
-      if (site.slug) {
+      if (site.status === 'published' && site.slug) {
+        // Published - redirect to the live site
         redirectTo('https://' + site.slug + '-sites.megabyte.space');
+      } else if (site.status === 'queued' || site.status === 'building') {
+        // Still building - show waiting screen with the slug (not UUID)
+        state.siteId = site.site_id || site.id;
+        state.slug = site.slug;
+        state.selectedBusiness = { name: site.business_name, address: site.business_address || '' };
+        navigateTo('waiting');
       } else {
-        // Fallback: if somehow no slug, go to details with business pre-populated
+        // Draft or other - go to details to configure and trigger build
         state.selectedBusiness = {
           name: site.business_name,
           address: site.business_address || '',
