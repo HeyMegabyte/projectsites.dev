@@ -328,9 +328,8 @@ export const Workbench = memo(
 
     const isSmallViewport = useViewport(1024);
     const streaming = useStore(streamingState);
-    const { exportChat, getChatExportData } = useChatHistory();
+    const { exportChat } = useChatHistory();
     const [isSyncing, setIsSyncing] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
 
     const setSelectedView = (view: WorkbenchViewType) => {
       workbenchStore.currentView.set(view);
@@ -394,29 +393,6 @@ export const Workbench = memo(
         setIsSyncing(false);
       }
     }, []);
-
-    const handleSaveToProjectSites = useCallback(async () => {
-      setIsSaving(true);
-
-      try {
-        const chatData = await getChatExportData();
-
-        const result = await workbenchStore.saveToProjectSites(chatData);
-        toast.success(
-          <div>
-            Published to{' '}
-            <a href={result.url} target="_blank" rel="noopener noreferrer" className="underline font-bold">
-              {result.slug}
-            </a>
-          </div>,
-        );
-      } catch (error) {
-        console.error('Error saving to Project Sites:', error);
-        toast.error(error instanceof Error ? error.message : 'Failed to save');
-      } finally {
-        setIsSaving(false);
-      }
-    }, [getChatExportData]);
 
     return (
       chatStarted && (
@@ -496,18 +472,6 @@ export const Workbench = memo(
                             </DropdownMenu.Item>
                           </DropdownMenu.Content>
                         </DropdownMenu.Root>
-                      </div>
-
-                      {/* Save to Project Sites Button */}
-                      <div className="flex border border-bolt-elements-borderColor rounded-md overflow-hidden ml-1">
-                        <button
-                          onClick={handleSaveToProjectSites}
-                          disabled={isSaving || streaming}
-                          className="rounded-md items-center justify-center [&:is(:disabled,.disabled)]:cursor-not-allowed [&:is(:disabled,.disabled)]:opacity-60 px-3 py-1.5 text-xs bg-accent-500 text-white hover:text-bolt-elements-item-contentAccent [&:not(:disabled,.disabled)]:hover:bg-bolt-elements-button-primary-backgroundHover outline-accent-500 flex gap-1.7"
-                        >
-                          <div className={isSaving ? 'i-ph:spinner animate-spin' : 'i-ph:cloud-arrow-up'} />
-                          {isSaving ? 'Saving...' : 'Save'}
-                        </button>
                       </div>
                     </div>
                   )}
