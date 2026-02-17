@@ -66,7 +66,8 @@ app.use(
   '/api/*',
   cors({
     origin: (origin) => {
-      // Allow requests from our domains
+      if (!origin) return '';
+      // Allow requests from our domains and any *sites.megabyte.space subdomain
       const allowed = [
         `https://${DOMAINS.SITES_BASE}`,
         `https://${DOMAINS.SITES_STAGING}`,
@@ -74,7 +75,10 @@ app.use(
         'http://localhost:3000',
         'http://localhost:5173',
       ];
-      if (origin && allowed.includes(origin)) {
+      if (allowed.includes(origin)) return origin;
+      // Allow any subdomain of sites.megabyte.space
+      if (origin.endsWith(DOMAINS.SITES_SUFFIX.replace('-sites.', 'sites.')) ||
+          origin.endsWith(`-${DOMAINS.SITES_BASE}`)) {
         return origin;
       }
       return '';

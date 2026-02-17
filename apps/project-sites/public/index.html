@@ -1,6 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <!-- Google Tag Manager -->
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','GTM-T48Z6BJJ');</script>
+  <!-- End Google Tag Manager -->
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-VBBRRQLDFT"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-VBBRRQLDFT');
+  </script>
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="chrome=1">
   <meta name="viewport" content="width=device-width, minimum-scale=1, initial-scale=1, user-scalable=yes">
@@ -16,6 +31,10 @@
   <meta name="HandheldFriendly" content="True">
   <meta name="MobileOptimized" content="400">
   <meta name="contact" content="hey@megabyte.space">
+  <meta property="fb:app_id" content="669135071652897">
+  <meta name="x-rim-auto-match" content="none">
+  <link rel="dns-prefetch" href="https://www.googletagmanager.com">
+  <link rel="preconnect" href="https://www.googletagmanager.com" crossorigin="anonymous">
   <meta name="geography" content="USA">
   <meta itemprop="image" content="https://sites.megabyte.space/icon-512.png">
 
@@ -332,6 +351,13 @@
       background: rgba(100, 255, 218, 0.1);
       border-color: var(--accent);
     }
+    .header-auth-btn:focus {
+      outline: none;
+      box-shadow: 0 0 0 2px var(--accent-dim);
+    }
+    .header-auth-btn:active {
+      transform: scale(0.97);
+    }
 
     /* ======================================================
        Admin Dashboard Panel
@@ -392,6 +418,14 @@
       color: var(--accent);
       background: rgba(100, 255, 218, 0.05);
     }
+    .admin-btn:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-dim);
+    }
+    .admin-btn:active {
+      transform: scale(0.97);
+    }
     .admin-btn-accent {
       border-color: var(--accent);
       color: var(--accent);
@@ -408,17 +442,23 @@
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 16px;
-      transition: all 0.25s ease;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       position: relative;
       display: flex;
       flex-direction: column;
       gap: 10px;
+      animation: fadeInUp 0.4s ease both;
     }
     .site-card:hover {
       border-color: var(--border-hover);
       transform: translateY(-2px);
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
     }
+    .site-card:nth-child(2) { animation-delay: 0.06s; }
+    .site-card:nth-child(3) { animation-delay: 0.12s; }
+    .site-card:nth-child(4) { animation-delay: 0.18s; }
+    .site-card:nth-child(5) { animation-delay: 0.24s; }
+    .site-card:nth-child(6) { animation-delay: 0.3s; }
     .site-card-preview {
       height: 100px;
       border-radius: 8px;
@@ -497,6 +537,15 @@
     .site-card-btn:hover {
       border-color: var(--border-hover);
       color: var(--text-primary);
+    }
+    .site-card-btn:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-dim);
+    }
+    .site-card-btn:active {
+      transform: scale(0.97);
+      background: rgba(80, 165, 219, 0.08);
     }
     .site-card-btn.danger:hover {
       border-color: var(--error);
@@ -653,7 +702,7 @@
       text-transform: uppercase;
       letter-spacing: 0.04em;
     }
-    .plan-badge.free { background: rgba(148, 163, 184, 0.15); color: #94a3b8; }
+    .plan-badge.free { background: rgba(148, 163, 184, 0.15); color: #94a3b8; cursor: pointer; }
     .plan-badge.paid { background: rgba(100, 255, 218, 0.15); color: var(--accent); }
     .site-card-upgrade-btn {
       padding: 8px 16px;
@@ -1086,7 +1135,7 @@
     }
     .details-biz-dropdown {
       position: absolute;
-      top: 70px;
+      top: 60px;
       left: 0;
       right: 0;
       padding-top: 20px;
@@ -1543,6 +1592,13 @@
       transform: translateY(-2px);
       box-shadow: 0 0 40px rgba(80, 165, 219, 0.3), 0 0 80px rgba(80, 165, 219, 0.1);
     }
+    .btn-accent:focus:not(:disabled) {
+      outline: none;
+      box-shadow: 0 0 0 3px var(--accent-dim), 0 0 40px rgba(80, 165, 219, 0.2);
+    }
+    .btn-accent:active:not(:disabled) {
+      transform: translateY(0) scale(0.98);
+    }
     .btn-secondary-outline {
       background: transparent;
       color: var(--text-primary);
@@ -1552,6 +1608,14 @@
       border-color: var(--accent);
       color: var(--accent);
       transform: translateY(-1px);
+    }
+    .btn-secondary-outline:focus:not(:disabled) {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-dim);
+    }
+    .btn-secondary-outline:active:not(:disabled) {
+      transform: scale(0.98);
     }
     .btn-full { width: 100%; }
     .btn-large {
@@ -1955,6 +2019,10 @@
       text-align: center;
       position: relative;
       z-index: 1;
+    }
+    .screen-waiting.active {
+      justify-content: flex-start;
+      padding-top: 40px;
     }
     .waiting-content {
       max-width: 480px;
@@ -2969,6 +3037,10 @@
   </script>
 </head>
 <body>
+  <!-- Google Tag Manager (noscript) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-T48Z6BJJ"
+  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  <!-- End Google Tag Manager (noscript) -->
 
   <!-- Background orbs -->
   <div class="bg-orbs">
@@ -3066,12 +3138,16 @@
 
       <!-- Tab: Connect Domain (CNAME) -->
       <div id="domain-panel-connect" style="display:none;">
-        <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:12px;">Add a domain you already own. It must have a CNAME record pointing to <code>sites.megabyte.space</code>.</p>
+        <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:12px;">Add a domain you already own. Point a CNAME record to <code>sites.megabyte.space</code>.</p>
         <div class="hostname-add-form">
-          <input type="text" id="domain-add-input" placeholder="e.g. www.mybusiness.com" />
+          <input type="text" id="domain-add-input" placeholder="e.g. www.mybusiness.com" onkeydown="if(event.key==='Enter'){event.preventDefault();addHostname();}" />
           <button onclick="addHostname()">Add Domain</button>
         </div>
-        <p style="font-size:0.7rem;color:var(--text-muted);margin-top:10px;">Custom domains require a paid plan. Add the CNAME record in your DNS provider first, then add the domain here.</p>
+        <div id="domain-connect-upgrade-cta" style="display:none;margin-top:10px;padding:10px 14px;background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);border-radius:var(--radius);font-size:0.8rem;color:var(--text-secondary);">
+          Custom domains require a paid plan. <a href="javascript:void(0)" onclick="openBillingCheckout()" style="color:var(--accent);font-weight:600;text-decoration:underline;">Upgrade now</a>
+        </div>
+        <div id="domain-cname-status" style="display:none;margin-top:10px;"></div>
+        <p style="font-size:0.7rem;color:var(--text-muted);margin-top:10px;">Add the CNAME record in your DNS provider, then add the domain here. We'll monitor it until it resolves.</p>
       </div>
 
       <!-- Tab: Register New Domain -->
@@ -3120,8 +3196,9 @@
         <label for="edit-site-slug">Slug</label>
         <input type="text" id="edit-site-slug" placeholder="url-friendly-slug" maxlength="100" />
       </div>
+      <div id="edit-site-slug-preview" style="font-size:0.75rem;color:var(--accent);margin-top:-10px;margin-bottom:12px;font-family:'SF Mono','Fira Code',monospace;transition:opacity 0.2s;"></div>
       <div class="edit-site-note">
-        <strong>Note:</strong> Changing the title here will only update the dashboard display name. It will not change the title on the live website unless you do a full <strong>Reset</strong> or manually update it using the bolt.diy <strong>Edit</strong> feature. Changing the slug will update the subdomain URL (slug-sites.megabyte.space).
+        Title changes apply to the dashboard only. Use <strong>Reset</strong> or <strong>AI Edit</strong> to update the live site. Slug changes update the subdomain URL.
       </div>
       <div id="edit-site-msg" class="msg" style="margin-bottom:12px;"></div>
       <div style="display:flex;gap:10px;justify-content:flex-end;">
@@ -3291,6 +3368,7 @@
       <p class="search-hint">Search for your business to generate a free preview &mdash; no account or credit card required.</p>
 
       <div class="hero-ctas">
+        <button class="btn btn-accent" onclick="document.getElementById('search-input').focus()">Build Your Free Website</button>
         <a href="#how-it-works" class="btn-ghost">How it works &darr;</a>
       </div>
       <p class="hero-clarify"><strong>Free preview</strong> includes a full AI-generated site. Pay only when you're ready to go live.</p>
@@ -3743,6 +3821,15 @@
     </div>
   </div>
 
+  <!-- Footer CTA -->
+  <div style="text-align:center;padding:48px 24px 0;position:relative;z-index:1;">
+    <div style="max-width:640px;margin:0 auto;padding:36px 32px;background:linear-gradient(135deg,rgba(80,165,219,0.08),rgba(124,58,237,0.08));border:1px solid var(--border);border-radius:var(--radius-lg);animation:fadeInUp 0.6s ease both;">
+      <h3 style="font-size:1.4rem;font-weight:800;margin-bottom:8px;letter-spacing:-0.02em;">What are you waiting for?</h3>
+      <p style="color:var(--text-secondary);font-size:1rem;margin-bottom:20px;">Build your next gorgeous website for <strong style="color:var(--accent);">FREE</strong>. No credit card required.</p>
+      <button class="btn btn-accent btn-large" onclick="document.getElementById('search-input').focus();window.scrollTo({top:0,behavior:'smooth'})">Get Started Now</button>
+    </div>
+  </div>
+
   <!-- Footer -->
   <footer class="site-footer">
     <div class="footer-inner">
@@ -4044,7 +4131,7 @@
         html += '</div>';
         // Action buttons - Row 2 (management)
         html += '<div class="site-card-actions">';
-        html += '<button class="site-card-btn" onclick="openDomainModal(\'' + escapeHtml(s.id) + '\', \'' + escapeHtml(name) + '\')">Domains</button>';
+        html += '<button class="site-card-btn" onclick="openDomainModal(\'' + escapeHtml(s.id) + '\', \'' + escapeHtml(name) + '\', \'' + escapeHtml(slug) + '\')">Domains</button>';
         html += '<button class="site-card-btn" onclick="openResetModal(\'' + escapeHtml(s.id) + '\', \'' + escapeHtml(name) + '\', \'' + escapeHtml(s.business_address || '') + '\', \'' + escapeHtml(s.google_place_id || '') + '\', \'' + escapeHtml(s.additional_context || '') + '\')">Reset</button>';
         html += '<button class="site-card-btn" onclick="openDeployModal(\'' + escapeHtml(s.id) + '\', \'' + escapeHtml(name) + '\')">Deploy</button>';
         html += '<button class="site-card-btn danger" onclick="openDeleteModal(\'' + escapeHtml(s.id) + '\', \'' + escapeHtml(name) + '\')">Delete</button>';
@@ -4086,13 +4173,21 @@
 
     /* ── Domain Modal ────────────────────────────── */
 
-    function openDomainModal(siteId, siteName) {
+    var adminDomainModalSlug = null;
+
+    function openDomainModal(siteId, siteName, siteSlug) {
       adminDomainModalSiteId = siteId;
+      adminDomainModalSlug = siteSlug || null;
       document.getElementById('domain-modal-title').textContent = 'Domains: ' + siteName;
       document.getElementById('domain-modal').classList.add('visible');
       document.getElementById('domain-add-input').value = '';
       hideMsg('domain-modal-msg');
       loadHostnames(siteId);
+      // Focus the first input
+      setTimeout(function() {
+        var firstInput = document.querySelector('#domain-modal input:not([type=hidden])');
+        if (firstInput) firstInput.focus();
+      }, 100);
     }
 
     function closeDomainModal() {
@@ -4117,11 +4212,27 @@
         })
         .then(function(d) {
           var hostnames = d.data || [];
-          if (!hostnames.length) {
+          var html = '';
+
+          // Always show the CNAME subdomain as a grayed-out, undeletable entry
+          if (adminDomainModalSlug) {
+            var cnameHost = adminDomainModalSlug + '-sites.megabyte.space';
+            html += '<div class="hostname-item" style="opacity:0.6;background:rgba(148,163,184,0.04);border-radius:8px;padding:10px 12px;margin-bottom:4px;">';
+            html += '<div style="flex:1;min-width:0;">';
+            html += '<div class="hostname-item-name" style="display:flex;align-items:center;gap:6px;">';
+            html += '<a href="https://' + escapeHtml(cnameHost) + '" target="_blank" style="color:var(--text-muted);">' + escapeHtml(cnameHost) + '</a>';
+            html += '<span style="font-size:0.55rem;background:rgba(148,163,184,0.2);color:#94a3b8;padding:1px 5px;border-radius:3px;font-weight:700;letter-spacing:0.04em;">SYSTEM</span>';
+            html += '</div>';
+            html += '<div class="hostname-item-type" style="color:var(--text-muted);">Default subdomain &middot; cannot be removed</div>';
+            html += '</div>';
+            html += '</div>';
+          }
+
+          if (!hostnames.length && !adminDomainModalSlug) {
             container.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:8px;">No domains configured yet.</div>';
             return;
           }
-          var html = '';
+
           for (var i = 0; i < hostnames.length; i++) {
             var h = hostnames[i];
             var url = 'https://' + h.hostname;
@@ -4214,6 +4325,10 @@
         headers['Authorization'] = 'Bearer ' + state.session.token;
       }
 
+      // Hide previous upgrade CTA
+      var ctaEl = document.getElementById('domain-connect-upgrade-cta');
+      if (ctaEl) ctaEl.style.display = 'none';
+
       fetch('/api/sites/' + siteId + '/hostnames', {
         method: 'POST',
         headers: headers,
@@ -4225,18 +4340,42 @@
             if (d && d.error) {
               msg = typeof d.error === 'string' ? d.error : (d.error.message || d.error.code || msg);
             }
+            // Show upgrade CTA if custom domain requires paid plan
+            if (res.status === 403 && msg.toLowerCase().indexOf('paid') !== -1) {
+              var ctaEl = document.getElementById('domain-connect-upgrade-cta');
+              if (ctaEl) ctaEl.style.display = 'block';
+            }
             throw new Error(msg);
           });
           return res.json();
         })
-        .then(function() {
+        .then(function(d) {
           input.value = '';
           hideMsg('domain-modal-msg');
           loadHostnames(siteId);
+
+          // Show CNAME monitoring status for newly added domain
+          var hostnameData = d.data || d;
+          if (hostnameData.status === 'pending' && hostname) {
+            showCnameMonitor(hostname);
+          }
         })
         .catch(function(err) {
           showMsg('domain-modal-msg', 'error', err.message || 'Failed to add domain');
         });
+    }
+
+    function showCnameMonitor(hostname) {
+      var el = document.getElementById('domain-cname-status');
+      if (!el) return;
+      el.style.display = 'block';
+      el.innerHTML = '<div style="padding:10px 14px;background:rgba(80,165,219,0.06);border:1px solid rgba(80,165,219,0.15);border-radius:var(--radius);font-size:0.8rem;">'
+        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'
+        + '<span class="loading-dots"><span></span><span></span><span></span></span>'
+        + '<span style="color:var(--text-secondary);">Monitoring CNAME for <strong style="color:var(--accent);">' + escapeHtml(hostname) + '</strong></span>'
+        + '</div>'
+        + '<div style="color:var(--text-muted);font-size:0.72rem;">Point your CNAME to <code>sites.megabyte.space</code>. We\'ll verify automatically.</div>'
+        + '</div>';
     }
 
     function deleteHostname(siteId, hostnameId) {
@@ -5801,12 +5940,37 @@
        =========================================================== */
     var editSiteModalId = null;
 
+    function updateSlugPreview() {
+      var slugInput = document.getElementById('edit-site-slug');
+      var preview = document.getElementById('edit-site-slug-preview');
+      if (!slugInput || !preview) return;
+      var val = slugInput.value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/--+/g, '-').replace(/^-|-$/g, '');
+      if (val) {
+        preview.textContent = val + '-sites.megabyte.space';
+        preview.style.opacity = '1';
+      } else {
+        preview.textContent = '';
+        preview.style.opacity = '0';
+      }
+    }
+
+    // Wire up live slug preview
+    (function() {
+      var slugInput = document.getElementById('edit-site-slug');
+      if (slugInput) {
+        slugInput.addEventListener('input', updateSlugPreview);
+      }
+    })();
+
     function openEditSiteModal(siteId, currentName, currentSlug) {
       editSiteModalId = siteId;
       document.getElementById('edit-site-title').value = currentName || '';
       document.getElementById('edit-site-slug').value = currentSlug || '';
+      updateSlugPreview();
       hideMsg('edit-site-msg');
       document.getElementById('edit-site-modal').classList.add('visible');
+      // Focus first input
+      setTimeout(function() { document.getElementById('edit-site-title').focus(); }, 100);
     }
 
     function closeEditSiteModal() {
@@ -6234,28 +6398,23 @@
 
     function renderDomainSearchResults(results) {
       var container = document.getElementById('domain-search-results');
-      if (!results.length) {
-        container.innerHTML = '<div style="padding:12px;color:var(--text-muted);font-size:0.85rem;text-align:center;">No domains found. Try a different name.</div>';
+      // Only show available domains
+      var available = results.filter(function(r) { return r.available; });
+      if (!available.length) {
+        container.innerHTML = '<div style="padding:12px;color:var(--text-muted);font-size:0.85rem;text-align:center;">No available domains found. Try a different name.</div>';
         container.classList.add('open');
         return;
       }
 
       var html = '';
-      for (var i = 0; i < results.length; i++) {
-        var r = results[i];
-        if (r.available) {
-          html += '<div class="domain-result-item" onclick="selectDomainForPurchase(\'' + escapeHtml(r.domain) + '\', ' + (r.price || 0) + ')">';
-          html += '<div>';
-          html += '<div class="domain-result-name">' + escapeHtml(r.domain) + '</div>';
-          html += '</div>';
-          html += '<div class="domain-result-price">$' + ((r.price || 0) / 100).toFixed(2) + '/yr</div>';
-          html += '</div>';
-        } else {
-          html += '<div class="domain-result-item" style="opacity:0.5;cursor:default;">';
-          html += '<div class="domain-result-name">' + escapeHtml(r.domain) + '</div>';
-          html += '<div class="domain-result-unavailable">Taken</div>';
-          html += '</div>';
-        }
+      for (var i = 0; i < available.length; i++) {
+        var r = available[i];
+        html += '<div class="domain-result-item" onclick="selectDomainForPurchase(\'' + escapeHtml(r.domain) + '\', ' + (r.price || 0) + ')">';
+        html += '<div>';
+        html += '<div class="domain-result-name">' + escapeHtml(r.domain) + '</div>';
+        html += '</div>';
+        html += '<div class="domain-result-price">$' + ((r.price || 0) / 100).toFixed(2) + '/yr</div>';
+        html += '</div>';
       }
       container.innerHTML = html;
       container.classList.add('open');
@@ -6564,32 +6723,76 @@
       });
     }
 
+    var _detailsPreBuiltResults = [];
+
     function fetchDetailsBizResults(query) {
       var searchUrl = '/api/search/businesses?q=' + encodeURIComponent(query);
       if (state.userLat !== null && state.userLng !== null) {
         searchUrl += '&lat=' + state.userLat + '&lng=' + state.userLng;
       }
 
-      fetch(searchUrl)
+      // Search both pre-built sites and Google Places in parallel (same as homepage)
+      var sitesP = fetch('/api/sites/search?q=' + encodeURIComponent(query))
+        .then(function(res) { return res.ok ? res.json() : { data: [] }; })
+        .then(function(d) { return d.data || []; })
+        .catch(function() { return []; });
+
+      var placesP = fetch(searchUrl)
         .then(function(res) { return res.json(); })
-        .then(function(d) {
-          var items = d.data || [];
-          renderDetailsBizDropdown(items);
+        .then(function(d) { return d.data || []; })
+        .catch(function() { return []; });
+
+      Promise.all([sitesP, placesP])
+        .then(function(results) {
+          _detailsPreBuiltResults = Array.isArray(results[0]) ? results[0] : [];
+          var places = Array.isArray(results[1]) ? results[1] : [];
+          renderDetailsBizDropdown(_detailsPreBuiltResults, places);
         })
         .catch(function() {
           closeDetailsBizDropdown();
         });
     }
 
-    function renderDetailsBizDropdown(items) {
-      if (!items.length) {
+    function renderDetailsBizDropdown(preBuilt, items) {
+      if (!preBuilt.length && !items.length) {
         closeDetailsBizDropdown();
         return;
       }
 
       var html = '';
-      for (var i = 0; i < items.length; i++) {
-        var item = items[i];
+
+      // Pre-built sites first (same styling as homepage dropdown)
+      for (var j = 0; j < preBuilt.length; j++) {
+        var pb = preBuilt[j];
+        html += '<div class="search-result search-result-prebuilt" onclick="selectDetailsPreBuilt(' + j + ')" style="padding:10px 16px;">';
+        html += '<div class="search-result-icon" style="width:32px;height:32px;background:rgba(34,197,94,0.12)">';
+        html += '<svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" style="width:16px;height:16px;">';
+        html += '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>';
+        html += '</svg></div>';
+        html += '<div class="search-result-text">';
+        html += '<div class="search-result-name" style="font-size:0.88rem;">' + escapeHtml(pb.business_name || pb.name || '') + ' <span style="display:inline-block;background:rgba(34,197,94,0.15);color:#22c55e;font-size:0.65rem;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:4px;vertical-align:middle;letter-spacing:0.03em">PRE-BUILT</span></div>';
+        html += '<div class="search-result-address" style="font-size:0.78rem;">' + escapeHtml(pb.business_address || pb.address || 'Ready to view') + '</div>';
+        html += '</div></div>';
+      }
+
+      // Filter out duplicates (same as homepage)
+      var preBuiltPlaceIds = {};
+      var preBuiltNames = {};
+      for (var p = 0; p < preBuilt.length; p++) {
+        if (preBuilt[p].google_place_id) preBuiltPlaceIds[preBuilt[p].google_place_id] = true;
+        var pbName = (preBuilt[p].business_name || '').toLowerCase().trim();
+        if (pbName) preBuiltNames[pbName] = true;
+      }
+      var filtered = items.filter(function(r) {
+        var pid = r.place_id || r.id || '';
+        if (pid && preBuiltPlaceIds[pid]) return false;
+        var rName = (r.name || r.business_name || '').toLowerCase().trim();
+        if (rName && preBuiltNames[rName]) return false;
+        return true;
+      });
+
+      for (var i = 0; i < filtered.length; i++) {
+        var item = filtered[i];
         var dist = '';
         if (state.userLat !== null && item.lat != null && item.lng != null) {
           var km = haversineKm(state.userLat, state.userLng, item.lat, item.lng);
@@ -6606,8 +6809,27 @@
         html += '</div></div>';
       }
       detailsBizDropdown.innerHTML = html;
-      detailsBizDropdown._items = items;
+      detailsBizDropdown._items = filtered;
       detailsBizDropdown.classList.add('open');
+    }
+
+    function selectDetailsPreBuilt(index) {
+      var site = _detailsPreBuiltResults[index];
+      if (!site) return;
+      closeDetailsBizDropdown();
+      // Set as selected business
+      state.selectedBusiness = {
+        name: site.business_name || site.name,
+        address: site.business_address || site.address || '',
+        place_id: site.google_place_id || ''
+      };
+      state.mode = 'business';
+      document.getElementById('badge-biz-name').textContent = state.selectedBusiness.name || '';
+      document.getElementById('badge-biz-addr').textContent = state.selectedBusiness.address || '';
+      document.getElementById('details-business-badge').style.display = 'flex';
+      document.getElementById('details-manual-fields').style.display = 'none';
+      var titleEl = document.getElementById('details-title');
+      if (titleEl && !resetSiteId) titleEl.textContent = 'Tell us more about your business';
     }
 
     function selectDetailsBusiness(index) {
@@ -6815,6 +7037,254 @@
       navigator.serviceWorker.register('/sw.js').catch(function() {
         // Service worker registration failed - non-critical
       });
+    }
+
+    /* ===========================================================
+       Enter Key Form Submission
+       =========================================================== */
+    (function() {
+      // Edit site modal: Enter submits
+      var editTitle = document.getElementById('edit-site-title');
+      var editSlug = document.getElementById('edit-site-slug');
+      if (editTitle) editTitle.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); saveEditSite(); } });
+      if (editSlug) editSlug.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); saveEditSite(); } });
+
+      // Email sign-in: Enter sends magic link
+      var emailInput = document.getElementById('email-input');
+      if (emailInput) emailInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); sendMagicLink(); } });
+
+      // Contact form: Enter on fields submits
+      var contactFields = ['contact-name', 'contact-email', 'contact-phone'];
+      contactFields.forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); submitContactForm(); } });
+      });
+
+      // Search input: Enter selects first result
+      var searchInputEl = document.getElementById('search-input');
+      if (searchInputEl) {
+        searchInputEl.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            var firstResult = document.querySelector('#search-dropdown .search-result');
+            if (firstResult) firstResult.click();
+          }
+        });
+      }
+
+      // Domain search: Enter on domain-search-input triggers search
+      var domSearchInput = document.getElementById('domain-search-input');
+      if (domSearchInput) domSearchInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); searchDomains(domSearchInput.value.trim()); } });
+    })();
+
+    /* ===========================================================
+       Modal Focus Traps
+       =========================================================== */
+    (function() {
+      function trapFocus(modalId) {
+        var modal = document.getElementById(modalId);
+        if (!modal) return;
+        var observer = new MutationObserver(function(mutations) {
+          for (var i = 0; i < mutations.length; i++) {
+            if (mutations[i].attributeName === 'class') {
+              if (modal.classList.contains('visible')) {
+                setTimeout(function() {
+                  var first = modal.querySelector('input:not([type=hidden]):not([style*="display:none"]), textarea, button:not(.modal-close)');
+                  if (first) first.focus();
+                }, 100);
+              }
+            }
+          }
+        });
+        observer.observe(modal, { attributes: true, attributeFilter: ['class'] });
+      }
+      trapFocus('domain-modal');
+      trapFocus('delete-modal');
+      trapFocus('deploy-modal');
+      trapFocus('details-modal');
+    })();
+
+    /* ===========================================================
+       Free Plan Badge → Billing
+       =========================================================== */
+    document.addEventListener('click', function(e) {
+      var badge = e.target.closest('.plan-badge.free');
+      if (badge) {
+        var siteId = badge.closest('.site-card') ? badge.closest('.site-card').querySelector('.site-card-btn[onclick*="openSiteCheckout"]') : null;
+        if (siteId) {
+          siteId.click();
+        } else {
+          openBillingCheckout();
+        }
+      }
+    });
+
+    /* ===========================================================
+       Status → Modal (instead of full-screen waiting)
+       =========================================================== */
+    (function() {
+      // Intercept the Status button click to open a modal instead of navigating
+      document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.site-card-btn');
+        if (!btn) return;
+        var onclick = btn.getAttribute('onclick');
+        if (!onclick || onclick.indexOf('navigateTo(\'waiting\')') === -1) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Extract siteId and slug from onclick
+        var siteIdMatch = onclick.match(/state\.siteId='([^']+)'/);
+        var slugMatch = onclick.match(/state\.slug='([^']+)'/);
+        if (siteIdMatch) state.siteId = siteIdMatch[1];
+        if (slugMatch) state.slug = slugMatch[1];
+
+        openStatusModal();
+      }, true);
+    })();
+
+    var statusModalOpen = false;
+
+    function openStatusModal() {
+      // Create or show the status modal
+      var existing = document.getElementById('status-modal-overlay');
+      if (!existing) {
+        var overlay = document.createElement('div');
+        overlay.id = 'status-modal-overlay';
+        overlay.className = 'modal-overlay visible';
+        overlay.onclick = function(e) { if (e.target === overlay) closeStatusModal(); };
+        overlay.innerHTML = '<div class="modal" style="max-width:560px;min-height:400px;">'
+          + '<div class="modal-title"><span>Build Status</span><button class="modal-close" onclick="closeStatusModal()">&times;</button></div>'
+          + '<div id="status-modal-terminal" style="padding:0;"></div>'
+          + '</div>';
+        document.body.appendChild(overlay);
+      } else {
+        existing.classList.add('visible');
+      }
+
+      statusModalOpen = true;
+
+      // Clone the terminal into the modal
+      var termBody = document.getElementById('status-modal-terminal');
+      if (termBody) {
+        termBody.innerHTML = '<div class="build-terminal" style="max-height:320px;margin:0;border:none;border-radius:0;">'
+          + '<div class="build-terminal-header">'
+          + '<div class="build-terminal-dot red"></div><div class="build-terminal-dot yellow"></div><div class="build-terminal-dot green"></div>'
+          + '<span class="build-terminal-title">' + escapeHtml(state.slug ? 'build: ' + state.slug : 'build-progress') + '</span>'
+          + '</div>'
+          + '<div class="build-terminal-body" id="status-modal-terminal-body"></div>'
+          + '</div>';
+      }
+
+      // Start polling workflow and printing to modal terminal
+      startStatusTerminal();
+    }
+
+    function closeStatusModal() {
+      var overlay = document.getElementById('status-modal-overlay');
+      if (overlay) overlay.classList.remove('visible');
+      statusModalOpen = false;
+      stopStatusTerminal();
+    }
+
+    var statusTerminalTimer = null;
+
+    function startStatusTerminal() {
+      stopStatusTerminal();
+      if (!state.siteId) return;
+
+      var body = document.getElementById('status-modal-terminal-body');
+      if (!body) return;
+      body.innerHTML = '';
+
+      function addLine(text, cls) {
+        var line = document.createElement('div');
+        line.className = 'build-terminal-line ' + (cls || '');
+        line.textContent = text;
+        body.appendChild(line);
+        line.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+
+      addLine('Checking build status...', 'active');
+
+      statusTerminalTimer = setInterval(function() {
+        if (!statusModalOpen) { stopStatusTerminal(); return; }
+        var headers = {};
+        if (state.session && state.session.token) headers['Authorization'] = 'Bearer ' + state.session.token;
+
+        fetch('/api/sites/' + state.siteId + '/workflow', { headers: headers })
+          .then(function(res) { return res.ok ? res.json() : null; })
+          .then(function(resp) {
+            if (!resp || !resp.data) return;
+            var data = resp.data;
+            body.innerHTML = '';
+
+            if (data.site_status === 'published') {
+              addLine('Build completed successfully!', 'done');
+              if (state.slug) addLine('Live at https://' + state.slug + '-sites.megabyte.space', 'done');
+              stopStatusTerminal();
+              return;
+            }
+
+            if (data.workflow_status === 'errored' || data.workflow_status === 'failed') {
+              addLine('Build failed', 'error');
+              var errMsg = data.workflow_error || 'Unknown error';
+              if (typeof errMsg === 'object') errMsg = errMsg.message || JSON.stringify(errMsg);
+              addLine(errMsg, 'error');
+              stopStatusTerminal();
+              return;
+            }
+
+            addLine('Workflow: ' + (data.workflow_status || 'unknown'), 'info');
+            addLine('Site: ' + (data.site_status || 'unknown'), 'info');
+
+            // Show each step
+            for (var i = 0; i < WORKFLOW_STEP_ORDER.length; i++) {
+              var step = WORKFLOW_STEP_ORDER[i];
+              var label = WORKFLOW_STEP_LABELS[step] || step;
+              if (data.workflow_status === 'complete' || data.site_status === 'published') {
+                addLine(label, 'done');
+              } else if (data.workflow_status === 'running' && i === 0) {
+                addLine(label, 'active');
+              } else {
+                addLine(label, 'pending');
+              }
+            }
+          })
+          .catch(function() {});
+      }, 3000);
+
+      // Immediate first poll
+      setTimeout(function() {
+        if (statusTerminalTimer) {
+          var headers = {};
+          if (state.session && state.session.token) headers['Authorization'] = 'Bearer ' + state.session.token;
+          fetch('/api/sites/' + state.siteId + '/workflow', { headers: headers })
+            .then(function(res) { return res.ok ? res.json() : null; })
+            .then(function(resp) {
+              if (!resp || !resp.data) return;
+              body.innerHTML = '';
+              var data = resp.data;
+              var addL = function(text, cls) {
+                var line = document.createElement('div');
+                line.className = 'build-terminal-line ' + (cls || '');
+                line.textContent = text;
+                body.appendChild(line);
+              };
+              addL('Workflow: ' + (data.workflow_status || 'pending'), 'info');
+              for (var i = 0; i < WORKFLOW_STEP_ORDER.length; i++) {
+                addL(WORKFLOW_STEP_LABELS[WORKFLOW_STEP_ORDER[i]] || WORKFLOW_STEP_ORDER[i], 'pending');
+              }
+            })
+            .catch(function() {});
+        }
+      }, 100);
+    }
+
+    function stopStatusTerminal() {
+      if (statusTerminalTimer) {
+        clearInterval(statusTerminalTimer);
+        statusTerminalTimer = null;
+      }
     }
   </script>
 </body>

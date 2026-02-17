@@ -117,6 +117,103 @@ describe('payloadLimitMiddleware', () => {
     // parseInt('not-a-number', 10) is NaN, so the check is skipped
     expect(res.status).toBe(200);
   });
+
+  describe('upload endpoint limits (100MB)', () => {
+    function createUploadApp() {
+      const app = new Hono<{ Bindings: any; Variables: any }>();
+      app.use('*', payloadLimitMiddleware);
+      app.post('/api/publish/bolt', (c) => c.text('ok'));
+      app.post('/api/sites/:id/deploy', (c) => c.text('ok'));
+      app.post('/api/sites/:id/settings', (c) => c.text('ok'));
+      app.post('/api/other', (c) => c.text('ok'));
+      app.onError((err, c) => {
+        const status = (err as any).statusCode || 500;
+        return c.json({ error: (err as any).message || 'error' }, status);
+      });
+      return app;
+    }
+
+    it('allows 50MB body for /api/publish/bolt', async () => {
+      const app = createUploadApp();
+      const size = 50 * 1024 * 1024; // 50MB
+      const res = await app.request('/api/publish/bolt', {
+        method: 'POST',
+        headers: { 'content-length': String(size) },
+      });
+      expect(res.status).toBe(200);
+    });
+
+    it('allows 99MB body for /api/publish/bolt', async () => {
+      const app = createUploadApp();
+      const size = 99 * 1024 * 1024; // 99MB
+      const res = await app.request('/api/publish/bolt', {
+        method: 'POST',
+        headers: { 'content-length': String(size) },
+      });
+      expect(res.status).toBe(200);
+    });
+
+    it('rejects 101MB body for /api/publish/bolt', async () => {
+      const app = createUploadApp();
+      const size = 101 * 1024 * 1024; // 101MB
+      const res = await app.request('/api/publish/bolt', {
+        method: 'POST',
+        headers: { 'content-length': String(size) },
+      });
+      expect(res.status).toBe(413);
+    });
+
+    it('allows 50MB body for /api/sites/:id/deploy', async () => {
+      const app = createUploadApp();
+      const size = 50 * 1024 * 1024;
+      const res = await app.request('/api/sites/abc-123/deploy', {
+        method: 'POST',
+        headers: { 'content-length': String(size) },
+      });
+      expect(res.status).toBe(200);
+    });
+
+    it('rejects 101MB body for /api/sites/:id/deploy', async () => {
+      const app = createUploadApp();
+      const size = 101 * 1024 * 1024;
+      const res = await app.request('/api/sites/abc-123/deploy', {
+        method: 'POST',
+        headers: { 'content-length': String(size) },
+      });
+      expect(res.status).toBe(413);
+    });
+
+    it('uses default limit for /api/sites/:id/settings (not an upload path)', async () => {
+      const app = createUploadApp();
+      // 1MB exceeds 256KB default limit but not upload limit
+      const size = 1 * 1024 * 1024;
+      const res = await app.request('/api/sites/abc-123/settings', {
+        method: 'POST',
+        headers: { 'content-length': String(size) },
+      });
+      expect(res.status).toBe(413);
+    });
+
+    it('uses default limit for non-upload API routes', async () => {
+      const app = createUploadApp();
+      const size = 1 * 1024 * 1024; // 1MB
+      const res = await app.request('/api/other', {
+        method: 'POST',
+        headers: { 'content-length': String(size) },
+      });
+      expect(res.status).toBe(413);
+    });
+
+    it('allows exact 100MB for upload endpoints', async () => {
+      const app = createUploadApp();
+      const size = 100 * 1024 * 1024; // exactly 100MB
+      const res = await app.request('/api/publish/bolt', {
+        method: 'POST',
+        headers: { 'content-length': String(size) },
+      });
+      expect(res.status).toBe(200);
+    });
+  });
 });
 
 // ─── securityHeadersMiddleware ───────────────────────────────
@@ -195,5 +292,57 @@ describe('securityHeadersMiddleware', () => {
     expect(csp).toContain('frame-src https://js.stripe.com');
     expect(csp).toContain("object-src 'none'");
     expect(csp).toContain("base-uri 'self'");
+  });
+
+  describe('CSP includes Google Tag Manager and Analytics', () => {
+    it('allows GTM in script-src', async () => {
+      const app = createApp();
+      const res = await app.request('/test');
+      const csp = res.headers.get('Content-Security-Policy')!;
+      expect(csp).toContain('https://www.googletagmanager.com');
+    });
+
+    it('allows Google Analytics in script-src', async () => {
+      const app = createApp();
+      const res = await app.request('/test');
+      const csp = res.headers.get('Content-Security-Policy')!;
+      const scriptSrc = csp.split(';').find(d => d.trim().startsWith('script-src'))!;
+      expect(scriptSrc).toContain('https://www.google-analytics.com');
+    });
+
+    it('allows GTM and GA in img-src', async () => {
+      const app = createApp();
+      const res = await app.request('/test');
+      const csp = res.headers.get('Content-Security-Policy')!;
+      const imgSrc = csp.split(';').find(d => d.trim().startsWith('img-src'))!;
+      expect(imgSrc).toContain('https://www.googletagmanager.com');
+      expect(imgSrc).toContain('https://www.google-analytics.com');
+    });
+
+    it('allows GA and GTM in connect-src', async () => {
+      const app = createApp();
+      const res = await app.request('/test');
+      const csp = res.headers.get('Content-Security-Policy')!;
+      const connectSrc = csp.split(';').find(d => d.trim().startsWith('connect-src'))!;
+      expect(connectSrc).toContain('https://www.google-analytics.com');
+      expect(connectSrc).toContain('https://www.googletagmanager.com');
+      expect(connectSrc).toContain('https://region1.google-analytics.com');
+    });
+
+    it('allows GTM in frame-src', async () => {
+      const app = createApp();
+      const res = await app.request('/test');
+      const csp = res.headers.get('Content-Security-Policy')!;
+      const frameSrc = csp.split(';').find(d => d.trim().startsWith('frame-src'))!;
+      expect(frameSrc).toContain('https://www.googletagmanager.com');
+    });
+
+    it('allows Cloudflare Insights in script-src', async () => {
+      const app = createApp();
+      const res = await app.request('/test');
+      const csp = res.headers.get('Content-Security-Policy')!;
+      const scriptSrc = csp.split(';').find(d => d.trim().startsWith('script-src'))!;
+      expect(scriptSrc).toContain('https://static.cloudflareinsights.com');
+    });
   });
 });
