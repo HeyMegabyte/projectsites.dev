@@ -68,7 +68,7 @@ export const securityHeadersMiddleware: MiddlewareHandler<{
     'Content-Security-Policy',
     [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' https://releases.transloadit.com https://js.stripe.com https://us.i.posthog.com https://us-assets.i.posthog.com https://static.cloudflareinsights.com",
+      "script-src 'self' 'unsafe-inline' https://releases.transloadit.com https://js.stripe.com https://us.i.posthog.com https://us-assets.i.posthog.com https://static.cloudflareinsights.com https://cdnjs.cloudflare.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://releases.transloadit.com",
       "img-src 'self' data: https:",
       "font-src 'self' https://fonts.gstatic.com",

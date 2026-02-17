@@ -687,7 +687,9 @@
       padding: 2px 8px;
       border-radius: 10px;
       font-weight: 600;
+      display: none;
     }
+    .admin-site-count.loaded { display: inline-block; }
     .admin-sites-usage {
       font-size: 0.8rem;
       color: var(--text-muted);
@@ -3917,10 +3919,16 @@
       // Determine org plan from subscription data
       var isPaidOrg = adminSubscription && adminSubscription.plan === 'paid' && adminSubscription.status === 'active';
 
-      // Update site count badge
+      // Update site count badge — hidden until loaded
       var countEl = document.getElementById('admin-site-count');
       if (countEl) {
-        countEl.textContent = adminSites.length ? adminSites.length + ' site' + (adminSites.length !== 1 ? 's' : '') : '';
+        if (adminSites.length) {
+          countEl.textContent = adminSites.length + ' site' + (adminSites.length !== 1 ? 's' : '');
+          countEl.classList.add('loaded');
+        } else {
+          countEl.textContent = '';
+          countEl.classList.remove('loaded');
+        }
       }
 
       if (!adminSites.length) {
