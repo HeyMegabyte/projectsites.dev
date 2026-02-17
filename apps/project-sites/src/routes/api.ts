@@ -812,6 +812,423 @@ api.get('/api/sites/by-slug/:slug/chat', async (c) => {
   });
 });
 
+// ─── Update Site (Title / Slug) ──────────────────────────────
+
+api.patch('/api/sites/:id', async (c) => {
+  const orgId = c.get('orgId');
+  if (!orgId) throw unauthorized('Must be authenticated');
+
+  const siteId = c.req.param('id');
+  const body = (await c.req.json()) as {
+    business_name?: string;
+    slug?: string;
+  };
+
+  // Verify ownership
+  const site = await dbQueryOne<{ id: string; slug: string; org_id: string }>(
+    c.env.DB,
+    'SELECT id, slug, org_id FROM sites WHERE id = ? AND org_id = ? AND deleted_at IS NULL',
+    [siteId, orgId],
+  );
+  if (!site) throw notFound('Site not found');
+
+  const updates: string[] = [];
+  const params: unknown[] = [];
+
+  if (body.business_name && body.business_name.trim()) {
+    updates.push('business_name = ?');
+    params.push(body.business_name.trim().slice(0, 200));
+  }
+
+  if (body.slug && body.slug.trim()) {
+    const newSlug = body.slug
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, '-')
+      .replace(/--+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 100);
+
+    if (newSlug && newSlug !== site.slug) {
+      // Check uniqueness
+      const existing = await dbQueryOne<{ id: string }>(
+        c.env.DB,
+        'SELECT id FROM sites WHERE slug = ? AND id != ? AND deleted_at IS NULL',
+        [newSlug, siteId],
+      );
+      if (existing) throw badRequest('Slug "' + newSlug + '" is already taken');
+
+      updates.push('slug = ?');
+      params.push(newSlug);
+
+      // Invalidate old KV cache
+      if (site.slug) {
+        await c.env.CACHE_KV.delete(`host:${site.slug}-sites.megabyte.space`).catch(() => {});
+      }
+    }
+  }
+
+  if (updates.length === 0) {
+    return c.json({ data: { updated: false } });
+  }
+
+  updates.push('updated_at = datetime(\'now\')');
+  params.push(siteId);
+
+  await c.env.DB.prepare(`UPDATE sites SET ${updates.join(', ')} WHERE id = ?`)
+    .bind(...params)
+    .run();
+
+  await auditService.writeAuditLog(c.env.DB, {
+    org_id: orgId,
+    actor_id: c.get('userId') ?? null,
+    action: 'site.updated',
+    target_type: 'site',
+    metadata_json: { site_id: siteId, ...body },
+    request_id: c.get('requestId'),
+  });
+
+  return c.json({ data: { updated: true } });
+});
+
+// ─── Reset Site (Re-crawl & Rebuild) ─────────────────────────
+
+api.post('/api/sites/:id/reset', async (c) => {
+  const orgId = c.get('orgId');
+  if (!orgId) throw unauthorized('Must be authenticated');
+
+  const siteId = c.req.param('id');
+
+  // Verify ownership
+  const site = await dbQueryOne<{ id: string; slug: string; org_id: string }>(
+    c.env.DB,
+    'SELECT id, slug, org_id FROM sites WHERE id = ? AND org_id = ? AND deleted_at IS NULL',
+    [siteId, orgId],
+  );
+  if (!site) throw notFound('Site not found');
+
+  const body = (await c.req.json()) as {
+    business?: { name?: string; address?: string; place_id?: string };
+    additional_context?: string;
+  };
+
+  // Update business info if provided
+  const updates: string[] = ['status = \'building\'', 'updated_at = datetime(\'now\')'];
+  const params: unknown[] = [];
+
+  if (body.business?.name) {
+    updates.push('business_name = ?');
+    params.push(body.business.name.trim().slice(0, 200));
+  }
+  if (body.business?.address) {
+    updates.push('business_address = ?');
+    params.push(body.business.address.trim().slice(0, 500));
+  }
+  if (body.business?.place_id) {
+    updates.push('google_place_id = ?');
+    params.push(body.business.place_id);
+  }
+  if (body.additional_context) {
+    updates.push('additional_context = ?');
+    params.push(body.additional_context.slice(0, 5000));
+  }
+
+  params.push(siteId);
+  await c.env.DB.prepare(`UPDATE sites SET ${updates.join(', ')} WHERE id = ?`)
+    .bind(...params)
+    .run();
+
+  // Trigger rebuild workflow
+  let workflowInstanceId: string | null = null;
+  if (c.env.SITE_WORKFLOW) {
+    try {
+      const instance = await c.env.SITE_WORKFLOW.create({
+        id: siteId,
+        params: {
+          siteId,
+          slug: site.slug,
+          businessName: body.business?.name || '',
+          businessAddress: body.business?.address || '',
+          additionalContext: body.additional_context || '',
+          isReset: true,
+        },
+      });
+      workflowInstanceId = instance.id;
+    } catch {
+      // Workflow creation may fail if instance with same ID exists
+      // Try with a unique suffix
+      try {
+        const resetId = `${siteId}-reset-${Date.now()}`;
+        const instance = await c.env.SITE_WORKFLOW.create({
+          id: resetId,
+          params: {
+            siteId,
+            slug: site.slug,
+            businessName: body.business?.name || '',
+            businessAddress: body.business?.address || '',
+            additionalContext: body.additional_context || '',
+            isReset: true,
+          },
+        });
+        workflowInstanceId = instance.id;
+      } catch {
+        // Workflow not available
+      }
+    }
+  }
+
+  await auditService.writeAuditLog(c.env.DB, {
+    org_id: orgId,
+    actor_id: c.get('userId') ?? null,
+    action: 'site.reset',
+    target_type: 'site',
+    metadata_json: { site_id: siteId, slug: site.slug },
+    request_id: c.get('requestId'),
+  });
+
+  return c.json({
+    data: {
+      site_id: siteId,
+      slug: site.slug,
+      status: 'building',
+      workflow_instance_id: workflowInstanceId,
+    },
+  });
+});
+
+// ─── Deploy to Site (ZIP + JSON upload) ──────────────────────
+
+api.post('/api/sites/:id/deploy', async (c) => {
+  const orgId = c.get('orgId');
+  if (!orgId) throw unauthorized('Must be authenticated');
+
+  const siteId = c.req.param('id');
+
+  // Verify ownership
+  const site = await dbQueryOne<{ id: string; slug: string; org_id: string }>(
+    c.env.DB,
+    'SELECT id, slug, org_id FROM sites WHERE id = ? AND org_id = ? AND deleted_at IS NULL',
+    [siteId, orgId],
+  );
+  if (!site) throw notFound('Site not found');
+
+  const formData = await c.req.formData();
+  const zipFile = formData.get('zip') as File | null;
+  const chatFile = formData.get('chat') as File | null;
+  const distPath = ((formData.get('dist_path') as string) || 'dist/').replace(/\/$/, '') + '/';
+
+  if (!zipFile) throw badRequest('ZIP file is required');
+
+  // Read ZIP file
+  const JSZip = (await import('jszip')).default;
+  const zipBuffer = await zipFile.arrayBuffer();
+  const zip = await JSZip.loadAsync(zipBuffer);
+
+  const slug = site.slug as string;
+  const version = `v${Date.now()}`;
+  const uploadedFiles: string[] = [];
+
+  // Upload files from the dist directory within the ZIP
+  const entries = Object.entries(zip.files);
+  for (const [path, file] of entries) {
+    if (file.dir) continue;
+
+    // Only include files under the dist path
+    let relativePath = path;
+    if (path.startsWith(distPath)) {
+      relativePath = path.slice(distPath.length);
+    } else if (distPath !== '/' && !path.startsWith(distPath)) {
+      continue;
+    }
+
+    if (!relativePath) continue;
+
+    const content = await file.async('arraybuffer');
+    const r2Key = `sites/${slug}/${version}/${relativePath}`;
+    await c.env.SITES_BUCKET.put(r2Key, content);
+    uploadedFiles.push(relativePath);
+  }
+
+  // Upload chat JSON if provided
+  if (chatFile) {
+    const chatContent = await chatFile.arrayBuffer();
+    await c.env.SITES_BUCKET.put(`sites/${slug}/${version}/_meta/chat.json`, chatContent, {
+      httpMetadata: { contentType: 'application/json' },
+    });
+  }
+
+  // Update manifest
+  const manifest = { current_version: version, updated_at: new Date().toISOString(), files: uploadedFiles };
+  await c.env.SITES_BUCKET.put(`sites/${slug}/_manifest.json`, JSON.stringify(manifest), {
+    httpMetadata: { contentType: 'application/json' },
+  });
+
+  // Update site status to published
+  await c.env.DB.prepare(
+    'UPDATE sites SET status = \'published\', current_build_version = ?, updated_at = datetime(\'now\') WHERE id = ?',
+  )
+    .bind(version, siteId)
+    .run();
+
+  // Invalidate KV cache
+  await c.env.CACHE_KV.delete(`host:${slug}-sites.megabyte.space`).catch(() => {});
+
+  await auditService.writeAuditLog(c.env.DB, {
+    org_id: orgId,
+    actor_id: c.get('userId') ?? null,
+    action: 'site.deployed',
+    target_type: 'site',
+    metadata_json: { site_id: siteId, slug, version, file_count: uploadedFiles.length },
+    request_id: c.get('requestId'),
+  });
+
+  return c.json({
+    data: {
+      site_id: siteId,
+      slug,
+      version,
+      files_uploaded: uploadedFiles.length,
+      status: 'published',
+    },
+  });
+});
+
+// ─── Domain Search (Cloudflare Registrar) ────────────────────
+
+api.get('/api/domains/search', async (c) => {
+  const query = c.req.query('q');
+  if (!query || query.trim().length < 3) {
+    return c.json({ data: [] });
+  }
+
+  const domain = query.trim().toLowerCase().replace(/[^a-z0-9.-]/g, '');
+
+  // Generate TLD variants to check
+  const baseName = domain.replace(/\.[^.]+$/, '').replace(/\./g, '');
+  const tlds = ['.com', '.net', '.org', '.io', '.co', '.dev', '.app', '.site', '.online'];
+  const candidates = domain.includes('.')
+    ? [domain, ...tlds.filter((t) => !domain.endsWith(t)).map((t) => baseName + t)]
+    : tlds.map((t) => baseName + t);
+
+  // Check availability via Cloudflare Registrar API
+  const results: Array<{ domain: string; available: boolean; price: number }> = [];
+
+  try {
+    const checkUrl = `https://api.cloudflare.com/client/v4/accounts/${
+      c.env.CF_API_TOKEN ? '84fa0d1b16ff8086dd958c468ce7fd59' : ''
+    }/registrar/domains?query=${encodeURIComponent(baseName)}`;
+
+    const cfRes = await fetch(checkUrl, {
+      headers: {
+        Authorization: `Bearer ${c.env.CF_API_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (cfRes.ok) {
+      const cfData = (await cfRes.json()) as {
+        result?: Array<{
+          name: string;
+          available: boolean;
+          price?: number;
+        }>;
+      };
+      if (cfData.result) {
+        for (const r of cfData.result) {
+          results.push({
+            domain: r.name,
+            available: r.available,
+            price: r.price ? Math.round(r.price * 100) : 0, // Convert to cents
+          });
+        }
+      }
+    }
+  } catch {
+    // Cloudflare Registrar API may not be available
+  }
+
+  // If API returned no results, return candidates as unavailable/unknown
+  if (results.length === 0) {
+    for (const c of candidates.slice(0, 9)) {
+      results.push({ domain: c, available: false, price: 0 });
+    }
+  }
+
+  return c.json({ data: results });
+});
+
+// ─── Domain Purchase (Stripe subscription) ───────────────────
+
+api.post('/api/domains/purchase', async (c) => {
+  const orgId = c.get('orgId');
+  if (!orgId) throw unauthorized('Must be authenticated');
+
+  const body = (await c.req.json()) as {
+    domain: string;
+    site_id: string;
+    success_url: string;
+    cancel_url: string;
+  };
+
+  if (!body.domain || !body.site_id) {
+    throw badRequest('domain and site_id are required');
+  }
+
+  // Verify site ownership
+  const site = await dbQueryOne<{ id: string; org_id: string }>(
+    c.env.DB,
+    'SELECT id, org_id FROM sites WHERE id = ? AND org_id = ? AND deleted_at IS NULL',
+    [body.site_id, orgId],
+  );
+  if (!site) throw notFound('Site not found');
+
+  // Create a Stripe checkout for domain subscription
+  const userId = c.get('userId') || '';
+  const user = await dbQueryOne<{ email: string }>(
+    c.env.DB,
+    'SELECT email FROM users WHERE id = ?',
+    [userId],
+  );
+
+  const stripeRes = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${btoa(c.env.STRIPE_SECRET_KEY + ':')}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      'mode': 'subscription',
+      'success_url': body.success_url,
+      'cancel_url': body.cancel_url,
+      'customer_email': user?.email || '',
+      'line_items[0][price_data][currency]': 'usd',
+      'line_items[0][price_data][recurring][interval]': 'year',
+      'line_items[0][price_data][unit_amount]': '1500', // $15/yr default
+      'line_items[0][price_data][product_data][name]': `Domain: ${body.domain}`,
+      'line_items[0][price_data][product_data][description]': `Annual domain registration for ${body.domain}`,
+      'line_items[0][quantity]': '1',
+      'metadata[org_id]': orgId,
+      'metadata[site_id]': body.site_id,
+      'metadata[domain]': body.domain,
+      'metadata[type]': 'domain_purchase',
+    }),
+  });
+
+  if (!stripeRes.ok) {
+    const errData = await stripeRes.text();
+    throw badRequest('Failed to create checkout: ' + errData);
+  }
+
+  const session = (await stripeRes.json()) as { url: string; id: string };
+
+  return c.json({
+    data: {
+      checkout_url: session.url,
+      session_id: session.id,
+    },
+  });
+});
+
 // ─── Contact Form Route ─────────────────────────────────────
 
 api.post('/api/contact', async (c) => {

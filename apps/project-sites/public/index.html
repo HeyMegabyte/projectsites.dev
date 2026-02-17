@@ -653,20 +653,28 @@
     .plan-badge.free { background: rgba(148, 163, 184, 0.15); color: #94a3b8; }
     .plan-badge.paid { background: rgba(100, 255, 218, 0.15); color: var(--accent); }
     .site-card-upgrade-btn {
-      padding: 3px 10px;
-      border-radius: 6px;
-      border: 1px solid var(--accent);
-      background: transparent;
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 2px solid var(--accent);
+      background: linear-gradient(135deg, rgba(80, 165, 219, 0.15), rgba(124, 58, 237, 0.1));
       color: var(--accent);
-      font-size: 0.65rem;
-      font-weight: 600;
+      font-size: 0.8rem;
+      font-weight: 700;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       white-space: nowrap;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      animation: upgradeGlow 2s ease-in-out infinite;
     }
     .site-card-upgrade-btn:hover {
-      background: rgba(80, 165, 219, 0.12);
-      box-shadow: 0 0 12px rgba(80, 165, 219, 0.2);
+      background: linear-gradient(135deg, rgba(80, 165, 219, 0.25), rgba(124, 58, 237, 0.2));
+      box-shadow: 0 0 20px rgba(80, 165, 219, 0.35), 0 0 40px rgba(80, 165, 219, 0.15);
+      transform: translateY(-1px);
+    }
+    @keyframes upgradeGlow {
+      0%, 100% { box-shadow: 0 0 8px rgba(80, 165, 219, 0.15); }
+      50% { box-shadow: 0 0 16px rgba(80, 165, 219, 0.3), 0 0 32px rgba(124, 58, 237, 0.1); }
     }
 
     .admin-site-count {
@@ -714,6 +722,263 @@
       .admin-panel-header { flex-direction: column; align-items: flex-start; }
       .admin-panel-actions { width: 100%; }
     }
+
+    /* ======================================================
+       Build Terminal (Waiting Screen)
+       ====================================================== */
+    .build-terminal {
+      margin-top: 28px;
+      background: #0d0d1f;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      text-align: left;
+      max-width: 480px;
+      width: 100%;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .build-terminal-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      background: rgba(255,255,255,0.03);
+      border-bottom: 1px solid var(--border);
+    }
+    .build-terminal-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .build-terminal-dot.red { background: #ef4444; }
+    .build-terminal-dot.yellow { background: #fbbf24; }
+    .build-terminal-dot.green { background: #22c55e; }
+    .build-terminal-title {
+      flex: 1;
+      text-align: center;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    }
+    .build-terminal-body {
+      padding: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 0.75rem;
+      line-height: 1.8;
+    }
+    .build-terminal-line {
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .build-terminal-line.active {
+      color: var(--accent);
+    }
+    .build-terminal-line.done {
+      color: var(--success);
+    }
+    .build-terminal-line.done::before {
+      content: '\2713 ';
+      color: var(--success);
+    }
+    .build-terminal-line.active::before {
+      content: '\25B6 ';
+      color: var(--accent);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    .build-terminal-line.pending {
+      color: var(--text-muted);
+      opacity: 0.5;
+    }
+    .build-terminal-line.pending::before {
+      content: '\25CB ';
+    }
+
+    /* ======================================================
+       Edit Site Modal
+       ====================================================== */
+    .edit-site-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .edit-site-row label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      width: 50px;
+      flex-shrink: 0;
+    }
+    .edit-site-row input {
+      flex: 1;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-size: 0.9rem;
+      font-family: var(--font);
+    }
+    .edit-site-row input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-dim);
+    }
+    .edit-site-note {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+      line-height: 1.5;
+      padding: 10px 12px;
+      background: rgba(251,191,36,0.06);
+      border: 1px solid rgba(251,191,36,0.15);
+      border-radius: 8px;
+    }
+
+    /* ======================================================
+       Deploy Modal
+       ====================================================== */
+    .deploy-upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 12px;
+    }
+    .deploy-upload-zone:hover {
+      border-color: var(--accent);
+      background: rgba(80,165,219,0.03);
+    }
+    .deploy-upload-zone.has-file {
+      border-color: var(--success);
+      background: rgba(34,197,94,0.04);
+    }
+    .deploy-file-name {
+      font-size: 0.85rem;
+      color: var(--success);
+      margin-top: 8px;
+      font-weight: 600;
+    }
+
+    /* ======================================================
+       Domain Search Results
+       ====================================================== */
+    .domain-search-wrap {
+      position: relative;
+      margin-bottom: 12px;
+    }
+    .domain-search-input {
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-size: 0.9rem;
+      font-family: var(--font);
+    }
+    .domain-search-input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .domain-search-results {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: var(--bg-card);
+      border: 1px solid var(--border-hover);
+      border-top: none;
+      border-radius: 0 0 var(--radius) var(--radius);
+      max-height: 250px;
+      overflow-y: auto;
+      z-index: 50;
+      display: none;
+      box-shadow: var(--shadow-lg);
+    }
+    .domain-search-results.open { display: block; }
+    .domain-result-item {
+      padding: 10px 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      transition: background 0.15s;
+    }
+    .domain-result-item:last-child { border-bottom: none; }
+    .domain-result-item:hover { background: var(--bg-card-hover); }
+    .domain-result-name {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .domain-result-price {
+      font-size: 0.8rem;
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .domain-result-unavailable {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+    .domain-tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .domain-tab {
+      flex: 1;
+      padding: 10px;
+      text-align: center;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: none;
+      border: none;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    .domain-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    .domain-tab:hover { color: var(--text-primary); }
+
+    /* ======================================================
+       Details Business Name Search
+       ====================================================== */
+    .details-biz-search-wrap {
+      position: relative;
+    }
+    .details-biz-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: var(--bg-card);
+      border: 1px solid var(--border-hover);
+      border-top: none;
+      border-radius: 0 0 var(--radius) var(--radius);
+      max-height: 280px;
+      overflow-y: auto;
+      z-index: 50;
+      display: none;
+      box-shadow: var(--shadow-lg);
+    }
+    .details-biz-dropdown.open { display: block; animation: fadeInScale 0.15s ease; }
 
     /* ======================================================
        Screens Container
@@ -2514,18 +2779,47 @@
 
   <!-- Domain Management Modal -->
   <div id="domain-modal" class="modal-overlay" onclick="if(event.target===this)closeDomainModal()">
-    <div class="modal">
+    <div class="modal" style="max-width:560px;">
       <div class="modal-title">
         <span id="domain-modal-title">Manage Domains</span>
         <button class="modal-close" onclick="closeDomainModal()">&times;</button>
       </div>
-      <div id="domain-modal-hostnames" class="hostname-list"></div>
-      <div id="domain-modal-msg" class="msg" style="margin-bottom:12px;"></div>
-      <div class="hostname-add-form">
-        <input type="text" id="domain-add-input" placeholder="e.g. www.mybusiness.com" />
-        <button onclick="addHostname()">Add Domain</button>
+
+      <!-- Tabs -->
+      <div class="domain-tabs">
+        <button class="domain-tab active" id="domain-tab-existing" onclick="switchDomainTab('existing')">Your Domains</button>
+        <button class="domain-tab" id="domain-tab-connect" onclick="switchDomainTab('connect')">Connect Domain</button>
+        <button class="domain-tab" id="domain-tab-register" onclick="switchDomainTab('register')">Register New</button>
       </div>
-      <p style="font-size:0.7rem;color:var(--text-muted);margin-top:10px;">Custom domains require a paid plan and a CNAME record pointing to <code>sites.megabyte.space</code>. Add the CNAME in your DNS provider first, then add the domain here.</p>
+
+      <!-- Tab: Existing Domains -->
+      <div id="domain-panel-existing">
+        <div id="domain-modal-hostnames" class="hostname-list"></div>
+      </div>
+
+      <!-- Tab: Connect Domain (CNAME) -->
+      <div id="domain-panel-connect" style="display:none;">
+        <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:12px;">Add a domain you already own. It must have a CNAME record pointing to <code>sites.megabyte.space</code>.</p>
+        <div class="hostname-add-form">
+          <input type="text" id="domain-add-input" placeholder="e.g. www.mybusiness.com" />
+          <button onclick="addHostname()">Add Domain</button>
+        </div>
+        <p style="font-size:0.7rem;color:var(--text-muted);margin-top:10px;">Custom domains require a paid plan. Add the CNAME record in your DNS provider first, then add the domain here.</p>
+      </div>
+
+      <!-- Tab: Register New Domain -->
+      <div id="domain-panel-register" style="display:none;">
+        <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:12px;">Search for an available domain to register. Domains are billed as a separate Stripe subscription at the Cloudflare wholesale price.</p>
+        <div class="domain-search-wrap">
+          <input type="text" id="domain-search-input" class="domain-search-input" placeholder="Search for a domain name..." autocomplete="off" />
+          <div id="domain-search-results" class="domain-search-results"></div>
+        </div>
+        <div id="domain-search-spinner" style="text-align:center;padding:12px;display:none;">
+          <span class="loading-dots"><span></span><span></span><span></span></span>
+        </div>
+      </div>
+
+      <div id="domain-modal-msg" class="msg" style="margin-top:12px;"></div>
     </div>
   </div>
 
@@ -2541,6 +2835,72 @@
         <button class="admin-btn" onclick="closeDeleteModal()">Cancel</button>
         <button class="admin-btn" style="border-color:var(--error);color:var(--error);" onclick="confirmDeleteSite()">Delete</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Edit Site Modal (Title / Slug) -->
+  <div id="edit-site-modal" class="modal-overlay" onclick="if(event.target===this)closeEditSiteModal()">
+    <div class="modal" style="max-width:480px;">
+      <div class="modal-title">
+        <span>Edit Website</span>
+        <button class="modal-close" onclick="closeEditSiteModal()">&times;</button>
+      </div>
+      <div class="edit-site-row">
+        <label for="edit-site-title">Title</label>
+        <input type="text" id="edit-site-title" placeholder="Website title" maxlength="200" />
+      </div>
+      <div class="edit-site-row">
+        <label for="edit-site-slug">Slug</label>
+        <input type="text" id="edit-site-slug" placeholder="url-friendly-slug" maxlength="100" />
+      </div>
+      <div class="edit-site-note">
+        <strong>Note:</strong> Changing the title here will only update the dashboard display name. It will not change the title on the live website unless you do a full <strong>Reset</strong> or manually update it using the bolt.diy <strong>Edit</strong> feature. Changing the slug will update the subdomain URL (slug-sites.megabyte.space).
+      </div>
+      <div id="edit-site-msg" class="msg" style="margin-bottom:12px;"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button class="admin-btn" onclick="closeEditSiteModal()">Cancel</button>
+        <button class="admin-btn admin-btn-accent" id="edit-site-save-btn" onclick="saveEditSite()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Deploy Modal (Upload ZIP / JSON) -->
+  <div id="deploy-modal" class="modal-overlay" onclick="if(event.target===this)closeDeployModal()">
+    <div class="modal" style="max-width:520px;">
+      <div class="modal-title">
+        <span id="deploy-modal-title">Deploy to Site</span>
+        <button class="modal-close" onclick="closeDeployModal()">&times;</button>
+      </div>
+      <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:16px;">Upload your built site files. The ZIP will be extracted and deployed to your site's R2 storage.</p>
+
+      <div class="input-group">
+        <label>ZIP File <span style="color:var(--accent);">*</span></label>
+        <div class="deploy-upload-zone" id="deploy-zip-zone" onclick="document.getElementById('deploy-zip-input').click()">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <div style="font-size:0.85rem;color:var(--text-muted);margin-top:8px;">Click to select or drag & drop a ZIP file</div>
+          <div id="deploy-zip-name" class="deploy-file-name" style="display:none;"></div>
+        </div>
+        <input type="file" id="deploy-zip-input" accept=".zip" style="display:none;" onchange="handleDeployZipSelect(this)" />
+      </div>
+
+      <div class="input-group">
+        <label>Chat JSON <span style="color:var(--text-muted);">(optional)</span></label>
+        <div class="deploy-upload-zone" id="deploy-json-zone" onclick="document.getElementById('deploy-json-input').click()" style="padding:16px;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <div style="font-size:0.8rem;color:var(--text-muted);margin-top:4px;">Bolt.diy chat export (enables restore)</div>
+          <div id="deploy-json-name" class="deploy-file-name" style="display:none;"></div>
+        </div>
+        <input type="file" id="deploy-json-input" accept=".json" style="display:none;" onchange="handleDeployJsonSelect(this)" />
+      </div>
+
+      <div class="edit-site-row">
+        <label for="deploy-dist-path" style="width:70px;">Dist Dir</label>
+        <input type="text" id="deploy-dist-path" value="dist/" placeholder="dist/" />
+      </div>
+      <p style="font-size:0.72rem;color:var(--text-muted);margin-bottom:16px;">The directory inside the ZIP to sync files from. Usually <code>dist/</code> for Vite builds.</p>
+
+      <div id="deploy-msg" class="msg" style="margin-bottom:12px;"></div>
+      <button class="btn btn-accent btn-full" id="deploy-submit-btn" onclick="submitDeploy()">Deploy</button>
     </div>
   </div>
 
@@ -2571,14 +2931,17 @@
 
       <!-- Manual business info (shown when no business selected from search) -->
       <div id="details-manual-fields" style="display:none;">
-        <div class="input-group">
+        <div class="input-group details-biz-search-wrap">
           <label for="business-name-input">Business Name <span style="color:var(--accent);">*</span></label>
-          <input type="text" id="business-name-input" class="input-field" placeholder="e.g. Vito's Men's Salon" maxlength="200" required />
+          <input type="text" id="business-name-input" class="input-field" placeholder="e.g. Vito's Men's Salon &mdash; search to find your business" maxlength="200" required autocomplete="off" />
+          <div id="details-biz-dropdown" class="details-biz-dropdown"></div>
+          <p style="font-size:0.7rem;color:var(--text-muted);margin-top:4px;">Search for your business to auto-fill, or type a custom name.</p>
         </div>
         <div class="input-group" style="position:relative;">
-          <label for="business-address-input">Business Address <span style="color:var(--accent);">*</span></label>
-          <input type="text" id="business-address-input" class="input-field" placeholder="Start typing an address..." maxlength="500" autocomplete="off" required />
+          <label for="business-address-input">Business Address</label>
+          <input type="text" id="business-address-input" class="input-field" placeholder="Start typing an address..." maxlength="500" autocomplete="off" />
           <div id="address-dropdown" class="address-dropdown"></div>
+          <p style="font-size:0.7rem;color:var(--text-muted);margin-top:4px;">Select a suggestion or enter a custom address.</p>
         </div>
       </div>
 
@@ -3058,6 +3421,19 @@
           <span>Build in progress</span>
           <span class="loading-dots"><span></span><span></span><span></span></span>
         </div>
+
+        <!-- Build Progress Terminal -->
+        <div class="build-terminal" id="build-terminal">
+          <div class="build-terminal-header">
+            <div class="build-terminal-dot red"></div>
+            <div class="build-terminal-dot yellow"></div>
+            <div class="build-terminal-dot green"></div>
+            <span class="build-terminal-title">build-progress</span>
+          </div>
+          <div class="build-terminal-body" id="build-terminal-body">
+            <div class="build-terminal-line active">Initializing build pipeline...</div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -3112,8 +3488,8 @@
         </a>
       </div>
       <div class="footer-bottom">
-        <span>&copy; 2026 Megabyte LLC</span>
-        <span>Powered by <a href="https://megabyte.space" target="_blank" rel="noopener noreferrer">Megabyte Labs</a> | <a href="https://megabyte.space/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a> | <a href="https://megabyte.space/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a> | <a href="https://megabyte.space/content" target="_blank" rel="noopener noreferrer">Content Policy</a></span>
+        <span>&copy; 2026 <a href="https://megabyte.space" target="_blank" rel="noopener noreferrer">Megabyte LLC</a></span>
+        <span><a href="https://megabyte.space/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a> | <a href="https://megabyte.space/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a> | <a href="https://megabyte.space/content" target="_blank" rel="noopener noreferrer">Content Policy</a></span>
       </div>
     </div>
   </footer>
@@ -3310,7 +3686,7 @@
           html += '<div class="site-card-date">Created ' + created + '</div>';
         }
 
-        // Action buttons
+        // Action buttons - Row 1 (primary actions)
         html += '<div class="site-card-actions">';
         if (status === 'published' && siteUrl) {
           html += '<button class="site-card-btn" onclick="window.open(\'' + escapeHtml(siteUrl) + '\', \'_blank\')">Visit</button>';
@@ -3320,9 +3696,15 @@
         if (status === 'published' && slug) {
           html += '<button class="site-card-btn" onclick="editSiteInBolt(\'' + escapeHtml(slug) + '\')">Edit</button>';
         }
+        html += '<button class="site-card-btn" onclick="openEditSiteModal(\'' + escapeHtml(s.id) + '\', \'' + escapeHtml(name) + '\', \'' + escapeHtml(slug) + '\')">Rename</button>';
+        html += '</div>';
+        // Action buttons - Row 2 (management)
+        html += '<div class="site-card-actions">';
         if (sitePlan === 'paid') {
           html += '<button class="site-card-btn" onclick="openDomainModal(\'' + escapeHtml(s.id) + '\', \'' + escapeHtml(name) + '\')">Domains</button>';
         }
+        html += '<button class="site-card-btn" onclick="openResetModal(\'' + escapeHtml(s.id) + '\', \'' + escapeHtml(name) + '\', \'' + escapeHtml(s.business_address || '') + '\', \'' + escapeHtml(s.google_place_id || '') + '\', \'' + escapeHtml(s.additional_context || '') + '\')">Reset</button>';
+        html += '<button class="site-card-btn" onclick="openDeployModal(\'' + escapeHtml(s.id) + '\', \'' + escapeHtml(name) + '\')">Deploy</button>';
         html += '<button class="site-card-btn danger" onclick="openDeleteModal(\'' + escapeHtml(s.id) + '\', \'' + escapeHtml(name) + '\')">Delete</button>';
         html += '</div>';
         html += '</div>';
@@ -3847,6 +4229,7 @@
     var searchDebounceTimer = null;
     var pollTimer = null;
     var uppyInstance = null;
+    var resetSiteId = null;
 
     /** Redirect helper - stubbable in E2E tests */
     function redirectTo(url) {
@@ -3887,6 +4270,10 @@
     function closeDetailsModal() {
       var modal = document.getElementById('details-modal');
       if (modal) modal.classList.remove('visible');
+      // Reset the build button text and reset mode
+      var buildBtn = document.getElementById('build-btn');
+      if (buildBtn) buildBtn.textContent = 'Build My Website';
+      resetSiteId = null;
     }
 
     function render() {
@@ -4278,6 +4665,9 @@
       }
       if (screen === 'waiting') {
         updateWaitingScreen();
+        startBuildTerminal();
+      } else {
+        stopBuildTerminal();
       }
       origNavigateTo(screen);
     };
@@ -4977,6 +5367,560 @@
           btn.textContent = 'Send Message';
           showMsg('contact-msg', 'error', err.message || 'Failed to send message. Please try again.');
         });
+    }
+
+    /* ===========================================================
+       Edit Site Modal (Title / Slug)
+       =========================================================== */
+    var editSiteModalId = null;
+
+    function openEditSiteModal(siteId, currentName, currentSlug) {
+      editSiteModalId = siteId;
+      document.getElementById('edit-site-title').value = currentName || '';
+      document.getElementById('edit-site-slug').value = currentSlug || '';
+      hideMsg('edit-site-msg');
+      document.getElementById('edit-site-modal').classList.add('visible');
+    }
+
+    function closeEditSiteModal() {
+      document.getElementById('edit-site-modal').classList.remove('visible');
+      editSiteModalId = null;
+    }
+
+    function saveEditSite() {
+      if (!editSiteModalId || !state.session || !state.session.token) return;
+
+      var title = document.getElementById('edit-site-title').value.trim();
+      var slug = document.getElementById('edit-site-slug').value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/--+/g, '-').replace(/^-|-$/g, '');
+
+      if (!title) {
+        showMsg('edit-site-msg', 'error', 'Title is required.');
+        return;
+      }
+
+      var btn = document.getElementById('edit-site-save-btn');
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+
+      fetch('/api/sites/' + editSiteModalId, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + state.session.token
+        },
+        body: JSON.stringify({ business_name: title, slug: slug || undefined })
+      })
+        .then(function(res) {
+          if (!res.ok) return res.json().then(function(d) { throw new Error(extractErrorMsg(d, 'Failed to update')); });
+          return res.json();
+        })
+        .then(function() {
+          btn.disabled = false;
+          btn.textContent = 'Save Changes';
+          closeEditSiteModal();
+          loadAdminDashboard();
+        })
+        .catch(function(err) {
+          btn.disabled = false;
+          btn.textContent = 'Save Changes';
+          showMsg('edit-site-msg', 'error', err.message || 'Failed to save changes.');
+        });
+    }
+
+    /* ===========================================================
+       Reset Modal (Re-crawl & Rebuild)
+       =========================================================== */
+
+    function openResetModal(siteId, name, address, placeId, context) {
+      resetSiteId = siteId;
+
+      // Pre-populate the details modal with existing data
+      state.mode = name ? 'business' : 'custom';
+
+      if (name && placeId) {
+        state.selectedBusiness = { name: name, address: address || '', place_id: placeId };
+      } else if (name) {
+        state.selectedBusiness = null;
+        state.mode = 'custom';
+      }
+
+      // Pre-populate manual fields
+      var nameInput = document.getElementById('business-name-input');
+      var addrInput = document.getElementById('business-address-input');
+      if (nameInput) nameInput.value = name || '';
+      if (addrInput) addrInput.value = address || '';
+
+      var textarea = document.getElementById('details-textarea');
+      if (textarea && context) textarea.value = context;
+
+      // Update the details modal title and button
+      updateDetailsScreen();
+      var titleEl = document.getElementById('details-title');
+      if (titleEl) titleEl.textContent = 'Reset & Rebuild Website';
+      var subtitleEl = document.getElementById('details-subtitle');
+      if (subtitleEl) subtitleEl.textContent = 'Review and update the business information. The current site files will be replaced with a fresh build.';
+      var buildBtn = document.getElementById('build-btn');
+      if (buildBtn) buildBtn.textContent = 'Reset & Rebuild';
+
+      openDetailsModal();
+    }
+
+    // Override submitBuild to handle reset mode
+    var origSubmitBuild = submitBuild;
+    submitBuild = function() {
+      if (resetSiteId) {
+        submitReset();
+        return;
+      }
+      origSubmitBuild();
+    };
+
+    function submitReset() {
+      if (!state.session || !state.session.token || !resetSiteId) return;
+
+      var rawContext = document.getElementById('details-textarea').value.trim();
+      var additionalContext = rawContext.replace(/<[^>]*>/g, '').slice(0, 5000);
+      var btn = document.getElementById('build-btn');
+
+      btn.disabled = true;
+      btn.innerHTML = 'Resetting <span class="loading-dots"><span></span><span></span><span></span></span>';
+      hideMsg('build-msg');
+
+      var payload = { additional_context: additionalContext };
+
+      if (state.selectedBusiness) {
+        payload.business = {
+          name: state.selectedBusiness.name || state.selectedBusiness.business_name,
+          address: state.selectedBusiness.address || state.selectedBusiness.formatted_address || '',
+          place_id: state.selectedBusiness.place_id || ''
+        };
+      } else {
+        var manualName = document.getElementById('business-name-input').value.trim();
+        var manualAddr = document.getElementById('business-address-input').value.trim();
+        if (!manualName) {
+          showMsg('build-msg', 'error', 'Please enter your business name.');
+          btn.disabled = false;
+          btn.textContent = 'Reset & Rebuild';
+          return;
+        }
+        payload.business = { name: manualName, address: manualAddr };
+      }
+
+      fetch('/api/sites/' + resetSiteId + '/reset', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + state.session.token
+        },
+        body: JSON.stringify(payload)
+      })
+        .then(function(res) {
+          if (!res.ok) return res.json().then(function(d) { throw new Error(extractErrorMsg(d, 'Failed to reset')); });
+          return res.json();
+        })
+        .then(function(resp) {
+          btn.disabled = false;
+          btn.textContent = 'Reset & Rebuild';
+          var data = resp.data || resp;
+          state.siteId = data.site_id || data.id || resetSiteId;
+          state.slug = data.slug || '';
+          resetSiteId = null;
+          closeDetailsModal();
+          navigateTo('waiting');
+          loadAdminDashboard();
+        })
+        .catch(function(err) {
+          btn.disabled = false;
+          btn.textContent = 'Reset & Rebuild';
+          showMsg('build-msg', 'error', err.message || 'Failed to reset site.');
+        });
+    }
+
+    /* ===========================================================
+       Deploy Modal (ZIP / JSON Upload)
+       =========================================================== */
+    var deploySiteId = null;
+    var deployZipFile = null;
+    var deployJsonFile = null;
+
+    function openDeployModal(siteId, siteName) {
+      deploySiteId = siteId;
+      deployZipFile = null;
+      deployJsonFile = null;
+      document.getElementById('deploy-modal-title').textContent = 'Deploy: ' + siteName;
+      document.getElementById('deploy-zip-name').style.display = 'none';
+      document.getElementById('deploy-json-name').style.display = 'none';
+      document.getElementById('deploy-zip-zone').classList.remove('has-file');
+      document.getElementById('deploy-json-zone').classList.remove('has-file');
+      document.getElementById('deploy-zip-input').value = '';
+      document.getElementById('deploy-json-input').value = '';
+      document.getElementById('deploy-dist-path').value = 'dist/';
+      hideMsg('deploy-msg');
+      document.getElementById('deploy-modal').classList.add('visible');
+    }
+
+    function closeDeployModal() {
+      document.getElementById('deploy-modal').classList.remove('visible');
+      deploySiteId = null;
+    }
+
+    function handleDeployZipSelect(input) {
+      if (input.files && input.files[0]) {
+        deployZipFile = input.files[0];
+        var nameEl = document.getElementById('deploy-zip-name');
+        nameEl.textContent = deployZipFile.name + ' (' + (deployZipFile.size / 1024 / 1024).toFixed(2) + ' MB)';
+        nameEl.style.display = 'block';
+        document.getElementById('deploy-zip-zone').classList.add('has-file');
+      }
+    }
+
+    function handleDeployJsonSelect(input) {
+      if (input.files && input.files[0]) {
+        deployJsonFile = input.files[0];
+        var nameEl = document.getElementById('deploy-json-name');
+        nameEl.textContent = deployJsonFile.name;
+        nameEl.style.display = 'block';
+        document.getElementById('deploy-json-zone').classList.add('has-file');
+      }
+    }
+
+    function submitDeploy() {
+      if (!deploySiteId || !state.session || !state.session.token) return;
+      if (!deployZipFile) {
+        showMsg('deploy-msg', 'error', 'Please select a ZIP file.');
+        return;
+      }
+
+      var distPath = document.getElementById('deploy-dist-path').value.trim() || 'dist/';
+      var btn = document.getElementById('deploy-submit-btn');
+      btn.disabled = true;
+      btn.innerHTML = 'Deploying <span class="loading-dots"><span></span><span></span><span></span></span>';
+      hideMsg('deploy-msg');
+
+      var formData = new FormData();
+      formData.append('zip', deployZipFile);
+      if (deployJsonFile) formData.append('chat', deployJsonFile);
+      formData.append('dist_path', distPath);
+
+      fetch('/api/sites/' + deploySiteId + '/deploy', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + state.session.token
+        },
+        body: formData
+      })
+        .then(function(res) {
+          if (!res.ok) return res.json().then(function(d) { throw new Error(extractErrorMsg(d, 'Deploy failed')); });
+          return res.json();
+        })
+        .then(function() {
+          btn.disabled = false;
+          btn.textContent = 'Deploy';
+          showMsg('deploy-msg', 'success', 'Site deployed successfully!');
+          setTimeout(function() {
+            closeDeployModal();
+            loadAdminDashboard();
+          }, 1500);
+        })
+        .catch(function(err) {
+          btn.disabled = false;
+          btn.textContent = 'Deploy';
+          showMsg('deploy-msg', 'error', err.message || 'Deploy failed.');
+        });
+    }
+
+    /* ===========================================================
+       Enhanced Domain Modal (Tabs + Search + Purchase)
+       =========================================================== */
+    function switchDomainTab(tab) {
+      var tabs = ['existing', 'connect', 'register'];
+      for (var i = 0; i < tabs.length; i++) {
+        var tabBtn = document.getElementById('domain-tab-' + tabs[i]);
+        var panel = document.getElementById('domain-panel-' + tabs[i]);
+        if (tabs[i] === tab) {
+          if (tabBtn) tabBtn.classList.add('active');
+          if (panel) panel.style.display = '';
+        } else {
+          if (tabBtn) tabBtn.classList.remove('active');
+          if (panel) panel.style.display = 'none';
+        }
+      }
+      hideMsg('domain-modal-msg');
+    }
+
+    // Domain search for registration
+    var domainSearchTimer = null;
+    var domainSearchInput = document.getElementById('domain-search-input');
+    if (domainSearchInput) {
+      domainSearchInput.addEventListener('input', function() {
+        var q = domainSearchInput.value.trim();
+        clearTimeout(domainSearchTimer);
+        if (q.length < 3) {
+          closeDomainSearchResults();
+          return;
+        }
+        document.getElementById('domain-search-spinner').style.display = '';
+        domainSearchTimer = setTimeout(function() {
+          searchDomains(q);
+        }, 500);
+      });
+    }
+
+    function searchDomains(query) {
+      // Clean up the query - remove protocol and paths
+      query = query.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
+
+      fetch('/api/domains/search?q=' + encodeURIComponent(query), {
+        headers: state.session && state.session.token ? { 'Authorization': 'Bearer ' + state.session.token } : {}
+      })
+        .then(function(res) { return res.json(); })
+        .then(function(d) {
+          document.getElementById('domain-search-spinner').style.display = 'none';
+          var results = d.data || [];
+          renderDomainSearchResults(results);
+        })
+        .catch(function() {
+          document.getElementById('domain-search-spinner').style.display = 'none';
+          closeDomainSearchResults();
+        });
+    }
+
+    function renderDomainSearchResults(results) {
+      var container = document.getElementById('domain-search-results');
+      if (!results.length) {
+        container.innerHTML = '<div style="padding:12px;color:var(--text-muted);font-size:0.85rem;text-align:center;">No domains found. Try a different name.</div>';
+        container.classList.add('open');
+        return;
+      }
+
+      var html = '';
+      for (var i = 0; i < results.length; i++) {
+        var r = results[i];
+        if (r.available) {
+          html += '<div class="domain-result-item" onclick="selectDomainForPurchase(\'' + escapeHtml(r.domain) + '\', ' + (r.price || 0) + ')">';
+          html += '<div>';
+          html += '<div class="domain-result-name">' + escapeHtml(r.domain) + '</div>';
+          html += '</div>';
+          html += '<div class="domain-result-price">$' + ((r.price || 0) / 100).toFixed(2) + '/yr</div>';
+          html += '</div>';
+        } else {
+          html += '<div class="domain-result-item" style="opacity:0.5;cursor:default;">';
+          html += '<div class="domain-result-name">' + escapeHtml(r.domain) + '</div>';
+          html += '<div class="domain-result-unavailable">Taken</div>';
+          html += '</div>';
+        }
+      }
+      container.innerHTML = html;
+      container.classList.add('open');
+    }
+
+    function closeDomainSearchResults() {
+      var el = document.getElementById('domain-search-results');
+      if (el) el.classList.remove('open');
+    }
+
+    function selectDomainForPurchase(domain, priceCents) {
+      closeDomainSearchResults();
+      if (!adminDomainModalSiteId || !state.session || !state.session.token) return;
+
+      var priceStr = '$' + (priceCents / 100).toFixed(2) + '/yr';
+      if (!confirm('Register ' + domain + ' for ' + priceStr + '?\n\nThis will be billed as a separate Stripe subscription.')) return;
+
+      showMsg('domain-modal-msg', 'info', 'Starting domain purchase for ' + domain + '...');
+
+      fetch('/api/domains/purchase', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + state.session.token
+        },
+        body: JSON.stringify({
+          domain: domain,
+          site_id: adminDomainModalSiteId,
+          success_url: window.location.origin + '/?domain_purchase=success',
+          cancel_url: window.location.origin + '/?domain_purchase=cancel'
+        })
+      })
+        .then(function(res) {
+          if (!res.ok) return res.json().then(function(d) { throw new Error(extractErrorMsg(d, 'Purchase failed')); });
+          return res.json();
+        })
+        .then(function(d) {
+          if (d.data && d.data.checkout_url) {
+            window.location.href = d.data.checkout_url;
+          } else {
+            showMsg('domain-modal-msg', 'success', 'Domain ' + domain + ' registered and added!');
+            loadHostnames(adminDomainModalSiteId);
+          }
+        })
+        .catch(function(err) {
+          showMsg('domain-modal-msg', 'error', err.message || 'Failed to purchase domain.');
+        });
+    }
+
+    /* ===========================================================
+       Build Terminal (Progress Messages)
+       =========================================================== */
+    var buildSteps = [
+      'Initializing build pipeline...',
+      'Researching business information...',
+      'Crawling public data sources...',
+      'Analyzing business category and services...',
+      'Generating website content with AI...',
+      'Creating page layouts and sections...',
+      'Designing responsive UI components...',
+      'Optimizing images and assets...',
+      'Building SEO metadata and schema...',
+      'Compiling and bundling static files...',
+      'Uploading to CDN edge network...',
+      'Configuring SSL and custom domain...',
+      'Running final quality checks...',
+      'Publishing your website!'
+    ];
+    var currentBuildStep = 0;
+    var buildTerminalTimer = null;
+
+    function startBuildTerminal() {
+      currentBuildStep = 0;
+      var body = document.getElementById('build-terminal-body');
+      if (!body) return;
+      body.innerHTML = '<div class="build-terminal-line active">' + buildSteps[0] + '</div>';
+      for (var i = 1; i < buildSteps.length; i++) {
+        body.innerHTML += '<div class="build-terminal-line pending">' + buildSteps[i] + '</div>';
+      }
+
+      clearInterval(buildTerminalTimer);
+      buildTerminalTimer = setInterval(function() {
+        advanceBuildStep();
+      }, 8000 + Math.random() * 7000); // 8-15s per step for realism
+    }
+
+    function advanceBuildStep() {
+      var body = document.getElementById('build-terminal-body');
+      if (!body) return;
+      var lines = body.querySelectorAll('.build-terminal-line');
+      if (currentBuildStep < lines.length) {
+        lines[currentBuildStep].classList.remove('active');
+        lines[currentBuildStep].classList.add('done');
+      }
+      currentBuildStep++;
+      if (currentBuildStep < lines.length) {
+        lines[currentBuildStep].classList.remove('pending');
+        lines[currentBuildStep].classList.add('active');
+        // Auto-scroll
+        lines[currentBuildStep].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } else {
+        // All done - stop timer
+        clearInterval(buildTerminalTimer);
+      }
+    }
+
+    function stopBuildTerminal() {
+      clearInterval(buildTerminalTimer);
+    }
+
+    /* ===========================================================
+       Details Modal: Business Name Live Search
+       =========================================================== */
+    var detailsBizSearchTimer = null;
+    var detailsBizNameInput = document.getElementById('business-name-input');
+    var detailsBizDropdown = document.getElementById('details-biz-dropdown');
+
+    if (detailsBizNameInput) {
+      detailsBizNameInput.addEventListener('input', function() {
+        var q = detailsBizNameInput.value.trim();
+        clearTimeout(detailsBizSearchTimer);
+        if (q.length < 2) {
+          closeDetailsBizDropdown();
+          return;
+        }
+        detailsBizSearchTimer = setTimeout(function() {
+          fetchDetailsBizResults(q);
+        }, 300);
+      });
+
+      detailsBizNameInput.addEventListener('focus', function() {
+        if (detailsBizNameInput.value.trim().length >= 2 && detailsBizDropdown.children.length > 0) {
+          detailsBizDropdown.classList.add('open');
+        }
+      });
+
+      document.addEventListener('click', function(e) {
+        if (!e.target.closest('.details-biz-search-wrap')) {
+          closeDetailsBizDropdown();
+        }
+      });
+    }
+
+    function fetchDetailsBizResults(query) {
+      var searchUrl = '/api/search/businesses?q=' + encodeURIComponent(query);
+      if (state.userLat !== null && state.userLng !== null) {
+        searchUrl += '&lat=' + state.userLat + '&lng=' + state.userLng;
+      }
+
+      fetch(searchUrl)
+        .then(function(res) { return res.json(); })
+        .then(function(d) {
+          var items = d.data || [];
+          renderDetailsBizDropdown(items);
+        })
+        .catch(function() {
+          closeDetailsBizDropdown();
+        });
+    }
+
+    function renderDetailsBizDropdown(items) {
+      if (!items.length) {
+        closeDetailsBizDropdown();
+        return;
+      }
+
+      var html = '';
+      for (var i = 0; i < items.length; i++) {
+        var item = items[i];
+        var dist = '';
+        if (state.userLat !== null && item.lat != null && item.lng != null) {
+          var km = haversineKm(state.userLat, state.userLng, item.lat, item.lng);
+          dist = ' <span style="color:var(--text-muted);font-size:0.75rem;">' + formatDistance(km) + '</span>';
+        }
+        html += '<div class="search-result" onclick="selectDetailsBusiness(' + i + ')" style="padding:10px 16px;">';
+        html += '<div class="search-result-icon" style="width:32px;height:32px;">';
+        html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;">';
+        html += '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>';
+        html += '</svg></div>';
+        html += '<div class="search-result-text">';
+        html += '<div class="search-result-name" style="font-size:0.88rem;">' + escapeHtml(item.name || '') + dist + '</div>';
+        html += '<div class="search-result-address" style="font-size:0.78rem;">' + escapeHtml(item.address || item.formatted_address || '') + '</div>';
+        html += '</div></div>';
+      }
+      detailsBizDropdown.innerHTML = html;
+      detailsBizDropdown._items = items;
+      detailsBizDropdown.classList.add('open');
+    }
+
+    function selectDetailsBusiness(index) {
+      var items = detailsBizDropdown._items || [];
+      var biz = items[index];
+      if (!biz) return;
+
+      // Set as selected business and switch to badge mode
+      state.selectedBusiness = biz;
+      state.mode = 'business';
+
+      // Update the details screen
+      document.getElementById('badge-biz-name').textContent = biz.name || '';
+      document.getElementById('badge-biz-addr').textContent = biz.address || biz.formatted_address || '';
+      document.getElementById('details-business-badge').style.display = 'flex';
+      document.getElementById('details-manual-fields').style.display = 'none';
+
+      var titleEl = document.getElementById('details-title');
+      if (titleEl && !resetSiteId) titleEl.textContent = 'Tell us more about your business';
+
+      closeDetailsBizDropdown();
+    }
+
+    function closeDetailsBizDropdown() {
+      if (detailsBizDropdown) detailsBizDropdown.classList.remove('open');
     }
 
     /* ===========================================================
