@@ -642,10 +642,12 @@
       gap: 8px;
     }
     .plan-badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-size: 0.65rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 0.8rem;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.04em;
@@ -733,7 +735,8 @@
       border-radius: var(--radius);
       overflow: hidden;
       text-align: left;
-      max-width: 480px;
+      min-width: 500px;
+      max-width: 600px;
       width: 100%;
       margin-left: auto;
       margin-right: auto;
@@ -784,11 +787,13 @@
     .build-terminal-line.done::before {
       content: '\2713 ';
       color: var(--success);
+      margin-right: 14px;
     }
     .build-terminal-line.active::before {
       content: '\25B6 ';
       color: var(--accent);
       animation: pulse 1.5s ease-in-out infinite;
+      margin-right: 14px;
     }
     .build-terminal-line.pending {
       color: var(--text-muted);
@@ -796,6 +801,7 @@
     }
     .build-terminal-line.pending::before {
       content: '\25CB ';
+      margin-right: 14px;
     }
 
     /* ======================================================
@@ -962,6 +968,7 @@
        ====================================================== */
     .details-biz-search-wrap {
       position: relative;
+      z-index: 999;
     }
     .details-biz-dropdown {
       position: absolute;
@@ -974,9 +981,12 @@
       border-radius: 0 0 var(--radius) var(--radius);
       max-height: 280px;
       overflow-y: auto;
-      z-index: 50;
+      z-index: 999;
       display: none;
       box-shadow: var(--shadow-lg);
+    }
+    .details-biz-dropdown .search-result {
+      padding: 12px 16px;
     }
     .details-biz-dropdown.open { display: block; animation: fadeInScale 0.15s ease; }
 
@@ -1568,7 +1578,7 @@
       top: 0; left: 0; right: 0; bottom: 0;
       background: rgba(0, 0, 0, 0.75);
       z-index: 2000;
-      align-items: center;
+      align-items: flex-start;
       justify-content: center;
       animation: fadeIn 0.15s ease;
       overflow-y: auto;
@@ -1593,13 +1603,14 @@
     .details-card {
       width: 100%;
       max-width: 600px;
-      margin: 0 auto;
+      margin: 20px auto;
       background: var(--bg-card);
       border: 1px solid var(--border);
       border-radius: var(--radius-lg);
       padding: 36px 32px;
       animation: fadeInScale 0.35s ease;
       position: relative;
+      flex-shrink: 0;
     }
     .details-card h2 {
       font-size: 1.4rem;
@@ -1665,9 +1676,14 @@
     }
 
     /* ── Address Autocomplete Dropdown ────────── */
+    #business-address-input {
+      position: relative;
+      z-index: 999;
+    }
     .address-dropdown {
       position: absolute;
-      top: 100%;
+      padding-top: 20px;
+      top: 60px;
       left: 0;
       right: 0;
       background: var(--bg-card);
@@ -1676,7 +1692,7 @@
       border-radius: 0 0 var(--radius) var(--radius);
       max-height: 280px;
       overflow-y: auto;
-      z-index: 50;
+      z-index: 999;
       display: none;
       box-shadow: var(--shadow-lg);
     }
@@ -1733,6 +1749,81 @@
     #uppy-dashboard-area {
       border-radius: var(--radius);
       overflow: hidden;
+    }
+
+    /* ── Improve with AI overlay ────────── */
+    .improve-ai-link {
+      font-size: 0.78rem;
+      color: var(--accent);
+      cursor: pointer;
+      font-weight: 600;
+      margin-left: 8px;
+      transition: color 0.2s;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .improve-ai-link:hover { color: #7c3aed; }
+    .improve-ai-overlay {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(10, 10, 26, 0.85);
+      border-radius: var(--radius);
+      z-index: 10;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .improve-ai-overlay.visible { display: flex; }
+    .improve-ai-spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    .improve-ai-text {
+      font-size: 0.85rem;
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    /* ── Premium domain badge ────────── */
+    .premium-domain-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: linear-gradient(135deg, rgba(124,58,237,0.15), rgba(80,165,219,0.15));
+      border: 1px solid rgba(124,58,237,0.25);
+      color: #c4b5fd;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .premium-domain-badge svg { width: 10px; height: 10px; }
+
+    /* ── Unsubscribe domain warning modal ────────── */
+    .domain-unsub-warning {
+      background: rgba(239, 68, 68, 0.08);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 0.82rem;
+      color: var(--error);
+      margin-top: 8px;
+      line-height: 1.5;
+    }
+
+    /* ── Responsive terminal fix ────────── */
+    @media (max-width: 620px) {
+      .build-terminal { min-width: auto; max-width: 100%; }
     }
 
     /* Uppy dark theme overrides */
@@ -1975,7 +2066,14 @@
       border: 1px solid var(--border);
       border-radius: var(--radius-lg);
       transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+      opacity: 0;
+      transform: translateY(30px);
     }
+    .step-card.animate-in {
+      animation: fadeInUp 0.6s ease forwards;
+    }
+    .step-card:nth-child(2).animate-in { animation-delay: 0.15s; }
+    .step-card:nth-child(3).animate-in { animation-delay: 0.3s; }
     .step-card:hover {
       transform: translateY(-4px);
       border-color: var(--border-hover);
@@ -2019,7 +2117,14 @@
       border: 1px solid var(--border);
       border-radius: var(--radius-lg);
       transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+      opacity: 0;
+      transform: translateY(30px);
     }
+    .feature-card.animate-in {
+      animation: fadeInUp 0.6s ease forwards;
+    }
+    .feature-card:nth-child(2).animate-in { animation-delay: 0.15s; }
+    .feature-card:nth-child(3).animate-in { animation-delay: 0.3s; }
     .feature-card:hover {
       transform: translateY(-3px);
       border-color: var(--border-hover);
@@ -2114,6 +2219,12 @@
       border-radius: var(--radius-lg);
       padding: 48px 36px;
       box-shadow: var(--shadow-accent);
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    .pricing-card.animate-in {
+      animation: fadeInUp 0.6s ease forwards;
+      animation-delay: 0.15s;
     }
     .pricing-card .plan-label {
       display: inline-block;
@@ -2431,6 +2542,19 @@
       border-radius: var(--radius-lg);
       padding: 32px 24px;
       text-align: center;
+      transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    .handled-card.animate-in {
+      animation: fadeInUp 0.6s ease forwards;
+    }
+    .handled-card:nth-child(2).animate-in { animation-delay: 0.15s; }
+    .handled-card:nth-child(3).animate-in { animation-delay: 0.3s; }
+    .handled-card:hover {
+      transform: translateY(-3px);
+      border-color: var(--border-hover);
+      box-shadow: var(--shadow-accent);
     }
     .handled-card .handled-icon {
       width: 56px;
@@ -2481,7 +2605,14 @@
       background: var(--bg-card);
       border-radius: var(--radius-lg);
       overflow: hidden;
+      opacity: 0;
+      transform: translateY(30px);
+      transition: transform var(--transition), box-shadow var(--transition);
     }
+    .dvd-column.animate-in {
+      animation: fadeInUp 0.6s ease forwards;
+    }
+    .dvd-column:nth-child(2).animate-in { animation-delay: 0.15s; }
     .dvd-column.dvd-highlight {
       border: 2px solid var(--accent);
       box-shadow: var(--shadow-accent);
@@ -2537,6 +2668,11 @@
     }
     .faq-item {
       border-bottom: 1px solid var(--border);
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    .faq-item.animate-in {
+      animation: fadeInUp 0.4s ease forwards;
     }
     .faq-question {
       width: 100%;
@@ -2646,6 +2782,11 @@
       text-align: center;
       position: relative;
       overflow: hidden;
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    .pricing-card-free.animate-in {
+      animation: fadeInUp 0.6s ease forwards;
     }
     .pricing-card-free::before {
       content: '';
@@ -2945,14 +3086,20 @@
         </div>
       </div>
 
-      <div class="input-group">
-        <label for="details-textarea">Tell us about your business</label>
-        <textarea
-          id="details-textarea"
-          class="input-field"
-          maxlength="5000"
-          placeholder="Share details like your phone number, email address, physical address, business hours, services offered, brand colors, style preferences, or any specific features you'd like on your website. On top of the information you provide here, we'll also intelligently search the internet for public data about your business to help build the best possible site."
-        ></textarea>
+      <div class="input-group" style="position:relative;">
+        <label for="details-textarea">Tell us about your business <a class="improve-ai-link" onclick="improveWithAI()" id="improve-ai-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg> Improve with AI</a></label>
+        <div style="position:relative;">
+          <textarea
+            id="details-textarea"
+            class="input-field"
+            maxlength="5000"
+            placeholder="Share details like your phone number, email address, physical address, business hours, services offered, brand colors, style preferences, or any specific features you'd like on your website. On top of the information you provide here, we'll also intelligently search the internet for public data about your business to help build the best possible site."
+          ></textarea>
+          <div class="improve-ai-overlay" id="improve-ai-overlay">
+            <div class="improve-ai-spinner"></div>
+            <div class="improve-ai-text">Improving with AI...</div>
+          </div>
+        </div>
       </div>
 
       <div class="uppy-section">
@@ -3054,7 +3201,7 @@
                 </svg>
               </div>
               <h3>AI-Powered Customization</h3>
-              <p>As a paid subscriber ($50/mo), you can customize your website anytime using our AI-powered editor at <a href="https://bolt.megabyte.space" target="_blank" rel="noopener noreferrer" style="color:var(--accent);">bolt.megabyte.space</a>. Update hours, swap photos, add services &mdash; changes go live in real time, no coding required.</p>
+              <p>As a paid subscriber ($50/mo), you can customize your website anytime using our <a href="https://bolt.megabyte.space" target="_blank" rel="noopener noreferrer" style="color:var(--accent);font-weight:600;">AI Editor &rarr;</a>. Update hours, swap photos, add services &mdash; changes go live in real time, no coding required.</p>
             </div>
             <div class="handled-card">
               <div class="handled-icon">
@@ -3077,7 +3224,7 @@
           </div>
 
           <div class="handled-summary">
-            <strong>In short:</strong> You never have to touch code or fight with a page builder. But if you want to go deeper, our <a href="https://bolt.megabyte.space" target="_blank" rel="noopener noreferrer" style="color:var(--accent);">AI editor</a> makes it as easy as describing what you want. That's what "handled" means.
+            <strong>In short:</strong> You never have to touch code or fight with a page builder. But if you want to go deeper, our <a href="https://bolt.megabyte.space" target="_blank" rel="noopener noreferrer" style="color:var(--accent);font-weight:600;">AI Editor &rarr;</a> makes it as easy as describing what you want. That's what "handled" means.
           </div>
         </section>
 
@@ -3413,12 +3560,10 @@
 
         <h2 class="waiting-title">We're building your website...</h2>
         <p class="waiting-subtitle">Give us a few minutes. We'll notify you when it's ready.</p>
-        <p class="waiting-contact" id="waiting-contact"></p>
-        <p id="waiting-reference" style="font-size:0.8rem;color:var(--text-muted);margin-top:8px;font-family:monospace;"></p>
 
         <div class="waiting-status">
           <span class="status-dot"></span>
-          <span>Build in progress</span>
+          <span>Working on it</span>
           <span class="loading-dots"><span></span><span></span><span></span></span>
         </div>
 
@@ -3428,7 +3573,7 @@
             <div class="build-terminal-dot red"></div>
             <div class="build-terminal-dot yellow"></div>
             <div class="build-terminal-dot green"></div>
-            <span class="build-terminal-title">build-progress</span>
+            <span class="build-terminal-title" id="build-terminal-title">build-progress</span>
           </div>
           <div class="build-terminal-body" id="build-terminal-body">
             <div class="build-terminal-line active">Initializing build pipeline...</div>
@@ -3672,12 +3817,24 @@
         if (status === 'building') html += '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>';
         html += statusLabel + '</div>';
 
-        // Domain link with copy button
-        if (siteUrl) {
-          var displayDomain = s.primary_hostname || (slug + '-sites.megabyte.space');
+        // Domain links: CNAME subdomain + primary domain URL
+        if (slug) {
+          var cnameUrl = 'https://' + slug + '-sites.megabyte.space';
           html += '<div class="site-card-url-row">';
-          html += '<div class="site-card-domain"><a href="' + escapeHtml(siteUrl) + '" target="_blank">' + escapeHtml(displayDomain) + '</a></div>';
-          html += '<button class="site-card-copy-btn" onclick="copyUrl(\'' + escapeHtml(siteUrl) + '\', this)" title="Copy URL"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>';
+          html += '<span style="font-size:0.6rem;background:rgba(148,163,184,0.15);color:#94a3b8;padding:1px 5px;border-radius:3px;font-weight:600;flex-shrink:0;">CNAME</span>';
+          html += '<div class="site-card-domain"><a href="' + escapeHtml(cnameUrl) + '" target="_blank">' + escapeHtml(slug + '-sites.megabyte.space') + '</a></div>';
+          html += '<button class="site-card-copy-btn" onclick="copyUrl(\'' + escapeHtml(cnameUrl) + '\', this)" title="Copy URL"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>';
+          html += '</div>';
+        }
+        if (s.primary_hostname && s.primary_hostname !== (slug + '-sites.megabyte.space')) {
+          var primaryUrl = 'https://' + s.primary_hostname;
+          html += '<div class="site-card-url-row">';
+          html += '<span style="font-size:0.6rem;background:rgba(80,165,219,0.15);color:var(--accent);padding:1px 5px;border-radius:3px;font-weight:600;flex-shrink:0;">URL</span>';
+          html += '<div class="site-card-domain"><a href="' + escapeHtml(primaryUrl) + '" target="_blank" style="font-weight:600;">' + escapeHtml(s.primary_hostname) + '</a></div>';
+          if (s.has_premium_domain) {
+            html += '<span class="premium-domain-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>PREMIUM</span>';
+          }
+          html += '<button class="site-card-copy-btn" onclick="copyUrl(\'' + escapeHtml(primaryUrl) + '\', this)" title="Copy URL"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>';
           html += '</div>';
         }
 
@@ -3694,7 +3851,7 @@
           html += '<button class="site-card-btn" onclick="state.siteId=\'' + escapeHtml(s.id) + '\';state.slug=\'' + escapeHtml(slug) + '\';navigateTo(\'waiting\');">Status</button>';
         }
         if (status === 'published' && slug) {
-          html += '<button class="site-card-btn" onclick="editSiteInBolt(\'' + escapeHtml(slug) + '\')">Edit</button>';
+          html += '<button class="site-card-btn" onclick="editSiteInBolt(\'' + escapeHtml(slug) + '\')" title="Edit in AI Editor">AI Edit</button>';
         }
         html += '<button class="site-card-btn" onclick="openEditSiteModal(\'' + escapeHtml(s.id) + '\', \'' + escapeHtml(name) + '\', \'' + escapeHtml(slug) + '\')">Rename</button>';
         html += '</div>';
@@ -3793,7 +3950,12 @@
               html += '<span style="font-size:0.6rem;background:rgba(80,165,219,0.15);color:var(--accent);padding:1px 6px;border-radius:3px;font-weight:600;">PRIMARY</span>';
             }
             html += '</div>';
-            html += '<div class="hostname-item-type">' + typeLabel + ' &middot; ' + escapeHtml(h.status || 'pending') + '</div>';
+            var hasDomainSub = (h.type === 'custom_cname');
+            html += '<div class="hostname-item-type">' + typeLabel + ' &middot; ' + escapeHtml(h.status || 'pending');
+            if (hasDomainSub) {
+              html += ' &middot; <span class="premium-domain-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>PREMIUM</span>';
+            }
+            html += '</div>';
             html += '</div>';
             html += '<div style="display:flex;align-items:center;gap:4px;">';
             if (!isPrimary) {
@@ -3801,7 +3963,12 @@
               html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>';
               html += '</button>';
             }
-            html += '<button class="hostname-delete-btn" onclick="deleteHostname(\'' + escapeHtml(adminDomainModalSiteId) + '\', \'' + escapeHtml(h.id) + '\')" title="Remove">';
+            if (hasDomainSub) {
+              html += '<button class="hostname-delete-btn" onclick="unsubscribeDomain(\'' + escapeHtml(adminDomainModalSiteId) + '\', \'' + escapeHtml(h.id) + '\', \'' + escapeHtml(h.hostname) + '\')" title="Unsubscribe & remove domain" style="color:#fbbf24;">';
+              html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>';
+              html += '</button>';
+            }
+            html += '<button class="hostname-delete-btn" onclick="deleteHostnameWithWarning(\'' + escapeHtml(adminDomainModalSiteId) + '\', \'' + escapeHtml(h.id) + '\', \'' + escapeHtml(h.hostname) + '\', ' + (hasDomainSub ? 'true' : 'false') + ')" title="Remove">';
             html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
             html += '</button>';
             html += '</div>';
@@ -5059,19 +5226,11 @@
        Waiting Screen
        =========================================================== */
     function updateWaitingScreen() {
-      var contactEl = document.getElementById('waiting-contact');
-      if (state.session && state.session.identifier) {
-        contactEl.textContent = 'Signed in as ' + state.session.identifier;
-      } else {
-        contactEl.textContent = '';
-      }
-      var refEl = document.getElementById('waiting-reference');
-      if (refEl) {
-        // Show slug or business name instead of raw UUID
-        var refLabel = state.slug || (state.selectedBusiness && (state.selectedBusiness.name || state.selectedBusiness.business_name)) || state.siteId || '';
-        if (refLabel) {
-          refEl.textContent = 'Building: ' + refLabel;
-        }
+      // Put slug/name in the terminal title bar
+      var termTitle = document.getElementById('build-terminal-title');
+      if (termTitle) {
+        var refLabel = state.slug || (state.selectedBusiness && (state.selectedBusiness.name || state.selectedBusiness.business_name)) || '';
+        termTitle.textContent = refLabel ? 'build: ' + refLabel : 'build-progress';
       }
     }
 
@@ -5761,32 +5920,53 @@
     /* ===========================================================
        Build Terminal (Progress Messages)
        =========================================================== */
-    var buildSteps = [
-      'Initializing build pipeline...',
-      'Researching business information...',
-      'Crawling public data sources...',
-      'Analyzing business category and services...',
-      'Generating website content with AI...',
-      'Creating page layouts and sections...',
-      'Designing responsive UI components...',
-      'Optimizing images and assets...',
-      'Building SEO metadata and schema...',
-      'Compiling and bundling static files...',
-      'Uploading to CDN edge network...',
-      'Configuring SSL and custom domain...',
-      'Running final quality checks...',
-      'Publishing your website!'
-    ];
+    function getBuildSteps() {
+      var bizName = '';
+      var bizAddr = '';
+      if (state.selectedBusiness) {
+        bizName = state.selectedBusiness.name || state.selectedBusiness.business_name || '';
+        bizAddr = state.selectedBusiness.address || state.selectedBusiness.formatted_address || state.selectedBusiness.street_address || '';
+      } else {
+        var nameInput = document.getElementById('business-name-input');
+        var addrInput = document.getElementById('business-address-input');
+        if (nameInput) bizName = nameInput.value.trim();
+        if (addrInput) bizAddr = addrInput.value.trim();
+      }
+      var placeId = state.selectedBusiness ? (state.selectedBusiness.place_id || state.selectedBusiness.id || '') : '';
+      var steps = [
+        'Initializing build pipeline...'
+      ];
+      if (bizName) steps.push('Business: ' + bizName);
+      if (bizAddr) steps.push('Address: ' + bizAddr);
+      if (placeId) steps.push('Google Place ID: ' + placeId);
+      steps.push('Researching business entity data...');
+      steps.push('Crawling public data sources & social profiles...');
+      steps.push('AI analyzing business category & services...');
+      steps.push('AI generating brand colors, fonts & identity...');
+      steps.push('AI researching selling points & hero content...');
+      steps.push('AI generating full website HTML & content...');
+      steps.push('Creating page layouts & responsive sections...');
+      steps.push('Generating privacy policy & terms of service...');
+      steps.push('Running 8-dimension quality score check...');
+      steps.push('Optimizing images & building SEO metadata...');
+      steps.push('Compiling & uploading to CDN edge network...');
+      steps.push('Configuring SSL certificate & domain routing...');
+      if (state.slug) steps.push('Slug: ' + state.slug + '-sites.megabyte.space');
+      steps.push('Publishing your website!');
+      return steps;
+    }
+    var buildSteps = getBuildSteps();
     var currentBuildStep = 0;
     var buildTerminalTimer = null;
 
     function startBuildTerminal() {
       currentBuildStep = 0;
+      buildSteps = getBuildSteps();
       var body = document.getElementById('build-terminal-body');
       if (!body) return;
-      body.innerHTML = '<div class="build-terminal-line active">' + buildSteps[0] + '</div>';
+      body.innerHTML = '<div class="build-terminal-line active">' + escapeHtml(buildSteps[0]) + '</div>';
       for (var i = 1; i < buildSteps.length; i++) {
-        body.innerHTML += '<div class="build-terminal-line pending">' + buildSteps[i] + '</div>';
+        body.innerHTML += '<div class="build-terminal-line pending">' + escapeHtml(buildSteps[i]) + '</div>';
       }
 
       clearInterval(buildTerminalTimer);
@@ -5922,6 +6102,157 @@
     function closeDetailsBizDropdown() {
       if (detailsBizDropdown) detailsBizDropdown.classList.remove('open');
     }
+
+    /* ===========================================================
+       Improve with AI
+       =========================================================== */
+    function improveWithAI() {
+      var textarea = document.getElementById('details-textarea');
+      var overlay = document.getElementById('improve-ai-overlay');
+      var buildBtn = document.getElementById('build-btn');
+      var improveBtn = document.getElementById('improve-ai-btn');
+
+      var text = textarea.value.trim();
+      if (!text || text.length < 5) {
+        showMsg('build-msg', 'error', 'Please write some text first so AI can improve it.');
+        return;
+      }
+
+      // Show overlay, prevent modification
+      overlay.classList.add('visible');
+      textarea.disabled = true;
+      buildBtn.disabled = true;
+      improveBtn.style.pointerEvents = 'none';
+      improveBtn.style.opacity = '0.5';
+
+      // Gather business context
+      var bizName = '';
+      var bizAddr = '';
+      if (state.selectedBusiness) {
+        bizName = state.selectedBusiness.name || state.selectedBusiness.business_name || '';
+        bizAddr = state.selectedBusiness.address || state.selectedBusiness.formatted_address || '';
+      } else {
+        var nameInput = document.getElementById('business-name-input');
+        var addrInput = document.getElementById('business-address-input');
+        if (nameInput) bizName = nameInput.value.trim();
+        if (addrInput) bizAddr = addrInput.value.trim();
+      }
+
+      var headers = { 'Content-Type': 'application/json' };
+      if (state.session && state.session.token) {
+        headers['Authorization'] = 'Bearer ' + state.session.token;
+      }
+
+      fetch('/api/sites/improve-prompt', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({
+          text: text,
+          business_name: bizName,
+          business_address: bizAddr
+        })
+      })
+        .then(function(res) {
+          if (!res.ok) return res.json().then(function(d) { throw new Error(extractErrorMsg(d, 'AI improvement failed')); });
+          return res.json();
+        })
+        .then(function(d) {
+          var improved = d.data && d.data.improved_text ? d.data.improved_text : text;
+          textarea.value = improved;
+          overlay.classList.remove('visible');
+          textarea.disabled = false;
+          buildBtn.disabled = false;
+          improveBtn.style.pointerEvents = '';
+          improveBtn.style.opacity = '';
+        })
+        .catch(function(err) {
+          overlay.classList.remove('visible');
+          textarea.disabled = false;
+          buildBtn.disabled = false;
+          improveBtn.style.pointerEvents = '';
+          improveBtn.style.opacity = '';
+          showMsg('build-msg', 'error', err.message || 'AI improvement failed. Please try again.');
+        });
+    }
+
+    /* ===========================================================
+       Domain Unsubscribe + Delete with Warning
+       =========================================================== */
+    function unsubscribeDomain(siteId, hostnameId, hostname) {
+      var confirmed = confirm(
+        'UNSUBSCRIBE DOMAIN: ' + hostname + '\n\n' +
+        'WARNING: This will cancel your premium domain subscription. ' +
+        'The domain will stop resolving to your site and you may lose the registration. ' +
+        'This action cannot be easily undone.\n\n' +
+        'Are you sure you want to unsubscribe from this domain?'
+      );
+      if (!confirmed) return;
+
+      var headers = { 'Content-Type': 'application/json' };
+      if (state.session && state.session.token) {
+        headers['Authorization'] = 'Bearer ' + state.session.token;
+      }
+
+      showMsg('domain-modal-msg', 'info', 'Cancelling domain subscription...');
+
+      fetch('/api/sites/' + siteId + '/hostnames/' + hostnameId + '/unsubscribe', {
+        method: 'POST',
+        headers: headers
+      })
+        .then(function(res) {
+          if (!res.ok) return res.json().then(function(d) { throw new Error(extractErrorMsg(d, 'Unsubscribe failed')); });
+          return res.json();
+        })
+        .then(function() {
+          showMsg('domain-modal-msg', 'success', 'Domain subscription cancelled. The domain will be removed at end of billing period.');
+          loadHostnames(siteId);
+          loadAdminDashboard();
+        })
+        .catch(function(err) {
+          showMsg('domain-modal-msg', 'error', err.message || 'Failed to unsubscribe from domain.');
+        });
+    }
+
+    function deleteHostnameWithWarning(siteId, hostnameId, hostname, isPremium) {
+      var message = 'Remove domain: ' + hostname + '?';
+      if (isPremium) {
+        message += '\n\nWARNING: This is a PREMIUM domain with an active subscription. ' +
+          'Removing it will NOT automatically cancel the subscription billing. ' +
+          'Please unsubscribe first using the billing icon button, or manage it through the Billing portal.\n\n' +
+          'Are you sure you want to remove this domain?';
+      }
+      if (!confirm(message)) return;
+      deleteHostname(siteId, hostnameId);
+    }
+
+    /* ===========================================================
+       Scroll-based Animations (Intersection Observer)
+       =========================================================== */
+    (function initScrollAnimations() {
+      var animateSelectors = '.step-card, .feature-card, .handled-card, .dvd-column, .pricing-card, .pricing-card-free, .faq-item';
+      var animateEls = document.querySelectorAll(animateSelectors);
+      if (!animateEls.length) return;
+
+      if ('IntersectionObserver' in window) {
+        var observer = new IntersectionObserver(function(entries) {
+          for (var i = 0; i < entries.length; i++) {
+            if (entries[i].isIntersecting) {
+              entries[i].target.classList.add('animate-in');
+              observer.unobserve(entries[i].target);
+            }
+          }
+        }, { threshold: 0.15 });
+
+        for (var i = 0; i < animateEls.length; i++) {
+          observer.observe(animateEls[i]);
+        }
+      } else {
+        // Fallback: just show everything
+        for (var j = 0; j < animateEls.length; j++) {
+          animateEls[j].classList.add('animate-in');
+        }
+      }
+    })();
 
     /* ===========================================================
        Init

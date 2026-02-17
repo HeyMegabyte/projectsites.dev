@@ -244,11 +244,22 @@ api.get('/api/sites', async (c) => {
     [orgId],
   );
 
-  // Enrich each site with its primary hostname
+  // Enrich each site with its primary hostname + custom domain info
   const enriched = await Promise.all(
     data.map(async (site) => {
       const primaryHostname = await domainService.getPrimaryHostname(c.env.DB, site.id as string);
-      return { ...site, primary_hostname: primaryHostname };
+      // Check if site has a custom/premium domain
+      const customDomain = await dbQueryOne<{ hostname: string; type: string }>(
+        c.env.DB,
+        "SELECT hostname, type FROM hostnames WHERE site_id = ? AND type = 'custom_cname' AND deleted_at IS NULL LIMIT 1",
+        [site.id as string],
+      );
+      return {
+        ...site,
+        primary_hostname: primaryHostname,
+        has_premium_domain: !!customDomain,
+        premium_domain: customDomain?.hostname ?? null,
+      };
     }),
   );
 
@@ -530,6 +541,52 @@ api.delete('/api/sites/:siteId/hostnames/:hostnameId', async (c) => {
   await c.env.CACHE_KV.delete(`host:${hostname.hostname}`).catch(() => {});
 
   return c.json({ data: { deleted: true } });
+});
+
+// ─── Unsubscribe Domain (cancel premium domain subscription + delete) ──
+
+api.post('/api/sites/:siteId/hostnames/:hostnameId/unsubscribe', async (c) => {
+  const orgId = c.get('orgId');
+  if (!orgId) throw unauthorized('Must be authenticated');
+
+  const siteId = c.req.param('siteId');
+  const hostnameId = c.req.param('hostnameId');
+
+  // Verify ownership
+  const site = await dbQueryOne<Record<string, unknown>>(
+    c.env.DB,
+    'SELECT id FROM sites WHERE id = ? AND org_id = ? AND deleted_at IS NULL',
+    [siteId, orgId],
+  );
+  if (!site) throw notFound('Site not found');
+
+  const hostname = await dbQueryOne<{ id: string; hostname: string; type: string }>(
+    c.env.DB,
+    'SELECT id, hostname, type FROM hostnames WHERE id = ? AND site_id = ?',
+    [hostnameId, siteId],
+  );
+  if (!hostname) throw notFound('Hostname not found');
+
+  // Soft-delete the hostname
+  await c.env.DB.prepare("UPDATE hostnames SET deleted_at = datetime('now') WHERE id = ?")
+    .bind(hostnameId)
+    .run();
+
+  // Invalidate KV cache
+  await c.env.CACHE_KV.delete(`host:${hostname.hostname}`).catch(() => {});
+
+  // Log the unsubscribe action
+  await auditService.writeAuditLog(c.env.DB, {
+    org_id: orgId,
+    actor_id: c.get('userId') ?? null,
+    action: 'hostname.unsubscribed',
+    target_type: 'hostname',
+    target_id: hostnameId,
+    metadata_json: { hostname: hostname.hostname, type: hostname.type },
+    request_id: c.get('requestId'),
+  });
+
+  return c.json({ data: { unsubscribed: true, hostname: hostname.hostname } });
 });
 
 // ─── Billing Portal ─────────────────────────────────────────

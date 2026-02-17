@@ -504,4 +504,66 @@ search.post('/api/sites/create-from-search', async (c) => {
   );
 });
 
+// ─── Improve Prompt with AI ─────────────────────────────────
+search.post('/api/sites/improve-prompt', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const text = typeof body.text === 'string' ? body.text.trim() : '';
+  const businessName = typeof body.business_name === 'string' ? body.business_name.trim() : '';
+  const businessAddress = typeof body.business_address === 'string' ? body.business_address.trim() : '';
+
+  if (!text || text.length < 5) {
+    throw badRequest('Text must be at least 5 characters long');
+  }
+
+  if (text.length > 5000) {
+    throw badRequest('Text must not exceed 5000 characters');
+  }
+
+  // Build the AI improvement prompt
+  const systemPrompt =
+    'You are a professional website copywriter and business consultant. ' +
+    'Your job is to take rough notes about a business and improve them into clear, well-structured ' +
+    'information that would help an AI build a great website. ' +
+    'Fix grammar, spelling, and formatting. Organize the information logically. ' +
+    'Where information seems missing or incomplete, insert FILL_ME_IN as a placeholder and ' +
+    'add a brief comment about what should go there. ' +
+    'Keep the same general meaning but make it professional and comprehensive. ' +
+    'Return ONLY the improved text, nothing else.';
+
+  let userPrompt = 'Here is the rough text to improve:\n\n' + text;
+  if (businessName) {
+    userPrompt += '\n\nBusiness name: ' + businessName;
+  }
+  if (businessAddress) {
+    userPrompt += '\nBusiness address: ' + businessAddress;
+  }
+
+  try {
+    const ai = c.env.AI;
+    if (!ai) {
+      // Fallback: return original text if AI binding not available
+      return c.json({ data: { improved_text: text } });
+    }
+
+    const result = await ai.run('@cf/meta/llama-3.1-8b-instruct' as Parameters<typeof ai.run>[0], {
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      max_tokens: 2048,
+      temperature: 0.3,
+    });
+
+    const improved =
+      typeof result === 'object' && result !== null && 'response' in result
+        ? String((result as { response: string }).response).trim()
+        : text;
+
+    return c.json({ data: { improved_text: improved || text } });
+  } catch {
+    // On AI failure, return original text rather than error
+    return c.json({ data: { improved_text: text } });
+  }
+});
+
 export { search };
