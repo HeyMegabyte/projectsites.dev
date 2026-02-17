@@ -324,22 +324,42 @@ export default {
   /**
    * Scheduled handler for periodic tasks (cron triggers).
    *
-   * Planned tasks:
+   * Runs:
    * - Verify pending custom hostnames via Cloudflare API
-   * - Dunning checks for past-due subscriptions
-   * - Analytics rollup
+   * - Log results for observability
    */
-  async scheduled(_event: ScheduledEvent, _env: Env, _ctx: ExecutionContext): Promise<void> {
-    // TODO: Implement scheduled tasks
-    // - verifyPendingHostnames
-    // - dunning check
-    // - analytics rollup
+  async scheduled(_event: ScheduledEvent, env: Env, _ctx: ExecutionContext): Promise<void> {
     console.warn(
       JSON.stringify({
         level: 'info',
         service: 'cron',
         message: 'Scheduled task triggered',
+        trigger: _event.cron,
       }),
     );
+
+    try {
+      const { verifyPendingHostnames } = await import('./services/domains.js');
+      const result = await verifyPendingHostnames(env.DB, env);
+
+      console.warn(
+        JSON.stringify({
+          level: 'info',
+          service: 'cron',
+          message: 'Hostname verification complete',
+          verified: result.verified,
+          failed: result.failed,
+        }),
+      );
+    } catch (err) {
+      console.warn(
+        JSON.stringify({
+          level: 'error',
+          service: 'cron',
+          message: 'Hostname verification failed',
+          error: err instanceof Error ? err.message : String(err),
+        }),
+      );
+    }
   },
 };

@@ -120,3 +120,20 @@ export function trackError(
     },
   });
 }
+
+/**
+ * Track a domain lifecycle event.
+ */
+export function trackDomain(
+  env: Env,
+  ctx: ExecutionContext,
+  action: string,
+  distinctId: string,
+  extra?: Record<string, unknown>,
+): void {
+  capture(env, ctx, {
+    event: `domain_${action}`,
+    distinctId,
+    properties: extra,
+  });
+}

@@ -719,10 +719,45 @@
       font-size: 0.9rem;
     }
 
+    /* Domain Summary Bar */
+    .domain-summary-bar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 18px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .domain-summary-bar .domain-stat {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+    }
+    .domain-stat-value {
+      font-weight: 600;
+      color: var(--text-primary);
+      font-size: 0.85rem;
+    }
+    .domain-stat-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .domain-stat-dot.active { background: var(--success); }
+    .domain-stat-dot.pending { background: #fbbf24; }
+    .domain-stat-dot.failed { background: var(--error); }
+
     @media (max-width: 600px) {
       .site-grid { grid-template-columns: 1fr; gap: 10px; }
       .admin-panel-header { flex-direction: column; align-items: flex-start; }
       .admin-panel-actions { width: 100%; }
+      .domain-summary-bar { flex-direction: column; align-items: flex-start; gap: 8px; }
     }
 
     /* ======================================================
@@ -2906,6 +2941,26 @@
         </div>
       </div>
 
+      <!-- Domain Summary Bar -->
+      <div id="domain-summary-bar" class="domain-summary-bar" style="display:none;">
+        <div class="domain-stat">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          Domains: <span class="domain-stat-value" id="domain-total-count">0</span>
+        </div>
+        <div class="domain-stat">
+          <span class="domain-stat-dot active"></span>
+          Active: <span class="domain-stat-value" id="domain-active-count">0</span>
+        </div>
+        <div class="domain-stat">
+          <span class="domain-stat-dot pending"></span>
+          Pending: <span class="domain-stat-value" id="domain-pending-count">0</span>
+        </div>
+        <div class="domain-stat">
+          <span class="domain-stat-dot failed"></span>
+          Failed: <span class="domain-stat-value" id="domain-failed-count">0</span>
+        </div>
+      </div>
+
       <!-- Sites Grid -->
       <div id="admin-sites-grid" class="site-grid">
         <div class="admin-empty">Loading your websites...</div>
@@ -3727,7 +3782,7 @@
 
       var headers = { 'Authorization': 'Bearer ' + state.session.token };
 
-      // Load sites + subscription in parallel
+      // Load sites + subscription + domain summary in parallel
       var sitesP = fetch('/api/sites', { headers: headers })
         .then(function(r) { return r.ok ? r.json() : { data: [] }; })
         .then(function(d) { return d.data || []; })
@@ -3738,12 +3793,36 @@
         .then(function(d) { return d.data || null; })
         .catch(function() { return null; });
 
-      Promise.all([sitesP, subP]).then(function(results) {
+      var domainSummaryP = fetch('/api/admin/domains/summary', { headers: headers })
+        .then(function(r) { return r.ok ? r.json() : { data: null }; })
+        .then(function(d) { return d.data || null; })
+        .catch(function() { return null; });
+
+      Promise.all([sitesP, subP, domainSummaryP]).then(function(results) {
         adminSites = results[0];
         adminSubscription = results[1];
         renderAdminSites();
         renderAdminBilling();
+        renderDomainSummary(results[2]);
       });
+    }
+
+    function renderDomainSummary(summary) {
+      var bar = document.getElementById('domain-summary-bar');
+      if (!bar) return;
+      if (!summary || !summary.total) {
+        bar.style.display = 'none';
+        return;
+      }
+      bar.style.display = 'flex';
+      var totalEl = document.getElementById('domain-total-count');
+      var activeEl = document.getElementById('domain-active-count');
+      var pendingEl = document.getElementById('domain-pending-count');
+      var failedEl = document.getElementById('domain-failed-count');
+      if (totalEl) totalEl.textContent = summary.total;
+      if (activeEl) activeEl.textContent = summary.by_status ? summary.by_status.active : 0;
+      if (pendingEl) pendingEl.textContent = summary.by_status ? summary.by_status.pending : 0;
+      if (failedEl) failedEl.textContent = summary.by_status ? summary.by_status.verification_failed : 0;
     }
 
     function hideAdminDashboard() {
@@ -3963,6 +4042,12 @@
             html += '</div>';
             html += '</div>';
             html += '<div style="display:flex;align-items:center;gap:4px;">';
+            // Re-verify button for pending/failed hostnames
+            if (h.status === 'pending' || h.status === 'verification_failed') {
+              html += '<button class="hostname-delete-btn" onclick="verifyHostname(\'' + escapeHtml(h.id) + '\')" title="Re-verify domain" style="color:#22c55e;">';
+              html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>';
+              html += '</button>';
+            }
             if (!isPrimary) {
               html += '<button class="hostname-delete-btn" onclick="setPrimaryHostname(\'' + escapeHtml(adminDomainModalSiteId) + '\', \'' + escapeHtml(h.id) + '\')" title="Set as primary" style="color:var(--text-muted);">';
               html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>';
@@ -4069,6 +4154,47 @@
         })
         .catch(function() {
           showMsg('domain-modal-msg', 'error', 'Failed to delete domain');
+        });
+    }
+
+    function verifyHostname(hostnameId) {
+      if (!state.session || !state.session.token) return;
+      var headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + state.session.token
+      };
+
+      showMsg('domain-modal-msg', 'info', 'Verifying domain...');
+
+      fetch('/api/admin/domains/' + hostnameId + '/verify', {
+        method: 'POST',
+        headers: headers
+      })
+        .then(function(res) {
+          if (!res.ok) return res.json().then(function(d) {
+            var msg = 'Verification failed';
+            if (d && d.error) {
+              msg = typeof d.error === 'string' ? d.error : (d.error.message || msg);
+            }
+            throw new Error(msg);
+          });
+          return res.json();
+        })
+        .then(function(d) {
+          var data = d.data;
+          if (data.status === 'active') {
+            showMsg('domain-modal-msg', 'success', 'Domain verified successfully! SSL: ' + data.ssl_status);
+          } else if (data.verification_errors && data.verification_errors.length > 0) {
+            showMsg('domain-modal-msg', 'error', 'Verification issues: ' + data.verification_errors.join(', '));
+          } else {
+            showMsg('domain-modal-msg', 'info', 'Domain status: ' + data.status + '. SSL: ' + data.ssl_status);
+          }
+          if (adminDomainModalSiteId) {
+            loadHostnames(adminDomainModalSiteId);
+          }
+        })
+        .catch(function(err) {
+          showMsg('domain-modal-msg', 'error', err.message || 'Verification failed');
         });
     }
 
@@ -6137,7 +6263,11 @@
           if (wfStatus === 'errored' || wfStatus === 'failed') {
             clearInterval(buildTerminalTimer);
             addTerminalLine('', '');
-            addTerminalLine('Build failed: ' + (wfError || 'Unknown error'), 'error');
+            var errorMsg = wfError || 'Unknown error';
+            if (typeof errorMsg === 'object') {
+              errorMsg = errorMsg.message || errorMsg.name || JSON.stringify(errorMsg);
+            }
+            addTerminalLine('Build failed: ' + errorMsg, 'error');
             addTerminalLine('Please try rebuilding from the admin panel.', 'info');
             return;
           }

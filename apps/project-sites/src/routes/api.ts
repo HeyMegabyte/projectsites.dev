@@ -316,13 +316,31 @@ api.get('/api/sites/:id/workflow', async (c) => {
   try {
     const instance = await c.env.SITE_WORKFLOW.get(siteId);
     const status = await instance.status();
+
+    // Serialize workflow error to a human-readable string.
+    // Cloudflare Workflow status.error can be an Error object, a plain object,
+    // or a string — ensure we always return a string for the client.
+    let workflowError: string | null = null;
+    if (status.error != null) {
+      if (typeof status.error === 'string') {
+        workflowError = status.error;
+      } else if (status.error instanceof Error) {
+        workflowError = status.error.message;
+      } else if (typeof status.error === 'object') {
+        const errObj = status.error as Record<string, unknown>;
+        workflowError = (errObj.message as string) ?? (errObj.name as string) ?? JSON.stringify(status.error);
+      } else {
+        workflowError = String(status.error);
+      }
+    }
+
     return c.json({
       data: {
         site_id: siteId,
         workflow_available: true,
         instance_id: instance.id,
         workflow_status: status.status,
-        workflow_error: status.error ?? null,
+        workflow_error: workflowError,
         workflow_output: status.output ?? null,
         site_status: site.status,
       },
@@ -1284,6 +1302,325 @@ api.post('/api/domains/purchase', async (c) => {
       session_id: session.id,
     },
   });
+});
+
+// ─── Admin Domain Management Routes ─────────────────────────
+
+/**
+ * List all domains for an organization with filtering and pagination.
+ * Supports ?status=active|pending|verification_failed and ?type=free_subdomain|custom_cname.
+ */
+api.get('/api/admin/domains', async (c) => {
+  const orgId = c.get('orgId');
+  if (!orgId) throw unauthorized('Must be authenticated');
+
+  const limit = Math.min(Number(c.req.query('limit') ?? '50'), 200);
+  const offset = Number(c.req.query('offset') ?? '0');
+  const statusFilter = c.req.query('status');
+  const typeFilter = c.req.query('type');
+
+  let sql = 'SELECT * FROM hostnames WHERE org_id = ? AND deleted_at IS NULL';
+  const params: unknown[] = [orgId];
+
+  if (statusFilter) {
+    sql += ' AND status = ?';
+    params.push(statusFilter);
+  }
+
+  if (typeFilter) {
+    sql += ' AND type = ?';
+    params.push(typeFilter);
+  }
+
+  sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+  params.push(limit, offset);
+
+  const { data } = await dbQuery<Record<string, unknown>>(c.env.DB, sql, params);
+
+  return c.json({ data });
+});
+
+/**
+ * Get a summary of domain counts by status and type for the org.
+ */
+api.get('/api/admin/domains/summary', async (c) => {
+  const orgId = c.get('orgId');
+  if (!orgId) throw unauthorized('Must be authenticated');
+
+  const { data } = await dbQuery<Record<string, unknown>>(
+    c.env.DB,
+    `SELECT
+      COUNT(*) as total,
+      SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
+      SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
+      SUM(CASE WHEN status = 'verification_failed' THEN 1 ELSE 0 END) as failed,
+      SUM(CASE WHEN type = 'free_subdomain' THEN 1 ELSE 0 END) as free_subdomain,
+      SUM(CASE WHEN type = 'custom_cname' THEN 1 ELSE 0 END) as custom_cname
+    FROM hostnames
+    WHERE org_id = ? AND deleted_at IS NULL`,
+    [orgId],
+  );
+
+  const stats = data[0] ?? { total: 0, active: 0, pending: 0, failed: 0, free_subdomain: 0, custom_cname: 0 };
+
+  return c.json({
+    data: {
+      total: stats.total ?? 0,
+      by_status: {
+        active: stats.active ?? 0,
+        pending: stats.pending ?? 0,
+        verification_failed: stats.failed ?? 0,
+      },
+      by_type: {
+        free_subdomain: stats.free_subdomain ?? 0,
+        custom_cname: stats.custom_cname ?? 0,
+      },
+    },
+  });
+});
+
+/**
+ * Re-verify a domain hostname against Cloudflare.
+ * Triggers a fresh verification check and updates the DB status.
+ */
+api.post('/api/admin/domains/:hostnameId/verify', async (c) => {
+  const orgId = c.get('orgId');
+  if (!orgId) throw unauthorized('Must be authenticated');
+
+  const hostnameId = c.req.param('hostnameId');
+
+  // Find the hostname belonging to this org
+  const hostname = await dbQueryOne<{
+    id: string;
+    hostname: string;
+    cf_custom_hostname_id: string;
+    org_id: string;
+    site_id: string;
+    status: string;
+  }>(
+    c.env.DB,
+    'SELECT id, hostname, cf_custom_hostname_id, org_id, site_id, status FROM hostnames WHERE id = ? AND deleted_at IS NULL',
+    [hostnameId],
+  );
+
+  if (!hostname || hostname.org_id !== orgId) {
+    throw notFound('Hostname not found');
+  }
+
+  if (!hostname.cf_custom_hostname_id) {
+    return c.json({
+      data: {
+        hostname: hostname.hostname,
+        status: hostname.status,
+        ssl_status: 'unknown',
+        verification_errors: [],
+        message: 'No Cloudflare hostname ID — cannot verify',
+      },
+    });
+  }
+
+  // Check status with Cloudflare
+  const cfStatus = await domainService.checkHostnameStatus(c.env, hostname.cf_custom_hostname_id);
+
+  const newStatus =
+    cfStatus.status === 'active'
+      ? 'active'
+      : cfStatus.verification_errors.length > 0
+        ? 'verification_failed'
+        : 'pending';
+
+  // Update DB
+  const { dbUpdate: dbUpdateFn } = await import('../services/db.js');
+  await dbUpdateFn(
+    c.env.DB,
+    'hostnames',
+    {
+      status: newStatus,
+      ssl_status: cfStatus.ssl_status,
+      verification_errors:
+        cfStatus.verification_errors.length > 0
+          ? JSON.stringify(cfStatus.verification_errors)
+          : null,
+      last_verified_at: new Date().toISOString(),
+    },
+    'id = ?',
+    [hostnameId],
+  );
+
+  // Audit log
+  await auditService.writeAuditLog(c.env.DB, {
+    org_id: orgId,
+    actor_id: c.get('userId') ?? null,
+    action: 'hostname.verified',
+    target_type: 'hostname',
+    target_id: hostnameId,
+    metadata_json: {
+      hostname: hostname.hostname,
+      previous_status: hostname.status,
+      new_status: newStatus,
+      ssl_status: cfStatus.ssl_status,
+    },
+    request_id: c.get('requestId'),
+  });
+
+  return c.json({
+    data: {
+      hostname: hostname.hostname,
+      status: newStatus,
+      ssl_status: cfStatus.ssl_status,
+      verification_errors: cfStatus.verification_errors,
+    },
+  });
+});
+
+/**
+ * Get comprehensive health check for a specific domain.
+ * Checks Cloudflare status, DNS CNAME target, and SSL status.
+ */
+api.get('/api/admin/domains/:hostnameId/health', async (c) => {
+  const orgId = c.get('orgId');
+  if (!orgId) throw unauthorized('Must be authenticated');
+
+  const hostnameId = c.req.param('hostnameId');
+
+  const hostname = await dbQueryOne<{
+    id: string;
+    hostname: string;
+    cf_custom_hostname_id: string;
+    org_id: string;
+    site_id: string;
+    type: string;
+    status: string;
+    ssl_status: string;
+    last_verified_at: string;
+  }>(
+    c.env.DB,
+    'SELECT id, hostname, cf_custom_hostname_id, org_id, site_id, type, status, ssl_status, last_verified_at FROM hostnames WHERE id = ? AND deleted_at IS NULL',
+    [hostnameId],
+  );
+
+  if (!hostname || hostname.org_id !== orgId) {
+    throw notFound('Hostname not found');
+  }
+
+  // Fetch Cloudflare status and DNS CNAME in parallel
+  let cfStatus = 'unknown';
+  let cfSslStatus = 'unknown';
+  let verificationErrors: string[] = [];
+  let cnameTarget: string | null = null;
+
+  const cfPromise = hostname.cf_custom_hostname_id
+    ? domainService
+        .checkHostnameStatus(c.env, hostname.cf_custom_hostname_id)
+        .then((result) => {
+          cfStatus = result.status;
+          cfSslStatus = result.ssl_status;
+          verificationErrors = result.verification_errors;
+        })
+        .catch(() => {
+          cfStatus = 'unknown';
+        })
+    : Promise.resolve();
+
+  const dnsPromise = domainService
+    .checkCnameTarget(hostname.hostname)
+    .then((target) => {
+      cnameTarget = target;
+    })
+    .catch(() => {
+      cnameTarget = null;
+    });
+
+  await Promise.all([cfPromise, dnsPromise]);
+
+  return c.json({
+    data: {
+      hostname: hostname.hostname,
+      type: hostname.type,
+      db_status: hostname.status,
+      cf_status: cfStatus,
+      ssl_status: cfSslStatus,
+      dns_configured: cnameTarget != null,
+      cname_target: cnameTarget,
+      verification_errors: verificationErrors,
+      last_verified_at: hostname.last_verified_at,
+    },
+  });
+});
+
+/**
+ * Admin deprovision: Soft-delete a hostname AND remove from Cloudflare.
+ * Unlike the per-site DELETE, this also cleans up the CF custom hostname.
+ */
+api.delete('/api/admin/domains/:hostnameId', async (c) => {
+  const orgId = c.get('orgId');
+  if (!orgId) throw unauthorized('Must be authenticated');
+
+  const hostnameId = c.req.param('hostnameId');
+
+  const hostname = await dbQueryOne<{
+    id: string;
+    hostname: string;
+    cf_custom_hostname_id: string;
+    org_id: string;
+    site_id: string;
+    type: string;
+    status: string;
+  }>(
+    c.env.DB,
+    'SELECT id, hostname, cf_custom_hostname_id, org_id, site_id, type, status FROM hostnames WHERE id = ? AND deleted_at IS NULL',
+    [hostnameId],
+  );
+
+  if (!hostname || hostname.org_id !== orgId) {
+    throw notFound('Hostname not found');
+  }
+
+  // Delete from Cloudflare if we have a CF ID
+  if (hostname.cf_custom_hostname_id) {
+    try {
+      await domainService.deleteCustomHostname(c.env, hostname.cf_custom_hostname_id);
+    } catch {
+      // Log but don't block — the CF resource may already be gone
+      console.warn(JSON.stringify({
+        level: 'warn',
+        service: 'domains',
+        message: 'Failed to delete CF custom hostname during deprovision',
+        hostname: hostname.hostname,
+        cf_id: hostname.cf_custom_hostname_id,
+      }));
+    }
+  }
+
+  // Soft-delete in DB
+  const { dbUpdate: dbUpdateFn } = await import('../services/db.js');
+  await dbUpdateFn(
+    c.env.DB,
+    'hostnames',
+    { deleted_at: new Date().toISOString(), status: 'deleted' },
+    'id = ?',
+    [hostnameId],
+  );
+
+  // Invalidate KV cache
+  await c.env.CACHE_KV.delete(`host:${hostname.hostname}`).catch(() => {});
+
+  // Audit log
+  await auditService.writeAuditLog(c.env.DB, {
+    org_id: orgId,
+    actor_id: c.get('userId') ?? null,
+    action: 'hostname.deprovisioned',
+    target_type: 'hostname',
+    target_id: hostnameId,
+    metadata_json: {
+      hostname: hostname.hostname,
+      type: hostname.type,
+      had_cf_id: !!hostname.cf_custom_hostname_id,
+    },
+    request_id: c.get('requestId'),
+  });
+
+  return c.json({ data: { deprovisioned: true, hostname: hostname.hostname } });
 });
 
 // ─── Contact Form Route ─────────────────────────────────────
