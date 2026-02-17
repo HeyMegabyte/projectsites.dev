@@ -1,0 +1,234 @@
+name: Project Sites CI/CD
+
+on:
+  push:
+    branches: [main, staging]
+    paths:
+      - 'apps/project-sites/**'
+      - 'packages/shared/**'
+      - 'supabase/migrations/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/project-sites/**'
+      - 'packages/shared/**'
+      - 'supabase/migrations/**'
+
+env:
+  NODE_VERSION: '20.18.0'
+
+jobs:
+  # ─── Stage 1: Auto-fix + Lint + Typecheck ──────────────────
+  check:
+    name: Typecheck + Lint + Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install shared deps
+        working-directory: packages/shared
+        run: npm ci --legacy-peer-deps
+
+      - name: Install worker deps
+        working-directory: apps/project-sites
+        run: npm ci --legacy-peer-deps
+
+      - name: Typecheck shared
+        working-directory: packages/shared
+        run: npm run typecheck
+
+      - name: Typecheck worker
+        working-directory: apps/project-sites
+        run: npm run typecheck
+
+      - name: Lint shared
+        working-directory: packages/shared
+        run: npm run lint
+
+      - name: Lint worker
+        working-directory: apps/project-sites
+        run: npm run lint
+
+      - name: Format check shared
+        working-directory: packages/shared
+        run: npm run format:check
+
+      - name: Format check worker
+        working-directory: apps/project-sites
+        run: npm run format:check
+
+  # ─── Stage 2: Unit / Functional Tests (Jest) ───────────────
+  test-unit:
+    name: Unit Tests
+    needs: [check]
+    runs-on: ubuntu-latest
+    env:
+      ENVIRONMENT: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install shared deps
+        working-directory: packages/shared
+        run: npm ci --legacy-peer-deps
+
+      - name: Install worker deps
+        working-directory: apps/project-sites
+        run: npm ci --legacy-peer-deps
+
+      - name: Test shared package
+        working-directory: packages/shared
+        run: npm run test:unit -- --coverage
+
+      - name: Test worker package
+        working-directory: apps/project-sites
+        run: npm run test:unit -- --coverage
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-reports
+          path: |
+            packages/shared/coverage
+            apps/project-sites/coverage
+
+  # ─── Stage 3: Deploy to Staging ────────────────────────────
+  deploy-staging:
+    name: Deploy to Staging
+    needs: [test-unit]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
+    runs-on: ubuntu-latest
+    environment: staging
+    outputs:
+      deployment-version: ${{ steps.deploy.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install worker deps
+        working-directory: apps/project-sites
+        run: npm ci --legacy-peer-deps
+
+      - name: Deploy Worker to staging
+        id: deploy
+        working-directory: apps/project-sites
+        run: |
+          npx wrangler deploy --env staging 2>&1 | tee deploy.log
+          echo "version=$(date +%s)" >> "$GITHUB_OUTPUT"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+
+  # ─── Stage 4: Playwright E2E on Staging ───────────────────
+  e2e-staging:
+    name: E2E Tests (Staging)
+    needs: [deploy-staging]
+    runs-on: ubuntu-latest
+    env:
+      BASE_URL: https://sites-staging.megabyte.space
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install worker deps
+        working-directory: apps/project-sites
+        run: npm ci --legacy-peer-deps
+
+      - name: Install Playwright browsers
+        working-directory: apps/project-sites
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright E2E on staging
+        working-directory: apps/project-sites
+        run: npx playwright test
+        env:
+          BASE_URL: ${{ env.BASE_URL }}
+
+      - name: Upload test results on failure
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-results-staging
+          path: apps/project-sites/test-results
+
+  # ─── Stage 5: Deploy to Production ─────────────────────────
+  deploy-production:
+    name: Deploy to Production
+    needs: [e2e-staging]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install worker deps
+        working-directory: apps/project-sites
+        run: npm ci --legacy-peer-deps
+
+      - name: Deploy Worker to production
+        working-directory: apps/project-sites
+        run: npx wrangler deploy --env production
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+
+  # ─── Stage 6: Post-deploy E2E on Production ────────────────
+  e2e-production:
+    name: Post-Deploy E2E (Production)
+    needs: [deploy-production]
+    runs-on: ubuntu-latest
+    env:
+      BASE_URL: https://sites.megabyte.space
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install worker deps
+        working-directory: apps/project-sites
+        run: npm ci --legacy-peer-deps
+
+      - name: Install Playwright browsers
+        working-directory: apps/project-sites
+        run: npx playwright install --with-deps chromium
+
+      - name: Run production smoke tests
+        working-directory: apps/project-sites
+        run: npx playwright test
+        env:
+          BASE_URL: ${{ env.BASE_URL }}
+
+      - name: Upload test results on failure
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-results-production
+          path: apps/project-sites/test-results
+
+      # ─── Rollback if E2E fails ──────────────────────────────
+      - name: Rollback on failure
+        if: failure()
+        working-directory: apps/project-sites
+        run: |
+          echo "::error::Production E2E failed - triggering rollback"
+          npx wrangler rollback --env production --message "Automated rollback: E2E failed"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}

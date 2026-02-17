@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 80" fill="none">
+  <!-- 3D Interlocking Chevron Icon -->
+  <g transform="translate(0, 4) scale(0.14)">
+    <!-- GREEN CHEVRON (back, upper) -->
+    <polygon points="96,128 256,32 256,176 96,272" fill="#2d9a5c"/>
+    <polygon points="256,32 416,128 416,272 256,176" fill="#4ade80"/>
+    <!-- BLUE CHEVRON (front, lower) -->
+    <polygon points="96,240 256,144 256,288 96,384" fill="#2563eb"/>
+    <polygon points="256,144 416,240 416,384 256,288" fill="#60a5fa"/>
+    <!-- GREEN front overlap -->
+    <polygon points="96,272 256,176 256,288 96,384" fill="#2d9a5c"/>
+    <polygon points="96,384 256,288 256,320 96,416" fill="#22c55e"/>
+    <!-- BLUE bottom edge -->
+    <polygon points="256,288 416,384 416,416 256,320" fill="#3b82f6"/>
+  </g>
+
+  <!-- "Project Sites" text -->
+  <text x="78" y="54" font-family="'Inter', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="42" font-weight="800" letter-spacing="-0.5" fill="#9ca3af">
+    Project Sites
+  </text>
+</svg>

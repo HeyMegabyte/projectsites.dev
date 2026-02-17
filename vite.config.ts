@@ -6,9 +6,10 @@ import { optimizeCssModules } from 'vite-plugin-optimize-css-modules';
 import tsconfigPaths from 'vite-tsconfig-paths';
 import * as dotenv from 'dotenv';
 
-// Load environment variables from multiple files
+// Load environment variables from multiple files (first match wins per key)
 dotenv.config({ path: '.env.local' });
 dotenv.config({ path: '.env' });
+dotenv.config({ path: '.env.production' });
 dotenv.config();
 
 export default defineConfig((config) => {

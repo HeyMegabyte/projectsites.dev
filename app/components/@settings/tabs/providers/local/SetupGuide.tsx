@@ -528,7 +528,7 @@ function SetupGuide({ onBack }: { onBack: () => void }) {
       </Card>
 
       {/* Performance Optimization */}
-      <Card className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 shadow-sm">
+      <Card className="bg-gradient-to-r from-purple-500/10 to-teal-500/10 border border-purple-500/20 shadow-sm">
         <CardHeader className="pb-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">

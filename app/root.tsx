@@ -47,6 +47,16 @@ export const links: LinksFunction = () => [
   },
 ];
 
+/**
+ * Must run before WebContainer.boot() to override the iframe URL.
+ * The default /headless endpoint may 404 with older internal package
+ * versions. Setting WEBCONTAINER_API_IFRAME_URL ensures the correct
+ * origin is used for the headless runtime.
+ */
+const webcontainerIframeOverride = stripIndents`
+  globalThis.WEBCONTAINER_API_IFRAME_URL = "https://stackblitz.com";
+`;
+
 const inlineThemeCode = stripIndents`
   setTutorialKitTheme();
 
@@ -67,6 +77,7 @@ export const Head = createHead(() => (
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <Meta />
     <Links />
+    <script dangerouslySetInnerHTML={{ __html: webcontainerIframeOverride }} />
     <script dangerouslySetInnerHTML={{ __html: inlineThemeCode }} />
   </>
 ));

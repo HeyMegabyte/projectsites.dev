@@ -90,6 +90,7 @@ export const ChatImpl = memo(
     const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
     const [imageDataList, setImageDataList] = useState<string[]>([]);
     const [searchParams, setSearchParams] = useSearchParams();
+    const importTriggeredRef = useRef(false);
     const [fakeLoading, setFakeLoading] = useState(false);
     const files = useStore(workbenchStore.files);
     const [designScheme, setDesignScheme] = useState<DesignScheme>(defaultDesignScheme);
@@ -190,6 +191,39 @@ export const ChatImpl = memo(
         });
       }
     }, [model, provider, searchParams]);
+
+    // Handle importChatFrom URL parameter (used by Project Sites "Edit" button)
+    useEffect(() => {
+      const importUrl = searchParams.get('importChatFrom');
+
+      if (importUrl && !importTriggeredRef.current) {
+        importTriggeredRef.current = true;
+        setSearchParams({});
+
+        toast.info('Importing chat from Project Sites...');
+
+        fetch(importUrl)
+          .then((res) => {
+            if (!res.ok) {
+              throw new Error('Failed to fetch chat data');
+            }
+
+            return res.json();
+          })
+          .then((data) => {
+            const chatData = data as { messages?: unknown[]; description?: string };
+
+            if (chatData && chatData.messages && Array.isArray(chatData.messages)) {
+              importChat(chatData.description || 'Imported from Project Sites', chatData.messages as Message[]);
+            } else {
+              toast.error('Invalid chat data format');
+            }
+          })
+          .catch((err: Error) => {
+            toast.error('Failed to import chat: ' + err.message);
+          });
+      }
+    }, [searchParams]);
 
     const { enhancingPrompt, promptEnhanced, enhancePrompt, resetEnhancer } = usePromptEnhancer();
     const { parsedMessages, parseMessages } = useMessageParser();
@@ -594,6 +628,20 @@ export const ChatImpl = memo(
       Cookies.set('selectedProvider', newProvider.name, { expires: 30 });
     };
 
+    const handleWebSearchResult = useCallback(
+      (result: string) => {
+        const currentInput = input || '';
+        const newInput = currentInput.length > 0 ? `${result}\n\n${currentInput}` : result;
+
+        // Update the input via the same mechanism as handleInputChange
+        const syntheticEvent = {
+          target: { value: newInput },
+        } as React.ChangeEvent<HTMLTextAreaElement>;
+        handleInputChange(syntheticEvent);
+      },
+      [input, handleInputChange],
+    );
+
     return (
       <BaseChat
         ref={animationScope}
@@ -664,6 +712,7 @@ export const ChatImpl = memo(
         selectedElement={selectedElement}
         setSelectedElement={setSelectedElement}
         addToolResult={addToolResult}
+        onWebSearchResult={handleWebSearchResult}
       />
     );
   },

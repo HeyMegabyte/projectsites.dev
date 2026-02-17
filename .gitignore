@@ -32,6 +32,9 @@ functions/build/
 *.vars
 .wrangler
 _worker.bundle
+package-lock.json
+test-results/
+playwright-report/
 
 Modelfile
 modelfiles
