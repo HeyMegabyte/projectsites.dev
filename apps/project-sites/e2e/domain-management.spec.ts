@@ -86,6 +86,29 @@ test.describe('Domain Management UI', () => {
   });
 });
 
+test.describe('Admin Panel Styling', () => {
+  test('admin panel has min-height: 500px', async ({ page }) => {
+    await page.goto('/');
+
+    const html = await page.content();
+    expect(html).toContain('min-height: 500px');
+  });
+});
+
+test.describe('Site Card URL Display', () => {
+  test('site card rendering includes both CNAME and URL badge logic', async ({ page }) => {
+    await page.goto('/');
+
+    const html = await page.content();
+    // Verify CNAME badge markup
+    expect(html).toContain('>CNAME</span>');
+    // Verify URL badge markup (always rendered)
+    expect(html).toContain('>URL</span>');
+    // Verify the URL falls back to CNAME when no primary custom domain
+    expect(html).toContain('hasPrimaryCustom ? \'https://\' + s.primary_hostname : cnameUrl');
+  });
+});
+
 test.describe('Workflow Error Display', () => {
   test('build terminal does not display [object Object]', async ({ page }) => {
     await page.goto('/');

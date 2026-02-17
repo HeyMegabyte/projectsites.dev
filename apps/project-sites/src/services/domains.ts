@@ -267,7 +267,7 @@ export async function provisionCustomDomain(
   db: D1Database,
   env: Env,
   opts: { org_id: string; site_id: string; hostname: string },
-): Promise<{ hostname: string; status: HostnameState }> {
+): Promise<{ hostname: string; status: HostnameState; is_primary: boolean }> {
   // Check domain limit
   const { data: existingDomains } = await dbQuery<{ id: string }>(
     db,
@@ -290,12 +290,23 @@ export async function provisionCustomDomain(
     throw conflict(`Hostname ${opts.hostname} already registered`);
   }
 
+  // Check if this site already has custom domains (for auto-primary logic)
+  const { data: siteCustomDomains } = await dbQuery<{ id: string; type: string }>(
+    db,
+    'SELECT id, type FROM hostnames WHERE site_id = ? AND type = ? AND deleted_at IS NULL',
+    [opts.site_id, 'custom_cname'],
+  );
+
+  const isFirstCustomDomain = siteCustomDomains.length === 0;
+
   // Create CF custom hostname
   const cfResult = await createCustomHostname(env, opts.hostname);
 
+  const hostnameId = crypto.randomUUID();
+
   // Store in DB
   await dbInsert(db, 'hostnames', {
-    id: crypto.randomUUID(),
+    id: hostnameId,
     org_id: opts.org_id,
     site_id: opts.site_id,
     hostname: opts.hostname,
@@ -308,9 +319,16 @@ export async function provisionCustomDomain(
     deleted_at: null,
   });
 
+  // Auto-set as primary if this is the first custom domain for the site
+  if (isFirstCustomDomain) {
+    await dbUpdate(db, 'hostnames', { is_primary: 0 }, 'site_id = ?', [opts.site_id]);
+    await dbUpdate(db, 'hostnames', { is_primary: 1 }, 'id = ?', [hostnameId]);
+  }
+
   return {
     hostname: opts.hostname,
     status: cfResult.status === 'active' ? 'active' : 'pending',
+    is_primary: isFirstCustomDomain,
   };
 }
 
