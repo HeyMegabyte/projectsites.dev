@@ -442,12 +442,12 @@
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 16px;
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
       position: relative;
       display: flex;
       flex-direction: column;
       gap: 10px;
-      animation: fadeInUp 0.4s ease both;
+      animation: fadeInUp 0.4s ease forwards;
     }
     .site-card:hover {
       border-color: var(--border-hover);
@@ -618,6 +618,98 @@
       line-height: 1;
     }
     .modal-close:hover { color: var(--text-primary); }
+
+    /* Site Logs Modal */
+    .logs-modal { max-width: 680px; width: 95%; max-height: 85vh; padding: 24px; }
+    .logs-container {
+      background: #0c0c1e;
+      border: 1px solid rgba(100, 255, 218, 0.1);
+      border-radius: 8px;
+      padding: 0;
+      max-height: 55vh;
+      overflow-y: auto;
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', Consolas, monospace;
+      font-size: 0.72rem;
+      line-height: 1.6;
+    }
+    .logs-container::-webkit-scrollbar { width: 6px; }
+    .logs-container::-webkit-scrollbar-track { background: transparent; }
+    .logs-container::-webkit-scrollbar-thumb { background: rgba(100, 255, 218, 0.2); border-radius: 3px; }
+    .logs-empty {
+      padding: 32px;
+      text-align: center;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+    .log-entry {
+      display: flex;
+      gap: 10px;
+      padding: 6px 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      align-items: flex-start;
+      transition: background 0.15s ease;
+    }
+    .log-entry:hover { background: rgba(100, 255, 218, 0.03); }
+    .log-entry:last-child { border-bottom: none; }
+    .log-ts {
+      color: #6b7280;
+      flex-shrink: 0;
+      white-space: nowrap;
+      min-width: 130px;
+    }
+    .log-action {
+      font-weight: 600;
+      flex-shrink: 0;
+      min-width: 140px;
+    }
+    .log-action.site-created { color: #22c55e; }
+    .log-action.site-deleted { color: #ef4444; }
+    .log-action.site-updated { color: #3b82f6; }
+    .log-action.site-reset { color: #f59e0b; }
+    .log-action.site-deployed { color: #8b5cf6; }
+    .log-action.hostname-provisioned { color: #06b6d4; }
+    .log-action.hostname-unsubscribed { color: #fbbf24; }
+    .log-action.hostname-verified { color: #22c55e; }
+    .log-action.hostname-deprovisioned { color: #ef4444; }
+    .log-action.hostname-set-primary { color: #a78bfa; }
+    .log-action.workflow-started { color: var(--accent); }
+    .log-action.workflow-completed { color: #22c55e; }
+    .log-action.workflow-failed { color: #ef4444; }
+    .log-action.default-action { color: var(--text-secondary); }
+    .log-meta {
+      color: var(--text-muted);
+      word-break: break-word;
+      flex: 1;
+    }
+    .log-meta code {
+      background: rgba(100, 255, 218, 0.08);
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-size: 0.68rem;
+    }
+    .logs-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      gap: 8px;
+    }
+    .logs-toolbar .logs-count {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+    .logs-toolbar .logs-refresh-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      padding: 4px 10px;
+      font-size: 0.72rem;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .logs-toolbar .logs-refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+
     .hostname-list {
       display: flex;
       flex-direction: column;
@@ -739,6 +831,15 @@
       display: none;
     }
     .admin-site-count.loaded { display: inline-block; }
+    .credits-pill {
+      font-size: 0.65rem;
+      background: rgba(124, 58, 237, 0.15);
+      color: #a78bfa;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 600;
+      margin-left: 4px;
+    }
     .admin-sites-usage {
       font-size: 0.8rem;
       color: var(--text-muted);
@@ -3071,6 +3172,7 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
           <span>Your Websites</span>
           <span id="admin-site-count" class="admin-site-count"></span>
+          <span id="admin-credits-pill" class="credits-pill" style="display:none;"></span>
         </div>
         <div class="admin-panel-actions">
           <button class="admin-btn" id="admin-refresh-btn" onclick="loadAdminDashboard()" title="Refresh">
@@ -3168,15 +3270,22 @@
 
   <!-- Delete Confirmation Modal -->
   <div id="delete-modal" class="modal-overlay" onclick="if(event.target===this)closeDeleteModal()">
-    <div class="modal" style="max-width:400px;">
+    <div class="modal" style="max-width:440px;">
       <div class="modal-title">
         <span>Delete Website?</span>
-        <button class="modal-close" onclick="closeDeleteModal()">&times;</button>
+        <button class="modal-close" onclick="closeDeleteModal()" aria-label="Close">&times;</button>
       </div>
-      <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:20px;">This will permanently remove <strong id="delete-modal-name"></strong> and its domains. This cannot be undone.</p>
+      <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:16px;">This will permanently remove <strong id="delete-modal-name"></strong> and its domains. This cannot be undone.</p>
+      <div id="delete-modal-sub-option" style="display:none;margin-bottom:16px;padding:12px;background:rgba(100,255,218,0.05);border:1px solid rgba(100,255,218,0.12);border-radius:8px;">
+        <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:0.82rem;color:var(--text-secondary);">
+          <input type="checkbox" id="delete-cancel-sub" style="margin-top:3px;accent-color:var(--accent);" />
+          <span>Also cancel my paid subscription. <span style="color:var(--text-muted);font-size:0.75rem;">Uncheck this if you plan to create a new site and want to keep your subscription credit.</span></span>
+        </label>
+      </div>
+      <div id="delete-modal-msg" class="msg" style="margin-bottom:12px;"></div>
       <div style="display:flex;gap:10px;justify-content:flex-end;">
         <button class="admin-btn" onclick="closeDeleteModal()">Cancel</button>
-        <button class="admin-btn" style="border-color:var(--error);color:var(--error);" onclick="confirmDeleteSite()">Delete</button>
+        <button class="admin-btn" id="delete-confirm-btn" style="border-color:var(--error);color:var(--error);" onclick="confirmDeleteSite()">Delete</button>
       </div>
     </div>
   </div>
@@ -3204,6 +3313,25 @@
       <div style="display:flex;gap:10px;justify-content:flex-end;">
         <button class="admin-btn" onclick="closeEditSiteModal()">Cancel</button>
         <button class="admin-btn admin-btn-accent" id="edit-site-save-btn" onclick="saveEditSite()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Site Logs Modal -->
+  <div id="site-logs-modal" class="modal-overlay" onclick="if(event.target===this)closeSiteLogsModal()">
+    <div class="modal logs-modal">
+      <div class="modal-title">
+        <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Logs: <span id="logs-modal-site-name"></span></span>
+        <button class="modal-close" onclick="closeSiteLogsModal()" aria-label="Close logs">&times;</button>
+      </div>
+      <div class="logs-toolbar">
+        <span class="logs-count" id="logs-count-label"></span>
+        <button class="logs-refresh-btn" onclick="refreshSiteLogs()">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px;margin-right:3px;"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Refresh
+        </button>
+      </div>
+      <div class="logs-container" id="logs-container">
+        <div class="logs-empty">Loading logs...</div>
       </div>
     </div>
   </div>
@@ -3299,7 +3427,7 @@
           <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(100,255,218,0.05);border:1px solid rgba(100,255,218,0.15);border-radius:var(--radius);font-size:0.72rem;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
             <span style="color:var(--text-secondary);flex:1;">Google Place ID: <a id="details-place-id-text" href="#" target="_blank" rel="noopener noreferrer" style="color:var(--accent);font-size:0.68rem;font-family:monospace;text-decoration:underline;text-underline-offset:2px;"></a></span>
-            <button onclick="removeGooglePlaceId()" title="Remove Google Place ID" style="background:none;border:none;cursor:pointer;padding:2px;line-height:1;color:var(--text-muted);font-size:1rem;opacity:0.7;transition:opacity 0.2s;" onmouseover="this.style.opacity='1';this.style.color='var(--accent)'" onmouseout="this.style.opacity='0.7';this.style.color='var(--text-muted)'">&times;</button>
+            <button onclick="removeGooglePlaceId()" title="Remove Google Place ID" aria-label="Remove Google Place ID" style="background:none;border:none;cursor:pointer;padding:2px;line-height:1;color:var(--text-muted);font-size:1rem;opacity:0.7;transition:opacity 0.2s;" onmouseover="this.style.opacity='1';this.style.color='var(--accent)'" onmouseout="this.style.opacity='0.7';this.style.color='var(--text-muted)'">&times;</button>
           </div>
         </div>
       </div>
@@ -3972,6 +4100,8 @@
       Promise.all([sitesP, subP, domainSummaryP]).then(function(results) {
         adminSites = results[0];
         adminSubscription = results[1];
+        state._adminSites = adminSites;
+        state._adminSubscription = adminSubscription;
         renderAdminSites();
         renderAdminBilling();
         renderDomainSummary(results[2]);
@@ -4020,6 +4150,27 @@
         }
       }
 
+      // Credits pill: show how many paid slots are available
+      var creditsPill = document.getElementById('admin-credits-pill');
+      if (creditsPill) {
+        if (isPaidOrg) {
+          var subQty = (adminSubscription && adminSubscription.quantity) ? Number(adminSubscription.quantity) : 1;
+          var paidSiteCount = 0;
+          for (var ci = 0; ci < adminSites.length; ci++) {
+            if (adminSites[ci].plan === 'paid') paidSiteCount++;
+          }
+          var availableCredits = Math.max(0, subQty - paidSiteCount);
+          if (availableCredits > 0) {
+            creditsPill.textContent = availableCredits + ' credit' + (availableCredits !== 1 ? 's' : '') + ' available';
+            creditsPill.style.display = 'inline-block';
+          } else {
+            creditsPill.style.display = 'none';
+          }
+        } else {
+          creditsPill.style.display = 'none';
+        }
+      }
+
       if (!adminSites.length) {
         grid.innerHTML = '<div class="site-card-new" onclick="openNewWebsiteModal()">'
           + '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>'
@@ -4065,7 +4216,7 @@
           html += '<span class="plan-badge paid">Paid</span>';
         } else {
           html += '<span class="plan-badge free">Free</span>';
-          html += '<button class="site-card-upgrade-btn" onclick="openSiteCheckout(\'' + escapeHtml(s.id) + '\')">Upgrade to Paid</button>';
+          html += '<button class="site-card-upgrade-btn" onclick="openSiteCheckout(\'' + escapeAttr(s.id) + '\')">Upgrade to Paid</button>';
         }
         html += '</div>';
 
@@ -4090,7 +4241,7 @@
             html += '<div class="site-card-url-row">';
             html += '<span style="' + tagStyle + 'background:rgba(148,163,184,0.15);color:#94a3b8;">CNAME</span>';
             html += '<div class="site-card-domain"><a href="' + escapeHtml(cnameUrl) + '" target="_blank">' + escapeHtml(cnameHost) + '</a></div>';
-            html += '<button class="site-card-copy-btn" onclick="copyUrl(\'' + escapeHtml(cnameUrl) + '\', this)" title="Copy CNAME"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>';
+            html += '<button class="site-card-copy-btn" onclick="copyUrl(\'' + escapeAttr(cnameUrl) + '\', this)" title="Copy CNAME"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>';
             html += '</div>';
 
             // Separate URL row (custom domain)
@@ -4101,14 +4252,14 @@
             if (s.has_premium_domain) {
               html += '<span class="premium-domain-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>PREMIUM</span>';
             }
-            html += '<button class="site-card-copy-btn" onclick="copyUrl(\'' + escapeHtml(primaryUrl) + '\', this)" title="Copy URL"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>';
+            html += '<button class="site-card-copy-btn" onclick="copyUrl(\'' + escapeAttr(primaryUrl) + '\', this)" title="Copy URL"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>';
             html += '</div>';
           } else {
             // Single combined row: URL / CNAME (both point to the same place)
             html += '<div class="site-card-url-row">';
             html += '<span style="' + tagStyle + 'background:rgba(80,165,219,0.15);color:var(--accent);">URL / CNAME</span>';
             html += '<div class="site-card-domain"><a href="' + escapeHtml(cnameUrl) + '" target="_blank">' + escapeHtml(cnameHost) + '</a></div>';
-            html += '<button class="site-card-copy-btn" onclick="copyUrl(\'' + escapeHtml(cnameUrl) + '\', this)" title="Copy URL"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>';
+            html += '<button class="site-card-copy-btn" onclick="copyUrl(\'' + escapeAttr(cnameUrl) + '\', this)" title="Copy URL"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>';
             html += '</div>';
           }
         }
@@ -4121,21 +4272,22 @@
         // Action buttons - Row 1 (primary actions)
         html += '<div class="site-card-actions">';
         if (status === 'published' && siteUrl) {
-          html += '<button class="site-card-btn" onclick="window.open(\'' + escapeHtml(siteUrl) + '\', \'_blank\')">Visit</button>';
+          html += '<button class="site-card-btn" onclick="window.open(\'' + escapeAttr(siteUrl) + '\', \'_blank\')">Visit</button>';
         } else if (status === 'building') {
-          html += '<button class="site-card-btn" onclick="state.siteId=\'' + escapeHtml(s.id) + '\';state.slug=\'' + escapeHtml(slug) + '\';navigateTo(\'waiting\');">Status</button>';
+          html += '<button class="site-card-btn" onclick="state.siteId=\'' + escapeAttr(s.id) + '\';state.slug=\'' + escapeAttr(slug) + '\';navigateTo(\'waiting\');">Status</button>';
         }
         if (status === 'published' && slug) {
-          html += '<button class="site-card-btn" onclick="editSiteInBolt(\'' + escapeHtml(slug) + '\')" title="Edit in AI Editor">AI Edit</button>';
+          html += '<button class="site-card-btn" onclick="editSiteInBolt(\'' + escapeAttr(slug) + '\')" title="Edit in AI Editor">AI Edit</button>';
         }
-        html += '<button class="site-card-btn" onclick="openEditSiteModal(\'' + escapeHtml(s.id) + '\', \'' + escapeHtml(name) + '\', \'' + escapeHtml(slug) + '\')">Rename</button>';
+        html += '<button class="site-card-btn" onclick="openEditSiteModal(\'' + escapeAttr(s.id) + '\', \'' + escapeAttr(name) + '\', \'' + escapeAttr(slug) + '\')">Rename</button>';
+        html += '<button class="site-card-btn" onclick="openSiteLogsModal(\'' + escapeAttr(s.id) + '\', \'' + escapeAttr(name) + '\')">Logs</button>';
         html += '</div>';
         // Action buttons - Row 2 (management)
         html += '<div class="site-card-actions">';
-        html += '<button class="site-card-btn" onclick="openDomainModal(\'' + escapeHtml(s.id) + '\', \'' + escapeHtml(name) + '\', \'' + escapeHtml(slug) + '\')">Domains</button>';
-        html += '<button class="site-card-btn" onclick="openResetModal(\'' + escapeHtml(s.id) + '\', \'' + escapeHtml(name) + '\', \'' + escapeHtml(s.business_address || '') + '\', \'' + escapeHtml(s.google_place_id || '') + '\', \'' + escapeHtml(s.additional_context || '') + '\')">Reset</button>';
-        html += '<button class="site-card-btn" onclick="openDeployModal(\'' + escapeHtml(s.id) + '\', \'' + escapeHtml(name) + '\')">Deploy</button>';
-        html += '<button class="site-card-btn danger" onclick="openDeleteModal(\'' + escapeHtml(s.id) + '\', \'' + escapeHtml(name) + '\')">Delete</button>';
+        html += '<button class="site-card-btn" onclick="openDomainModal(\'' + escapeAttr(s.id) + '\', \'' + escapeAttr(name) + '\', \'' + escapeAttr(slug) + '\')">Domains</button>';
+        html += '<button class="site-card-btn" onclick="openResetModal(\'' + escapeAttr(s.id) + '\', \'' + escapeAttr(name) + '\', \'' + escapeAttr(s.business_address || '') + '\', \'' + escapeAttr(s.google_place_id || '') + '\', \'' + escapeAttr(s.additional_context || '') + '\')">Reset</button>';
+        html += '<button class="site-card-btn" onclick="openDeployModal(\'' + escapeAttr(s.id) + '\', \'' + escapeAttr(name) + '\')">Deploy</button>';
+        html += '<button class="site-card-btn danger" onclick="openDeleteModal(\'' + escapeAttr(s.id) + '\', \'' + escapeAttr(name) + '\')">Delete</button>';
         html += '</div>';
         html += '</div>';
       }
@@ -4257,21 +4409,21 @@
             html += '<div style="display:flex;align-items:center;gap:4px;">';
             // Re-verify button for pending/failed hostnames
             if (h.status === 'pending' || h.status === 'verification_failed') {
-              html += '<button class="hostname-delete-btn" onclick="verifyHostname(\'' + escapeHtml(h.id) + '\')" title="Re-verify domain" style="color:#22c55e;">';
+              html += '<button class="hostname-delete-btn" onclick="verifyHostname(\'' + escapeAttr(h.id) + '\')" title="Re-verify domain" style="color:#22c55e;">';
               html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>';
               html += '</button>';
             }
             if (!isPrimary) {
-              html += '<button class="hostname-delete-btn" onclick="setPrimaryHostname(\'' + escapeHtml(adminDomainModalSiteId) + '\', \'' + escapeHtml(h.id) + '\')" title="Set as primary" style="color:var(--text-muted);">';
+              html += '<button class="hostname-delete-btn" onclick="setPrimaryHostname(\'' + escapeAttr(adminDomainModalSiteId) + '\', \'' + escapeAttr(h.id) + '\')" title="Set as primary" style="color:var(--text-muted);">';
               html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>';
               html += '</button>';
             }
             if (hasDomainSub) {
-              html += '<button class="hostname-delete-btn" onclick="unsubscribeDomain(\'' + escapeHtml(adminDomainModalSiteId) + '\', \'' + escapeHtml(h.id) + '\', \'' + escapeHtml(h.hostname) + '\')" title="Unsubscribe & remove domain" style="color:#fbbf24;">';
+              html += '<button class="hostname-delete-btn" onclick="unsubscribeDomain(\'' + escapeAttr(adminDomainModalSiteId) + '\', \'' + escapeAttr(h.id) + '\', \'' + escapeAttr(h.hostname) + '\')" title="Unsubscribe & remove domain" style="color:#fbbf24;">';
               html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>';
               html += '</button>';
             }
-            html += '<button class="hostname-delete-btn" onclick="deleteHostnameWithWarning(\'' + escapeHtml(adminDomainModalSiteId) + '\', \'' + escapeHtml(h.id) + '\', \'' + escapeHtml(h.hostname) + '\', ' + (hasDomainSub ? 'true' : 'false') + ')" title="Remove">';
+            html += '<button class="hostname-delete-btn" onclick="deleteHostnameWithWarning(\'' + escapeAttr(adminDomainModalSiteId) + '\', \'' + escapeAttr(h.id) + '\', \'' + escapeAttr(h.hostname) + '\', ' + (hasDomainSub ? 'true' : 'false') + ')" title="Remove">';
             html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
             html += '</button>';
             html += '</div>';
@@ -4442,37 +4594,79 @@
     /* ── Delete Modal ────────────────────────────── */
 
     var deleteModalSiteId = null;
+    var deleteModalSitePlan = null;
 
     function openDeleteModal(siteId, siteName) {
       deleteModalSiteId = siteId;
       document.getElementById('delete-modal-name').textContent = siteName;
+      hideMsg('delete-modal-msg');
+
+      // Check if this site has a paid plan — show subscription option
+      var subOption = document.getElementById('delete-modal-sub-option');
+      var cancelCheck = document.getElementById('delete-cancel-sub');
+      deleteModalSitePlan = null;
+
+      // Look up the site's plan from cached admin data
+      if (state._adminSites) {
+        for (var i = 0; i < state._adminSites.length; i++) {
+          if (state._adminSites[i].id === siteId) {
+            deleteModalSitePlan = state._adminSites[i].plan || 'free';
+            break;
+          }
+        }
+      }
+
+      if (deleteModalSitePlan === 'paid') {
+        subOption.style.display = 'block';
+        cancelCheck.checked = false; // Default: keep subscription (credit remains)
+      } else {
+        subOption.style.display = 'none';
+      }
+
+      document.body.style.overflow = 'hidden';
       document.getElementById('delete-modal').classList.add('visible');
     }
 
     function closeDeleteModal() {
       document.getElementById('delete-modal').classList.remove('visible');
       deleteModalSiteId = null;
+      deleteModalSitePlan = null;
+      document.body.style.overflow = '';
     }
 
     function confirmDeleteSite() {
       if (!deleteModalSiteId) return;
 
-      var headers = {};
+      var headers = { 'Content-Type': 'application/json' };
       if (state.session && state.session.token) {
         headers['Authorization'] = 'Bearer ' + state.session.token;
       }
 
+      var btn = document.getElementById('delete-confirm-btn');
+      btn.disabled = true;
+      btn.textContent = 'Deleting...';
+
+      var cancelSub = false;
+      if (deleteModalSitePlan === 'paid') {
+        cancelSub = document.getElementById('delete-cancel-sub').checked;
+      }
+
       fetch('/api/sites/' + deleteModalSiteId, {
         method: 'DELETE',
-        headers: headers
+        headers: headers,
+        body: JSON.stringify({ cancel_subscription: cancelSub })
       })
         .then(function(res) {
-          if (!res.ok) throw new Error('Delete failed');
+          if (!res.ok) return res.json().then(function(d) { throw new Error(extractErrorMsg(d, 'Delete failed')); });
+          btn.disabled = false;
+          btn.textContent = 'Delete';
           closeDeleteModal();
           loadAdminDashboard();
         })
-        .catch(function() {
-          closeDeleteModal();
+        .catch(function(err) {
+          btn.disabled = false;
+          btn.textContent = 'Delete';
+          showMsg('delete-modal-msg', 'error', err.message || 'Delete failed. Please try again.');
         });
     }
 
@@ -5738,6 +5932,12 @@
       return div.innerHTML;
     }
 
+    /** Escape a string for safe embedding in inline onclick='' attributes (escapes single quotes too). */
+    function escapeAttr(str) {
+      if (!str) return '';
+      return escapeHtml(str).replace(/'/g, '&#39;');
+    }
+
     /* ===========================================================
        Handle Auth Callback
        =========================================================== */
@@ -6015,6 +6215,128 @@
       editSiteModalId = null;
     }
 
+    /* ===========================================================
+       Site Logs Modal
+       =========================================================== */
+    var siteLogsModalId = null;
+
+    function openSiteLogsModal(siteId, siteName) {
+      siteLogsModalId = siteId;
+      var nameEl = document.getElementById('logs-modal-site-name');
+      if (nameEl) nameEl.textContent = siteName || siteId;
+      document.getElementById('site-logs-modal').classList.add('visible');
+      fetchSiteLogs(siteId);
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeSiteLogsModal() {
+      document.getElementById('site-logs-modal').classList.remove('visible');
+      siteLogsModalId = null;
+      document.body.style.overflow = '';
+    }
+
+    function refreshSiteLogs() {
+      if (siteLogsModalId) fetchSiteLogs(siteLogsModalId);
+    }
+
+    function fetchSiteLogs(siteId) {
+      var container = document.getElementById('logs-container');
+      var countLabel = document.getElementById('logs-count-label');
+      container.innerHTML = '<div class="logs-empty">Loading logs...</div>';
+      if (countLabel) countLabel.textContent = '';
+
+      if (!state.session || !state.session.token) {
+        container.innerHTML = '<div class="logs-empty">Sign in to view logs.</div>';
+        return;
+      }
+
+      fetch('/api/sites/' + encodeURIComponent(siteId) + '/logs?limit=200', {
+        headers: { 'Authorization': 'Bearer ' + state.session.token }
+      })
+        .then(function(res) {
+          if (!res.ok) return res.json().then(function(d) { throw new Error(extractErrorMsg(d, 'Failed to load logs')); });
+          return res.json();
+        })
+        .then(function(d) {
+          var logs = d.data || [];
+          if (countLabel) countLabel.textContent = logs.length + ' log entr' + (logs.length === 1 ? 'y' : 'ies');
+          if (!logs.length) {
+            container.innerHTML = '<div class="logs-empty">No logs yet for this site.</div>';
+            return;
+          }
+          var html = '';
+          for (var i = 0; i < logs.length; i++) {
+            var log = logs[i];
+            var ts = log.created_at ? formatLogTimestamp(log.created_at) : '—';
+            var action = log.action || 'unknown';
+            var actionClass = action.replace(/\./g, '-');
+            var actionLabel = formatActionLabel(action);
+            var meta = formatLogMeta(log.metadata_json, action);
+            html += '<div class="log-entry">';
+            html += '<span class="log-ts">' + escapeHtml(ts) + '</span>';
+            html += '<span class="log-action ' + escapeHtml(actionClass) + '">' + escapeHtml(actionLabel) + '</span>';
+            html += '<span class="log-meta">' + meta + '</span>';
+            html += '</div>';
+          }
+          container.innerHTML = html;
+        })
+        .catch(function(err) {
+          container.innerHTML = '<div class="logs-empty" style="color:var(--error);">' + escapeHtml(err.message) + '</div>';
+        });
+    }
+
+    function formatLogTimestamp(iso) {
+      try {
+        var d = new Date(iso);
+        var month = String(d.getMonth() + 1).padStart(2, '0');
+        var day = String(d.getDate()).padStart(2, '0');
+        var h = String(d.getHours()).padStart(2, '0');
+        var m = String(d.getMinutes()).padStart(2, '0');
+        var s = String(d.getSeconds()).padStart(2, '0');
+        return d.getFullYear() + '-' + month + '-' + day + ' ' + h + ':' + m + ':' + s;
+      } catch (e) { return iso; }
+    }
+
+    function formatActionLabel(action) {
+      var map = {
+        'site.created': 'Site Created',
+        'site.deleted': 'Site Deleted',
+        'site.updated': 'Site Updated',
+        'site.reset': 'Site Reset',
+        'site.deployed': 'Site Deployed',
+        'hostname.provisioned': 'Domain Added',
+        'hostname.unsubscribed': 'Domain Removed',
+        'hostname.verified': 'Domain Verified',
+        'hostname.deprovisioned': 'Domain Removed',
+        'hostname.set_primary': 'Primary Domain Set',
+        'workflow.started': 'Build Started',
+        'workflow.completed': 'Build Completed',
+        'workflow.failed': 'Build Failed'
+      };
+      return map[action] || action.replace(/\./g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
+    }
+
+    function formatLogMeta(metaJson, action) {
+      if (!metaJson) return '';
+      var meta;
+      try {
+        meta = typeof metaJson === 'string' ? JSON.parse(metaJson) : metaJson;
+      } catch (e) { return ''; }
+      var parts = [];
+      // Show relevant fields but redact PII
+      if (meta.slug) parts.push('slug: <code>' + escapeHtml(meta.slug) + '</code>');
+      if (meta.hostname) parts.push('domain: <code>' + escapeHtml(meta.hostname) + '</code>');
+      if (meta.type) parts.push('type: ' + escapeHtml(meta.type));
+      if (meta.old_slug && meta.new_slug) parts.push('slug: <code>' + escapeHtml(meta.old_slug) + '</code> &rarr; <code>' + escapeHtml(meta.new_slug) + '</code>');
+      if (meta.old_name && meta.new_name) parts.push('name: ' + escapeHtml(meta.old_name) + ' &rarr; ' + escapeHtml(meta.new_name));
+      if (meta.build_version) parts.push('v' + escapeHtml(meta.build_version));
+      if (meta.business_name) parts.push(escapeHtml(meta.business_name));
+      if (meta.workflow_step) parts.push('step: ' + escapeHtml(meta.workflow_step));
+      if (meta.social_profiles) parts.push('socials: ' + escapeHtml(String(meta.social_profiles)));
+      if (meta.error) parts.push('<span style="color:var(--error);">error: ' + escapeHtml(String(meta.error).slice(0, 200)) + '</span>');
+      return parts.join(' &middot; ');
+    }
+
     function saveEditSite() {
       if (!editSiteModalId || !state.session || !state.session.token) return;
 
@@ -6276,7 +6598,7 @@
             ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>'
             : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>';
 
-          html += '<div class="deploy-folder-item" data-path="' + escapeHtml(item.name) + '" onclick="selectDeployFolder(\'' + escapeHtml(item.name) + '\')">';
+          html += '<div class="deploy-folder-item" data-path="' + escapeHtml(item.name) + '" onclick="selectDeployFolder(\'' + escapeAttr(item.name) + '\')">';
           html += '<span class="deploy-folder-icon">' + iconSvg + '</span>';
           html += '<span class="deploy-folder-name">' + escapeHtml(item.label) + '</span>';
           html += '<span class="deploy-folder-count">' + item.count + ' file' + (item.count !== 1 ? 's' : '') + '</span>';
@@ -6446,7 +6768,7 @@
       var html = '';
       for (var i = 0; i < available.length; i++) {
         var r = available[i];
-        html += '<div class="domain-result-item" onclick="selectDomainForPurchase(\'' + escapeHtml(r.domain) + '\', ' + (r.price || 0) + ')">';
+        html += '<div class="domain-result-item" onclick="selectDomainForPurchase(\'' + escapeAttr(r.domain) + '\', ' + (r.price || 0) + ')">';
         html += '<div>';
         html += '<div class="domain-result-name">' + escapeHtml(r.domain) + '</div>';
         html += '</div>';

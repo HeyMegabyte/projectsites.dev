@@ -401,6 +401,15 @@ api.get('/api/billing/entitlements', async (c) => {
 
 api.get('/api/sites/:siteId/hostnames', async (c) => {
   const siteId = c.req.param('siteId');
+  const orgId = c.get('orgId');
+  if (!orgId) throw unauthorized('Must be authenticated');
+
+  const site = await dbQueryOne<Record<string, unknown>>(
+    c.env.DB,
+    'SELECT id FROM sites WHERE id = ? AND org_id = ? AND deleted_at IS NULL',
+    [siteId, orgId],
+  );
+  if (!site) throw notFound('Site not found');
 
   const hostnames = await domainService.getSiteHostnames(c.env.DB, siteId);
   return c.json({ data: hostnames });
@@ -452,7 +461,7 @@ api.post('/api/sites/:siteId/hostnames', async (c) => {
     actor_id: c.get('userId') ?? null,
     action: 'hostname.provisioned',
     target_type: 'hostname',
-    metadata_json: { hostname: result.hostname, type: validated.type },
+    metadata_json: { site_id: siteId, hostname: result.hostname, type: validated.type },
     request_id: c.get('requestId'),
   });
 
@@ -468,7 +477,7 @@ api.delete('/api/sites/:id', async (c) => {
   const siteId = c.req.param('id');
   const site = await dbQueryOne<Record<string, unknown>>(
     c.env.DB,
-    'SELECT id, slug FROM sites WHERE id = ? AND org_id = ? AND deleted_at IS NULL',
+    'SELECT id, slug, plan FROM sites WHERE id = ? AND org_id = ? AND deleted_at IS NULL',
     [siteId, orgId],
   );
 
@@ -476,8 +485,12 @@ api.delete('/api/sites/:id', async (c) => {
     throw notFound('Site not found');
   }
 
+  // Check if user wants to also cancel their subscription
+  const body = await c.req.json().catch(() => ({}));
+  const cancelSubscription = body && (body as Record<string, unknown>).cancel_subscription === true;
+
   // Soft-delete
-  await c.env.DB.prepare('UPDATE sites SET deleted_at = datetime(\'now\'), status = \'archived\' WHERE id = ?').bind(siteId).run();
+  await c.env.DB.prepare("UPDATE sites SET deleted_at = datetime('now'), status = 'archived' WHERE id = ?").bind(siteId).run();
 
   // Invalidate KV cache for the site's subdomain
   const slug = site.slug as string;
@@ -485,16 +498,42 @@ api.delete('/api/sites/:id', async (c) => {
     await c.env.CACHE_KV.delete(`host:${slug}-sites.megabyte.space`).catch(() => {});
   }
 
+  // Optionally cancel the Stripe subscription
+  let subscriptionCanceled = false;
+  if (cancelSubscription && site.plan === 'paid') {
+    const sub = await dbQueryOne<{ stripe_subscription_id: string | null }>(
+      c.env.DB,
+      'SELECT stripe_subscription_id FROM subscriptions WHERE org_id = ? AND deleted_at IS NULL',
+      [orgId],
+    );
+    if (sub?.stripe_subscription_id && c.env.STRIPE_SECRET_KEY) {
+      try {
+        await fetch(`https://api.stripe.com/v1/subscriptions/${sub.stripe_subscription_id}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Basic ${btoa(c.env.STRIPE_SECRET_KEY + ':')}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: 'cancel_at_period_end=true',
+        });
+        subscriptionCanceled = true;
+      } catch {
+        // Subscription cancel failure shouldn't block site deletion
+      }
+    }
+  }
+
   await auditService.writeAuditLog(c.env.DB, {
     org_id: orgId,
     actor_id: c.get('userId') ?? null,
     action: 'site.deleted',
     target_type: 'site',
-    metadata_json: { site_id: siteId, slug },
+    target_id: siteId,
+    metadata_json: { site_id: siteId, slug, subscription_canceled: subscriptionCanceled },
     request_id: c.get('requestId'),
   });
 
-  return c.json({ data: { deleted: true } });
+  return c.json({ data: { deleted: true, subscription_canceled: subscriptionCanceled } });
 });
 
 // ─── Set Primary Hostname ────────────────────────────────────
@@ -600,7 +639,7 @@ api.post('/api/sites/:siteId/hostnames/:hostnameId/unsubscribe', async (c) => {
     action: 'hostname.unsubscribed',
     target_type: 'hostname',
     target_id: hostnameId,
-    metadata_json: { hostname: hostname.hostname, type: hostname.type },
+    metadata_json: { site_id: siteId, hostname: hostname.hostname, type: hostname.type },
     request_id: c.get('requestId'),
   });
 
@@ -637,10 +676,33 @@ api.get('/api/audit-logs', async (c) => {
   const orgId = c.get('orgId');
   if (!orgId) throw unauthorized('Must be authenticated');
 
-  const limit = Number(c.req.query('limit') ?? '50');
-  const offset = Number(c.req.query('offset') ?? '0');
+  const limit = Math.min(Number(c.req.query('limit') ?? '50'), 200);
+  const offset = Math.max(Number(c.req.query('offset') ?? '0'), 0);
 
   const result = await auditService.getAuditLogs(c.env.DB, orgId, { limit, offset });
+  return c.json({ data: result.data });
+});
+
+// ─── Site-Specific Logs ─────────────────────────────────────
+
+api.get('/api/sites/:id/logs', async (c) => {
+  const orgId = c.get('orgId');
+  if (!orgId) throw unauthorized('Must be authenticated');
+
+  const siteId = c.req.param('id');
+
+  // Verify the site belongs to this org
+  const site = await dbQueryOne<Record<string, unknown>>(
+    c.env.DB,
+    'SELECT id FROM sites WHERE id = ? AND org_id = ?',
+    [siteId, orgId],
+  );
+  if (!site) throw notFound('Site not found');
+
+  const limit = Math.min(Number(c.req.query('limit') ?? '100'), 200);
+  const offset = Math.max(Number(c.req.query('offset') ?? '0'), 0);
+
+  const result = await auditService.getSiteAuditLogs(c.env.DB, orgId, siteId, { limit, offset });
   return c.json({ data: result.data });
 });
 
@@ -959,6 +1021,7 @@ api.patch('/api/sites/:id', async (c) => {
     actor_id: c.get('userId') ?? null,
     action: 'site.updated',
     target_type: 'site',
+    target_id: siteId,
     metadata_json: { site_id: siteId, ...body },
     request_id: c.get('requestId'),
   });
@@ -1057,6 +1120,7 @@ api.post('/api/sites/:id/reset', async (c) => {
     actor_id: c.get('userId') ?? null,
     action: 'site.reset',
     target_type: 'site',
+    target_id: siteId,
     metadata_json: { site_id: siteId, slug: site.slug },
     request_id: c.get('requestId'),
   });
@@ -1153,6 +1217,7 @@ api.post('/api/sites/:id/deploy', async (c) => {
     actor_id: c.get('userId') ?? null,
     action: 'site.deployed',
     target_type: 'site',
+    target_id: siteId,
     metadata_json: { site_id: siteId, slug, version, file_count: uploadedFiles.length },
     request_id: c.get('requestId'),
   });
