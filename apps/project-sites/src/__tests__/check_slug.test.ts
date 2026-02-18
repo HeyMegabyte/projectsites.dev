@@ -127,19 +127,20 @@ describe('GET /api/slug/check', () => {
     expect(json.data.reason).toBe('Slug is required');
   });
 
-  it('returns available=false for slug with only 1 character', async () => {
+  it('returns available=false for slug with only 1 or 2 characters', async () => {
     const { app, env } = createAuthApp();
 
-    const res = await app.request(
-      'http://localhost/api/slug/check?slug=a',
-      { method: 'GET' },
-      env,
-    );
+    const res1 = await app.request('http://localhost/api/slug/check?slug=a', { method: 'GET' }, env);
+    expect(res1.status).toBe(200);
+    const json1 = await res1.json();
+    expect(json1.data.available).toBe(false);
+    expect(json1.data.reason).toContain('at least 3 characters');
 
-    expect(res.status).toBe(200);
-    const json = await res.json();
-    expect(json.data.available).toBe(false);
-    expect(json.data.reason).toContain('at least 2 characters');
+    const res2 = await app.request('http://localhost/api/slug/check?slug=ab', { method: 'GET' }, env);
+    expect(res2.status).toBe(200);
+    const json2 = await res2.json();
+    expect(json2.data.available).toBe(false);
+    expect(json2.data.reason).toContain('at least 3 characters');
   });
 
   it('normalizes slugs (uppercase, special chars)', async () => {

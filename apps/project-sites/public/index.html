@@ -534,25 +534,37 @@
       color: var(--text-secondary);
       font-size: 0.7rem;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
       text-align: center;
     }
     .site-card-btn:hover {
-      border-color: var(--border-hover);
-      color: var(--text-primary);
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(80, 165, 219, 0.06);
+      transform: translateY(-1px);
+      box-shadow: 0 2px 8px rgba(80, 165, 219, 0.12);
     }
     .site-card-btn:focus {
       outline: none;
       border-color: var(--accent);
-      box-shadow: 0 0 0 2px var(--accent-dim);
+      box-shadow: 0 0 0 2px var(--accent-dim), 0 0 12px rgba(80, 165, 219, 0.1);
     }
     .site-card-btn:active {
-      transform: scale(0.97);
-      background: rgba(80, 165, 219, 0.08);
+      transform: translateY(1px) scale(0.96);
+      background: rgba(80, 165, 219, 0.12);
+      border-color: #4ecdc4;
+      box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.15);
+      transition-duration: 0.08s;
     }
     .site-card-btn.danger:hover {
       border-color: var(--error);
       color: var(--error);
+      background: rgba(239, 68, 68, 0.06);
+      box-shadow: 0 2px 8px rgba(239, 68, 68, 0.12);
+    }
+    .site-card-btn.danger:active {
+      background: rgba(239, 68, 68, 0.12);
+      border-color: #dc2626;
     }
 
     /* New Site Card */
@@ -1108,14 +1120,44 @@
       line-height: 1;
     }
     .inline-edit-wrap .inline-cancel-btn:hover { color: #dc2626; }
+    .inline-edit-wrap.inline-edit-inline {
+      display: inline-flex;
+      gap: 2px;
+      min-height: auto;
+      vertical-align: baseline;
+    }
+    .inline-edit-wrap.inline-edit-inline .slug-editable {
+      font-family: inherit;
+      font-size: inherit;
+      color: inherit;
+      border-bottom: 1px dashed currentColor;
+      padding-bottom: 0;
+    }
+    .inline-edit-wrap.inline-edit-inline .inline-edit-btn {
+      vertical-align: baseline;
+      padding: 0 1px;
+      opacity: 0.5;
+    }
+    .inline-edit-wrap.inline-edit-inline .inline-input {
+      display: inline;
+      width: auto;
+      min-width: 40px;
+      max-width: 140px;
+      padding: 1px 4px;
+      font-size: inherit;
+      font-family: inherit;
+      vertical-align: baseline;
+      border-radius: 3px;
+    }
     .inline-slug-url {
       font-size: 0.68rem;
       font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
-      margin-top: 2px;
       transition: color 0.2s;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      flex: 1;
+      min-width: 0;
     }
     .inline-slug-url.status-default { color: var(--accent); }
     .inline-slug-url.status-available { color: #22c55e; }
@@ -1760,37 +1802,60 @@
       transform: none !important;
     }
     .btn-accent {
-      background: var(--accent);
+      background: linear-gradient(135deg, var(--accent) 0%, #4ecdc4 50%, var(--accent) 100%);
+      background-size: 200% 200%;
       color: var(--bg-primary);
+      transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease, background-position 0.5s ease, filter 0.3s ease;
     }
     .btn-accent:hover:not(:disabled) {
-      transform: translateY(-2px);
-      box-shadow: 0 0 40px rgba(80, 165, 219, 0.3), 0 0 80px rgba(80, 165, 219, 0.1);
+      transform: translateY(-3px);
+      background-position: 100% 0;
+      box-shadow:
+        0 0 20px rgba(80, 165, 219, 0.4),
+        0 0 60px rgba(80, 165, 219, 0.15),
+        0 4px 16px rgba(0, 0, 0, 0.3);
+      filter: brightness(1.1);
     }
     .btn-accent:focus:not(:disabled) {
       outline: none;
-      box-shadow: 0 0 0 3px var(--accent-dim), 0 0 40px rgba(80, 165, 219, 0.2);
+      box-shadow:
+        0 0 0 3px var(--accent-dim),
+        0 0 30px rgba(80, 165, 219, 0.25),
+        inset 0 0 12px rgba(255, 255, 255, 0.08);
     }
     .btn-accent:active:not(:disabled) {
-      transform: translateY(0) scale(0.98);
+      transform: translateY(1px) scale(0.97);
+      box-shadow:
+        0 0 10px rgba(80, 165, 219, 0.3),
+        inset 0 2px 6px rgba(0, 0, 0, 0.2);
+      filter: brightness(0.95);
+      transition-duration: 0.08s;
     }
     .btn-secondary-outline {
       background: transparent;
       color: var(--text-primary);
       border: 1.5px solid var(--border);
+      transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease, border-color 0.3s ease, color 0.3s ease, background 0.3s ease;
     }
     .btn-secondary-outline:hover:not(:disabled) {
       border-color: var(--accent);
       color: var(--accent);
-      transform: translateY(-1px);
+      transform: translateY(-2px);
+      background: rgba(80, 165, 219, 0.04);
+      box-shadow:
+        0 0 20px rgba(80, 165, 219, 0.1),
+        0 4px 12px rgba(0, 0, 0, 0.2);
     }
     .btn-secondary-outline:focus:not(:disabled) {
       outline: none;
       border-color: var(--accent);
-      box-shadow: 0 0 0 3px var(--accent-dim);
+      box-shadow: 0 0 0 3px var(--accent-dim), 0 0 20px rgba(80, 165, 219, 0.1);
     }
     .btn-secondary-outline:active:not(:disabled) {
-      transform: scale(0.98);
+      transform: scale(0.97);
+      background: rgba(80, 165, 219, 0.08);
+      border-color: #4ecdc4;
+      transition-duration: 0.08s;
     }
     .btn-full { width: 100%; }
     .btn-large {
@@ -1800,7 +1865,7 @@
     }
 
     /* Material-style ripple effect */
-    .btn, .site-card-btn, .admin-btn, .logs-refresh-btn {
+    .btn, .site-card-btn, .admin-btn, .logs-refresh-btn, .domain-tab, .hostname-delete-btn {
       position: relative;
       overflow: hidden;
     }
@@ -4341,40 +4406,26 @@
         html += '<button class="inline-edit-btn" onclick="startInlineEdit(\'' + escapeJsString(s.id) + '\', \'name\', \'' + escapeJsString(name) + '\')" title="Edit title" aria-label="Edit title"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>';
         html += '</div>';
 
-        // Slug — inline editable
-        if (slug) {
-          html += '<div id="inline-slug-wrap-' + s.id + '">';
-          html += '<div class="inline-edit-wrap" id="inline-slug-' + s.id + '">';
-          html += '<span class="inline-text" style="font-family:\'SF Mono\',\'Fira Code\',monospace;font-size:0.72rem;color:var(--text-muted);">' + escapeHtml(slug) + '</span>';
-          html += '<button class="inline-edit-btn" onclick="startInlineEdit(\'' + escapeJsString(s.id) + '\', \'slug\', \'' + escapeJsString(slug) + '\')" title="Edit slug" aria-label="Edit slug"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>';
-          html += '</div>';
-          html += '<div class="inline-slug-url status-default" id="inline-slug-url-' + s.id + '">https://' + escapeHtml(slug) + '-sites.megabyte.space</div>';
-          html += '</div>';
-        }
-
         // Status badge
         html += '<div class="site-card-status ' + status + '">';
         if (status === 'published') html += '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
         if (status === 'building') html += '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>';
         html += statusLabel + '</div>';
 
-        // Domain links: combined URL/CNAME when same, separate rows when different
+        // Slug — displayed as embedded editable part of the URL line
+        // Combines: slug editor, URL display, and CNAME into a single line
         if (slug) {
           var cnameHost = slug + '-sites.megabyte.space';
           var cnameUrl = 'https://' + cnameHost;
+          html += '<div class="site-card-url-row" id="inline-slug-wrap-' + s.id + '">';
+          html += '<span class="inline-slug-url status-default" id="inline-slug-url-' + s.id + '">https://<span class="inline-edit-wrap inline-edit-inline" id="inline-slug-' + s.id + '"><span class="inline-text slug-editable">' + escapeHtml(slug) + '</span><button class="inline-edit-btn" onclick="startInlineEdit(\'' + escapeJsString(s.id) + '\', \'slug\', \'' + escapeJsString(slug) + '\')" title="Edit slug" aria-label="Edit slug"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button></span>-sites.megabyte.space</span>';
+          html += '<button class="site-card-copy-btn" onclick="copyUrl(\'' + escapeAttr(cnameUrl) + '\', this)" title="Copy URL"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>';
+          html += '</div>';
+          // If custom primary domain, show it separately
           var hasPrimaryCustom = s.primary_hostname && s.primary_hostname !== cnameHost;
-          var tagStyle = 'display:inline-block;font-size:0.6rem;padding:1px 5px;border-radius:3px;font-weight:600;flex-shrink:0;min-width:42px;text-align:center;';
-
           if (hasPrimaryCustom) {
-            // Separate CNAME row
-            html += '<div class="site-card-url-row">';
-            html += '<span style="' + tagStyle + 'background:rgba(148,163,184,0.15);color:#94a3b8;">CNAME</span>';
-            html += '<div class="site-card-domain"><a href="' + escapeHtml(cnameUrl) + '" target="_blank">' + escapeHtml(cnameHost) + '</a></div>';
-            html += '<button class="site-card-copy-btn" onclick="copyUrl(\'' + escapeAttr(cnameUrl) + '\', this)" title="Copy CNAME"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>';
-            html += '</div>';
-
-            // Separate URL row (custom domain)
             var primaryUrl = 'https://' + s.primary_hostname;
+            var tagStyle = 'display:inline-block;font-size:0.6rem;padding:1px 5px;border-radius:3px;font-weight:600;flex-shrink:0;min-width:42px;text-align:center;';
             html += '<div class="site-card-url-row">';
             html += '<span style="' + tagStyle + 'background:rgba(80,165,219,0.15);color:var(--accent);">URL</span>';
             html += '<div class="site-card-domain"><a href="' + escapeHtml(primaryUrl) + '" target="_blank">' + escapeHtml(s.primary_hostname) + '</a></div>';
@@ -4382,13 +4433,6 @@
               html += '<span class="premium-domain-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>PREMIUM</span>';
             }
             html += '<button class="site-card-copy-btn" onclick="copyUrl(\'' + escapeAttr(primaryUrl) + '\', this)" title="Copy URL"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>';
-            html += '</div>';
-          } else {
-            // Single combined row: URL / CNAME (both point to the same place)
-            html += '<div class="site-card-url-row">';
-            html += '<span style="' + tagStyle + 'background:rgba(80,165,219,0.15);color:var(--accent);">URL / CNAME</span>';
-            html += '<div class="site-card-domain"><a href="' + escapeHtml(cnameUrl) + '" target="_blank">' + escapeHtml(cnameHost) + '</a></div>';
-            html += '<button class="site-card-copy-btn" onclick="copyUrl(\'' + escapeAttr(cnameUrl) + '\', this)" title="Copy URL"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>';
             html += '</div>';
           }
         }
@@ -4401,9 +4445,7 @@
         // Action buttons - Row 1 (primary actions)
         html += '<div class="site-card-actions">';
         if (status === 'published' && siteUrl) {
-          html += '<button class="site-card-btn" onclick="window.open(\'' + escapeJsString(siteUrl) + '\', \'_blank\')">Visit</button>';
-        } else if (status === 'building') {
-          html += '<button class="site-card-btn" onclick="state.siteId=\'' + escapeJsString(s.id) + '\';state.slug=\'' + escapeJsString(slug) + '\';navigateTo(\'waiting\');">Status</button>';
+          html += '<button class="site-card-btn btn-visit" onclick="window.open(\'' + escapeJsString(siteUrl) + '\', \'_blank\')">Visit</button>';
         }
         if (status === 'published' && slug) {
           html += '<button class="site-card-btn" onclick="editSiteInBolt(\'' + escapeJsString(slug) + '\')" title="Edit in AI Editor">AI Edit</button>';
@@ -4490,7 +4532,11 @@
       var container = document.getElementById('domain-modal-hostnames');
       container.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:8px;">Loading...</div>';
 
-      fetch('/api/sites/' + siteId + '/hostnames')
+      var hdrs = {};
+      if (state.session && state.session.token) {
+        hdrs['Authorization'] = 'Bearer ' + state.session.token;
+      }
+      fetch('/api/sites/' + siteId + '/hostnames', { headers: hdrs })
         .then(function(r) {
           if (!r.ok) return r.json().then(function(d) {
             var msg = 'Failed to load domains';
@@ -4505,17 +4551,29 @@
           var hostnames = d.data || [];
           var html = '';
 
-          // Always show the CNAME subdomain as a grayed-out, undeletable entry
+          // Always show the CNAME subdomain as the primary URL entry
           if (adminDomainModalSlug) {
             var cnameHost = adminDomainModalSlug + '-sites.megabyte.space';
-            html += '<div class="hostname-item" style="opacity:0.6;background:rgba(148,163,184,0.04);border-radius:8px;padding:10px 12px;margin-bottom:4px;">';
+            html += '<div class="hostname-item" style="background:rgba(80,165,219,0.04);border:1px solid rgba(80,165,219,0.12);border-radius:8px;padding:10px 12px;margin-bottom:8px;">';
             html += '<div style="flex:1;min-width:0;">';
             html += '<div class="hostname-item-name" style="display:flex;align-items:center;gap:6px;">';
-            html += '<a href="https://' + escapeHtml(cnameHost) + '" target="_blank" style="color:var(--text-muted);">' + escapeHtml(cnameHost) + '</a>';
-            html += '<span style="font-size:0.55rem;background:rgba(148,163,184,0.2);color:#94a3b8;padding:1px 5px;border-radius:3px;font-weight:700;letter-spacing:0.04em;">SYSTEM</span>';
+            html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+            html += '<a href="https://' + escapeHtml(cnameHost) + '" target="_blank" style="color:var(--accent);">' + escapeHtml(cnameHost) + '</a>';
+            html += '<span style="font-size:0.6rem;background:rgba(80,165,219,0.15);color:var(--accent);padding:1px 6px;border-radius:3px;font-weight:600;">PRIMARY</span>';
             html += '</div>';
-            html += '<div class="hostname-item-type" style="color:var(--text-muted);">Default subdomain &middot; cannot be removed</div>';
+            html += '<div class="hostname-item-type" style="color:var(--text-muted);">Default subdomain &middot; always active</div>';
             html += '</div>';
+            html += '</div>';
+          }
+
+          // Upgrade CTA if no custom domains
+          var hasCustom = false;
+          for (var ci = 0; ci < hostnames.length; ci++) { if (hostnames[ci].type === 'custom_cname') hasCustom = true; }
+          if (!hasCustom) {
+            html += '<div style="margin:8px 0 12px;padding:14px 16px;background:linear-gradient(135deg,rgba(100,255,218,0.04),rgba(124,58,237,0.04));border:1px solid rgba(100,255,218,0.12);border-radius:var(--radius);text-align:center;">';
+            html += '<div style="font-size:0.85rem;color:var(--text-primary);font-weight:600;margin-bottom:4px;">Want a custom domain?</div>';
+            html += '<div style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:10px;">Get a free domain or point your own for <strong style="color:var(--accent);">$50/mo</strong></div>';
+            html += '<button class="btn btn-accent" onclick="openBillingCheckout()" style="padding:8px 20px;font-size:0.8rem;">Upgrade Now</button>';
             html += '</div>';
           }
 
@@ -4532,6 +4590,12 @@
             html += '<div class="hostname-item">';
             html += '<div style="flex:1;min-width:0;">';
             html += '<div class="hostname-item-name" style="display:flex;align-items:center;gap:6px;">';
+            var isVerified = h.status === 'active' || h.status === 'verified';
+            if (isVerified) {
+              html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+            } else {
+              html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+            }
             html += '<a href="' + escapeHtml(url) + '" target="_blank">' + escapeHtml(h.hostname) + '</a>';
             if (isPrimary) {
               html += '<span style="font-size:0.6rem;background:rgba(80,165,219,0.15);color:var(--accent);padding:1px 6px;border-radius:3px;font-weight:600;">PRIMARY</span>';
@@ -4631,10 +4695,11 @@
             if (d && d.error) {
               msg = typeof d.error === 'string' ? d.error : (d.error.message || d.error.code || msg);
             }
-            // Show upgrade CTA if custom domain requires paid plan
+            // Show upgrade CTA if custom domain requires paid plan (don't also show red error)
             if (res.status === 403 && msg.toLowerCase().indexOf('paid') !== -1) {
               var ctaEl = document.getElementById('domain-connect-upgrade-cta');
               if (ctaEl) ctaEl.style.display = 'block';
+              return; // Don't throw — the CTA is enough feedback
             }
             throw new Error(msg);
           });
@@ -4645,14 +4710,22 @@
           hideMsg('domain-modal-msg');
           loadHostnames(siteId);
 
-          // Show CNAME monitoring status for newly added domain
+          // Show CNAME status based on result
           var hostnameData = d.data || d;
-          if (hostnameData.status === 'pending' && hostname) {
+          if (hostnameData.status === 'active' || hostnameData.status === 'verified') {
+            showMsg('domain-modal-msg', 'info', 'Domain added successfully! CNAME verified.');
+          } else if (hostnameData.status === 'pending' && hostname) {
             showCnameMonitor(hostname);
           }
         })
         .catch(function(err) {
-          showMsg('domain-modal-msg', 'error', err.message || 'Failed to add domain');
+          // For CNAME errors, show detailed diagnostics
+          var msg = err.message || 'Failed to add domain';
+          if (msg.indexOf('CNAME') !== -1 || msg.indexOf('cname') !== -1) {
+            showCnameDiagnostics(hostname, msg);
+          } else {
+            showMsg('domain-modal-msg', 'error', msg);
+          }
         });
     }
 
@@ -4667,6 +4740,23 @@
         + '</div>'
         + '<div style="color:var(--text-muted);font-size:0.72rem;">Point your CNAME to <code>sites.megabyte.space</code>. We\'ll verify automatically.</div>'
         + '</div>';
+    }
+
+    function showCnameDiagnostics(hostname, errorMsg) {
+      var el = document.getElementById('domain-cname-status');
+      if (!el) return;
+      el.style.display = 'block';
+      el.innerHTML = '<div style="padding:12px 14px;background:rgba(251,191,36,0.06);border:1px solid rgba(251,191,36,0.25);border-radius:var(--radius);font-size:0.8rem;">'
+        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
+        + '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>'
+        + '<strong style="color:#fbbf24;">CNAME Not Configured</strong>'
+        + '</div>'
+        + '<div style="color:var(--text-secondary);margin-bottom:8px;">' + escapeHtml(errorMsg) + '</div>'
+        + '<div style="color:var(--text-muted);font-size:0.72rem;line-height:1.5;">'
+        + '<strong>To fix:</strong> Go to your DNS provider and add a CNAME record:<br>'
+        + '<code style="background:rgba(255,255,255,0.05);padding:2px 6px;border-radius:3px;">' + escapeHtml(hostname) + '</code> &rarr; <code style="background:rgba(255,255,255,0.05);padding:2px 6px;border-radius:3px;">sites.megabyte.space</code><br>'
+        + 'Or you can <a href="javascript:void(0)" onclick="switchDomainTab(\'register\')" style="color:var(--accent);text-decoration:underline;">register a new domain</a> instead.'
+        + '</div></div>';
     }
 
     function deleteHostname(siteId, hostnameId) {
@@ -5875,7 +5965,7 @@
 
       uppyInstance = new Uppy.Uppy({
         restrictions: {
-          maxFileSize: 10 * 1024 * 1024,
+          maxFileSize: 100 * 1024 * 1024,
           maxNumberOfFiles: 5,
           allowedFileTypes: ['.jpg', '.jpeg', '.png', '.svg', '.webp', '.pdf']
         },
@@ -5890,7 +5980,7 @@
         hideUploadButton: true,
         proudlyDisplayPoweredByUppy: false,
         theme: 'dark',
-        note: 'Images (JPG, PNG, SVG, WebP) and PDFs. Max 10MB each, up to 5 files.'
+        note: 'Images (JPG, PNG, SVG, WebP) and PDFs. Max 100MB each, up to 5 files.'
       });
     }
 
@@ -5903,6 +5993,8 @@
       }
 
       var rawContext = document.getElementById('details-textarea').value.trim();
+      // Save to localStorage for re-use on Reset
+      try { localStorage.setItem('ps_business_context', rawContext); } catch(e) { /* private browsing */ }
       // Client-side sanitization: strip HTML tags and limit length
       var additionalContext = rawContext.replace(/<[^>]*>/g, '').slice(0, 5000);
       var btn = document.getElementById('build-btn');
@@ -6103,7 +6195,7 @@
 
     /* Material-style ripple effect on button clicks */
     document.addEventListener('click', function(e) {
-      var btn = e.target.closest('.btn, .site-card-btn, .admin-btn, .logs-refresh-btn');
+      var btn = e.target.closest('.btn, .site-card-btn, .admin-btn, .logs-refresh-btn, .domain-tab, .hostname-delete-btn');
       if (!btn) return;
       var circle = document.createElement('span');
       circle.className = 'ripple-circle';
@@ -6358,7 +6450,7 @@
     function validateSlugLocal(raw) {
       if (!raw || !raw.trim()) return { valid: false, reason: 'Slug is required', normalized: '' };
       var n = raw.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/--+/g, '-').replace(/^-|-$/g, '').slice(0, 100);
-      if (!n || n.length < 2) return { valid: false, reason: 'At least 2 characters', normalized: n };
+      if (!n || n.length < 3) return { valid: false, reason: 'At least 3 characters', normalized: n };
       if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(n)) return { valid: false, reason: 'Must start/end with letter or number', normalized: n };
       return { valid: true, normalized: n };
     }
@@ -6374,35 +6466,42 @@
     }
 
     function startInlineEdit(siteId, field, currentValue) {
-      var wrap = document.getElementById('inline-' + field + '-' + siteId);
-      if (!wrap) return;
-
       var isSlug = (field === 'slug');
-      var inputClass = isSlug ? 'inline-input slug-input' : 'inline-input';
 
-      wrap.innerHTML = '<input type="text" class="' + inputClass + '" id="inline-input-' + field + '-' + siteId + '" value="' + escapeHtml(currentValue) + '" maxlength="' + (isSlug ? '100' : '200') + '" />'
-        + '<button class="inline-save-btn" id="inline-save-' + field + '-' + siteId + '" onclick="saveInlineEdit(\'' + escapeJsString(siteId) + '\', \'' + field + '\', \'' + escapeJsString(currentValue) + '\')" title="Save" aria-label="Save"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>'
-        + '<button class="inline-cancel-btn" onclick="cancelInlineEdit(\'' + escapeJsString(siteId) + '\', \'' + field + '\', \'' + escapeJsString(currentValue) + '\')" title="Cancel" aria-label="Cancel"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>';
+      if (isSlug) {
+        // For slug: replace the URL line content with https://[input]-sites.megabyte.space
+        var urlEl = document.getElementById('inline-slug-url-' + siteId);
+        if (!urlEl) return;
+        urlEl.className = 'inline-slug-url status-default';
+        urlEl.innerHTML = 'https://<input type="text" class="inline-input slug-input" id="inline-input-slug-' + siteId + '" value="' + escapeHtml(currentValue) + '" maxlength="100" style="display:inline;width:auto;min-width:40px;max-width:140px;padding:1px 4px;font-size:inherit;font-family:inherit;vertical-align:baseline;border-radius:3px;" />'
+          + '<button class="inline-save-btn" id="inline-save-slug-' + siteId + '" onclick="saveInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(currentValue) + '\')" title="Save" aria-label="Save" style="background:none;border:none;cursor:pointer;color:#22c55e;padding:0 1px;vertical-align:baseline;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>'
+          + '<button class="inline-cancel-btn" onclick="cancelInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(currentValue) + '\')" title="Cancel" aria-label="Cancel" style="background:none;border:none;cursor:pointer;color:#ef4444;padding:0 1px;vertical-align:baseline;"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>'
+          + '-sites.megabyte.space';
+      } else {
+        // For name: replace the wrap content with input + save/cancel
+        var wrap = document.getElementById('inline-name-' + siteId);
+        if (!wrap) return;
+        wrap.innerHTML = '<input type="text" class="inline-input" id="inline-input-name-' + siteId + '" value="' + escapeHtml(currentValue) + '" maxlength="200" />'
+          + '<button class="inline-save-btn" id="inline-save-name-' + siteId + '" onclick="saveInlineEdit(\'' + escapeJsString(siteId) + '\', \'name\', \'' + escapeJsString(currentValue) + '\')" title="Save" aria-label="Save"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>'
+          + '<button class="inline-cancel-btn" onclick="cancelInlineEdit(\'' + escapeJsString(siteId) + '\', \'name\', \'' + escapeJsString(currentValue) + '\')" title="Cancel" aria-label="Cancel"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>';
+      }
 
       var input = document.getElementById('inline-input-' + field + '-' + siteId);
       if (input) {
         input.focus();
         input.select();
 
-        // For slug: live validation + availability check
         if (isSlug) {
           input.addEventListener('input', function() {
             onSlugInput(siteId, currentValue);
           });
-          // Show initial state as default (unchanged)
-          var urlEl = document.getElementById('inline-slug-url-' + siteId);
-          if (urlEl) {
-            urlEl.className = 'inline-slug-url status-default';
-            urlEl.textContent = 'https://' + currentValue + '-sites.megabyte.space';
-          }
+          // Size input to content width
+          input.style.width = Math.max(40, Math.min(140, currentValue.length * 7 + 16)) + 'px';
+          input.addEventListener('input', function() {
+            this.style.width = Math.max(40, Math.min(140, this.value.length * 7 + 16)) + 'px';
+          });
         }
 
-        // Submit on Enter, cancel on Escape
         input.addEventListener('keydown', function(e) {
           if (e.key === 'Enter') {
             e.preventDefault();
@@ -6426,13 +6525,11 @@
 
       if (!result.valid) {
         urlEl.className = 'inline-slug-url status-invalid';
-        urlEl.textContent = result.reason;
         if (saveBtn) saveBtn.disabled = true;
         return;
       }
 
       var normalized = result.normalized;
-      urlEl.textContent = 'https://' + normalized + '-sites.megabyte.space';
 
       // If same as original, show default blue
       if (normalized === originalSlug) {
@@ -6443,7 +6540,6 @@
 
       // Changed — check availability with debounce
       urlEl.className = 'inline-slug-url status-checking';
-      urlEl.textContent = 'Checking availability...';
       if (saveBtn) saveBtn.disabled = true;
 
       if (inlineSlugCheckTimer) clearTimeout(inlineSlugCheckTimer);
@@ -6475,11 +6571,9 @@
 
           if (d.data && d.data.available) {
             urlEl.className = 'inline-slug-url status-available';
-            urlEl.textContent = 'https://' + slug + '-sites.megabyte.space';
             if (saveBtn) saveBtn.disabled = false;
           } else {
             urlEl.className = 'inline-slug-url status-taken';
-            urlEl.textContent = (d.data && d.data.reason) || 'Slug is already taken';
             if (saveBtn) saveBtn.disabled = true;
           }
         })
@@ -6487,29 +6581,25 @@
           if (requestId !== inlineSlugCheckCounter) return;
           if (urlEl) {
             urlEl.className = 'inline-slug-url status-invalid';
-            urlEl.textContent = 'Error checking availability';
           }
         });
     }
 
     function cancelInlineEdit(siteId, field, originalValue) {
-      var wrap = document.getElementById('inline-' + field + '-' + siteId);
-      if (!wrap) return;
-
       // Clear any pending slug check timer
       if (inlineSlugCheckTimer) { clearTimeout(inlineSlugCheckTimer); inlineSlugCheckTimer = null; }
 
       var isSlug = (field === 'slug');
       if (isSlug) {
-        wrap.innerHTML = '<span class="inline-text" style="font-family:\'SF Mono\',\'Fira Code\',monospace;font-size:0.72rem;color:var(--text-muted);">' + escapeHtml(originalValue) + '</span>'
-          + '<button class="inline-edit-btn" onclick="startInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(originalValue) + '\')" title="Edit slug" aria-label="Edit slug"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>';
-        // Reset URL display
+        // Restore the combined URL line: https://[slug-editable]-sites.megabyte.space
         var urlEl = document.getElementById('inline-slug-url-' + siteId);
         if (urlEl) {
           urlEl.className = 'inline-slug-url status-default';
-          urlEl.textContent = 'https://' + originalValue + '-sites.megabyte.space';
+          urlEl.innerHTML = 'https://<span class="inline-edit-wrap inline-edit-inline" id="inline-slug-' + siteId + '"><span class="inline-text slug-editable">' + escapeHtml(originalValue) + '</span><button class="inline-edit-btn" onclick="startInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(originalValue) + '\')" title="Edit slug" aria-label="Edit slug"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button></span>-sites.megabyte.space';
         }
       } else {
+        var wrap = document.getElementById('inline-name-' + siteId);
+        if (!wrap) return;
         wrap.innerHTML = '<span class="inline-text site-card-name" title="' + escapeHtml(originalValue) + '">' + escapeHtml(originalValue) + '</span>'
           + '<button class="inline-edit-btn" onclick="startInlineEdit(\'' + escapeJsString(siteId) + '\', \'name\', \'' + escapeJsString(originalValue) + '\')" title="Edit title" aria-label="Edit title"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>';
       }
@@ -6529,7 +6619,7 @@
         var slugResult = validateSlugLocal(value);
         if (!slugResult.valid) {
           var slugUrlEl = document.getElementById('inline-slug-url-' + siteId);
-          if (slugUrlEl) { slugUrlEl.className = 'inline-slug-url status-invalid'; slugUrlEl.textContent = slugResult.reason; }
+          if (slugUrlEl) { slugUrlEl.className = 'inline-slug-url status-invalid'; }
           return;
         }
         value = slugResult.normalized;
@@ -6607,7 +6697,6 @@
             var urlEl = document.getElementById('inline-slug-url-' + siteId);
             if (urlEl) {
               urlEl.className = 'inline-slug-url status-taken';
-              urlEl.textContent = err.message || 'Failed to save';
             }
           } else {
             input.style.borderColor = '#ef4444';
@@ -6775,7 +6864,14 @@
       if (addrInput) addrInput.value = address || '';
 
       var textarea = document.getElementById('details-textarea');
-      if (textarea && context) textarea.value = context;
+      if (textarea) {
+        if (context) {
+          textarea.value = context;
+        } else {
+          // Restore from localStorage if no context from server
+          try { var saved = localStorage.getItem('ps_business_context'); if (saved) textarea.value = saved; } catch(e) { /* private browsing */ }
+        }
+      }
 
       // Update the details modal title and button
       updateDetailsScreen();
@@ -6803,6 +6899,7 @@
       if (!state.session || !state.session.token || !resetSiteId) return;
 
       var rawContext = document.getElementById('details-textarea').value.trim();
+      try { localStorage.setItem('ps_business_context', rawContext); } catch(e) { /* private browsing */ }
       var additionalContext = rawContext.replace(/<[^>]*>/g, '').slice(0, 5000);
       var btn = document.getElementById('build-btn');
 

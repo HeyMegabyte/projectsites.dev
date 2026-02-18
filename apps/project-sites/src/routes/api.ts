@@ -285,8 +285,8 @@ api.get('/api/slug/check', async (c) => {
     .replace(/^-|-$/g, '')
     .slice(0, 100);
 
-  if (!normalized || normalized.length < 2) {
-    return c.json({ data: { available: false, reason: 'Slug must be at least 2 characters' } });
+  if (!normalized || normalized.length < 3) {
+    return c.json({ data: { available: false, reason: 'Slug must be at least 3 characters' } });
   }
 
   if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(normalized)) {
@@ -1202,15 +1202,20 @@ api.post('/api/sites/:id/reset', async (c) => {
     }
   }
 
-  await auditService.writeAuditLog(c.env.DB, {
-    org_id: orgId,
-    actor_id: c.get('userId') ?? null,
-    action: 'site.reset',
-    target_type: 'site',
-    target_id: siteId,
-    metadata_json: { site_id: siteId, slug: site.slug },
-    request_id: c.get('requestId'),
-  });
+  try {
+    await auditService.writeAuditLog(c.env.DB, {
+      org_id: orgId,
+      actor_id: c.get('userId') ?? null,
+      action: 'site.reset',
+      target_type: 'site',
+      target_id: siteId,
+      metadata_json: { site_id: siteId, slug: site.slug },
+      request_id: c.get('requestId'),
+    });
+  } catch {
+    // Audit log failure should not block reset
+    console.warn('Failed to write audit log for site.reset');
+  }
 
   return c.json({
     data: {

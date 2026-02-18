@@ -104,18 +104,20 @@ test.describe('Client-side Slug Validation (validateSlugLocal)', () => {
     });
   });
 
-  test('rejects slug with only 1 character', async ({ page }) => {
+  test('rejects slug with fewer than 3 characters', async ({ page }) => {
     await page.goto('/');
 
-    const result = await page.evaluate(() => {
+    const result1 = await page.evaluate(() => {
       const fn = (window as unknown as { validateSlugLocal: (s: string) => unknown }).validateSlugLocal;
       return fn('a');
     });
+    expect(result1).toMatchObject({ valid: false, reason: expect.stringContaining('3') });
 
-    expect(result).toMatchObject({
-      valid: false,
-      reason: expect.stringContaining('2'),
+    const result2 = await page.evaluate(() => {
+      const fn = (window as unknown as { validateSlugLocal: (s: string) => unknown }).validateSlugLocal;
+      return fn('ab');
     });
+    expect(result2).toMatchObject({ valid: false, reason: expect.stringContaining('3') });
   });
 
   test('rejects slug that normalizes to empty', async ({ page }) => {
@@ -266,5 +268,132 @@ test.describe('Search Deduplication', () => {
       return typeof (window as unknown as Record<string, unknown>).renderDropdown === 'function';
     });
     expect(exists).toBe(true);
+  });
+});
+
+test.describe('Domain Modal Accessibility', () => {
+  test('domain modal has role=dialog and aria-modal', async ({ page }) => {
+    await page.goto('/');
+
+    const modal = page.locator('#domain-modal');
+    await expect(modal).toHaveAttribute('role', 'dialog');
+    await expect(modal).toHaveAttribute('aria-modal', 'true');
+  });
+
+  test('delete modal has role=dialog and aria-modal', async ({ page }) => {
+    await page.goto('/');
+
+    const modal = page.locator('#delete-modal');
+    await expect(modal).toHaveAttribute('role', 'dialog');
+    await expect(modal).toHaveAttribute('aria-modal', 'true');
+  });
+});
+
+test.describe('Domain Management Functions', () => {
+  test('loadHostnames and showCnameDiagnostics are defined', async ({ page }) => {
+    await page.goto('/');
+
+    const fns = await page.evaluate(() => {
+      const w = window as unknown as Record<string, unknown>;
+      return {
+        loadHostnames: typeof w.loadHostnames,
+        showCnameDiagnostics: typeof w.showCnameDiagnostics,
+        showCnameMonitor: typeof w.showCnameMonitor,
+        openDomainModal: typeof w.openDomainModal,
+      };
+    });
+
+    expect(fns.loadHostnames).toBe('function');
+    expect(fns.showCnameDiagnostics).toBe('function');
+    expect(fns.showCnameMonitor).toBe('function');
+    expect(fns.openDomainModal).toBe('function');
+  });
+});
+
+test.describe('Reset Functions', () => {
+  test('openResetModal and submitReset are defined', async ({ page }) => {
+    await page.goto('/');
+
+    const fns = await page.evaluate(() => {
+      const w = window as unknown as Record<string, unknown>;
+      return {
+        openResetModal: typeof w.openResetModal,
+        submitReset: typeof w.submitReset,
+      };
+    });
+
+    expect(fns.openResetModal).toBe('function');
+    expect(fns.submitReset).toBe('function');
+  });
+});
+
+test.describe('Button Effects', () => {
+  test('ripple-expand keyframe animation exists', async ({ page }) => {
+    await page.goto('/');
+
+    const hasRipple = await page.evaluate(() => {
+      const sheets = document.styleSheets;
+      for (let s = 0; s < sheets.length; s++) {
+        try {
+          const rules = sheets[s].cssRules;
+          for (let r = 0; r < rules.length; r++) {
+            if ((rules[r] as CSSKeyframesRule).name === 'ripple-expand') return true;
+          }
+        } catch { /* cross-origin */ }
+      }
+      return false;
+    });
+    expect(hasRipple).toBe(true);
+  });
+
+  test('btn-accent has enhanced background-size for gradient animation', async ({ page }) => {
+    await page.goto('/');
+
+    const hasBgSize = await page.evaluate(() => {
+      const sheets = document.styleSheets;
+      for (let s = 0; s < sheets.length; s++) {
+        try {
+          const rules = sheets[s].cssRules;
+          for (let r = 0; r < rules.length; r++) {
+            const rule = rules[r] as CSSStyleRule;
+            if (rule.selectorText === '.btn-accent') {
+              return rule.style.backgroundSize === '200% 200%';
+            }
+          }
+        } catch { /* cross-origin */ }
+      }
+      return false;
+    });
+    expect(hasBgSize).toBe(true);
+  });
+
+  test('Status button is removed from site cards', async ({ page }) => {
+    await page.goto('/');
+
+    // openStatusModal should not exist since Status button was removed
+    const exists = await page.evaluate(() => {
+      return typeof (window as unknown as Record<string, unknown>).openStatusModal;
+    });
+    // The function may still exist but the button is gone - check that "Status" button text is absent
+    // from the renderAdminSites function output (by checking the function source)
+    const hasStatusBtn = await page.evaluate(() => {
+      const fn = (window as unknown as { renderAdminSites: () => void }).renderAdminSites;
+      return fn.toString().includes("'>Status</button>'");
+    });
+    expect(hasStatusBtn).toBe(false);
+  });
+});
+
+test.describe('Upload Size Limit', () => {
+  test('upload note mentions 100MB limit', async ({ page }) => {
+    await page.goto('/');
+
+    const hasLimit = await page.evaluate(() => {
+      const fn = (window as unknown as { initUppy: () => void }).initUppy;
+      if (!fn) return false;
+      const src = fn.toString();
+      return src.includes('100 * 1024 * 1024') || src.includes('100MB');
+    });
+    expect(hasLimit).toBe(true);
   });
 });
