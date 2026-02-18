@@ -470,7 +470,7 @@ test.describe('Inline Edit Button Styling', () => {
     expect(color).toBeTruthy();
   });
 
-  test('inline-edit-btn hover has scale transform', async ({ page }) => {
+  test('inline-edit-btn hover has color transition', async ({ page }) => {
     await page.goto('/');
 
     const hasHover = await page.evaluate(() => {
@@ -481,7 +481,7 @@ test.describe('Inline Edit Button Styling', () => {
           for (let r = 0; r < rules.length; r++) {
             const rule = rules[r] as CSSStyleRule;
             if (rule.selectorText && rule.selectorText.includes('.inline-edit-btn:hover')) {
-              return rule.style.transform.includes('scale');
+              return !!rule.style.color;
             }
           }
         } catch {
@@ -765,7 +765,7 @@ test.describe('Signin Button States', () => {
 });
 
 test.describe('Inline Input Colors', () => {
-  test('inline-input has white background and dark text', async ({ page }) => {
+  test('inline-input has transparent background and inherited color', async ({ page }) => {
     await page.goto('/');
 
     const colors = await page.evaluate(() => {
@@ -792,8 +792,8 @@ test.describe('Inline Input Colors', () => {
       }
       return { background: '', color: '' };
     });
-    expect(colors.background).toMatch(/#fff|white|rgb\(255/);
-    expect(colors.color).toMatch(/#1a1a2e|rgb\(26/);
+    expect(colors.background).toBe('transparent');
+    expect(colors.color).toBe('inherit');
   });
 });
 
@@ -845,7 +845,6 @@ test.describe('Material Ripple Effect Coverage', () => {
         '.details-modal-close',
         '.header-auth-btn',
         '.site-card-new',
-        '.site-card-copy-btn',
         '.site-card-upgrade-btn',
         '.inline-edit-btn',
         '.inline-save-btn',
@@ -901,7 +900,6 @@ test.describe('Material Ripple Effect Coverage', () => {
         'details-modal-close',
         'header-auth-btn',
         'site-card-new',
-        'site-card-copy-btn',
         'site-card-upgrade-btn',
         'inline-edit-btn',
         'inline-save-btn',
@@ -1272,5 +1270,174 @@ test.describe('Slug Editable Keyboard Accessibility', () => {
       return src.includes('onkeydown') && src.includes('Enter') && src.includes('startInlineEdit');
     });
     expect(hasKeydown).toBe(true);
+  });
+});
+
+test.describe('Title Click to Edit', () => {
+  test('site-card-name in renderAdminSites has onclick for startInlineEdit', async ({ page }) => {
+    await page.goto('/');
+
+    const hasClick = await page.evaluate(() => {
+      const fn = (window as unknown as { renderAdminSites: () => void }).renderAdminSites;
+      if (!fn) return false;
+      const src = fn.toString();
+      return (
+        src.includes('site-card-name') && src.includes('onclick') && src.includes('cursor:pointer')
+      );
+    });
+    expect(hasClick).toBe(true);
+  });
+});
+
+test.describe('Copy Button No Ripple', () => {
+  test('site-card-copy-btn is excluded from ripple CSS selector', async ({ page }) => {
+    await page.goto('/');
+
+    const excluded = await page.evaluate(() => {
+      const sheets = document.styleSheets;
+      for (let s = 0; s < sheets.length; s++) {
+        try {
+          const rules = sheets[s].cssRules;
+          for (let r = 0; r < rules.length; r++) {
+            const rule = rules[r] as CSSStyleRule;
+            const sel = rule.selectorText || '';
+            if (
+              sel.includes('.btn') &&
+              rule.style.overflow === 'hidden' &&
+              rule.style.position === 'relative'
+            ) {
+              return !sel.includes('.site-card-copy-btn');
+            }
+          }
+        } catch {
+          /* cross-origin */
+        }
+      }
+      return true;
+    });
+    expect(excluded).toBe(true);
+  });
+});
+
+test.describe('Button Stability', () => {
+  test('btn-accent active has no translateY or scale transform', async ({ page }) => {
+    await page.goto('/');
+
+    const noTransform = await page.evaluate(() => {
+      const sheets = document.styleSheets;
+      for (let s = 0; s < sheets.length; s++) {
+        try {
+          const rules = sheets[s].cssRules;
+          for (let r = 0; r < rules.length; r++) {
+            const rule = rules[r] as CSSStyleRule;
+            if (rule.selectorText && rule.selectorText.includes('.btn-accent:active')) {
+              const t = rule.style.transform;
+              return !t || (!t.includes('translateY') && !t.includes('scale'));
+            }
+          }
+        } catch {
+          /* cross-origin */
+        }
+      }
+      return true;
+    });
+    expect(noTransform).toBe(true);
+  });
+});
+
+test.describe('Modified Date on Site Cards', () => {
+  test('renderAdminSites includes updated_at for modified date', async ({ page }) => {
+    await page.goto('/');
+
+    const hasModified = await page.evaluate(() => {
+      const fn = (window as unknown as { renderAdminSites: () => void }).renderAdminSites;
+      if (!fn) return false;
+      const src = fn.toString();
+      return src.includes('updated_at') && src.includes('Modified');
+    });
+    expect(hasModified).toBe(true);
+  });
+});
+
+test.describe('DVd Column Hover', () => {
+  test('dvd-column has hover CSS rule', async ({ page }) => {
+    await page.goto('/');
+
+    const hasHover = await page.evaluate(() => {
+      const sheets = document.styleSheets;
+      for (let s = 0; s < sheets.length; s++) {
+        try {
+          const rules = sheets[s].cssRules;
+          for (let r = 0; r < rules.length; r++) {
+            const rule = rules[r] as CSSStyleRule;
+            if (rule.selectorText && rule.selectorText.includes('.dvd-column:hover')) {
+              return !!rule.style.boxShadow;
+            }
+          }
+        } catch {
+          /* cross-origin */
+        }
+      }
+      return false;
+    });
+    expect(hasHover).toBe(true);
+  });
+});
+
+test.describe('AI Business Validation', () => {
+  test('submitBuild calls validate-business endpoint', async ({ page }) => {
+    await page.goto('/');
+
+    const hasValidation = await page.evaluate(() => {
+      const scripts = document.querySelectorAll('script');
+      for (let i = 0; i < scripts.length; i++) {
+        const text = scripts[i].textContent || '';
+        if (text.includes('submitBuild') && text.includes('validate-business')) {
+          return true;
+        }
+      }
+      return false;
+    });
+    expect(hasValidation).toBe(true);
+  });
+
+  test('createSiteFromSearch function exists', async ({ page }) => {
+    await page.goto('/');
+
+    const exists = await page.evaluate(() => {
+      return (
+        typeof (window as unknown as { createSiteFromSearch: unknown }).createSiteFromSearch ===
+        'function'
+      );
+    });
+    expect(exists).toBe(true);
+  });
+});
+
+test.describe('Deploy Index Warning', () => {
+  test('checkFolderForIndex function exists', async ({ page }) => {
+    await page.goto('/');
+
+    const exists = await page.evaluate(() => {
+      return (
+        typeof (window as unknown as { checkFolderForIndex: unknown }).checkFolderForIndex ===
+        'function'
+      );
+    });
+    expect(exists).toBe(true);
+  });
+});
+
+test.describe('Form Validation Reset', () => {
+  test('closeDetailsModal clears validation errors', async ({ page }) => {
+    await page.goto('/');
+
+    const clears = await page.evaluate(() => {
+      const fn = (window as unknown as { closeDetailsModal: () => void }).closeDetailsModal;
+      if (!fn) return false;
+      const src = fn.toString();
+      return src.includes('hideMsg') && src.includes('boxShadow');
+    });
+    expect(clears).toBe(true);
   });
 });

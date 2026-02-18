@@ -370,7 +370,7 @@
       box-shadow: 0 0 0 2px var(--accent-dim);
     }
     .header-auth-btn:active {
-      transform: scale(0.97);
+      opacity: 0.7;
     }
 
     /* ======================================================
@@ -438,7 +438,7 @@
       box-shadow: 0 0 0 2px var(--accent-dim);
     }
     .admin-btn:active {
-      transform: scale(0.97);
+      opacity: 0.7;
     }
     .admin-btn-accent {
       border-color: var(--accent);
@@ -464,8 +464,7 @@
     }
     .site-card:hover {
       border-color: var(--border-hover);
-      transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), 0 0 0 1px var(--border-hover);
     }
     .site-card-preview {
       height: 100px;
@@ -598,8 +597,8 @@
       box-shadow: 0 0 0 3px var(--accent-dim);
     }
     .site-card-new:active {
-      transform: scale(0.98);
       background: rgba(100, 255, 218, 0.06);
+      box-shadow: 0 0 0 2px rgba(100, 255, 218, 0.3);
     }
     .site-card-new svg { color: var(--text-muted); transition: color 0.2s; }
     .site-card-new:hover svg { color: var(--accent); }
@@ -649,7 +648,7 @@
     }
     .modal-close:hover { color: var(--text-primary); }
     .modal-close:focus { outline: none; color: var(--accent); }
-    .modal-close:active { transform: scale(0.85); transition: transform 0.06s; }
+    .modal-close:active { opacity: 0.6; transition: opacity 0.06s; }
 
     /* Site Logs Modal */
     .logs-modal { max-width: 860px; width: 95%; max-height: 90vh; padding: 24px; }
@@ -687,7 +686,13 @@
       color: #6b7280;
       flex-shrink: 0;
       white-space: nowrap;
-      min-width: 130px;
+      min-width: 140px;
+      font-size: 0.68rem;
+      letter-spacing: 0.02em;
+      padding: 2px 8px;
+      background: rgba(107, 114, 128, 0.08);
+      border-radius: 4px;
+      border-left: 2px solid rgba(100, 255, 218, 0.3);
     }
     .log-action {
       font-weight: 600;
@@ -705,7 +710,13 @@
     .log-action.hostname-deprovisioned { color: #ef4444; }
     .log-action.hostname-deleted { color: #ef4444; }
     .log-action.hostname-set-primary { color: #a78bfa; }
+    .log-action.workflow-queued { color: #fbbf24; }
     .log-action.workflow-started { color: var(--accent); }
+    .log-action.workflow-step-profile_research_complete { color: #06b6d4; }
+    .log-action.workflow-step-parallel_research_complete { color: #06b6d4; }
+    .log-action.workflow-step-html_generation_complete { color: #8b5cf6; }
+    .log-action.workflow-step-legal_and_scoring_complete { color: #a78bfa; }
+    .log-action.workflow-step-upload_to_r2_complete { color: #3b82f6; }
     .log-action.workflow-completed { color: #22c55e; }
     .log-action.workflow-failed { color: #ef4444; }
     .log-action.auth-magic_link_verified { color: #06b6d4; }
@@ -832,7 +843,7 @@
     .plan-badge.free { background: rgba(148, 163, 184, 0.15); color: #94a3b8; cursor: pointer; transition: all 0.2s; }
     .plan-badge.free:hover { background: rgba(148, 163, 184, 0.25); color: #cbd5e1; }
     .plan-badge.free:focus { outline: none; box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.3); }
-    .plan-badge.free:active { transform: scale(0.95); }
+    .plan-badge.free:active { opacity: 0.7; }
     .plan-badge.paid { background: rgba(100, 255, 218, 0.15); color: var(--accent); cursor: default; }
     .plan-badge.paid:hover { background: rgba(100, 255, 218, 0.22); }
     .plan-badge.paid:focus { outline: none; box-shadow: 0 0 0 2px var(--accent-dim); }
@@ -861,8 +872,8 @@
       box-shadow: 0 0 0 3px var(--accent-dim), 0 0 20px rgba(80, 165, 219, 0.25);
     }
     .site-card-upgrade-btn:active {
-      transform: scale(0.97);
-      box-shadow: 0 0 10px rgba(80, 165, 219, 0.2);
+      filter: brightness(0.9);
+      box-shadow: 0 0 0 3px rgba(80, 165, 219, 0.4);
     }
     @keyframes upgradeGlow {
       0%, 100% { box-shadow: 0 0 8px rgba(80, 165, 219, 0.15); }
@@ -907,8 +918,8 @@
       flex-shrink: 0;
     }
     .site-card-copy-btn:hover { color: var(--accent); }
-    .site-card-copy-btn:focus { outline: none; color: var(--accent); box-shadow: 0 0 0 2px var(--accent-dim); border-radius: 3px; }
-    .site-card-copy-btn:active { transform: scale(0.9); }
+    .site-card-copy-btn:focus { outline: none; color: var(--accent); }
+    .site-card-copy-btn:active { color: #4ecdc4; }
     .site-card-copy-btn.copied { color: #22c55e; }
     .copy-toast {
       position: absolute;
@@ -1109,7 +1120,6 @@
     .inline-edit-wrap .inline-edit-btn:hover {
       opacity: 1;
       color: #4ecdc4;
-      transform: scale(1.15);
     }
     .inline-edit-wrap .inline-edit-btn:focus {
       outline: none;
@@ -1117,22 +1127,24 @@
       color: var(--accent);
     }
     .inline-edit-wrap .inline-edit-btn:active {
-      transform: scale(0.9);
+      opacity: 0.7;
       transition-duration: 0.06s;
     }
     .inline-edit-wrap .inline-input {
       flex: 0 1 auto;
       min-width: 60px;
       max-width: 220px;
-      padding: 3px 6px;
-      border-radius: 4px;
-      border: 1px solid var(--accent);
-      background: #fff;
-      color: #1a1a2e;
+      padding: 0;
+      border: none;
+      border-bottom: 1px dashed var(--accent);
+      border-radius: 0;
+      background: transparent;
+      color: inherit;
       font-size: inherit;
       font-family: inherit;
       outline: none;
-      box-shadow: 0 0 0 2px var(--accent-dim);
+      box-shadow: none;
+      caret-color: var(--accent);
     }
     .inline-edit-wrap .inline-input.slug-input {
       font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
@@ -1223,7 +1235,7 @@
       box-shadow: none;
     }
     .inline-slug-url {
-      font-size: 0.68rem;
+      font-size: 0.78rem;
       font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
       transition: color 0.2s;
       white-space: nowrap;
@@ -1359,34 +1371,31 @@
       border-color: white;
     }
     .domain-search-results {
-      position: absolute;
-      top: 100%;
-      left: 0;
-      right: 0;
-      padding-top: 10px;
-      margin-top: -10px;
+      position: relative;
       background: var(--bg-card);
-      border: 1px solid var(--border-hover);
-      border-top: none;
-      border-radius: 0 0 var(--radius) var(--radius);
-      max-height: 250px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      max-height: 320px;
       overflow-y: auto;
-      z-index: 50;
+      margin-top: 12px;
       display: none;
-      box-shadow: var(--shadow-lg);
     }
     .domain-search-results.open { display: block; }
+    .domain-results-table { padding: 4px 0; }
     .domain-result-item {
       padding: 10px 14px;
-      cursor: pointer;
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      gap: 10px;
       border-bottom: 1px solid rgba(255,255,255,0.04);
       transition: background 0.15s;
     }
     .domain-result-item:last-child { border-bottom: none; }
-    .domain-result-item:hover { background: var(--bg-card-hover); }
+    .domain-result-item:hover { background: rgba(100, 255, 218, 0.03); }
+    .domain-result-item.domain-taken { opacity: 0.6; }
+    .domain-result-status { flex-shrink: 0; width: 18px; display: flex; align-items: center; }
+    .domain-result-item .domain-result-name { flex: 1; }
+    .domain-result-item .domain-result-price { flex-shrink: 0; min-width: 70px; text-align: right; }
     .domain-result-name {
       font-size: 0.9rem;
       font-weight: 600;
@@ -1921,7 +1930,7 @@
       font-family: var(--font);
     }
     .back-link:hover { color: var(--accent); }
-    .back-link:active { transform: scale(0.96); transition-duration: 0.06s; }
+    .back-link:active { opacity: 0.7; transition-duration: 0.06s; }
 
     /* ======================================================
        Buttons (shared)
@@ -1939,7 +1948,7 @@
       text-decoration: none;
       cursor: pointer;
       border: none;
-      transition: transform var(--transition), box-shadow var(--transition), background var(--transition), opacity var(--transition);
+      transition: box-shadow var(--transition), background var(--transition), opacity var(--transition), filter var(--transition), border-color var(--transition);
     }
     .btn:disabled {
       opacity: 0.5;
@@ -1953,7 +1962,6 @@
       transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease, background-position 0.5s ease, filter 0.3s ease;
     }
     .btn-accent:hover:not(:disabled) {
-      transform: translateY(-3px);
       background-position: 100% 0;
       box-shadow:
         0 0 20px rgba(80, 165, 219, 0.4),
@@ -1969,11 +1977,10 @@
         inset 0 0 12px rgba(255, 255, 255, 0.08);
     }
     .btn-accent:active:not(:disabled) {
-      transform: translateY(1px) scale(0.97);
       box-shadow:
-        0 0 10px rgba(80, 165, 219, 0.3),
+        0 0 0 3px rgba(80, 165, 219, 0.5),
         inset 0 2px 6px rgba(0, 0, 0, 0.2);
-      filter: brightness(0.95);
+      filter: brightness(0.92);
       transition-duration: 0.08s;
     }
     .btn-secondary-outline {
@@ -1985,7 +1992,6 @@
     .btn-secondary-outline:hover:not(:disabled) {
       border-color: var(--accent);
       color: var(--accent);
-      transform: translateY(-2px);
       background: rgba(80, 165, 219, 0.04);
       box-shadow:
         0 0 20px rgba(80, 165, 219, 0.1),
@@ -1997,9 +2003,9 @@
       box-shadow: 0 0 0 3px var(--accent-dim), 0 0 20px rgba(80, 165, 219, 0.1);
     }
     .btn-secondary-outline:active:not(:disabled) {
-      transform: scale(0.97);
       background: rgba(80, 165, 219, 0.08);
       border-color: #4ecdc4;
+      box-shadow: 0 0 0 2px rgba(78, 205, 196, 0.3);
       transition-duration: 0.08s;
     }
     .btn-full { width: 100%; }
@@ -2013,7 +2019,7 @@
     .btn, .site-card-btn, .admin-btn, .admin-btn-accent, .logs-refresh-btn,
     .domain-tab, .hostname-delete-btn, .signin-btn, .back-link,
     .modal-close, .details-modal-close, .header-auth-btn,
-    .site-card-new, .site-card-copy-btn, .site-card-upgrade-btn,
+    .site-card-new, .site-card-upgrade-btn,
     .inline-edit-btn, .inline-save-btn, .inline-cancel-btn,
     .faq-question, .btn-allow, .btn-skip, .improve-ai-link,
     .plan-badge {
@@ -2047,10 +2053,23 @@
       border-radius: 8px;
       font-size: 0.85rem;
       margin-top: 12px;
-      display: none;
       text-align: left;
+      min-height: 40px;
+      visibility: hidden;
+      opacity: 0;
+      max-height: 0;
+      overflow: hidden;
+      transition: opacity 0.2s ease, max-height 0.25s ease, padding 0.25s ease, margin 0.25s ease;
+      padding: 0 14px;
+      margin-top: 0;
     }
-    .msg.visible { display: block; animation: fadeIn 0.2s ease; }
+    .msg.visible {
+      visibility: visible;
+      opacity: 1;
+      max-height: 120px;
+      padding: 10px 14px;
+      margin-top: 12px;
+    }
     .msg-error {
       background: var(--error-dim);
       color: var(--error);
@@ -2151,7 +2170,7 @@
       box-shadow: 0 0 0 2px var(--accent-dim);
     }
     .location-modal-actions .btn-skip:active {
-      transform: scale(0.97);
+      opacity: 0.7;
       transition-duration: 0.06s;
     }
 
@@ -2212,7 +2231,7 @@
     }
     .details-modal-close:hover { color: var(--text-primary); }
     .details-modal-close:focus { outline: none; color: var(--accent); }
-    .details-modal-close:active { transform: scale(0.85); transition: transform 0.06s; }
+    .details-modal-close:active { opacity: 0.6; transition: opacity 0.06s; }
     .details-card {
       width: 100%;
       max-width: 600px;
@@ -3239,7 +3258,13 @@
       overflow: hidden;
       opacity: 0;
       transform: translateY(30px);
-      transition: transform var(--transition), box-shadow var(--transition);
+      transition: box-shadow 0.3s ease, border-color 0.3s ease;
+    }
+    .dvd-column:hover {
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), 0 0 0 1px var(--border-hover);
+    }
+    .dvd-column.dvd-highlight:hover {
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), 0 0 20px rgba(80, 165, 219, 0.15);
     }
     .dvd-column.animate-in {
       animation: fadeInUp 0.6s ease forwards;
@@ -3418,6 +3443,11 @@
       overflow: hidden;
       opacity: 0;
       transform: translateY(30px);
+      transition: box-shadow 0.3s ease, border-color 0.3s ease;
+    }
+    .pricing-card-free:hover {
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), 0 0 20px rgba(80, 165, 219, 0.1);
+      border-color: #4ecdc4;
     }
     .pricing-card-free.animate-in {
       animation: fadeInUp 0.6s ease forwards;
@@ -3675,7 +3705,7 @@
         <span id="deploy-modal-title">Deploy to Site</span>
         <button class="modal-close" onclick="closeDeployModal()">&times;</button>
       </div>
-      <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:16px;">Upload your built site files. The ZIP will be extracted and deployed to your site's R2 storage.</p>
+      <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:16px;">Upload your built site files. The ZIP will be extracted and deployed to your website.</p>
 
       <div class="input-group">
         <label>ZIP File <span style="color:var(--accent);">*</span></label>
@@ -3709,6 +3739,7 @@
       <div id="deploy-selected-info" class="deploy-selected-path" style="display:none;">
         Deploy from: <strong id="deploy-selected-folder">dist/</strong>
       </div>
+      <div id="deploy-index-warning" style="display:none;padding:8px 12px;margin-top:8px;border-radius:6px;font-size:0.8rem;background:rgba(251,191,36,0.1);color:#fbbf24;border:1px solid rgba(251,191,36,0.2);"></div>
 
       <div id="deploy-msg" class="msg" style="margin-bottom:12px;"></div>
       <button class="btn btn-accent btn-full" id="deploy-submit-btn" onclick="submitDeploy()">Deploy</button>
@@ -4597,9 +4628,9 @@
         }
         html += '</div>';
 
-        // Site name — inline editable
+        // Site name — inline editable (click title to edit)
         html += '<div class="inline-edit-wrap" id="inline-name-' + s.id + '">';
-        html += '<span class="inline-text site-card-name" title="' + escapeHtml(name) + '">' + escapeHtml(name) + '</span>';
+        html += '<span class="inline-text site-card-name" tabindex="0" role="button" title="' + escapeHtml(name) + '" onclick="startInlineEdit(\'' + escapeJsString(s.id) + '\', \'name\', \'' + escapeJsString(name) + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();startInlineEdit(\'' + escapeJsString(s.id) + '\', \'name\', \'' + escapeJsString(name) + '\')}" style="cursor:pointer;">' + escapeHtml(name) + '</span>';
         html += '<button class="inline-edit-btn" onclick="startInlineEdit(\'' + escapeJsString(s.id) + '\', \'name\', \'' + escapeJsString(name) + '\')" title="Edit title" aria-label="Edit title"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>';
         html += '</div>';
 
@@ -4634,9 +4665,13 @@
           }
         }
 
-        // Created date
-        if (created) {
-          html += '<div class="site-card-date">Created ' + created + '</div>';
+        // Created + Modified dates
+        var modified = s.updated_at ? new Date(s.updated_at).toLocaleDateString() : '';
+        if (created || modified) {
+          html += '<div class="site-card-date">';
+          if (created) html += 'Created ' + created;
+          if (modified && modified !== created) html += '<span class="site-card-date-sep">&nbsp;&middot;&nbsp;</span>Modified ' + modified;
+          html += '</div>';
         }
 
         // Action buttons - Row 1 (primary actions)
@@ -4749,14 +4784,14 @@
           var hostnames = d.data || [];
           var html = '';
 
-          // Always show the CNAME subdomain as the primary URL entry
+          // Always show the CNAME subdomain as the primary URL entry (editable slug)
           if (adminDomainModalSlug) {
             var cnameHost = adminDomainModalSlug + '-sites.megabyte.space';
             html += '<div class="hostname-item" style="background:rgba(80,165,219,0.04);border:1px solid rgba(80,165,219,0.12);border-radius:8px;padding:10px 12px;margin-bottom:8px;">';
             html += '<div style="flex:1;min-width:0;">';
             html += '<div class="hostname-item-name" style="display:flex;align-items:center;gap:6px;">';
             html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
-            html += '<a href="https://' + escapeHtml(cnameHost) + '" target="_blank" style="color:var(--accent);">' + escapeHtml(cnameHost) + '</a>';
+            html += '<span class="inline-slug-url status-default" id="domain-modal-slug-url" style="font-size:0.82rem;">https://<span class="inline-edit-wrap inline-edit-inline" id="inline-slug-domain-modal"><span class="inline-text slug-editable" tabindex="0" role="button" onclick="startInlineEdit(\'' + escapeJsString(adminDomainModalSiteId) + '\', \'slug\', \'' + escapeJsString(adminDomainModalSlug) + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();startInlineEdit(\'' + escapeJsString(adminDomainModalSiteId) + '\', \'slug\', \'' + escapeJsString(adminDomainModalSlug) + '\')}">' + escapeHtml(adminDomainModalSlug) + '</span><button class="inline-edit-btn" onclick="startInlineEdit(\'' + escapeJsString(adminDomainModalSiteId) + '\', \'slug\', \'' + escapeJsString(adminDomainModalSlug) + '\')" title="Edit slug" aria-label="Edit slug"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button></span>-sites.megabyte.space</span>';
             html += '<span style="font-size:0.6rem;background:rgba(80,165,219,0.15);color:var(--accent);padding:1px 6px;border-radius:3px;font-weight:600;">PRIMARY</span>';
             html += '</div>';
             html += '<div class="hostname-item-type" style="color:var(--text-muted);">Default subdomain &middot; always active</div>';
@@ -5433,8 +5468,14 @@
       if (modal) modal.classList.remove('visible');
       // Reset the build button text and reset mode
       var buildBtn = document.getElementById('build-btn');
-      if (buildBtn) buildBtn.textContent = 'Build My Website';
+      if (buildBtn) { buildBtn.textContent = 'Build My Website'; buildBtn.disabled = false; }
       resetSiteId = null;
+      // Clear any validation errors
+      hideMsg('details-error');
+      hideMsg('details-msg');
+      // Remove red outlines from inputs
+      var inputs = modal ? modal.querySelectorAll('.input-field, textarea') : [];
+      for (var i = 0; i < inputs.length; i++) inputs[i].style.boxShadow = '';
     }
 
     /** CTA entry point: if logged in open the build modal; otherwise go to sign-in first. */
@@ -5875,8 +5916,15 @@
         state._pendingBuild = false;
       }
       if (screen === 'waiting') {
-        updateWaitingScreen();
-        startBuildTerminal();
+        // Instead of showing waiting screen, go to admin dashboard and open logs
+        stopBuildTerminal();
+        origNavigateTo('admin');
+        loadAdminSites();
+        setTimeout(function() {
+          var siteName = state.businessName || state.slug || 'Building site';
+          if (state.siteId) openSiteLogsModal(state.siteId, siteName);
+        }, 600);
+        return;
       } else {
         stopBuildTerminal();
       }
@@ -6230,16 +6278,23 @@
           types: state.selectedBusiness.types
         };
       } else {
-        var manualName = document.getElementById('business-name-input').value.trim();
-        var manualAddr = document.getElementById('business-address-input').value.trim();
+        var manualNameEl = document.getElementById('business-name-input');
+        var manualAddrEl = document.getElementById('business-address-input');
+        var manualName = manualNameEl.value.trim();
+        var manualAddr = manualAddrEl.value.trim();
+        // Clear previous red outlines
+        manualNameEl.style.boxShadow = '';
+        manualAddrEl.style.boxShadow = '';
         if (!manualName) {
           showMsg('build-msg', 'error', 'Please enter your business name.');
+          manualNameEl.style.boxShadow = '0 0 0 2px rgba(239, 68, 68, 0.3)';
           btn.disabled = false;
           btn.textContent = 'Build My Website';
           return;
         }
         if (!manualAddr) {
           showMsg('build-msg', 'error', 'Please enter your business address.');
+          manualAddrEl.style.boxShadow = '0 0 0 2px rgba(239, 68, 68, 0.3)';
           btn.disabled = false;
           btn.textContent = 'Build My Website';
           return;
@@ -6252,6 +6307,34 @@
         headers['Authorization'] = 'Bearer ' + state.session.token;
       }
 
+      // AI validation check before submitting
+      fetch('/api/validate-business', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({
+          name: payload.business ? payload.business.name : '',
+          address: payload.business ? payload.business.address : '',
+          context: additionalContext
+        })
+      })
+        .then(function(res) { return res.ok ? res.json() : null; })
+        .then(function(d) {
+          if (d && d.data && !d.data.valid) {
+            showMsg('build-msg', 'error', d.data.reason || 'Business data does not appear to be legitimate.');
+            btn.disabled = false;
+            btn.textContent = 'Build My Website';
+            return;
+          }
+          // Validation passed - proceed with build
+          createSiteFromSearch(payload, headers, btn);
+        })
+        .catch(function() {
+          // If AI validation fails, proceed anyway
+          createSiteFromSearch(payload, headers, btn);
+        });
+    }
+
+    function createSiteFromSearch(payload, headers, btn) {
       fetch('/api/sites/create-from-search', {
         method: 'POST',
         headers: headers,
@@ -6401,7 +6484,7 @@
 
     /* Material-style ripple effect on button clicks */
     document.addEventListener('click', function(e) {
-      var btn = e.target.closest('.btn, .site-card-btn, .admin-btn, .admin-btn-accent, .logs-refresh-btn, .domain-tab, .hostname-delete-btn, .signin-btn, .back-link, .modal-close, .details-modal-close, .header-auth-btn, .site-card-new, .site-card-copy-btn, .site-card-upgrade-btn, .inline-edit-btn, .inline-save-btn, .inline-cancel-btn, .faq-question, .btn-allow, .btn-skip, .improve-ai-link, .plan-badge');
+      var btn = e.target.closest('.btn, .site-card-btn, .admin-btn, .admin-btn-accent, .logs-refresh-btn, .domain-tab, .hostname-delete-btn, .signin-btn, .back-link, .modal-close, .details-modal-close, .header-auth-btn, .site-card-new, .site-card-upgrade-btn, .inline-edit-btn, .inline-save-btn, .inline-cancel-btn, .faq-question, .btn-allow, .btn-skip, .improve-ai-link, .plan-badge');
       if (!btn) return;
       var circle = document.createElement('span');
       circle.className = 'ripple-circle';
@@ -6879,7 +6962,7 @@
       } else {
         var wrap = document.getElementById('inline-name-' + siteId);
         if (!wrap) return;
-        wrap.innerHTML = '<span class="inline-text site-card-name" title="' + escapeHtml(originalValue) + '">' + escapeHtml(originalValue) + '</span>'
+        wrap.innerHTML = '<span class="inline-text site-card-name" tabindex="0" role="button" title="' + escapeHtml(originalValue) + '" onclick="startInlineEdit(\'' + escapeJsString(siteId) + '\', \'name\', \'' + escapeJsString(originalValue) + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();startInlineEdit(\'' + escapeJsString(siteId) + '\', \'name\', \'' + escapeJsString(originalValue) + '\')}" style="cursor:pointer;">' + escapeHtml(originalValue) + '</span>'
           + '<button class="inline-edit-btn" onclick="startInlineEdit(\'' + escapeJsString(siteId) + '\', \'name\', \'' + escapeJsString(originalValue) + '\')" title="Edit title" aria-label="Edit title"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>';
       }
     }
@@ -7059,12 +7142,25 @@
     function formatLogTimestamp(iso) {
       try {
         var d = new Date(iso);
+        var now = new Date();
+        var diff = now - d;
+        var secs = Math.floor(diff / 1000);
+        var mins = Math.floor(secs / 60);
+        var hrs = Math.floor(mins / 60);
+        var days = Math.floor(hrs / 24);
+        var relative = '';
+        if (secs < 60) relative = 'just now';
+        else if (mins < 60) relative = mins + 'm ago';
+        else if (hrs < 24) relative = hrs + 'h ago';
+        else if (days < 7) relative = days + 'd ago';
+        else relative = '';
         var month = String(d.getMonth() + 1).padStart(2, '0');
-        var day = String(d.getDate()).padStart(2, '0');
+        var day2 = String(d.getDate()).padStart(2, '0');
         var h = String(d.getHours()).padStart(2, '0');
         var m = String(d.getMinutes()).padStart(2, '0');
-        var s = String(d.getSeconds()).padStart(2, '0');
-        return d.getFullYear() + '-' + month + '-' + day + ' ' + h + ':' + m + ':' + s;
+        var s2 = String(d.getSeconds()).padStart(2, '0');
+        var abs = d.getFullYear() + '-' + month + '-' + day2 + ' ' + h + ':' + m + ':' + s2;
+        return relative ? abs + ' (' + relative + ')' : abs;
       } catch (e) { return iso; }
     }
 
@@ -7281,6 +7377,16 @@
     function closeDeployModal() {
       document.getElementById('deploy-modal').classList.remove('visible');
       deploySiteId = null;
+      // Reset validation state
+      hideMsg('deploy-msg');
+      var zipZone = document.getElementById('deploy-zip-zone');
+      if (zipZone) zipZone.classList.remove('has-file');
+      var zipName = document.getElementById('deploy-zip-name');
+      if (zipName) { zipName.textContent = ''; zipName.style.display = 'none'; }
+      var jsonName = document.getElementById('deploy-json-name');
+      if (jsonName) { jsonName.textContent = ''; jsonName.style.display = 'none'; }
+      deployZipFile = null;
+      deployJsonFile = null;
     }
 
     function handleDeployZipSelect(input) {
@@ -7408,6 +7514,28 @@
       var folderEl = document.getElementById('deploy-selected-folder');
       infoEl.style.display = 'block';
       folderEl.textContent = folderPath === './' ? '/ (root)' : folderPath;
+
+      // Check if selected folder has index.html
+      checkFolderForIndex(folderPath);
+    }
+
+    function checkFolderForIndex(folderPath) {
+      if (!deployZipFile || typeof JSZip === 'undefined') return;
+      var warnEl = document.getElementById('deploy-index-warning');
+      JSZip.loadAsync(deployZipFile).then(function(zip) {
+        var prefix = folderPath === './' ? '' : folderPath;
+        var hasIndex = !!zip.file(prefix + 'index.html');
+        if (warnEl) {
+          if (hasIndex) {
+            warnEl.style.display = 'none';
+          } else {
+            warnEl.textContent = 'Warning: No index.html found in ' + (folderPath === './' ? 'root' : folderPath) + '. Your site may not load correctly.';
+            warnEl.style.display = 'block';
+          }
+        }
+      }).catch(function() {
+        if (warnEl) warnEl.style.display = 'none';
+      });
     }
 
     function handleDeployJsonSelect(input) {
@@ -7509,38 +7637,66 @@
       fetch('/api/domains/search?q=' + encodeURIComponent(query), {
         headers: state.session && state.session.token ? { 'Authorization': 'Bearer ' + state.session.token } : {}
       })
-        .then(function(res) { return res.json(); })
+        .then(function(res) {
+          if (!res.ok) return res.json().then(function(d) { throw new Error(extractErrorMsg(d, 'Domain search failed. Please try again.')); });
+          return res.json();
+        })
         .then(function(d) {
           document.getElementById('domain-search-spinner').style.display = 'none';
-          var results = d.data || [];
-          renderDomainSearchResults(results);
+          var results = (d && d.data) ? d.data : [];
+          renderDomainSearchResults(results, query);
         })
-        .catch(function() {
+        .catch(function(err) {
           document.getElementById('domain-search-spinner').style.display = 'none';
-          closeDomainSearchResults();
+          var container = document.getElementById('domain-search-results');
+          container.innerHTML = '<div style="padding:12px;color:var(--error);font-size:0.85rem;text-align:center;">' + escapeHtml(err.message || 'Domain search failed. Please try again.') + '</div>';
+          container.classList.add('open');
         });
     }
 
-    function renderDomainSearchResults(results) {
+    function renderDomainSearchResults(results, query) {
       var container = document.getElementById('domain-search-results');
-      // Only show available domains
-      var available = results.filter(function(r) { return r.available; });
-      if (!available.length) {
-        container.innerHTML = '<div style="padding:12px;color:var(--text-muted);font-size:0.85rem;text-align:center;">No available domains found. Try a different name.</div>';
-        container.classList.add('open');
-        return;
+      // Sort by price (lowest first)
+      results.sort(function(a, b) { return (a.price || 0) - (b.price || 0); });
+
+      // Always show queried domain at top with availability indicator
+      var queriedDomain = (query || '').toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
+      var queriedResult = null;
+      var otherResults = [];
+      for (var i = 0; i < results.length; i++) {
+        if (results[i].domain && results[i].domain.toLowerCase() === queriedDomain) {
+          queriedResult = results[i];
+        } else {
+          otherResults.push(results[i]);
+        }
       }
 
-      var html = '';
-      for (var i = 0; i < available.length; i++) {
-        var r = available[i];
-        html += '<div class="domain-result-item" onclick="selectDomainForPurchase(\'' + escapeAttr(r.domain) + '\', ' + (r.price || 0) + ')">';
-        html += '<div>';
-        html += '<div class="domain-result-name">' + escapeHtml(r.domain) + '</div>';
-        html += '</div>';
-        html += '<div class="domain-result-price">$' + ((r.price || 0) / 100).toFixed(2) + '/yr</div>';
+      var html = '<div class="domain-results-table">';
+      // Show queried domain first
+      if (queriedResult) {
+        var isAvail = queriedResult.available;
+        html += '<div class="domain-result-item ' + (isAvail ? 'domain-available' : 'domain-taken') + '">';
+        html += '<div class="domain-result-status">' + (isAvail ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>') + '</div>';
+        html += '<div class="domain-result-name" style="font-weight:700;">' + escapeHtml(queriedResult.domain) + '</div>';
+        html += '<div class="domain-result-price">' + (isAvail ? '$' + ((queriedResult.price || 0) / 100).toFixed(2) + '/yr' : 'Taken') + '</div>';
+        if (isAvail) html += '<button class="btn btn-accent" style="padding:6px 14px;font-size:0.75rem;" onclick="selectDomainForPurchase(\'' + escapeAttr(queriedResult.domain) + '\', ' + (queriedResult.price || 0) + ')">Get</button>';
         html += '</div>';
       }
+      // Show other results
+      for (var j = 0; j < otherResults.length; j++) {
+        var r = otherResults[j];
+        if (!r.available) continue;
+        html += '<div class="domain-result-item domain-available">';
+        html += '<div class="domain-result-status"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>';
+        html += '<div class="domain-result-name">' + escapeHtml(r.domain) + '</div>';
+        html += '<div class="domain-result-price">$' + ((r.price || 0) / 100).toFixed(2) + '/yr</div>';
+        html += '<button class="btn btn-accent" style="padding:6px 14px;font-size:0.75rem;" onclick="selectDomainForPurchase(\'' + escapeAttr(r.domain) + '\', ' + (r.price || 0) + ')">Get</button>';
+        html += '</div>';
+      }
+      if (!queriedResult && !otherResults.filter(function(r) { return r.available; }).length) {
+        html += '<div style="padding:16px;color:var(--text-muted);font-size:0.85rem;text-align:center;">No available domains found. Try a different name.</div>';
+      }
+      html += '</div>';
       container.innerHTML = html;
       container.classList.add('open');
     }
