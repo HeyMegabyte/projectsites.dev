@@ -107,7 +107,9 @@ test.describe('Button Interactive States', () => {
             if (sel.includes('.plan-badge.free:focus')) hasFocus = true;
             if (sel.includes('.plan-badge.free:active')) hasActive = true;
           }
-        } catch { /* cross-origin sheets */ }
+        } catch {
+          /* cross-origin sheets */
+        }
       }
       return { hasHover, hasFocus, hasActive };
     });
@@ -131,7 +133,9 @@ test.describe('Button Interactive States', () => {
             if (sel.includes('.site-card-new:focus')) hasFocus = true;
             if (sel.includes('.site-card-new:active')) hasActive = true;
           }
-        } catch { /* cross-origin sheets */ }
+        } catch {
+          /* cross-origin sheets */
+        }
       }
       return { hasFocus, hasActive };
     });
@@ -155,7 +159,9 @@ test.describe('site-card-preview-placeholder alignment', () => {
               return rule.style.textAlign === 'center';
             }
           }
-        } catch { /* cross-origin sheets */ }
+        } catch {
+          /* cross-origin sheets */
+        }
       }
       return false;
     });
@@ -176,7 +182,9 @@ test.describe('handled-summary hover', () => {
             const sel = (rules[r] as CSSStyleRule).selectorText || '';
             if (sel.includes('.handled-summary:hover')) return true;
           }
-        } catch { /* cross-origin sheets */ }
+        } catch {
+          /* cross-origin sheets */
+        }
       }
       return false;
     });

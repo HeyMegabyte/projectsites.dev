@@ -111,7 +111,9 @@ test.describe('escapeAttr function', () => {
 
     // Verify escapeAttr exists and handles apostrophes
     const result = await page.evaluate(() => {
-      return (window as unknown as Record<string, (s: string) => string>).escapeAttr("Vito's Salon");
+      return (window as unknown as Record<string, (s: string) => string>).escapeAttr(
+        "Vito's Salon",
+      );
     });
     expect(result).toContain('&#39;');
     expect(result).not.toContain("'");

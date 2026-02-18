@@ -66,7 +66,8 @@ test.describe('Client-side Slug Validation (validateSlugLocal)', () => {
     await page.goto('/');
 
     const result = await page.evaluate(() => {
-      const fn = (window as unknown as { validateSlugLocal: (s: string) => unknown }).validateSlugLocal;
+      const fn = (window as unknown as { validateSlugLocal: (s: string) => unknown })
+        .validateSlugLocal;
       return fn('my-business');
     });
 
@@ -80,7 +81,8 @@ test.describe('Client-side Slug Validation (validateSlugLocal)', () => {
     await page.goto('/');
 
     const result = await page.evaluate(() => {
-      const fn = (window as unknown as { validateSlugLocal: (s: string) => unknown }).validateSlugLocal;
+      const fn = (window as unknown as { validateSlugLocal: (s: string) => unknown })
+        .validateSlugLocal;
       return fn('My Business Name!');
     });
 
@@ -94,7 +96,8 @@ test.describe('Client-side Slug Validation (validateSlugLocal)', () => {
     await page.goto('/');
 
     const result = await page.evaluate(() => {
-      const fn = (window as unknown as { validateSlugLocal: (s: string) => unknown }).validateSlugLocal;
+      const fn = (window as unknown as { validateSlugLocal: (s: string) => unknown })
+        .validateSlugLocal;
       return fn('');
     });
 
@@ -108,13 +111,15 @@ test.describe('Client-side Slug Validation (validateSlugLocal)', () => {
     await page.goto('/');
 
     const result1 = await page.evaluate(() => {
-      const fn = (window as unknown as { validateSlugLocal: (s: string) => unknown }).validateSlugLocal;
+      const fn = (window as unknown as { validateSlugLocal: (s: string) => unknown })
+        .validateSlugLocal;
       return fn('a');
     });
     expect(result1).toMatchObject({ valid: false, reason: expect.stringContaining('3') });
 
     const result2 = await page.evaluate(() => {
-      const fn = (window as unknown as { validateSlugLocal: (s: string) => unknown }).validateSlugLocal;
+      const fn = (window as unknown as { validateSlugLocal: (s: string) => unknown })
+        .validateSlugLocal;
       return fn('ab');
     });
     expect(result2).toMatchObject({ valid: false, reason: expect.stringContaining('3') });
@@ -124,7 +129,8 @@ test.describe('Client-side Slug Validation (validateSlugLocal)', () => {
     await page.goto('/');
 
     const result = await page.evaluate(() => {
-      const fn = (window as unknown as { validateSlugLocal: (s: string) => unknown }).validateSlugLocal;
+      const fn = (window as unknown as { validateSlugLocal: (s: string) => unknown })
+        .validateSlugLocal;
       return fn('!!!');
     });
 
@@ -188,7 +194,9 @@ test.describe('Inline Editing CSS', () => {
             const sel = (rules[r] as CSSStyleRule).selectorText || '';
             if (sel.includes('.inline-edit-wrap')) return true;
           }
-        } catch { /* cross-origin */ }
+        } catch {
+          /* cross-origin */
+        }
       }
       return false;
     });
@@ -216,7 +224,9 @@ test.describe('Inline Editing CSS', () => {
               if (sel.includes(`.inline-slug-url.${key}`)) found[key] = true;
             }
           }
-        } catch { /* cross-origin */ }
+        } catch {
+          /* cross-origin */
+        }
       }
       return found;
     });
@@ -242,14 +252,21 @@ test.describe('Inline Editing CSS', () => {
             const rule = rules[r] as CSSStyleRule;
             const sel = rule.selectorText || '';
             // Only match the specific base selector that defines color
-            if (sel.includes('inline-save-btn') && !sel.includes(':hover') && !sel.includes(':disabled') && rule.style.color) {
+            if (
+              sel.includes('inline-save-btn') &&
+              !sel.includes(':hover') &&
+              !sel.includes(':disabled') &&
+              rule.style.color
+            ) {
               saveColor = rule.style.color;
             }
             if (sel.includes('inline-cancel-btn') && !sel.includes(':hover') && rule.style.color) {
               cancelColor = rule.style.color;
             }
           }
-        } catch { /* cross-origin */ }
+        } catch {
+          /* cross-origin */
+        }
       }
       return { saveColor, cancelColor };
     });
@@ -339,7 +356,9 @@ test.describe('Button Effects', () => {
           for (let r = 0; r < rules.length; r++) {
             if ((rules[r] as CSSKeyframesRule).name === 'ripple-expand') return true;
           }
-        } catch { /* cross-origin */ }
+        } catch {
+          /* cross-origin */
+        }
       }
       return false;
     });
@@ -360,7 +379,9 @@ test.describe('Button Effects', () => {
               return rule.style.backgroundSize === '200% 200%';
             }
           }
-        } catch { /* cross-origin */ }
+        } catch {
+          /* cross-origin */
+        }
       }
       return false;
     });
@@ -409,7 +430,9 @@ test.describe('Copy Toast', () => {
             if (sel === '.copy-toast') hasToastCSS = true;
             if ((rules[r] as CSSKeyframesRule).name === 'toast-pop') hasToastPop = true;
           }
-        } catch { /* cross-origin */ }
+        } catch {
+          /* cross-origin */
+        }
       }
       return { hasToastCSS, hasToastPop };
     });
@@ -429,11 +452,17 @@ test.describe('Inline Edit Button Styling', () => {
           const rules = sheets[s].cssRules;
           for (let r = 0; r < rules.length; r++) {
             const rule = rules[r] as CSSStyleRule;
-            if (rule.selectorText && rule.selectorText.includes('.inline-edit-btn') && !rule.selectorText.includes(':hover')) {
+            if (
+              rule.selectorText &&
+              rule.selectorText.includes('.inline-edit-btn') &&
+              !rule.selectorText.includes(':hover')
+            ) {
               return rule.style.color;
             }
           }
-        } catch { /* cross-origin */ }
+        } catch {
+          /* cross-origin */
+        }
       }
       return '';
     });
@@ -455,7 +484,9 @@ test.describe('Inline Edit Button Styling', () => {
               return rule.style.transform.includes('scale');
             }
           }
-        } catch { /* cross-origin */ }
+        } catch {
+          /* cross-origin */
+        }
       }
       return false;
     });
@@ -474,11 +505,17 @@ test.describe('Slug Editable Click Target', () => {
           const rules = sheets[s].cssRules;
           for (let r = 0; r < rules.length; r++) {
             const rule = rules[r] as CSSStyleRule;
-            if (rule.selectorText && rule.selectorText.includes('.slug-editable') && !rule.selectorText.includes(':hover')) {
+            if (
+              rule.selectorText &&
+              rule.selectorText.includes('.slug-editable') &&
+              !rule.selectorText.includes(':hover')
+            ) {
               return rule.style.cursor === 'pointer';
             }
           }
-        } catch { /* cross-origin */ }
+        } catch {
+          /* cross-origin */
+        }
       }
       return false;
     });
@@ -499,7 +536,9 @@ test.describe('Slug Editable Click Target', () => {
               return true;
             }
           }
-        } catch { /* cross-origin */ }
+        } catch {
+          /* cross-origin */
+        }
       }
       return false;
     });
@@ -508,7 +547,7 @@ test.describe('Slug Editable Click Target', () => {
 });
 
 test.describe('Slug Editor Styling', () => {
-  test('inline slug input has border and box-shadow CSS rules', async ({ page }) => {
+  test('inline slug input is transparent with dashed underline only', async ({ page }) => {
     await page.goto('/');
 
     const result = await page.evaluate(() => {
@@ -518,26 +557,79 @@ test.describe('Slug Editor Styling', () => {
           const rules = sheets[s].cssRules;
           for (let r = 0; r < rules.length; r++) {
             const rule = rules[r] as CSSStyleRule;
-            if (rule.selectorText && rule.selectorText.includes('.inline-edit-inline') && rule.selectorText.includes('.inline-input')) {
+            if (
+              rule.selectorText &&
+              rule.selectorText.includes('.inline-edit-inline') &&
+              rule.selectorText.includes('.inline-input')
+            ) {
               return {
-                hasBorder: !!rule.style.border || !!rule.style.borderWidth,
-                hasBoxShadow: !!rule.style.boxShadow,
-                hasBackground: !!rule.style.background || !!rule.style.backgroundColor,
+                borderTopStyle: rule.style.borderTopStyle,
+                borderBottomStyle: rule.style.borderBottomStyle,
+                boxShadow: rule.style.boxShadow,
+                background: rule.style.background || rule.style.backgroundColor,
+                color: rule.style.color,
+                borderRadius: rule.style.borderRadius,
               };
             }
           }
-        } catch { /* cross-origin */ }
+        } catch {
+          /* cross-origin */
+        }
       }
-      return { hasBorder: false, hasBoxShadow: false, hasBackground: false };
+      return {
+        borderTopStyle: '',
+        borderBottomStyle: '',
+        boxShadow: '',
+        background: '',
+        color: '',
+        borderRadius: '',
+      };
     });
-    expect(result.hasBorder).toBe(true);
-    expect(result.hasBoxShadow).toBe(true);
-    expect(result.hasBackground).toBe(true);
+    expect(result.borderTopStyle).toBe('none');
+    expect(result.borderBottomStyle).toBe('dashed');
+    expect(result.boxShadow).toBe('none');
+    expect(result.background).toBe('transparent');
+    expect(result.color).toBe('inherit');
+    expect(result.borderRadius).toBe('0px');
+  });
+
+  test('inline slug save/cancel buttons are fully transparent', async ({ page }) => {
+    await page.goto('/');
+
+    const result = await page.evaluate(() => {
+      const sheets = document.styleSheets;
+      for (let s = 0; s < sheets.length; s++) {
+        try {
+          const rules = sheets[s].cssRules;
+          for (let r = 0; r < rules.length; r++) {
+            const rule = rules[r] as CSSStyleRule;
+            const sel = rule.selectorText || '';
+            if (sel.includes('.inline-edit-inline') && sel.includes('.inline-save-btn')) {
+              return {
+                background: rule.style.background || rule.style.backgroundColor,
+                border: rule.style.border,
+                outline: rule.style.outline,
+                boxShadow: rule.style.boxShadow,
+              };
+            }
+          }
+        } catch {
+          /* cross-origin */
+        }
+      }
+      return { background: '', border: '', outline: '', boxShadow: '' };
+    });
+    expect(result.background).toBe('transparent');
+    expect(result.border).toBe('none');
+    expect(result.outline).toBe('none');
+    expect(result.boxShadow).toBe('none');
   });
 });
 
 test.describe('Inline Button Alignment', () => {
-  test('inline slug save/cancel buttons use inline-flex for vertical alignment', async ({ page }) => {
+  test('inline slug save/cancel buttons use inline-flex for vertical alignment', async ({
+    page,
+  }) => {
     await page.goto('/');
 
     const result = await page.evaluate(() => {
@@ -555,7 +647,9 @@ test.describe('Inline Button Alignment', () => {
               };
             }
           }
-        } catch { /* cross-origin */ }
+        } catch {
+          /* cross-origin */
+        }
       }
       return { display: '', alignItems: '' };
     });
@@ -606,7 +700,9 @@ test.describe('Signin Page Compact Footer', () => {
             const sel = (rules[r] as CSSStyleRule).selectorText || '';
             if (sel === '.signin-footer') return true;
           }
-        } catch { /* cross-origin */ }
+        } catch {
+          /* cross-origin */
+        }
       }
       return false;
     });
@@ -640,7 +736,9 @@ test.describe('Signin Button States', () => {
             if (sel.includes('.signin-btn:active')) hasActive = true;
             if (sel.includes('.signin-btn:focus')) hasFocus = true;
           }
-        } catch { /* cross-origin */ }
+        } catch {
+          /* cross-origin */
+        }
       }
       return { hasActive, hasFocus };
     });
@@ -677,14 +775,20 @@ test.describe('Inline Input Colors', () => {
           const rules = sheets[s].cssRules;
           for (let r = 0; r < rules.length; r++) {
             const rule = rules[r] as CSSStyleRule;
-            if (rule.selectorText && rule.selectorText.includes('.inline-input') && !rule.selectorText.includes('.inline-edit-inline')) {
+            if (
+              rule.selectorText &&
+              rule.selectorText.includes('.inline-input') &&
+              !rule.selectorText.includes('.inline-edit-inline')
+            ) {
               return {
                 background: rule.style.background || rule.style.backgroundColor,
                 color: rule.style.color,
               };
             }
           }
-        } catch { /* cross-origin */ }
+        } catch {
+          /* cross-origin */
+        }
       }
       return { background: '', color: '' };
     });
@@ -698,7 +802,8 @@ test.describe('Workflow Log Labels', () => {
     await page.goto('/');
 
     const labels = await page.evaluate(() => {
-      const fn = (window as unknown as { formatActionLabel: (a: string) => string }).formatActionLabel;
+      const fn = (window as unknown as { formatActionLabel: (a: string) => string })
+        .formatActionLabel;
       return {
         queued: fn('workflow.queued'),
         started: fn('workflow.started'),
@@ -727,13 +832,29 @@ test.describe('Material Ripple Effect Coverage', () => {
 
     const result = await page.evaluate(() => {
       const requiredClasses = [
-        '.btn', '.site-card-btn', '.admin-btn', '.admin-btn-accent',
-        '.logs-refresh-btn', '.domain-tab', '.hostname-delete-btn',
-        '.signin-btn', '.back-link', '.modal-close', '.details-modal-close',
-        '.header-auth-btn', '.site-card-new', '.site-card-copy-btn',
-        '.site-card-upgrade-btn', '.inline-edit-btn', '.inline-save-btn',
-        '.inline-cancel-btn', '.faq-question', '.btn-allow', '.btn-skip',
-        '.improve-ai-link', '.plan-badge',
+        '.btn',
+        '.site-card-btn',
+        '.admin-btn',
+        '.admin-btn-accent',
+        '.logs-refresh-btn',
+        '.domain-tab',
+        '.hostname-delete-btn',
+        '.signin-btn',
+        '.back-link',
+        '.modal-close',
+        '.details-modal-close',
+        '.header-auth-btn',
+        '.site-card-new',
+        '.site-card-copy-btn',
+        '.site-card-upgrade-btn',
+        '.inline-edit-btn',
+        '.inline-save-btn',
+        '.inline-cancel-btn',
+        '.faq-question',
+        '.btn-allow',
+        '.btn-skip',
+        '.improve-ai-link',
+        '.plan-badge',
       ];
 
       const sheets = document.styleSheets;
@@ -744,12 +865,18 @@ test.describe('Material Ripple Effect Coverage', () => {
           for (let r = 0; r < rules.length; r++) {
             const rule = rules[r] as CSSStyleRule;
             const sel = rule.selectorText || '';
-            if (sel.includes('.btn') && rule.style.overflow === 'hidden' && rule.style.position === 'relative') {
+            if (
+              sel.includes('.btn') &&
+              rule.style.overflow === 'hidden' &&
+              rule.style.position === 'relative'
+            ) {
               rippleSelector = sel;
               break;
             }
           }
-        } catch { /* cross-origin */ }
+        } catch {
+          /* cross-origin */
+        }
         if (rippleSelector) break;
       }
 
@@ -770,11 +897,22 @@ test.describe('Material Ripple Effect Coverage', () => {
 
     const result = await page.evaluate(() => {
       const required = [
-        'modal-close', 'details-modal-close', 'header-auth-btn',
-        'site-card-new', 'site-card-copy-btn', 'site-card-upgrade-btn',
-        'inline-edit-btn', 'inline-save-btn', 'inline-cancel-btn',
-        'faq-question', 'btn-allow', 'btn-skip', 'improve-ai-link',
-        'plan-badge', 'signin-btn', 'back-link',
+        'modal-close',
+        'details-modal-close',
+        'header-auth-btn',
+        'site-card-new',
+        'site-card-copy-btn',
+        'site-card-upgrade-btn',
+        'inline-edit-btn',
+        'inline-save-btn',
+        'inline-cancel-btn',
+        'faq-question',
+        'btn-allow',
+        'btn-skip',
+        'improve-ai-link',
+        'plan-badge',
+        'signin-btn',
+        'back-link',
       ];
       const scripts = document.querySelectorAll('script');
       let handlerCode = '';
@@ -811,7 +949,9 @@ test.describe('Material Ripple Effect Coverage', () => {
             if ((rules[r] as CSSKeyframesRule).name === 'ripple-expand') hasKeyframe = true;
             if ((rules[r] as CSSStyleRule).selectorText === '.ripple-circle') hasClass = true;
           }
-        } catch { /* cross-origin */ }
+        } catch {
+          /* cross-origin */
+        }
       }
       return { hasKeyframe, hasClass };
     });
@@ -836,7 +976,9 @@ test.describe('Button State Coverage', () => {
             if (sel.includes('.modal-close:active')) hasActive = true;
             if (sel.includes('.modal-close:focus')) hasFocus = true;
           }
-        } catch { /* cross-origin */ }
+        } catch {
+          /* cross-origin */
+        }
       }
       return { hasActive, hasFocus };
     });
@@ -859,7 +1001,9 @@ test.describe('Button State Coverage', () => {
             if (sel.includes('.faq-question:active')) hasActive = true;
             if (sel.includes('.faq-question:focus')) hasFocus = true;
           }
-        } catch { /* cross-origin */ }
+        } catch {
+          /* cross-origin */
+        }
       }
       return { hasActive, hasFocus };
     });
@@ -882,7 +1026,9 @@ test.describe('Button State Coverage', () => {
             if (sel.includes('.inline-edit-btn:active')) hasActive = true;
             if (sel.includes('.inline-edit-btn:focus')) hasFocus = true;
           }
-        } catch { /* cross-origin */ }
+        } catch {
+          /* cross-origin */
+        }
       }
       return { hasActive, hasFocus };
     });
@@ -909,7 +1055,9 @@ test.describe('Button State Coverage', () => {
             if (sel.includes('.btn-skip:active')) skipActive = true;
             if (sel.includes('.btn-skip:focus')) skipFocus = true;
           }
-        } catch { /* cross-origin */ }
+        } catch {
+          /* cross-origin */
+        }
       }
       return { allowActive, allowFocus, skipActive, skipFocus };
     });
@@ -921,14 +1069,20 @@ test.describe('Button State Coverage', () => {
 });
 
 test.describe('Ripple Dynamic Sizing', () => {
-  test('ripple JS handler dynamically sizes circles based on button dimensions', async ({ page }) => {
+  test('ripple JS handler dynamically sizes circles based on button dimensions', async ({
+    page,
+  }) => {
     await page.goto('/');
 
     const hasSizing = await page.evaluate(() => {
       const scripts = document.querySelectorAll('script');
       for (let i = 0; i < scripts.length; i++) {
         const text = scripts[i].textContent || '';
-        if (text.includes('ripple-circle') && text.includes('rect.width') && text.includes('rect.height')) {
+        if (
+          text.includes('ripple-circle') &&
+          text.includes('rect.width') &&
+          text.includes('rect.height')
+        ) {
           return true;
         }
       }
@@ -952,7 +1106,9 @@ test.describe('Ripple Dynamic Sizing', () => {
               return true;
             }
           }
-        } catch { /* cross-origin */ }
+        } catch {
+          /* cross-origin */
+        }
       }
       return false;
     });
@@ -987,14 +1143,134 @@ test.describe('Accessibility Improvements', () => {
           const rules = sheets[s].cssRules;
           for (let r = 0; r < rules.length; r++) {
             const rule = rules[r] as CSSMediaRule;
-            if (rule.media && rule.media.mediaText && rule.media.mediaText.includes('prefers-reduced-motion')) {
+            if (
+              rule.media &&
+              rule.media.mediaText &&
+              rule.media.mediaText.includes('prefers-reduced-motion')
+            ) {
               return true;
             }
           }
-        } catch { /* cross-origin */ }
+        } catch {
+          /* cross-origin */
+        }
       }
       return false;
     });
     expect(hasMediaQuery).toBe(true);
+  });
+});
+
+test.describe('Slug Validation Hints', () => {
+  test('slug-hint CSS classes exist for error, taken, available, checking', async ({ page }) => {
+    await page.goto('/');
+
+    const result = await page.evaluate(() => {
+      const found = { error: false, taken: false, available: false, checking: false, base: false };
+      const sheets = document.styleSheets;
+      for (let s = 0; s < sheets.length; s++) {
+        try {
+          const rules = sheets[s].cssRules;
+          for (let r = 0; r < rules.length; r++) {
+            const sel = (rules[r] as CSSStyleRule).selectorText || '';
+            if (sel === '.slug-hint') found.base = true;
+            if (sel.includes('.hint-error')) found.error = true;
+            if (sel.includes('.hint-taken')) found.taken = true;
+            if (sel.includes('.hint-available')) found.available = true;
+            if (sel.includes('.hint-checking')) found.checking = true;
+          }
+        } catch {
+          /* cross-origin */
+        }
+      }
+      return found;
+    });
+    expect(result.base).toBe(true);
+    expect(result.error).toBe(true);
+    expect(result.taken).toBe(true);
+    expect(result.available).toBe(true);
+    expect(result.checking).toBe(true);
+  });
+
+  test('showSlugHint and clearSlugHint functions exist', async ({ page }) => {
+    await page.goto('/');
+
+    const result = await page.evaluate(() => {
+      const w = window as unknown as { showSlugHint: unknown; clearSlugHint: unknown };
+      return {
+        hasShow: typeof w.showSlugHint === 'function',
+        hasClear: typeof w.clearSlugHint === 'function',
+      };
+    });
+    expect(result.hasShow).toBe(true);
+    expect(result.hasClear).toBe(true);
+  });
+});
+
+test.describe('Slug Checking Pulse Animation', () => {
+  test('status-checking has pulse animation CSS', async ({ page }) => {
+    await page.goto('/');
+
+    const result = await page.evaluate(() => {
+      let hasAnimation = false;
+      let hasKeyframe = false;
+      const sheets = document.styleSheets;
+      for (let s = 0; s < sheets.length; s++) {
+        try {
+          const rules = sheets[s].cssRules;
+          for (let r = 0; r < rules.length; r++) {
+            const rule = rules[r] as CSSStyleRule;
+            if (rule.selectorText && rule.selectorText.includes('.status-checking')) {
+              if (rule.style.animation || rule.style.animationName) hasAnimation = true;
+            }
+            if ((rules[r] as CSSKeyframesRule).name === 'slug-pulse') hasKeyframe = true;
+          }
+        } catch {
+          /* cross-origin */
+        }
+      }
+      return { hasAnimation, hasKeyframe };
+    });
+    expect(result.hasAnimation).toBe(true);
+    expect(result.hasKeyframe).toBe(true);
+  });
+});
+
+test.describe('Save Toast Feedback', () => {
+  test('showSaveToast function exists', async ({ page }) => {
+    await page.goto('/');
+
+    const exists = await page.evaluate(() => {
+      return typeof (window as unknown as { showSaveToast: unknown }).showSaveToast === 'function';
+    });
+    expect(exists).toBe(true);
+  });
+});
+
+test.describe('Slug Editable Keyboard Accessibility', () => {
+  test('slug-editable spans have tabindex and role=button in renderAdminSites', async ({
+    page,
+  }) => {
+    await page.goto('/');
+
+    const hasA11y = await page.evaluate(() => {
+      const fn = (window as unknown as { renderAdminSites: () => void }).renderAdminSites;
+      if (!fn) return false;
+      const src = fn.toString();
+      return src.includes('tabindex="0"') && src.includes('role="button"');
+    });
+    expect(hasA11y).toBe(true);
+  });
+
+  test('slug-editable spans have onkeydown handler for Enter/Space', async ({ page }) => {
+    await page.goto('/');
+
+    const hasKeydown = await page.evaluate(() => {
+      const fn = (window as unknown as { renderAdminSites: () => void }).renderAdminSites;
+      if (!fn) return false;
+      const src = fn.toString();
+      return src.includes('onkeydown') && src.includes('Enter') && src.includes('startInlineEdit');
+    });
+    expect(hasKeydown).toBe(true);
   });
 });

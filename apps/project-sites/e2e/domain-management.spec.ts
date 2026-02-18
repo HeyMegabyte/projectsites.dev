@@ -113,7 +113,7 @@ test.describe('Site Card URL Display', () => {
     const html = await page.content();
     // The URL link in site cards should NOT have font-weight:600
     // The combined URL / CNAME row should not bold the link
-    expect(html).not.toContain('hasPrimaryCustom ? \'https://\' + s.primary_hostname : cnameUrl');
+    expect(html).not.toContain("hasPrimaryCustom ? 'https://' + s.primary_hostname : cnameUrl");
   });
 
   test('CNAME and URL tags use min-width for alignment', async ({ page }) => {
@@ -130,7 +130,7 @@ test.describe('Domains Button Availability', () => {
 
     const html = await page.content();
     // The Domains button should NOT be gated behind sitePlan === paid
-    expect(html).not.toContain('if (sitePlan === \'paid\') {');
+    expect(html).not.toContain("if (sitePlan === 'paid') {");
     // The openDomainModal call should still exist
     expect(html).toContain('openDomainModal(');
   });
@@ -156,7 +156,7 @@ test.describe('Build Terminal', () => {
     await page.goto('/');
 
     const html = await page.content();
-    expect(html).toContain('typeof errorMsg === \'object\'');
+    expect(html).toContain("typeof errorMsg === 'object'");
     expect(html).toContain('errorMsg.message || errorMsg.name || JSON.stringify(errorMsg)');
   });
 });
@@ -169,7 +169,7 @@ test.describe('Auto-hide Error Notifications', () => {
     // Verify auto-hide pairs are wired up
     expect(html).toContain('details-textarea');
     expect(html).toContain('autoHidePairs');
-    expect(html).toContain('addEventListener(\'input\'');
+    expect(html).toContain("addEventListener('input'");
   });
 });
 

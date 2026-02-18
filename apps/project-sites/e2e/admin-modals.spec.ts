@@ -70,7 +70,9 @@ test.describe('Admin Dashboard Modals', () => {
     await page.goto('/');
 
     const exists = await page.evaluate(() => {
-      return typeof (window as unknown as Record<string, unknown>).openNewWebsiteModal === 'function';
+      return (
+        typeof (window as unknown as Record<string, unknown>).openNewWebsiteModal === 'function'
+      );
     });
     expect(exists).toBe(true);
   });
@@ -113,7 +115,9 @@ test.describe('Material Ripple Animation', () => {
           for (let r = 0; r < rules.length; r++) {
             if ((rules[r] as CSSKeyframesRule).name === 'ripple-expand') return true;
           }
-        } catch { /* cross-origin sheets */ }
+        } catch {
+          /* cross-origin sheets */
+        }
       }
       return false;
     });
@@ -141,7 +145,9 @@ test.describe('Material Ripple Animation', () => {
             const sel = (rules[r] as CSSStyleRule).selectorText || '';
             if (sel === '.ripple-circle') return true;
           }
-        } catch { /* cross-origin sheets */ }
+        } catch {
+          /* cross-origin sheets */
+        }
       }
       return false;
     });
@@ -165,7 +171,9 @@ test.describe('Site Card Animation', () => {
               if (rule.style.opacity === '0') hasOpacity0 = true;
             }
           }
-        } catch { /* cross-origin sheets */ }
+        } catch {
+          /* cross-origin sheets */
+        }
       }
       return { hasOpacity0 };
     });
@@ -229,7 +237,9 @@ test.describe('Logs Modal Layout', () => {
               return rule.style.maxWidth === '860px';
             }
           }
-        } catch { /* cross-origin sheets */ }
+        } catch {
+          /* cross-origin sheets */
+        }
       }
       return false;
     });

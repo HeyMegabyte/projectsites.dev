@@ -1193,16 +1193,18 @@
       width: auto;
       min-width: 40px;
       max-width: 160px;
-      padding: 2px 6px;
+      padding: 0;
       font-size: inherit;
       font-family: inherit;
       vertical-align: baseline;
-      border-radius: 4px;
-      border: 1px solid var(--accent);
-      background: #fff;
-      color: #1a1a2e;
+      border: none;
+      border-bottom: 1px dashed currentColor;
+      border-radius: 0;
+      background: transparent;
+      color: inherit;
       outline: none;
-      box-shadow: 0 0 0 2px var(--accent-dim);
+      box-shadow: none;
+      caret-color: var(--accent);
     }
     .inline-edit-wrap.inline-edit-inline .inline-save-btn,
     .inline-edit-wrap.inline-edit-inline .inline-cancel-btn {
@@ -1210,6 +1212,15 @@
       align-items: center;
       vertical-align: middle;
       padding: 0 2px;
+      background: transparent;
+      border: none;
+      outline: none;
+      box-shadow: none;
+    }
+    .inline-edit-wrap.inline-edit-inline .inline-save-btn:focus,
+    .inline-edit-wrap.inline-edit-inline .inline-cancel-btn:focus {
+      outline: none;
+      box-shadow: none;
     }
     .inline-slug-url {
       font-size: 0.68rem;
@@ -1225,7 +1236,22 @@
     .inline-slug-url.status-available { color: #22c55e; }
     .inline-slug-url.status-taken { color: #ef4444; }
     .inline-slug-url.status-invalid { color: #ef4444; }
-    .inline-slug-url.status-checking { color: #fbbf24; }
+    .inline-slug-url.status-checking { color: #fbbf24; animation: slug-pulse 1s ease-in-out infinite; }
+    @keyframes slug-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .slug-hint {
+      display: block;
+      font-size: 0.6rem;
+      margin-top: 2px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      opacity: 0.85;
+    }
+    .slug-hint.hint-error { color: #ef4444; }
+    .slug-hint.hint-taken { color: #ef4444; }
+    .slug-hint.hint-available { color: #22c55e; }
+    .slug-hint.hint-checking { color: #fbbf24; }
 
     /* ======================================================
        Deploy Modal
@@ -4589,7 +4615,7 @@
           var cnameHost = slug + '-sites.megabyte.space';
           var cnameUrl = 'https://' + cnameHost;
           html += '<div class="site-card-url-row" id="inline-slug-wrap-' + s.id + '">';
-          html += '<span class="inline-slug-url status-default" id="inline-slug-url-' + s.id + '">https://<span class="inline-edit-wrap inline-edit-inline" id="inline-slug-' + s.id + '"><span class="inline-text slug-editable" onclick="startInlineEdit(\'' + escapeJsString(s.id) + '\', \'slug\', \'' + escapeJsString(slug) + '\')">' + escapeHtml(slug) + '</span><button class="inline-edit-btn" onclick="startInlineEdit(\'' + escapeJsString(s.id) + '\', \'slug\', \'' + escapeJsString(slug) + '\')" title="Edit slug" aria-label="Edit slug"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button></span>-sites.megabyte.space</span>';
+          html += '<span class="inline-slug-url status-default" id="inline-slug-url-' + s.id + '">https://<span class="inline-edit-wrap inline-edit-inline" id="inline-slug-' + s.id + '"><span class="inline-text slug-editable" tabindex="0" role="button" onclick="startInlineEdit(\'' + escapeJsString(s.id) + '\', \'slug\', \'' + escapeJsString(slug) + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();startInlineEdit(\'' + escapeJsString(s.id) + '\', \'slug\', \'' + escapeJsString(slug) + '\')}">' + escapeHtml(slug) + '</span><button class="inline-edit-btn" onclick="startInlineEdit(\'' + escapeJsString(s.id) + '\', \'slug\', \'' + escapeJsString(slug) + '\')" title="Edit slug" aria-label="Edit slug"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button></span>-sites.megabyte.space</span>';
           html += '<button class="site-card-copy-btn" onclick="copyUrl(\'' + escapeAttr(cnameUrl) + '\', this)" title="Copy URL"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>';
           html += '</div>';
           // If custom primary domain, show it separately
@@ -6728,6 +6754,39 @@
       }
     }
 
+    function showSaveToast(siteId, field) {
+      var anchor = (field === 'slug')
+        ? document.getElementById('inline-slug-wrap-' + siteId)
+        : document.getElementById('inline-name-' + siteId);
+      if (!anchor) return;
+      anchor.style.position = 'relative';
+      var existing = anchor.querySelector('.copy-toast');
+      if (existing) existing.remove();
+      var toast = document.createElement('span');
+      toast.className = 'copy-toast';
+      toast.textContent = 'Saved!';
+      anchor.appendChild(toast);
+      setTimeout(function() { if (toast.parentNode) toast.remove(); }, 1500);
+    }
+
+    function showSlugHint(siteId, message, cls) {
+      var wrap = document.getElementById('inline-slug-wrap-' + siteId);
+      if (!wrap) return;
+      var existing = wrap.querySelector('.slug-hint');
+      if (existing) existing.remove();
+      var hint = document.createElement('span');
+      hint.className = 'slug-hint ' + cls;
+      hint.textContent = message;
+      wrap.appendChild(hint);
+    }
+
+    function clearSlugHint(siteId) {
+      var wrap = document.getElementById('inline-slug-wrap-' + siteId);
+      if (!wrap) return;
+      var existing = wrap.querySelector('.slug-hint');
+      if (existing) existing.remove();
+    }
+
     function onSlugInput(siteId, originalSlug) {
       var input = document.getElementById('inline-input-slug-' + siteId);
       var urlEl = document.getElementById('inline-slug-url-' + siteId);
@@ -6740,6 +6799,7 @@
       if (!result.valid) {
         urlEl.className = 'inline-slug-url status-invalid';
         if (saveBtn) saveBtn.disabled = true;
+        showSlugHint(siteId, result.reason || 'Invalid slug', 'hint-error');
         return;
       }
 
@@ -6749,12 +6809,14 @@
       if (normalized === originalSlug) {
         urlEl.className = 'inline-slug-url status-default';
         if (saveBtn) saveBtn.disabled = false;
+        clearSlugHint(siteId);
         return;
       }
 
       // Changed — check availability with debounce
       urlEl.className = 'inline-slug-url status-checking';
       if (saveBtn) saveBtn.disabled = true;
+      showSlugHint(siteId, 'Checking availability\u2026', 'hint-checking');
 
       if (inlineSlugCheckTimer) clearTimeout(inlineSlugCheckTimer);
       inlineSlugCheckTimer = setTimeout(function() {
@@ -6786,9 +6848,11 @@
           if (d.data && d.data.available) {
             urlEl.className = 'inline-slug-url status-available';
             if (saveBtn) saveBtn.disabled = false;
+            showSlugHint(siteId, 'Available!', 'hint-available');
           } else {
             urlEl.className = 'inline-slug-url status-taken';
             if (saveBtn) saveBtn.disabled = true;
+            showSlugHint(siteId, 'Already taken', 'hint-taken');
           }
         })
         .catch(function() {
@@ -6805,11 +6869,12 @@
 
       var isSlug = (field === 'slug');
       if (isSlug) {
+        clearSlugHint(siteId);
         // Restore the combined URL line: https://[slug-editable]-sites.megabyte.space
         var urlEl = document.getElementById('inline-slug-url-' + siteId);
         if (urlEl) {
           urlEl.className = 'inline-slug-url status-default';
-          urlEl.innerHTML = 'https://<span class="inline-edit-wrap inline-edit-inline" id="inline-slug-' + siteId + '"><span class="inline-text slug-editable" onclick="startInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(originalValue) + '\')">' + escapeHtml(originalValue) + '</span><button class="inline-edit-btn" onclick="startInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(originalValue) + '\')" title="Edit slug" aria-label="Edit slug"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button></span>-sites.megabyte.space';
+          urlEl.innerHTML = 'https://<span class="inline-edit-wrap inline-edit-inline" id="inline-slug-' + siteId + '"><span class="inline-text slug-editable" tabindex="0" role="button" onclick="startInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(originalValue) + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();startInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(originalValue) + '\')}">' + escapeHtml(originalValue) + '</span><button class="inline-edit-btn" onclick="startInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(originalValue) + '\')" title="Edit slug" aria-label="Edit slug"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button></span>-sites.megabyte.space';
         }
       } else {
         var wrap = document.getElementById('inline-name-' + siteId);
@@ -6893,6 +6958,8 @@
           }
           // Targeted update — restore display mode with new value (no full re-render)
           cancelInlineEdit(siteId, field, value);
+          // Show save success toast
+          showSaveToast(siteId, isSlug ? 'slug' : 'name');
           // Update site card preview URL if slug changed
           if (isSlug) {
             var previewLink = document.querySelector('#site-card-' + siteId + ' .site-card-preview a');
