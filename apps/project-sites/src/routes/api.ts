@@ -1162,6 +1162,24 @@ api.patch('/api/sites/:id', async (c) => {
       if (site.slug) {
         await c.env.CACHE_KV.delete(`host:${site.slug}-sites.megabyte.space`).catch(() => {});
       }
+
+      // Copy R2 files from old slug to new slug
+      try {
+        const oldPrefix = `sites/${site.slug}/`;
+        const listed = await c.env.SITES_BUCKET.list({ prefix: oldPrefix, limit: 500 });
+        for (const obj of listed.objects) {
+          const newKey = `sites/${newSlug}/${obj.key.slice(oldPrefix.length)}`;
+          const source = await c.env.SITES_BUCKET.get(obj.key);
+          if (source) {
+            await c.env.SITES_BUCKET.put(newKey, source.body, {
+              httpMetadata: source.httpMetadata,
+            });
+          }
+        }
+      } catch {
+        // R2 migration failure should not block the slug update
+        console.warn(`Failed to migrate R2 files from sites/${site.slug}/ to sites/${newSlug}/`);
+      }
     }
   }
 
@@ -1240,10 +1258,15 @@ api.post('/api/sites/:id/reset', async (c) => {
   );
   if (!site) throw notFound('Site not found');
 
-  const body = (await c.req.json()) as {
+  let body: {
     business?: { name?: string; address?: string; place_id?: string };
     additional_context?: string;
-  };
+  } = {};
+  try {
+    body = (await c.req.json()) as typeof body;
+  } catch {
+    // Empty or malformed body is acceptable — reset with defaults
+  }
 
   // Update business info if provided
   const updates: string[] = ['status = \'building\'', 'updated_at = datetime(\'now\')'];
@@ -1261,11 +1284,7 @@ api.post('/api/sites/:id/reset', async (c) => {
     updates.push('google_place_id = ?');
     params.push(body.business.place_id);
   }
-  if (body.additional_context) {
-    updates.push('additional_context = ?');
-    params.push(body.additional_context.slice(0, 5000));
-  }
-
+  // Note: additional_context is passed to the workflow but not stored in the sites table
   params.push(siteId);
   await c.env.DB.prepare(`UPDATE sites SET ${updates.join(', ')} WHERE id = ?`)
     .bind(...params)

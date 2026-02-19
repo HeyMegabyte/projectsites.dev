@@ -655,3 +655,118 @@ test.describe('Visit Button', () => {
     expect(res.headers()['content-type']).toContain('application/json');
   });
 });
+
+// ─── Editor Toolbar Styling ─────────────────────────────────
+
+test.describe('Editor Toolbar Styling', () => {
+  test('editor-toolbar has gradient background', async ({ page }) => {
+    await page.goto('/');
+    const html = await page.content();
+    const idx = html.indexOf('.editor-toolbar {');
+    expect(idx).toBeGreaterThan(-1);
+    const section = html.substring(idx, idx + 400);
+    expect(section).toContain('linear-gradient');
+    expect(section).toContain('border-radius');
+  });
+
+  test('editor-toolbar-btn has rounded pill style', async ({ page }) => {
+    await page.goto('/');
+    const html = await page.content();
+    const idx = html.indexOf('.editor-toolbar-btn {');
+    expect(idx).toBeGreaterThan(-1);
+    const section = html.substring(idx, idx + 300);
+    expect(section).toContain('border-radius: 6px');
+    expect(section).toContain('font-weight: 500');
+  });
+
+  test('editor has language indicator element', async ({ page }) => {
+    await page.goto('/');
+    const html = await page.content();
+    expect(html).toContain('id="files-editor-lang"');
+    expect(html).toContain('font-family:monospace');
+  });
+
+  test('code-editor-wrap connects with toolbar border radius', async ({ page }) => {
+    await page.goto('/');
+    const html = await page.content();
+    const idx = html.indexOf('.code-editor-wrap {');
+    expect(idx).toBeGreaterThan(-1);
+    const section = html.substring(idx, idx + 300);
+    expect(section).toContain('border-radius: 0 0');
+  });
+});
+
+// ─── Domain Search Modal Integration ────────────────────────
+
+test.describe('Domain Search Modal Integration', () => {
+  test('domain-search-results has no inner max-height scroll', async ({ page }) => {
+    await page.goto('/');
+    const html = await page.content();
+    const idx = html.indexOf('.domain-search-results {');
+    expect(idx).toBeGreaterThan(-1);
+    const section = html.substring(idx, idx + 300);
+    // Should NOT contain max-height (removed to let modal scroll)
+    expect(section).not.toContain('max-height');
+    expect(section).not.toContain('overflow-y');
+  });
+});
+
+// ─── Slug Hint Positioning ──────────────────────────────────
+
+test.describe('Slug Hint Positioning', () => {
+  test('slug-hint uses inline-block for pill-row alignment', async ({ page }) => {
+    await page.goto('/');
+    const html = await page.content();
+    const idx = html.indexOf('.slug-hint {');
+    expect(idx).toBeGreaterThan(-1);
+    const section = html.substring(idx, idx + 200);
+    expect(section).toContain('inline-block');
+    expect(section).toContain('margin-left: 6px');
+  });
+
+  test('showSlugHint appends to hostname-chips container', async ({ page }) => {
+    await page.goto('/');
+    const html = await page.content();
+    expect(html).toContain("chips.appendChild(hint)");
+    expect(html).toContain("wrap.querySelector('.hostname-chips')");
+  });
+});
+
+// ─── Site Card Preview ──────────────────────────────────────
+
+test.describe('Site Card Preview Auto-Refresh', () => {
+  test('preview iframe includes cache-busting timestamp', async ({ page }) => {
+    await page.goto('/');
+    const html = await page.content();
+    // The iframe src should append ?_t= for cache busting
+    expect(html).toContain("'?_t='");
+    expect(html).toContain('data-site-id');
+  });
+
+  test('status polling re-renders cards on change', async ({ page }) => {
+    await page.goto('/');
+    const html = await page.content();
+    expect(html).toContain('renderAdminSites()');
+    expect(html).toContain('startSiteStatusPolling');
+  });
+});
+
+// ─── Reset & Build ──────────────────────────────────────────
+
+test.describe('Reset & Build', () => {
+  test('POST /api/sites/:id/reset requires auth', async ({ request }) => {
+    const res = await request.post('/api/sites/test-id/reset', {
+      headers: { 'Content-Type': 'application/json' },
+      data: '{}',
+    });
+    expect([401, 403]).toContain(res.status());
+  });
+
+  test('submitReset function sends POST with business data', async ({ page }) => {
+    await page.goto('/');
+    const html = await page.content();
+    expect(html).toContain('function submitReset()');
+    expect(html).toContain('/reset');
+    expect(html).toContain('additional_context');
+  });
+});

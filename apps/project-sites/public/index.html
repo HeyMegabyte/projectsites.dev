@@ -1419,9 +1419,9 @@
       50% { opacity: 0.5; }
     }
     .slug-hint {
-      display: block;
+      display: inline-block;
       font-size: 0.6rem;
-      margin-top: 2px;
+      margin-left: 6px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       opacity: 0.85;
     }
@@ -1545,8 +1545,6 @@
       background: linear-gradient(145deg, rgba(22, 22, 53, 0.95), rgba(15, 15, 42, 0.98));
       border: 1px solid rgba(80, 165, 219, 0.1);
       border-radius: var(--radius);
-      max-height: 340px;
-      overflow-y: auto;
       margin-top: 12px;
       display: none;
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
@@ -3994,7 +3992,7 @@
       display: flex;
       flex: 1;
       min-height: 280px;
-      border-radius: var(--radius);
+      border-radius: 0 0 var(--radius) var(--radius);
       border: 1px solid var(--border);
       background: var(--bg-primary);
       overflow: hidden;
@@ -4077,34 +4075,40 @@
     .editor-toolbar {
       display: flex;
       align-items: center;
-      gap: 4px;
-      margin-bottom: 8px;
+      gap: 6px;
+      padding: 6px 10px;
+      margin-bottom: 0;
+      background: linear-gradient(145deg, rgba(22, 22, 53, 0.95), rgba(15, 15, 42, 0.98));
+      border: 1px solid var(--border);
+      border-bottom: none;
+      border-radius: var(--radius) var(--radius) 0 0;
     }
     .editor-toolbar-btn {
-      background: none;
-      border: 1px solid var(--border);
-      border-radius: 4px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 6px;
       color: var(--text-muted);
       cursor: pointer;
-      padding: 4px 6px;
-      font-size: 0.68rem;
+      padding: 5px 10px;
+      font-size: 0.7rem;
+      font-weight: 500;
       transition: color 0.15s, border-color 0.15s, background 0.15s;
       display: inline-flex;
       align-items: center;
-      gap: 3px;
+      gap: 4px;
       position: relative;
     }
     .editor-toolbar-btn:hover {
       color: var(--accent);
-      border-color: var(--accent-dim);
-      background: rgba(100, 255, 218, 0.04);
+      border-color: rgba(80, 165, 219, 0.25);
+      background: rgba(80, 165, 219, 0.08);
     }
     .editor-toolbar-btn svg { flex-shrink: 0; }
     .editor-toolbar-sep {
       width: 1px;
-      height: 16px;
-      background: var(--border);
-      margin: 0 4px;
+      height: 18px;
+      background: rgba(255,255,255,0.06);
+      margin: 0 2px;
     }
     /* Files modal toolbar compact */
     .files-toolbar-compact {
@@ -4309,7 +4313,9 @@
           <span id="files-editor-size" style="font-size:0.68rem;color:var(--text-muted);"></span>
           <span class="editor-toolbar-sep"></span>
           <button class="editor-toolbar-btn" onclick="editorWordWrap()" title="Toggle word wrap" id="editor-wrap-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M3 12h15a3 3 0 1 1 0 6h-4"/><polyline points="16 16 14 18 16 20"/><path d="M3 18h7"/></svg>Wrap</button>
-          <button class="btn btn-accent" id="files-save-btn" onclick="saveCurrentFile()" style="font-size:0.72rem;padding:4px 14px;" title="Save file (Ctrl+S)">Save</button>
+          <span style="flex:1;"></span>
+          <span id="files-editor-lang" style="font-size:0.65rem;color:var(--text-muted);padding:3px 8px;background:rgba(255,255,255,0.03);border-radius:4px;font-family:monospace;"></span>
+          <button class="btn btn-accent" id="files-save-btn" onclick="saveCurrentFile()" style="font-size:0.72rem;padding:5px 16px;border-radius:6px;font-weight:600;" title="Save file (Ctrl+S)">Save</button>
         </div>
         <div class="code-editor-wrap" id="code-editor-wrap">
           <!-- CodeMirror mounts here when available; fallback to textarea otherwise -->
@@ -5338,7 +5344,7 @@
         // Preview thumbnail
         html += '<div class="site-card-preview">';
         if (status === 'published' && siteUrl) {
-          html += '<iframe src="' + escapeHtml(siteUrl) + '" loading="lazy" sandbox tabindex="-1"></iframe>';
+          html += '<iframe src="' + escapeHtml(siteUrl) + '?_t=' + (s.updated_at ? new Date(s.updated_at).getTime() : Date.now()) + '" loading="lazy" sandbox tabindex="-1" data-site-id="' + escapeAttr(s.id) + '"></iframe>';
         } else {
           html += '<div class="site-card-preview-placeholder">';
           if (status === 'building' || status === 'queued') {
@@ -7736,13 +7742,19 @@
       var hint = document.createElement('span');
       hint.className = 'slug-hint ' + cls;
       hint.textContent = message;
-      wrap.appendChild(hint);
+      // Place hint next to hostname-chips (Primary/Default pills) for inline display
+      var chips = wrap.querySelector('.hostname-chips');
+      if (chips) {
+        chips.appendChild(hint);
+      } else {
+        wrap.appendChild(hint);
+      }
     }
 
     function clearSlugHint(siteId, ctx) {
       var wrap = document.getElementById(getSlugElId('wrap', siteId, ctx));
       if (!wrap) return;
-      var existing = wrap.querySelector('.slug-hint');
+      var existing = wrap.querySelector('.slug-hint') || (wrap.querySelector('.hostname-chips') && wrap.querySelector('.hostname-chips .slug-hint'));
       if (existing) existing.remove();
     }
 
@@ -8863,6 +8875,12 @@
       hideMsg('files-editor-msg');
 
       var mode = getEditorMode(name);
+      // Show language tag in toolbar
+      var langEl = document.getElementById('files-editor-lang');
+      if (langEl) {
+        var langMap = { 'htmlmixed': 'HTML', 'css': 'CSS', 'javascript': 'JavaScript', 'application/json': 'JSON', 'xml': 'XML' };
+        langEl.textContent = langMap[mode] || mode || 'Text';
+      }
       var editor = ensureCMEditor(mode);
       if (editor) {
         editor.setValue('Loading...');
