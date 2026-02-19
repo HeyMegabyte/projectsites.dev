@@ -344,5 +344,23 @@ describe('securityHeadersMiddleware', () => {
       const scriptSrc = csp.split(';').find(d => d.trim().startsWith('script-src'))!;
       expect(scriptSrc).toContain('https://static.cloudflareinsights.com');
     });
+
+    it('frame-src uses *.megabyte.space for dash-based subdomains', async () => {
+      const app = createApp();
+      const res = await app.request('/test');
+      const csp = res.headers.get('Content-Security-Policy')!;
+      const frameSrc = csp.split(';').find(d => d.trim().startsWith('frame-src'))!;
+      // Must allow foo-sites.megabyte.space via *.megabyte.space wildcard
+      expect(frameSrc).toContain('https://*.megabyte.space');
+    });
+
+    it('frame-src does NOT use *.sites.megabyte.space (wrong subdomain pattern)', async () => {
+      const app = createApp();
+      const res = await app.request('/test');
+      const csp = res.headers.get('Content-Security-Policy')!;
+      const frameSrc = csp.split(';').find(d => d.trim().startsWith('frame-src'))!;
+      // *.sites.megabyte.space matches foo.sites.megabyte.space but NOT foo-sites.megabyte.space
+      expect(frameSrc).not.toContain('*.sites.megabyte.space');
+    });
   });
 });

@@ -50,8 +50,11 @@ search.get('/api/search/businesses', async (c) => {
     throw badRequest('Missing required query parameter: q');
   }
 
+  // Bound query length to prevent abuse
+  const boundedQ = q.trim().slice(0, 200);
+
   // Build request body with optional location bias from browser geolocation
-  const requestBody: Record<string, unknown> = { textQuery: q };
+  const requestBody: Record<string, unknown> = { textQuery: boundedQ };
 
   const lat = c.req.query('lat');
   const lng = c.req.query('lng');
@@ -267,7 +270,9 @@ search.get('/api/sites/search', async (c) => {
     return c.json({ data: [] });
   }
 
-  const searchTerm = `%${q.trim()}%`;
+  // Bound query length to prevent oversized LIKE scans
+  const bounded = q.trim().slice(0, 100);
+  const searchTerm = `%${bounded}%`;
   const { data } = await dbQuery<SiteSearchRow>(
     c.env.DB,
     'SELECT id, slug, business_name, business_address, google_place_id, status, current_build_version FROM sites WHERE business_name LIKE ? AND deleted_at IS NULL ORDER BY CASE WHEN status = \'published\' THEN 0 WHEN status = \'building\' THEN 1 ELSE 2 END, created_at DESC LIMIT 5',

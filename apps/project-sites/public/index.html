@@ -318,9 +318,10 @@
       height: 60px;
       display: flex;
       align-items: center;
-      background: rgba(10, 10, 26, 0.85);
-      backdrop-filter: blur(20px);
-      border-bottom: 1px solid var(--border);
+      background: rgba(10, 10, 26, 0.88);
+      backdrop-filter: blur(24px);
+      border-bottom: 1px solid rgba(80, 165, 219, 0.06);
+      box-shadow: 0 1px 12px rgba(0, 0, 0, 0.2);
     }
     .header-inner {
       max-width: 1200px;
@@ -379,10 +380,10 @@
        ====================================================== */
     .admin-panel {
       display: none;
-      background: linear-gradient(135deg, rgba(15, 15, 35, 0.95), rgba(10, 10, 26, 0.98));
-      border-bottom: 1px solid var(--border);
+      background: linear-gradient(160deg, rgba(15, 15, 35, 0.95), rgba(10, 10, 26, 0.98));
+      border-bottom: 1px solid rgba(80, 165, 219, 0.06);
       margin-top: 60px;
-      padding: 24px 0;
+      padding: 28px 0;
       min-height: 500px;
       animation: fadeIn 0.3s ease;
     }
@@ -453,9 +454,9 @@
       gap: 16px;
     }
     .site-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
+      background: linear-gradient(145deg, rgba(22, 22, 53, 0.7), rgba(15, 15, 42, 0.9));
+      border: 1px solid rgba(80, 165, 219, 0.08);
+      border-radius: 14px;
       padding: 16px;
       transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
       position: relative;
@@ -464,13 +465,14 @@
       gap: 10px;
     }
     .site-card:hover {
-      border-color: var(--border-hover);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3), 0 0 0 1px var(--border-hover);
+      border-color: rgba(80, 165, 219, 0.25);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), 0 0 20px rgba(80, 165, 219, 0.06);
+      transform: translateY(-2px);
     }
     .site-card-preview {
       height: 100px;
-      border-radius: 8px;
-      background: linear-gradient(135deg, rgba(100, 255, 218, 0.05), rgba(124, 58, 237, 0.08));
+      border-radius: 10px;
+      background: linear-gradient(135deg, rgba(80, 165, 219, 0.06), rgba(124, 58, 237, 0.08));
       display: flex;
       align-items: center;
       justify-content: center;
@@ -604,11 +606,11 @@
     /* New Site Card */
     .site-card-new {
       background: transparent;
-      border: 2px dashed var(--border);
-      border-radius: 12px;
+      border: 2px dashed rgba(80, 165, 219, 0.15);
+      border-radius: 14px;
       padding: 16px;
       cursor: pointer;
-      transition: border-color 0.25s ease, background 0.25s ease, box-shadow 0.25s ease;
+      transition: border-color 0.25s ease, background 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -618,7 +620,9 @@
     }
     .site-card-new:hover {
       border-color: var(--accent);
-      background: rgba(100, 255, 218, 0.03);
+      background: rgba(80, 165, 219, 0.04);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(80, 165, 219, 0.06);
     }
     .site-card-new:focus {
       outline: none;
@@ -639,7 +643,8 @@
       display: none;
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0, 0, 0, 0.7);
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
       z-index: 1000;
       animation: fadeIn 0.15s ease;
       align-items: center;
@@ -647,19 +652,20 @@
     }
     .modal-overlay.visible { display: flex; }
     .modal {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
+      background: linear-gradient(145deg, rgba(22, 22, 53, 0.98), rgba(15, 15, 42, 1));
+      border: 1px solid rgba(80, 165, 219, 0.12);
+      border-radius: 20px;
       padding: 28px;
       max-width: 500px;
       width: 90%;
       max-height: 80vh;
       overflow-y: auto;
-      animation: fadeInScale 0.2s ease;
+      animation: fadeInScale 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(80, 165, 219, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.03);
     }
     .modal-title {
       font-size: 1.1rem;
-      font-weight: 600;
+      font-weight: 700;
       color: var(--text-primary);
       margin-bottom: 20px;
       display: flex;
@@ -667,24 +673,26 @@
       justify-content: space-between;
     }
     .modal-close {
-      background: none;
-      border: none;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.06);
       color: var(--text-muted);
       cursor: pointer;
-      padding: 4px;
+      padding: 4px 8px;
       font-size: 1.2rem;
       line-height: 1;
+      border-radius: 8px;
+      transition: background 0.2s, color 0.2s, border-color 0.2s;
     }
-    .modal-close:hover { color: var(--text-primary); }
-    .modal-close:focus { outline: none; color: var(--accent); }
+    .modal-close:hover { color: var(--text-primary); background: rgba(239, 68, 68, 0.08); border-color: rgba(239, 68, 68, 0.2); }
+    .modal-close:focus { outline: none; color: var(--accent); box-shadow: 0 0 0 2px var(--accent-dim); }
     .modal-close:active { opacity: 0.6; transition: opacity 0.06s; }
 
     /* Site Logs Modal */
-    .logs-modal { max-width: 860px; width: 95%; max-height: 90vh; padding: 24px; }
+    .logs-modal { max-width: 860px; width: 95%; max-height: 90vh; padding: 24px; border-radius: 20px; }
     .logs-container {
-      background: #0c0c1e;
-      border: 1px solid rgba(100, 255, 218, 0.1);
-      border-radius: 8px;
+      background: rgba(8, 8, 22, 0.8);
+      border: 1px solid rgba(80, 165, 219, 0.08);
+      border-radius: 10px;
       padding: 0;
       max-height: 65vh;
       overflow-y: auto;
@@ -795,17 +803,23 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 10px 12px;
+      padding: 12px 14px;
       background: rgba(255, 255, 255, 0.02);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: 8px;
+      border: 1px solid rgba(80, 165, 219, 0.08);
+      border-radius: 10px;
+      transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+    }
+    .hostname-item:hover {
+      border-color: rgba(80, 165, 219, 0.15);
+      background: rgba(80, 165, 219, 0.03);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
     }
     .hostname-item-name {
       font-size: 0.85rem;
       color: var(--text-primary);
     }
-    .hostname-item-name a { color: var(--accent); text-decoration: none; }
-    .hostname-item-name a:hover { text-decoration: underline; }
+    .hostname-item-name a { color: var(--accent); text-decoration: none; transition: color 0.2s; }
+    .hostname-item-name a:hover { text-decoration: underline; color: #4ecdc4; }
     .hostname-item-type {
       font-size: 0.65rem;
       color: var(--text-muted);
@@ -816,10 +830,11 @@
       border: none;
       color: var(--text-muted);
       cursor: pointer;
-      padding: 4px;
-      transition: color 0.2s;
+      padding: 6px;
+      border-radius: 6px;
+      transition: color 0.2s, background 0.2s;
     }
-    .hostname-delete-btn:hover { color: var(--error); }
+    .hostname-delete-btn:hover { color: var(--error); background: rgba(239, 68, 68, 0.08); }
     .hostname-add-form {
       display: flex;
       gap: 8px;
@@ -827,28 +842,34 @@
     }
     .hostname-add-form input {
       flex: 1;
-      padding: 8px 12px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      background: var(--bg-primary);
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid rgba(80, 165, 219, 0.12);
+      background: linear-gradient(145deg, rgba(10, 10, 26, 0.8), rgba(15, 15, 42, 0.6));
       color: var(--text-primary);
       font-size: 0.85rem;
+      font-family: var(--font);
+      transition: border-color 0.3s, box-shadow 0.3s;
     }
     .hostname-add-form input:focus {
       outline: none;
       border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-dim);
     }
     .hostname-add-form button {
-      padding: 8px 16px;
-      border-radius: 8px;
-      border: 1px solid var(--accent);
-      background: rgba(100, 255, 218, 0.1);
-      color: var(--accent);
-      font-size: 0.8rem;
+      padding: 10px 20px;
+      border-radius: 10px;
+      border: none;
+      background: linear-gradient(135deg, rgba(80, 165, 219, 0.2), rgba(124, 58, 237, 0.15));
+      color: #fff;
+      font-size: 0.82rem;
+      font-weight: 600;
       cursor: pointer;
       white-space: nowrap;
+      transition: background 0.3s, box-shadow 0.3s, transform 0.15s;
     }
-    .hostname-add-form button:hover { background: rgba(100, 255, 218, 0.2); }
+    .hostname-add-form button:hover { background: linear-gradient(135deg, rgba(80, 165, 219, 0.3), rgba(124, 58, 237, 0.25)); box-shadow: 0 4px 16px rgba(80, 165, 219, 0.15); transform: translateY(-1px); }
+    .hostname-add-form button:active { transform: translateY(0) scale(0.98); }
 
     /* Billing info row */
     /* Per-site plan badge */
@@ -995,10 +1016,10 @@
       display: flex;
       align-items: center;
       gap: 16px;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 12px 18px;
+      background: linear-gradient(145deg, rgba(22, 22, 53, 0.6), rgba(15, 15, 42, 0.8));
+      border: 1px solid rgba(80, 165, 219, 0.08);
+      border-radius: 12px;
+      padding: 14px 20px;
       margin-bottom: 16px;
       flex-wrap: wrap;
     }
@@ -1052,9 +1073,9 @@
       display: flex;
       align-items: center;
       gap: 6px;
-      padding: 8px 12px;
-      background: rgba(255,255,255,0.03);
-      border-bottom: 1px solid var(--border);
+      padding: 10px 14px;
+      background: linear-gradient(145deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+      border-bottom: 1px solid rgba(80, 165, 219, 0.06);
     }
     .build-terminal-dot {
       width: 8px;
@@ -1412,21 +1433,24 @@
        Deploy Modal
        ====================================================== */
     .deploy-upload-zone {
-      border: 2px dashed var(--border);
-      border-radius: var(--radius);
+      border: 2px dashed rgba(80, 165, 219, 0.15);
+      border-radius: 14px;
       padding: 24px;
       text-align: center;
       cursor: pointer;
-      transition: border-color 0.2s, background 0.2s;
+      transition: border-color 0.3s, background 0.3s, box-shadow 0.3s, transform 0.15s;
       margin-bottom: 12px;
     }
     .deploy-upload-zone:hover {
       border-color: var(--accent);
-      background: rgba(80,165,219,0.03);
+      background: rgba(80,165,219,0.04);
+      box-shadow: 0 4px 16px rgba(80, 165, 219, 0.06);
+      transform: translateY(-1px);
     }
     .deploy-upload-zone.has-file {
       border-color: var(--success);
       background: rgba(34,197,94,0.04);
+      box-shadow: 0 2px 12px rgba(34, 197, 94, 0.08);
     }
     .deploy-file-name {
       font-size: 0.85rem;
@@ -1499,52 +1523,55 @@
     }
     .domain-search-input {
       width: 100%;
-      padding: 12px 16px;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      background: var(--bg-primary);
+      padding: 14px 18px;
+      border-radius: 12px;
+      border: 1px solid rgba(80, 165, 219, 0.12);
+      background: linear-gradient(145deg, rgba(10, 10, 26, 0.8), rgba(15, 15, 42, 0.6));
       color: var(--text-primary);
       font-size: 0.9rem;
       font-family: var(--font);
       z-index: 99;
       position: relative;
-      transition: border-color 0.2s, box-shadow 0.2s;
+      transition: border-color 0.3s, box-shadow 0.3s;
     }
     .domain-search-input:focus {
       outline: none;
       border-color: var(--accent);
-      box-shadow: 0 0 0 3px var(--accent-dim);
+      box-shadow: 0 0 0 3px var(--accent-dim), 0 0 20px rgba(80, 165, 219, 0.08);
     }
     .domain-search-results {
       position: relative;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
+      background: linear-gradient(145deg, rgba(22, 22, 53, 0.95), rgba(15, 15, 42, 0.98));
+      border: 1px solid rgba(80, 165, 219, 0.1);
       border-radius: var(--radius);
       max-height: 340px;
       overflow-y: auto;
       margin-top: 12px;
       display: none;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
     }
     .domain-search-results.open { display: block; }
     .domain-results-table { padding: 8px; }
     .domain-result-item {
-      padding: 12px 14px;
+      padding: 14px 16px;
       display: flex;
       align-items: center;
       gap: 12px;
       border: 1px solid transparent;
       border-radius: 10px;
       margin-bottom: 6px;
-      transition: background 0.15s, border-color 0.2s, transform 0.15s;
+      transition: background 0.2s, border-color 0.25s, transform 0.2s, box-shadow 0.2s;
       background: rgba(255,255,255,0.02);
+      cursor: pointer;
     }
     .domain-result-item:last-child { margin-bottom: 0; }
-    .domain-result-item:hover { background: rgba(80, 165, 219, 0.06); border-color: rgba(80, 165, 219, 0.15); transform: translateX(2px); }
-    .domain-result-item.domain-taken { opacity: 0.5; }
-    .domain-result-item.domain-available { border-color: rgba(34, 197, 94, 0.12); }
-    .domain-result-item.domain-available:hover { border-color: rgba(34, 197, 94, 0.3); background: rgba(34, 197, 94, 0.04); }
-    .domain-result-status { flex-shrink: 0; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
-    .domain-result-item.domain-available .domain-result-status { background: rgba(34, 197, 94, 0.12); }
+    .domain-result-item:hover { background: rgba(80, 165, 219, 0.06); border-color: rgba(80, 165, 219, 0.15); transform: translateX(3px); }
+    .domain-result-item.domain-taken { opacity: 0.45; cursor: default; }
+    .domain-result-item.domain-available { border-color: rgba(34, 197, 94, 0.15); }
+    .domain-result-item.domain-available:hover { border-color: rgba(34, 197, 94, 0.35); background: rgba(34, 197, 94, 0.06); box-shadow: 0 2px 12px rgba(34, 197, 94, 0.08); }
+    .domain-result-status { flex-shrink: 0; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: transform 0.2s; }
+    .domain-result-item:hover .domain-result-status { transform: scale(1.1); }
+    .domain-result-item.domain-available .domain-result-status { background: rgba(34, 197, 94, 0.15); box-shadow: 0 0 8px rgba(34, 197, 94, 0.1); }
     .domain-result-item.domain-taken .domain-result-status { background: rgba(239, 68, 68, 0.12); }
     .domain-result-item .domain-result-name { flex: 1; }
     .domain-result-item .domain-result-price { flex-shrink: 0; min-width: 70px; text-align: right; }
@@ -1559,8 +1586,8 @@
       margin-top: 2px;
     }
     .domain-result-price {
-      font-size: 0.82rem;
-      color: var(--accent);
+      font-size: 0.85rem;
+      color: #22c55e;
       font-weight: 700;
     }
     .domain-result-unavailable {
@@ -1570,30 +1597,34 @@
     }
     .domain-tabs {
       display: flex;
-      gap: 0;
-      margin-bottom: 16px;
-      border-bottom: 1px solid var(--border);
+      gap: 4px;
+      margin-bottom: 20px;
+      padding: 4px;
+      background: rgba(10, 10, 26, 0.6);
+      border-radius: 12px;
+      border: 1px solid rgba(80, 165, 219, 0.06);
     }
     .domain-tab {
       flex: 1;
-      padding: 10px;
+      padding: 10px 12px;
       text-align: center;
-      font-size: 0.82rem;
+      font-size: 0.8rem;
       font-weight: 600;
       color: var(--text-muted);
-      background: none;
+      background: transparent;
       border: none;
+      border-radius: 8px;
       cursor: pointer;
-      border-bottom: 2px solid transparent;
-      transition: color 0.2s, border-color 0.2s, background 0.2s;
+      transition: color 0.25s, background 0.25s, box-shadow 0.25s, transform 0.15s;
     }
     .domain-tab.active {
-      color: var(--accent);
-      border-bottom-color: var(--accent);
+      color: #fff;
+      background: linear-gradient(135deg, rgba(80, 165, 219, 0.2), rgba(124, 58, 237, 0.15));
+      box-shadow: 0 2px 8px rgba(80, 165, 219, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
     }
-    .domain-tab:hover { color: var(--text-primary); }
+    .domain-tab:hover:not(.active) { color: var(--text-primary); background: rgba(80, 165, 219, 0.06); }
     .domain-tab:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent-dim); }
-    .domain-tab:active { opacity: 0.7; }
+    .domain-tab:active { transform: scale(0.97); }
 
     /* Hostname status squares — fill parent height, square aspect ratio */
     .hostname-status-square {
@@ -2039,10 +2070,38 @@
       position: relative;
       z-index: 1;
       min-height: 100vh;
+      overflow: hidden;
     }
     .screen-signin.active {
       justify-content: center;
       gap: 0;
+    }
+    /* Animated background orbs for sign-in */
+    .screen-signin::before {
+      content: '';
+      position: absolute;
+      top: 15%;
+      left: -10%;
+      width: 400px;
+      height: 400px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(80, 165, 219, 0.08) 0%, transparent 70%);
+      animation: orbFloat1 12s ease-in-out infinite;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .screen-signin::after {
+      content: '';
+      position: absolute;
+      bottom: 10%;
+      right: -8%;
+      width: 350px;
+      height: 350px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(124, 58, 237, 0.08) 0%, transparent 70%);
+      animation: orbFloat2 15s ease-in-out infinite;
+      pointer-events: none;
+      z-index: 0;
     }
     /* Compact signin footer - fixed at bottom */
     .signin-footer {
@@ -2051,35 +2110,36 @@
       left: 0;
       right: 0;
       width: 100%;
-      padding: 12px 16px;
+      padding: 14px 16px;
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 10px;
-      opacity: 0.6;
-      transition: opacity 0.2s;
-      background: var(--bg-primary);
-      border-top: 1px solid var(--border);
+      opacity: 0.7;
+      transition: opacity 0.3s;
+      background: linear-gradient(180deg, transparent 0%, rgba(10, 10, 26, 0.95) 30%);
+      border-top: 1px solid rgba(80, 165, 219, 0.06);
       z-index: 10;
+      backdrop-filter: blur(12px);
     }
-    .signin-footer:hover { opacity: 0.85; }
+    .signin-footer:hover { opacity: 1; }
     .signin-footer-social {
       display: flex;
-      gap: 12px;
+      gap: 14px;
     }
     .signin-footer-social a {
       color: var(--text-muted);
-      transition: color 0.2s, transform 0.15s;
+      transition: color 0.2s, transform 0.2s;
       display: flex;
     }
-    .signin-footer-social a:hover { transform: scale(1.15); }
+    .signin-footer-social a:hover { transform: scale(1.2) translateY(-1px); }
     .signin-footer-social a[aria-label="GitHub"]:hover { color: #f0f6fc; }
     .signin-footer-social a[aria-label="X"]:hover { color: #f0f6fc; }
     .signin-footer-social a[aria-label="LinkedIn"]:hover { color: #0a66c2; }
     .signin-footer-social a[aria-label="YouTube"]:hover { color: #ff0000; }
     .signin-footer-social a[aria-label="Instagram"]:hover { color: #e4405f; }
     .signin-footer-social a[aria-label="Facebook"]:hover { color: #1877f2; }
-    .signin-footer-social a svg { width: 14px; height: 14px; }
+    .signin-footer-social a svg { width: 15px; height: 15px; }
     .signin-footer-legal {
       font-size: 0.7rem;
       color: var(--text-muted);
@@ -2093,25 +2153,46 @@
     .signin-card {
       width: 100%;
       max-width: 440px;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      padding: 40px 32px;
-      animation: fadeInScale 0.35s ease;
+      background: linear-gradient(145deg, rgba(22, 22, 53, 0.95), rgba(15, 15, 42, 0.98));
+      border: 1px solid rgba(80, 165, 219, 0.15);
+      border-radius: 20px;
+      padding: 44px 36px;
+      animation: fadeInScale 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(80, 165, 219, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+      position: relative;
+      z-index: 1;
+      backdrop-filter: blur(20px);
+    }
+    .signin-card::before {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: 21px;
+      padding: 1px;
+      background: linear-gradient(135deg, rgba(80, 165, 219, 0.25), transparent 50%, rgba(124, 58, 237, 0.2));
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
     }
     .signin-card h2 {
-      font-size: 1.5rem;
+      font-size: 1.6rem;
       font-weight: 800;
       margin-bottom: 8px;
       letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #e2e8f0 0%, #50a5db 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
     }
     .signin-card .signin-subtitle {
       font-size: 0.9rem;
       color: var(--text-secondary);
       margin-bottom: 32px;
+      line-height: 1.5;
     }
 
-    .signin-methods { display: flex; flex-direction: column; gap: 12px; }
+    .signin-methods { display: flex; flex-direction: column; gap: 14px; }
 
     .signin-btn {
       display: flex;
@@ -2119,60 +2200,76 @@
       justify-content: center;
       gap: 12px;
       width: 100%;
-      padding: 14px 20px;
+      padding: 15px 20px;
       border-radius: var(--radius);
       font-size: 0.95rem;
       font-weight: 600;
       font-family: var(--font);
       cursor: pointer;
-      transition: transform var(--transition), box-shadow var(--transition), background var(--transition), border-color var(--transition);
-      border: 1px solid var(--border);
-      background: var(--bg-input);
+      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease, background 0.3s ease, border-color 0.3s ease;
+      border: 1px solid rgba(80, 165, 219, 0.12);
+      background: linear-gradient(145deg, rgba(15, 15, 42, 0.8), rgba(22, 22, 53, 0.6));
       color: var(--text-primary);
+      position: relative;
+      overflow: hidden;
+    }
+    .signin-btn::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(80, 165, 219, 0.06), transparent);
+      opacity: 0;
+      transition: opacity 0.3s;
     }
     .signin-btn:hover {
-      transform: translateY(-1px);
-      border-color: var(--border-hover);
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      transform: translateY(-2px);
+      border-color: rgba(80, 165, 219, 0.3);
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3), 0 0 20px rgba(80, 165, 219, 0.08);
     }
+    .signin-btn:hover::after { opacity: 1; }
     .signin-btn:focus {
       outline: none;
       border-color: var(--accent);
-      box-shadow: 0 0 0 3px var(--accent-dim), 0 0 20px rgba(80, 165, 219, 0.1);
+      box-shadow: 0 0 0 3px var(--accent-dim), 0 0 24px rgba(80, 165, 219, 0.12);
     }
     .signin-btn:active {
       transform: translateY(1px) scale(0.98);
       box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
       transition-duration: 0.08s;
     }
-    .signin-btn svg { flex-shrink: 0; }
+    .signin-btn svg { flex-shrink: 0; position: relative; z-index: 1; }
+    .signin-btn span { position: relative; z-index: 1; }
 
     .signin-btn-google {
-      background: #fff;
+      background: linear-gradient(145deg, #ffffff, #f8f9fa);
       color: #1f1f1f;
-      border-color: #dadce0;
+      border-color: rgba(218, 220, 224, 0.8);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     }
+    .signin-btn-google::after { display: none; }
     .signin-btn-google:hover {
-      background: #f8f9fa;
-      border-color: #c4c7cc;
+      background: linear-gradient(145deg, #ffffff, #f0f1f3);
+      border-color: rgba(80, 165, 219, 0.4);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(80, 165, 219, 0.1);
     }
 
     .signin-divider {
       display: flex;
       align-items: center;
       gap: 16px;
-      margin: 20px 0;
+      margin: 22px 0;
       color: var(--text-muted);
-      font-size: 0.8rem;
+      font-size: 0.75rem;
       text-transform: uppercase;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.1em;
+      font-weight: 500;
     }
     .signin-divider::before,
     .signin-divider::after {
       content: '';
       flex: 1;
       height: 1px;
-      background: var(--border);
+      background: linear-gradient(90deg, transparent, rgba(80, 165, 219, 0.15), transparent);
     }
 
     /* Phone / Email form panels */
@@ -2201,17 +2298,17 @@
       padding: 14px 16px;
       font-size: 1rem;
       font-family: var(--font);
-      background: var(--bg-input);
-      border: 1.5px solid var(--border);
+      background: linear-gradient(145deg, rgba(10, 10, 26, 0.8), rgba(15, 15, 42, 0.5));
+      border: 1.5px solid rgba(80, 165, 219, 0.1);
       border-radius: var(--radius);
       color: var(--text-primary);
       outline: none;
-      transition: border-color var(--transition), box-shadow var(--transition);
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
     }
-    .input-field::placeholder { color: var(--text-secondary); }
+    .input-field::placeholder { color: var(--text-muted); }
     .input-field:focus {
       border-color: var(--accent);
-      box-shadow: 0 0 0 3px var(--accent-dim);
+      box-shadow: 0 0 0 3px var(--accent-dim), 0 0 20px rgba(80, 165, 219, 0.06);
     }
 
     textarea.input-field {
@@ -2399,8 +2496,8 @@
     .location-modal-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.6);
-      backdrop-filter: blur(4px);
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
       z-index: 10000;
       display: flex;
       align-items: center;
@@ -2408,14 +2505,15 @@
       animation: fadeIn 0.3s ease;
     }
     .location-modal {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      padding: 32px;
+      background: linear-gradient(145deg, rgba(22, 22, 53, 0.98), rgba(15, 15, 42, 1));
+      border: 1px solid rgba(80, 165, 219, 0.12);
+      border-radius: 20px;
+      padding: 36px;
       max-width: 400px;
       width: 90%;
       text-align: center;
-      animation: fadeInScale 0.3s ease;
+      animation: fadeInScale 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.03);
     }
     .location-modal-icon {
       margin-bottom: 16px;
@@ -2514,6 +2612,7 @@
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
       background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
       z-index: 2000;
       align-items: flex-start;
       justify-content: center;
@@ -2524,35 +2623,37 @@
     .details-modal-overlay.visible { display: flex; }
     .details-modal-close {
       position: absolute;
-      top: 12px;
-      right: 12px;
-      background: none;
-      border: none;
+      top: 14px;
+      right: 14px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.06);
       color: var(--text-muted);
       cursor: pointer;
-      padding: 6px;
-      font-size: 1.4rem;
+      padding: 4px 8px;
+      font-size: 1.3rem;
       line-height: 1;
       z-index: 2;
-      transition: color 0.2s;
+      transition: color 0.2s, background 0.2s;
+      border-radius: 8px;
     }
-    .details-modal-close:hover { color: var(--text-primary); }
-    .details-modal-close:focus { outline: none; color: var(--accent); }
+    .details-modal-close:hover { color: var(--text-primary); background: rgba(239, 68, 68, 0.08); }
+    .details-modal-close:focus { outline: none; color: var(--accent); box-shadow: 0 0 0 2px var(--accent-dim); }
     .details-modal-close:active { opacity: 0.6; transition: opacity 0.06s; }
     .details-card {
       width: 100%;
       max-width: 600px;
       margin: 20px auto;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      padding: 36px 32px;
-      animation: fadeInScale 0.35s ease;
+      background: linear-gradient(145deg, rgba(22, 22, 53, 0.98), rgba(15, 15, 42, 1));
+      border: 1px solid rgba(80, 165, 219, 0.12);
+      border-radius: 20px;
+      padding: 40px 36px;
+      animation: fadeInScale 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
       position: relative;
       flex-shrink: 0;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.03);
     }
     .details-card h2 {
-      font-size: 1.4rem;
+      font-size: 1.5rem;
       font-weight: 800;
       margin-bottom: 8px;
       letter-spacing: -0.02em;
@@ -3836,28 +3937,29 @@
     .toast {
       pointer-events: auto;
       padding: 12px 18px;
-      border-radius: 10px;
+      border-radius: 12px;
       font-size: 0.85rem;
       line-height: 1.4;
       max-width: 380px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-      animation: toastSlideIn 0.3s ease;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      animation: toastSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
       display: flex;
       align-items: center;
       gap: 8px;
+      backdrop-filter: blur(12px);
     }
     .toast-error {
-      background: rgba(220, 38, 38, 0.95);
+      background: rgba(220, 38, 38, 0.9);
       color: #fff;
       border: 1px solid rgba(248, 113, 113, 0.3);
     }
     .toast-success {
-      background: rgba(16, 185, 129, 0.95);
+      background: rgba(16, 185, 129, 0.9);
       color: #fff;
       border: 1px solid rgba(52, 211, 153, 0.3);
     }
     .toast-info {
-      background: rgba(59, 130, 246, 0.95);
+      background: rgba(59, 130, 246, 0.9);
       color: #fff;
       border: 1px solid rgba(96, 165, 250, 0.3);
     }
@@ -4093,30 +4195,47 @@
 
       <!-- Tab: Connect Domain (CNAME) -->
       <div id="domain-panel-connect" role="tabpanel" aria-labelledby="domain-tab-connect" style="display:none;">
-        <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:12px;">Add a domain you already own. Point a CNAME record to <code>sites.megabyte.space</code>.</p>
+        <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:16px;padding:14px 16px;background:linear-gradient(135deg,rgba(80,165,219,0.05),rgba(124,58,237,0.03));border:1px solid rgba(80,165,219,0.08);border-radius:12px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          <div>
+            <div style="font-size:0.85rem;color:var(--text-primary);font-weight:600;margin-bottom:3px;">Connect your own domain</div>
+            <div style="font-size:0.78rem;color:var(--text-secondary);line-height:1.5;">Point a CNAME record to <code style="background:rgba(80,165,219,0.1);padding:2px 6px;border-radius:4px;font-size:0.75rem;color:var(--accent);">sites.megabyte.space</code> in your DNS provider.</div>
+          </div>
+        </div>
         <div class="hostname-add-form">
           <label for="domain-add-input" class="sr-only">Domain name</label>
           <input type="text" id="domain-add-input" inputmode="url" placeholder="e.g. www.mybusiness.com" onkeydown="if(event.key==='Enter'){event.preventDefault();addHostname();}" />
           <button id="domain-add-btn" onclick="addHostname()">Add Domain</button>
         </div>
-        <div id="domain-connect-upgrade-cta" style="display:none;margin-top:14px;padding:16px 20px;background:linear-gradient(135deg,rgba(124,58,237,0.08),rgba(80,165,219,0.06));border:1px solid rgba(124,58,237,0.2);border-radius:var(--radius);text-align:center;">
-          <div style="font-size:0.9rem;font-weight:600;color:var(--text-primary);margin-bottom:6px;">Unlock Custom Domains</div>
-          <div style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:12px;">Connect your own domain with automatic SSL, CDN, and DNS management</div>
-          <button class="btn btn-accent" onclick="openBillingCheckout()" style="padding:8px 24px;font-size:0.82rem;font-weight:600;">Upgrade to Paid Plan</button>
+        <div id="domain-connect-upgrade-cta" style="display:none;margin-top:16px;padding:20px 24px;background:linear-gradient(135deg,rgba(124,58,237,0.1),rgba(80,165,219,0.08));border:1px solid rgba(124,58,237,0.2);border-radius:14px;text-align:center;position:relative;overflow:hidden;">
+          <div style="position:absolute;inset:-1px;border-radius:15px;padding:1px;background:linear-gradient(135deg,rgba(124,58,237,0.3),transparent 50%,rgba(80,165,219,0.2));-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none;"></div>
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="url(#upgrade-grad)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:8px;"><defs><linearGradient id="upgrade-grad" x1="0" y1="0" x2="24" y2="24"><stop offset="0%" stop-color="#50a5db"/><stop offset="100%" stop-color="#7c3aed"/></linearGradient></defs><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <div style="font-size:0.95rem;font-weight:700;color:var(--text-primary);margin-bottom:6px;">Unlock Custom Domains</div>
+          <div style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:14px;line-height:1.5;">Automatic SSL, global CDN, and DNS management included</div>
+          <button class="btn btn-accent" onclick="openBillingCheckout()" style="padding:10px 28px;font-size:0.85rem;font-weight:700;border-radius:10px;">Upgrade Now</button>
         </div>
         <div id="domain-cname-status" style="display:none;margin-top:10px;"></div>
-        <p style="font-size:0.7rem;color:var(--text-muted);margin-top:10px;">Add the CNAME record in your DNS provider, then add the domain here. We'll monitor it until it resolves.</p>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:14px;padding:10px 12px;background:rgba(255,255,255,0.02);border-radius:8px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <p style="font-size:0.72rem;color:var(--text-muted);margin:0;line-height:1.4;">Add the CNAME record in your DNS provider, then add the domain here. We'll monitor it until it resolves.</p>
+        </div>
       </div>
 
       <!-- Tab: Register New Domain -->
       <div id="domain-panel-register" role="tabpanel" aria-labelledby="domain-tab-register" style="display:none;">
-        <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:12px;">Search for an available domain to register. Domains are billed as a separate Stripe subscription at the Cloudflare wholesale price.</p>
+        <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:16px;padding:14px 16px;background:linear-gradient(135deg,rgba(34,197,94,0.04),rgba(80,165,219,0.03));border:1px solid rgba(34,197,94,0.1);border-radius:12px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          <div>
+            <div style="font-size:0.85rem;color:var(--text-primary);font-weight:600;margin-bottom:3px;">Register a new domain</div>
+            <div style="font-size:0.78rem;color:var(--text-secondary);line-height:1.5;">Domains are billed at <span style="color:#22c55e;font-weight:600;">Cloudflare wholesale prices</span> &mdash; no markup.</div>
+          </div>
+        </div>
         <div class="domain-search-wrap">
           <label for="domain-search-input" class="sr-only">Domain search</label>
           <input type="text" id="domain-search-input" class="domain-search-input" inputmode="url" placeholder="Search for a domain name..." autocomplete="off" />
           <div id="domain-search-results" class="domain-search-results"></div>
         </div>
-        <div id="domain-search-spinner" style="text-align:center;padding:12px;display:none;">
+        <div id="domain-search-spinner" style="text-align:center;padding:16px;display:none;">
           <span class="loading-dots"><span></span><span></span><span></span></span>
         </div>
       </div>
@@ -4723,8 +4842,11 @@
          ========================================== -->
     <div id="screen-signin" class="screen screen-signin">
       <div class="signin-card">
+        <div style="margin-bottom:24px;">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="url(#signin-lock-grad)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:12px;filter:drop-shadow(0 0 8px rgba(80,165,219,0.2));"><defs><linearGradient id="signin-lock-grad" x1="0" y1="0" x2="24" y2="24"><stop offset="0%" stop-color="#50a5db"/><stop offset="100%" stop-color="#7c3aed"/></linearGradient></defs><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
         <h2>Sign in to claim your website</h2>
-        <p class="signin-subtitle">Create your account to get started.</p>
+        <p class="signin-subtitle">Create your account to get started with your AI-powered site.</p>
 
         <!-- Main sign-in options -->
         <div id="signin-methods" class="signin-methods">

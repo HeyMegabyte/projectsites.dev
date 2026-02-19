@@ -88,6 +88,10 @@ api.get('/api/auth/magic-link/verify', async (c) => {
 
     if (result.redirect_url) {
       const redirectTarget = new URL(result.redirect_url);
+      // Only allow redirects to *.megabyte.space to prevent open redirect attacks
+      if (!redirectTarget.hostname.endsWith('.megabyte.space') && redirectTarget.hostname !== 'megabyte.space') {
+        return c.redirect('/?error=invalid_redirect');
+      }
       redirectTarget.searchParams.set('token', session.token);
       redirectTarget.searchParams.set('email', result.email);
       redirectTarget.searchParams.set('auth_callback', 'email');
@@ -185,7 +189,12 @@ api.get('/api/auth/google/callback', async (c) => {
       ? 'https://sites.megabyte.space'
       : 'https://sites-staging.megabyte.space';
 
-  const redirectTarget = new URL(result.redirect_url ?? baseUrl);
+  const rawRedirect = result.redirect_url ?? baseUrl;
+  const redirectTarget = new URL(rawRedirect);
+  // Only allow redirects to *.megabyte.space to prevent open redirect attacks
+  if (!redirectTarget.hostname.endsWith('.megabyte.space') && redirectTarget.hostname !== 'megabyte.space') {
+    return c.redirect(`${baseUrl}/?error=invalid_redirect`);
+  }
   redirectTarget.searchParams.set('token', session.token);
   redirectTarget.searchParams.set('email', result.email);
   posthog.trackAuth(c.env, c.executionCtx, 'google_oauth', 'verified', result.email);
@@ -1989,8 +1998,13 @@ Response:`;
     // Extract JSON from AI response
     const jsonMatch = text.match(/\{[^}]+\}/);
     if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      return c.json({ data: { valid: !!parsed.valid, reason: parsed.reason || null } });
+      try {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return c.json({ data: { valid: !!parsed.valid, reason: parsed.reason || null } });
+      } catch {
+        // Malformed JSON from AI — treat as valid
+        return c.json({ data: { valid: true } });
+      }
     }
     // If AI didn't respond properly, allow it through
     return c.json({ data: { valid: true } });

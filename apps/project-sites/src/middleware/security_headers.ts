@@ -73,7 +73,7 @@ export const securityHeadersMiddleware: MiddlewareHandler<{
       "img-src 'self' data: https: https://www.googletagmanager.com https://www.google-analytics.com",
       "font-src 'self' https://fonts.gstatic.com",
       "connect-src 'self' https://api.stripe.com https://us.i.posthog.com https://us-assets.i.posthog.com https://releases.transloadit.com https://www.google-analytics.com https://www.googletagmanager.com https://region1.google-analytics.com",
-      "frame-src https://js.stripe.com https://www.googletagmanager.com https://*.sites.megabyte.space https://*.megabyte.space",
+      "frame-src https://js.stripe.com https://www.googletagmanager.com https://*.megabyte.space",
       "object-src 'none'",
       "base-uri 'self'",
     ].join('; '),

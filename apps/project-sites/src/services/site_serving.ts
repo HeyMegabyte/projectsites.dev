@@ -264,7 +264,10 @@ export async function serveSiteFromR2(
     return new Response('Not Found', { status: 404 });
   }
 
-  const contentType = getContentType(requestPath);
+  // Use the resolved R2 path for content-type detection, not the raw request path.
+  // Raw path '/' has no extension → would return 'application/octet-stream' (download).
+  const resolvedPath = requestPath === '/' ? '/index.html' : requestPath;
+  const contentType = getContentType(resolvedPath);
   return buildSiteResponse(object, site, contentType);
 }
 
