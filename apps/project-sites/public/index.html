@@ -669,7 +669,7 @@
       overflow: hidden;
       min-width: 140px;
     }
-    .site-card-dropdown-menu.open { display: block; }
+    .site-card-dropdown-menu.open { display: block; animation: fadeInScale 0.15s ease-out; }
     .site-card-dropdown-item {
       display: flex; align-items: center; gap: 8px;
       padding: 8px 12px;
@@ -1638,15 +1638,15 @@
     }
     .domain-search-results {
       position: relative;
-      background: linear-gradient(145deg, rgba(22, 22, 53, 0.95), rgba(15, 15, 42, 0.98));
-      border: 1px solid rgba(80, 165, 219, 0.1);
-      border-radius: var(--radius);
-      margin-top: 12px;
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      margin-top: 8px;
       display: none;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      box-shadow: none;
     }
     .domain-search-results.open { display: block; }
-    .domain-results-table { padding: 8px; }
+    .domain-results-table { padding: 0; }
     .domain-result-item {
       padding: 14px 16px;
       display: flex;
@@ -1787,12 +1787,23 @@
       opacity: 0;
       transition: opacity 0.15s;
       z-index: 10;
-      max-width: 220px;
+      max-width: 320px;
+      min-width: 200px;
       white-space: normal;
       text-align: center;
       line-height: 1.3;
     }
     .hostname-chip[data-tip]:hover::after { opacity: 1; }
+    /* DomainConnect auto-setup buttons */
+    .dc-btn {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 0.62rem; font-weight: 600; text-decoration: none;
+      padding: 3px 8px; border-radius: 5px; transition: all 0.2s;
+    }
+    .dc-btn-gd { color: #1bdbdb; background: rgba(27,219,219,0.08); border: 1px solid rgba(27,219,219,0.15); }
+    .dc-btn-gd:hover { background: rgba(27,219,219,0.16); border-color: rgba(27,219,219,0.3); }
+    .dc-btn-cf { color: #F6821F; background: rgba(246,130,31,0.08); border: 1px solid rgba(246,130,31,0.15); }
+    .dc-btn-cf:hover { background: rgba(246,130,31,0.16); border-color: rgba(246,130,31,0.3); }
     .hostname-chip-setprimary {
       font-size: 0.62rem;
       color: var(--accent);
@@ -2547,6 +2558,22 @@
       border-radius: var(--radius-lg);
     }
 
+    /* Universal focus-visible for accessibility */
+    button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    button:focus:not(:focus-visible), a:focus:not(:focus-visible) { outline: none; }
+    /* Universal hover transition for interactive elements */
+    .editor-toolbar-btn:hover, .logs-refresh-btn:hover, .hostname-delete-btn:hover,
+    .domain-tab:hover:not(.active), .admin-btn:hover, .modal-close:hover {
+      filter: brightness(1.15);
+    }
+    .editor-toolbar-btn:active, .logs-refresh-btn:active, .hostname-delete-btn:active,
+    .admin-btn:active, .modal-close:active {
+      filter: brightness(0.9);
+      transition-duration: 0.06s;
+    }
     /* Material-style ripple effect */
     .btn, .site-card-btn, .admin-btn, .admin-btn-accent, .logs-refresh-btn,
     .domain-tab, .hostname-delete-btn, .signin-btn, .back-link,
@@ -2554,7 +2581,7 @@
     .site-card-new, .site-card-upgrade-btn,
     .inline-edit-btn, .inline-save-btn, .inline-cancel-btn,
     .faq-question, .btn-allow, .btn-skip, .improve-ai-link,
-    .plan-badge {
+    .plan-badge, .dc-btn, .editor-toolbar-btn, .topbar-cta {
       position: relative;
       overflow: hidden;
     }
@@ -4247,6 +4274,21 @@
       padding: 0 2px;
       margin-bottom: 10px;
     }
+    .files-breadcrumb-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.62rem;
+      font-weight: 600;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      flex-shrink: 0;
+      padding: 4px 8px;
+      background: rgba(80,165,219,0.06);
+      border: 1px solid rgba(80,165,219,0.12);
+      border-radius: 5px;
+    }
     .files-toolbar-compact .files-breadcrumb {
       font-size: 0.72rem;
       color: rgba(148,163,184,0.8);
@@ -4382,6 +4424,13 @@
 
       <!-- Tab: Existing Domains -->
       <div id="domain-panel-existing" role="tabpanel" aria-labelledby="domain-tab-existing">
+        <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:16px;padding:14px 16px;background:linear-gradient(135deg,rgba(148,163,184,0.04),rgba(80,165,219,0.03));border:1px solid rgba(148,163,184,0.08);border-radius:12px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          <div>
+            <div style="font-size:0.85rem;color:var(--text-primary);font-weight:600;margin-bottom:3px;">Your Domains</div>
+            <div style="font-size:0.78rem;color:var(--text-secondary);line-height:1.5;">All domains currently connected to this site. Set a primary domain to enable automatic redirects.</div>
+          </div>
+        </div>
         <div id="domain-modal-hostnames" class="hostname-list"></div>
       </div>
 
@@ -4419,7 +4468,7 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
           <div>
             <div style="font-size:0.85rem;color:var(--text-primary);font-weight:600;margin-bottom:3px;">Register a new domain</div>
-            <div style="font-size:0.78rem;color:var(--text-secondary);line-height:1.5;">Domains are billed at <span style="display:inline-flex;align-items:center;gap:4px;"><svg width="14" height="14" viewBox="0 0 100 100" style="flex-shrink:0;"><path d="M72.8 42.6c-.3 0-.6.1-.9.1-.2-6.5-5.5-11.7-12.1-11.7-4.2 0-7.9 2.1-10.1 5.4-1.4-1-3.2-1.6-5-1.6-4.8 0-8.7 3.9-8.7 8.7v.4c-4.3 1-7.5 4.8-7.5 9.4 0 5.3 4.3 9.6 9.6 9.6h34.7c5.3 0 9.6-4.3 9.6-9.6 0-5.3-4.3-9.7-9.6-10.7z" fill="#F6821F"/><path d="M66.1 55.9l3.1-10.7c.2-.6.1-1.2-.2-1.7-.3-.5-.8-.8-1.3-.9l-31.4-.8c-.1 0-.2-.1-.3-.1 0-.1 0-.2.1-.3l.6-1.5c.2-.4.5-.6.9-.6l32.2.9c2.8.1 5.7 2.3 6.6 5l1.1 3.3c-1.3-.6-2.8-1-4.3-1h-.6l-.1-.2z" fill="#FAAD3F"/></svg><span style="color:#F6821F;font-weight:700;">CloudFlare</span></span> wholesale prices &mdash; no markup.</div>
+            <div style="font-size:0.78rem;color:var(--text-secondary);line-height:1.5;">Domains are billed at <span style="color:#F6821F;font-weight:700;">CloudFlare</span> wholesale prices &mdash; no markup.</div>
           </div>
         </div>
         <div class="domain-search-wrap">
@@ -4446,6 +4495,7 @@
         <button class="modal-close" onclick="closeFilesModal()">&times;</button>
       </div>
       <div id="files-toolbar" class="files-toolbar-compact">
+        <span class="files-breadcrumb-label"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Path</span>
         <span id="files-breadcrumb" class="files-breadcrumb"></span>
       </div>
       <div id="files-list" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-primary);min-height:200px;"></div>
@@ -5601,7 +5651,6 @@
         html += '<div class="site-card-dropdown-menu">';
         html += '<button class="site-card-dropdown-item" onclick="openResetModal(\'' + escapeJsString(s.id) + '\', \'' + escapeJsString(name) + '\', \'' + escapeJsString(s.business_address || '') + '\', \'' + escapeJsString(s.google_place_id || '') + '\', \'' + escapeJsString(s.additional_context || '') + '\');closeAllDropdowns()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/></svg>Reset &amp; Rebuild</button>';
         html += '<button class="site-card-dropdown-item" onclick="openDeployModal(\'' + escapeJsString(s.id) + '\', \'' + escapeJsString(name) + '\');closeAllDropdowns()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Deploy ZIP</button>';
-        html += '<button class="site-card-dropdown-item" onclick="openSettingsModal(\'' + escapeJsString(s.id) + '\', \'' + escapeJsString(name) + '\');closeAllDropdowns()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72 1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>Settings</button>';
         html += '<div style="height:1px;background:rgba(255,255,255,0.05);margin:2px 0;"></div>';
         html += '<button class="site-card-dropdown-item danger-item" onclick="openDeleteModal(\'' + escapeJsString(s.id) + '\', \'' + escapeJsString(name) + '\');closeAllDropdowns()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete Site</button>';
         html += '</div></div>';
@@ -5829,12 +5878,22 @@
               html += '<div style="margin-top:4px;padding:6px 8px;background:rgba(251,191,36,0.06);border:1px solid rgba(251,191,36,0.15);border-radius:6px;font-size:0.68rem;line-height:1.4;">';
               html += '<span style="color:#fbbf24;font-weight:600;">CNAME pending</span> <span style="color:var(--text-muted);">&mdash; Point your CNAME to <code style="background:rgba(80,165,219,0.1);padding:1px 5px;border-radius:3px;font-size:0.65rem;color:var(--accent);">sites.megabyte.space</code></span>';
               html += '<div style="margin-top:4px;color:var(--text-muted);">DNS propagation usually takes 24&ndash;72 hours.</div>';
-              // DomainConnect auto-setup link
-              var dcHost = h.hostname.split('.').slice(-2).join('.');
-              var dcUrl = 'https://domainconnect.org/redirect?domain=' + encodeURIComponent(h.hostname) + '&host=' + encodeURIComponent(h.hostname.split('.')[0]) + '&type=CNAME&value=sites.megabyte.space&ttl=3600';
-              html += '<a href="' + escapeAttr(dcUrl) + '" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;margin-top:5px;font-size:0.65rem;color:#F6821F;font-weight:600;text-decoration:none;" data-tip="Auto-configure CNAME via DomainConnect protocol">';
+              // DomainConnect auto-setup buttons for GoDaddy + CloudFlare
+              var dcParts = h.hostname.split('.');
+              var dcDomain = dcParts.slice(-2).join('.');
+              var dcSubdomain = dcParts.length > 2 ? dcParts.slice(0, -2).join('.') : '';
+              var dcHostParam = dcSubdomain ? '&host=' + encodeURIComponent(dcSubdomain) : '';
+              var gdUrl = 'https://dcc.godaddy.com/manage/v2/domainTemplates/providers/megabyte.space/services/cname/apply?domain=' + encodeURIComponent(dcDomain) + dcHostParam;
+              var cfUrl = 'https://dash.cloudflare.com/domainconnect/v2/domainTemplates/providers/megabyte.space/services/cname/apply?domain=' + encodeURIComponent(dcDomain) + dcHostParam;
+              html += '<div style="display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap;">';
+              html += '<span style="font-size:0.6rem;color:var(--text-muted);">Auto-setup:</span>';
+              html += '<a href="' + escapeAttr(gdUrl) + '" target="_blank" rel="noopener" class="dc-btn dc-btn-gd" title="Auto-configure CNAME via GoDaddy DomainConnect">';
+              html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>';
+              html += 'GoDaddy</a>';
+              html += '<a href="' + escapeAttr(cfUrl) + '" target="_blank" rel="noopener" class="dc-btn dc-btn-cf" title="Auto-configure CNAME via CloudFlare DomainConnect">';
               html += '<svg width="12" height="12" viewBox="0 0 100 100" style="flex-shrink:0;"><path d="M72.8 42.6c-.3 0-.6.1-.9.1-.2-6.5-5.5-11.7-12.1-11.7-4.2 0-7.9 2.1-10.1 5.4-1.4-1-3.2-1.6-5-1.6-4.8 0-8.7 3.9-8.7 8.7v.4c-4.3 1-7.5 4.8-7.5 9.4 0 5.3 4.3 9.6 9.6 9.6h34.7c5.3 0 9.6-4.3 9.6-9.6 0-5.3-4.3-9.7-9.6-10.7z" fill="#F6821F"/></svg>';
-              html += 'Auto-setup via CloudFlare</a>';
+              html += 'CloudFlare</a>';
+              html += '</div>';
               html += '</div>';
             } else if (hasDomainSub && isVerified) {
               html += '<div style="margin-top:3px;font-size:0.65rem;color:#22c55e;font-weight:500;">CNAME verified &mdash; connected to sites.megabyte.space</div>';
@@ -7626,7 +7685,7 @@
 
     /* Material-style ripple effect on button clicks */
     document.addEventListener('click', function(e) {
-      var btn = e.target.closest('.btn, .site-card-btn, .admin-btn, .admin-btn-accent, .logs-refresh-btn, .domain-tab, .hostname-delete-btn, .signin-btn, .back-link, .modal-close, .details-modal-close, .header-auth-btn, .site-card-new, .site-card-upgrade-btn, .inline-edit-btn, .inline-save-btn, .inline-cancel-btn, .faq-question, .btn-allow, .btn-skip, .improve-ai-link, .plan-badge');
+      var btn = e.target.closest('.btn, .site-card-btn, .admin-btn, .admin-btn-accent, .logs-refresh-btn, .domain-tab, .hostname-delete-btn, .signin-btn, .back-link, .modal-close, .details-modal-close, .header-auth-btn, .site-card-new, .site-card-upgrade-btn, .inline-edit-btn, .inline-save-btn, .inline-cancel-btn, .faq-question, .btn-allow, .btn-skip, .improve-ai-link, .plan-badge, .dc-btn, .editor-toolbar-btn, .topbar-cta');
       if (!btn) return;
       var circle = document.createElement('span');
       circle.className = 'ripple-circle';
@@ -8379,12 +8438,13 @@
     }
 
     function getLogColorClass(action) {
-      if (action.includes('created') || action.includes('verified') || action.includes('completed') || action.includes('published')) return 'log-c-green';
-      if (action.includes('deleted') || action.includes('failed') || action.includes('error')) return 'log-c-red';
-      if (action.includes('reset') || action.includes('queued') || action.includes('warning')) return 'log-c-amber';
-      if (action.includes('generation') || action.includes('deployed') || action.includes('upload')) return 'log-c-purple';
-      if (action.includes('research') || action.includes('auth') || action.includes('hostname') || action.includes('dns')) return 'log-c-cyan';
-      if (action.includes('updated') || action.includes('changed') || action.includes('renamed')) return 'log-c-blue';
+      if (action.includes('created') || action.includes('verified') || action.includes('completed') || action.includes('published') || action.includes('complete')) return 'log-c-green';
+      if (action.includes('deleted') || action.includes('failed') || action.includes('error') || action.includes('canceled')) return 'log-c-red';
+      if (action.includes('reset') || action.includes('queued') || action.includes('warning') || action.includes('migration')) return 'log-c-amber';
+      if (action.includes('generation') || action.includes('deployed') || action.includes('upload') || action.includes('checkout') || action.includes('billing')) return 'log-c-purple';
+      if (action.includes('research') || action.includes('auth') || action.includes('hostname') || action.includes('dns') || action.includes('domain') || action.includes('notification')) return 'log-c-cyan';
+      if (action.includes('updated') || action.includes('changed') || action.includes('renamed') || action.includes('cache') || action.includes('file')) return 'log-c-blue';
+      if (action.includes('webhook') || action.includes('contact')) return 'log-c-muted';
       return 'log-c-muted';
     }
 
@@ -8399,7 +8459,12 @@
       if (action.includes('auth')) return '<svg ' + s + '><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
       if (action.includes('hostname') || action.includes('dns') || action.includes('domain')) return '<svg ' + s + '><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>';
       if (action.includes('slug') || action.includes('renamed') || action.includes('changed')) return '<svg ' + s + '><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>';
+      if (action.includes('billing') || action.includes('checkout') || action.includes('payment') || action.includes('subscription')) return '<svg ' + s + '><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>';
+      if (action.includes('notification')) return '<svg ' + s + '><path d="M22 17H2a3 3 0 0 0 3-3V9a7 7 0 0 1 14 0v5a3 3 0 0 0 3 3z"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
+      if (action.includes('file')) return '<svg ' + s + '><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
+      if (action.includes('cache') || action.includes('migration')) return '<svg ' + s + '><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>';
       if (action.includes('workflow') || action.includes('step')) return '<svg ' + s + '><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>';
+      if (action.includes('contact')) return '<svg ' + s + '><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg>';
       return '<svg ' + s + '><circle cx="12" cy="12" r="3"/></svg>';
     }
 
@@ -8442,8 +8507,28 @@
         'workflow.step.failed': 'Step Failed',
         'workflow.completed': 'Build Completed',
         'workflow.failed': 'Build Failed',
+        'auth.magic_link_requested': 'Sign-In Link Sent',
         'auth.magic_link_verified': 'Signed In (Email)',
-        'auth.google_oauth_verified': 'Signed In (Google)'
+        'auth.google_oauth_started': 'Google Sign-In Started',
+        'auth.google_oauth_verified': 'Signed In (Google)',
+        'billing.checkout_created': 'Checkout Started',
+        'billing.portal_opened': 'Billing Portal Opened',
+        'contact.form_submitted': 'Contact Form Sent',
+        'domain.purchase_initiated': 'Domain Purchase Started',
+        'site.published_from_bolt': 'Published from Bolt',
+        'site.r2_migration_started': 'File Migration Started',
+        'site.r2_migration_complete': 'File Migration Complete',
+        'site.r2_migration_failed': 'File Migration Failed',
+        'site.cache_invalidated': 'Cache Cleared',
+        'file.deleted': 'File Deleted',
+        'file.created': 'File Created',
+        'hostname.reset_primary': 'Primary Domain Reset',
+        'notification.domain_verified_sent': 'Domain Notification Sent',
+        'notification.build_complete_sent': 'Build Notification Sent',
+        'webhook.stripe.checkout.session.completed': 'Payment Received',
+        'webhook.stripe.customer.subscription.updated': 'Subscription Updated',
+        'webhook.stripe.customer.subscription.deleted': 'Subscription Canceled',
+        'webhook.stripe.invoice.payment_failed': 'Payment Failed'
       };
       return map[action] || action.replace(/\./g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
     }
@@ -8598,12 +8683,17 @@
           btn.disabled = false;
           btn.textContent = 'Reset & Rebuild';
           var data = resp.data || resp;
-          state.siteId = data.site_id || data.id || resetSiteId;
+          var rSiteId = data.site_id || data.id || resetSiteId;
+          var rSiteName = payload.business ? payload.business.name : '';
+          state.siteId = rSiteId;
           state.slug = data.slug || '';
           resetSiteId = null;
           closeDetailsModal();
+          showToast('Reset triggered — rebuilding site...', 'success');
           navigateTo('waiting');
           loadAdminDashboard();
+          // Auto-open Logs after a short delay so the user can see the reset logs
+          setTimeout(function() { openSiteLogsModal(rSiteId, rSiteName); }, 1500);
         })
         .catch(function(err) {
           btn.disabled = false;
@@ -9169,6 +9259,7 @@
         html += '<span style="flex:1;font-size:0.76rem;font-family:\'SF Mono\',\'Fira Code\',monospace;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(fileName) + '</span>';
         html += '<span style="font-size:0.65rem;color:var(--text-muted);flex-shrink:0;">' + sizeStr + '</span>';
         if (isEditable) html += '<span style="font-size:0.58rem;color:var(--accent);flex-shrink:0;padding:1px 5px;border:1px solid var(--accent-dim);border-radius:3px;">Edit</span>';
+        html += '<button onclick="event.stopPropagation();confirmDeleteFile(\'' + escapeAttr(f.key) + '\', \'' + escapeAttr(fileName) + '\')" title="Delete file" style="flex-shrink:0;background:none;border:1px solid rgba(239,68,68,0.15);border-radius:4px;padding:2px 4px;cursor:pointer;color:var(--text-muted);transition:all 0.15s;display:flex;align-items:center;" onmouseover="this.style.color=\'#ef4444\';this.style.borderColor=\'rgba(239,68,68,0.4)\'" onmouseout="this.style.color=\'var(--text-muted)\';this.style.borderColor=\'rgba(239,68,68,0.15)\'"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
         html += '</div>';
       }
       return html;
@@ -9224,6 +9315,28 @@
     function cancelNewFile() {
       var row = document.getElementById('new-file-input-row');
       if (row) row.remove();
+    }
+
+    function confirmDeleteFile(r2Key, fileName) {
+      if (!confirm('Delete "' + fileName + '"?\n\nThis cannot be undone.')) return;
+      deleteFile(r2Key, fileName);
+    }
+
+    function deleteFile(r2Key, fileName) {
+      if (!filesModalSiteId || !state.session || !state.session.token) return;
+      fetch('/api/sites/' + filesModalSiteId + '/files/' + encodeURIComponent(r2Key), {
+        method: 'DELETE',
+        headers: { 'Authorization': 'Bearer ' + state.session.token }
+      })
+        .then(function(r) {
+          if (!r.ok) return r.json().then(function(d) { throw new Error(extractErrorMsg(d, 'Failed to delete file')); });
+          showToast('"' + fileName + '" deleted.', 'success');
+          trackEvent('file_deleted', { site_id: filesModalSiteId, file: fileName });
+          loadFilesForSite();
+        })
+        .catch(function(err) {
+          showToast(err.message || 'Failed to delete file.', 'error');
+        });
     }
 
     function createNewFile(relativePath) {
@@ -9866,6 +9979,15 @@
         if (rName && preBuiltNames[rName]) return false;
         return true;
       });
+
+      // Sort by distance (closest first) when location is available
+      if (state.userLat !== null && state.userLng !== null) {
+        filtered.sort(function(a, b) {
+          var distA = (a.lat != null && a.lng != null) ? haversineKm(state.userLat, state.userLng, a.lat, a.lng) : Infinity;
+          var distB = (b.lat != null && b.lng != null) ? haversineKm(state.userLat, state.userLng, b.lat, b.lng) : Infinity;
+          return distA - distB;
+        });
+      }
 
       for (var i = 0; i < filtered.length; i++) {
         var item = filtered[i];

@@ -2427,4 +2427,52 @@ api.put('/api/sites/:id/files/:path{.+}', async (c) => {
   return c.json({ data: { key: fullKey, size: body.content.length, updated: true } });
 });
 
+/** Delete a single file from R2 */
+api.delete('/api/sites/:id/files/:path{.+}', async (c) => {
+  const orgId = c.get('orgId');
+  if (!orgId) throw unauthorized('Must be authenticated');
+
+  const siteId = c.req.param('id');
+  const rawPath = c.req.param('path');
+  if (!rawPath) throw badRequest('File path is required');
+
+  const filePath = sanitizeFilePath(rawPath);
+  if (!filePath) throw forbidden('Invalid file path');
+
+  const site = await dbQueryOne<{ slug: string }>(
+    c.env.DB,
+    'SELECT slug FROM sites WHERE id = ? AND org_id = ? AND deleted_at IS NULL',
+    [siteId, orgId],
+  );
+  if (!site) throw notFound('Site not found');
+
+  const fullKey = filePath.startsWith('sites/') ? filePath : `sites/${site.slug}/${filePath}`;
+  if (!fullKey.startsWith(`sites/${site.slug}/`)) {
+    throw forbidden('Access denied to this file path');
+  }
+
+  await c.env.SITES_BUCKET.delete(fullKey);
+
+  // Invalidate KV cache
+  await c.env.CACHE_KV.delete(`host:${site.slug}-sites.megabyte.space`).catch(() => {});
+
+  const fileName = fullKey.split('/').pop() || fullKey;
+
+  await auditService.writeAuditLog(c.env.DB, {
+    org_id: orgId,
+    actor_id: c.get('userId') ?? null,
+    action: 'file.deleted',
+    target_type: 'site',
+    target_id: siteId,
+    metadata_json: {
+      key: fullKey,
+      file_name: fileName,
+      message: 'File deleted: ' + fileName,
+    },
+    request_id: c.get('requestId'),
+  });
+
+  return c.json({ data: { key: fullKey, deleted: true } });
+});
+
 export { api };
