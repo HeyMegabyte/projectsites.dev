@@ -241,3 +241,37 @@ test.describe('Search Deduplication', () => {
     expect(hasDedup).toBe(true);
   });
 });
+
+test.describe('Smooth DOM Updates', () => {
+  test('addTerminalLine uses requestAnimationFrame', async ({ page }) => {
+    await page.goto('/');
+
+    const usesRAF = await page.evaluate(() => {
+      const scripts = document.querySelectorAll('script');
+      for (let i = 0; i < scripts.length; i++) {
+        const text = scripts[i].textContent || '';
+        if (text.includes('addTerminalLine') && text.includes('requestAnimationFrame')) {
+          return true;
+        }
+      }
+      return false;
+    });
+    expect(usesRAF).toBe(true);
+  });
+
+  test('site status polling uses requestAnimationFrame for rendering', async ({ page }) => {
+    await page.goto('/');
+
+    const usesRAF = await page.evaluate(() => {
+      const scripts = document.querySelectorAll('script');
+      for (let i = 0; i < scripts.length; i++) {
+        const text = scripts[i].textContent || '';
+        if (text.includes('startSiteStatusPolling') && text.includes('requestAnimationFrame')) {
+          return true;
+        }
+      }
+      return false;
+    });
+    expect(usesRAF).toBe(true);
+  });
+});

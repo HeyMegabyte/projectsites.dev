@@ -547,7 +547,7 @@ test.describe('Slug Editable Click Target', () => {
 });
 
 test.describe('Slug Editor Styling', () => {
-  test('inline slug input is transparent with dashed underline only', async ({ page }) => {
+  test('inline slug input is transparent with text-decoration underline', async ({ page }) => {
     await page.goto('/');
 
     const result = await page.evaluate(() => {
@@ -563,8 +563,10 @@ test.describe('Slug Editor Styling', () => {
               rule.selectorText.includes('.inline-input')
             ) {
               return {
-                borderTopStyle: rule.style.borderTopStyle,
-                borderBottomStyle: rule.style.borderBottomStyle,
+                border: rule.style.border || rule.style.borderStyle,
+                textDecorationLine: rule.style.textDecorationLine || rule.style.getPropertyValue('text-decoration-line'),
+                textDecorationStyle: rule.style.textDecorationStyle || rule.style.getPropertyValue('text-decoration-style'),
+                textUnderlineOffset: rule.style.textUnderlineOffset || rule.style.getPropertyValue('text-underline-offset'),
                 boxShadow: rule.style.boxShadow,
                 background: rule.style.background || rule.style.backgroundColor,
                 color: rule.style.color,
@@ -577,16 +579,20 @@ test.describe('Slug Editor Styling', () => {
         }
       }
       return {
-        borderTopStyle: '',
-        borderBottomStyle: '',
+        border: '',
+        textDecorationLine: '',
+        textDecorationStyle: '',
+        textUnderlineOffset: '',
         boxShadow: '',
         background: '',
         color: '',
         borderRadius: '',
       };
     });
-    expect(result.borderTopStyle).toBe('none');
-    expect(result.borderBottomStyle).toBe('dashed');
+    expect(result.border).toBe('none');
+    expect(result.textDecorationLine).toBe('underline');
+    expect(result.textDecorationStyle).toBe('solid');
+    expect(result.textUnderlineOffset).toBe('2px');
     expect(result.boxShadow).toBe('none');
     expect(result.background).toBe('transparent');
     expect(result.color).toBe('inherit');

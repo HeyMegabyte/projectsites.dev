@@ -332,3 +332,241 @@ test.describe('Button Focus-Visible States', () => {
     expect(hasStates.active).toBe(true);
   });
 });
+
+test.describe('Login Page Centering', () => {
+  test('signin screen has centered layout via flex', async ({ page }) => {
+    await page.goto('/');
+
+    const hasCentering = await page.evaluate(() => {
+      const styles = Array.from(document.querySelectorAll('style')).map(s => s.textContent).join('');
+      return styles.includes('.screen-signin') &&
+        styles.includes('min-height: 100vh') &&
+        styles.includes('justify-content: center');
+    });
+    expect(hasCentering).toBe(true);
+  });
+
+  test('signin-footer is fixed at bottom', async ({ page }) => {
+    await page.goto('/');
+
+    const hasFixed = await page.evaluate(() => {
+      const styles = Array.from(document.querySelectorAll('style')).map(s => s.textContent).join('');
+      return styles.includes('.signin-footer') && styles.includes('position: fixed');
+    });
+    expect(hasFixed).toBe(true);
+  });
+
+  test('signin-footer becomes static on small viewports', async ({ page }) => {
+    await page.goto('/');
+
+    const hasMediaQuery = await page.evaluate(() => {
+      const styles = Array.from(document.querySelectorAll('style')).map(s => s.textContent).join('');
+      return styles.includes('max-height: 600px') && styles.includes('position: static');
+    });
+    expect(hasMediaQuery).toBe(true);
+  });
+});
+
+test.describe('Footer CTA Visibility', () => {
+  test('footer-cta is hidden on signin and waiting screens', async ({ page }) => {
+    await page.goto('/');
+
+    const hasHideLogic = await page.evaluate(() => {
+      const scripts = document.querySelectorAll('script');
+      for (let i = 0; i < scripts.length; i++) {
+        const text = scripts[i].textContent || '';
+        if (text.includes('footerCta') && text.includes('hideCta')) {
+          return true;
+        }
+      }
+      return false;
+    });
+    expect(hasHideLogic).toBe(true);
+  });
+
+  test('footer-cta is hidden when user is logged in', async ({ page }) => {
+    await page.goto('/');
+
+    const hasAuthHide = await page.evaluate(() => {
+      const scripts = document.querySelectorAll('script');
+      for (let i = 0; i < scripts.length; i++) {
+        const text = scripts[i].textContent || '';
+        if (text.includes('hideCta') && text.includes('session') && text.includes('token')) {
+          return true;
+        }
+      }
+      return false;
+    });
+    expect(hasAuthHide).toBe(true);
+  });
+});
+
+test.describe('Inline Slug Input Style Sync', () => {
+  test('slug-editable has text-decoration underline', async ({ page }) => {
+    await page.goto('/');
+
+    const hasUnderline = await page.evaluate(() => {
+      const styles = Array.from(document.querySelectorAll('style')).map(s => s.textContent).join('');
+      return styles.includes('.slug-editable') && styles.includes('text-decoration: underline');
+    });
+    expect(hasUnderline).toBe(true);
+  });
+
+  test('slug-input inherits all font properties from parent', async ({ page }) => {
+    await page.goto('/');
+
+    const hasInherit = await page.evaluate(() => {
+      const styles = Array.from(document.querySelectorAll('style')).map(s => s.textContent).join('');
+      const slugInputSection = styles.includes('.slug-input');
+      const inheritsFont = styles.includes('font-family: inherit') && styles.includes('font-size: inherit');
+      const inheritsWeight = styles.includes('font-weight: inherit');
+      const inheritsLetterSpacing = styles.includes('letter-spacing: inherit');
+      return slugInputSection && inheritsFont && inheritsWeight && inheritsLetterSpacing;
+    });
+    expect(hasInherit).toBe(true);
+  });
+
+  test('slug-input has matching underline decoration', async ({ page }) => {
+    await page.goto('/');
+
+    const hasDecoration = await page.evaluate(() => {
+      const styles = Array.from(document.querySelectorAll('style')).map(s => s.textContent).join('');
+      return styles.includes('.slug-input') &&
+        styles.includes('text-decoration: underline') &&
+        styles.includes('text-underline-offset: 2px');
+    });
+    expect(hasDecoration).toBe(true);
+  });
+});
+
+test.describe('ARIA Accessibility', () => {
+  test('domain tabs have proper ARIA roles', async ({ page }) => {
+    await page.goto('/');
+
+    const hasRoles = await page.evaluate(() => {
+      const tablist = document.querySelector('.domain-tabs[role="tablist"]');
+      if (!tablist) return false;
+      const tabs = tablist.querySelectorAll('[role="tab"]');
+      return tabs.length === 3;
+    });
+    expect(hasRoles).toBe(true);
+  });
+
+  test('domain tab panels have tabpanel role', async ({ page }) => {
+    await page.goto('/');
+
+    const hasPanels = await page.evaluate(() => {
+      const panels = document.querySelectorAll('[role="tabpanel"]');
+      return panels.length === 3;
+    });
+    expect(hasPanels).toBe(true);
+  });
+
+  test('active domain tab has aria-selected=true', async ({ page }) => {
+    await page.goto('/');
+
+    const isSelected = await page.evaluate(() => {
+      const activeTab = document.querySelector('.domain-tab.active');
+      return activeTab ? activeTab.getAttribute('aria-selected') === 'true' : false;
+    });
+    expect(isSelected).toBe(true);
+  });
+
+  test('sr-only class exists for screen reader labels', async ({ page }) => {
+    await page.goto('/');
+
+    const hasSrOnly = await page.evaluate(() => {
+      const styles = Array.from(document.querySelectorAll('style')).map(s => s.textContent).join('');
+      return styles.includes('.sr-only') && styles.includes('clip: rect(0,0,0,0)');
+    });
+    expect(hasSrOnly).toBe(true);
+  });
+
+  test('domain add input has sr-only label', async ({ page }) => {
+    await page.goto('/');
+
+    const hasLabel = await page.evaluate(() => {
+      const label = document.querySelector('label[for="domain-add-input"]');
+      return label ? label.classList.contains('sr-only') : false;
+    });
+    expect(hasLabel).toBe(true);
+  });
+});
+
+test.describe('Performance Optimizations', () => {
+  test('no transition:all in critical button CSS', async ({ page }) => {
+    await page.goto('/');
+
+    const noTransitionAll = await page.evaluate(() => {
+      const styles = Array.from(document.querySelectorAll('style')).map(s => s.textContent).join('');
+      // Check that site-card-btn doesn't use transition: all
+      const siteCardBtnMatch = styles.match(/\.site-card-btn\s*\{[^}]*transition:\s*all/);
+      const headerBtnMatch = styles.match(/\.header-auth-btn\s*\{[^}]*transition:\s*all/);
+      const adminBtnMatch = styles.match(/\.admin-btn\s*\{[^}]*transition:\s*all/);
+      return !siteCardBtnMatch && !headerBtnMatch && !adminBtnMatch;
+    });
+    expect(noTransitionAll).toBe(true);
+  });
+
+  test('build-terminal uses min() for responsive min-width', async ({ page }) => {
+    await page.goto('/');
+
+    const usesMin = await page.evaluate(() => {
+      const styles = Array.from(document.querySelectorAll('style')).map(s => s.textContent).join('');
+      return styles.includes('min(500px, 100%)');
+    });
+    expect(usesMin).toBe(true);
+  });
+});
+
+test.describe('Mobile Keyboard Hints', () => {
+  test('domain-add-input has inputmode=url', async ({ page }) => {
+    await page.goto('/');
+
+    const hasInputmode = await page.evaluate(() => {
+      const input = document.getElementById('domain-add-input');
+      return input ? input.getAttribute('inputmode') === 'url' : false;
+    });
+    expect(hasInputmode).toBe(true);
+  });
+
+  test('business-name-input has inputmode=search', async ({ page }) => {
+    await page.goto('/');
+
+    const hasInputmode = await page.evaluate(() => {
+      const input = document.getElementById('business-name-input');
+      return input ? input.getAttribute('inputmode') === 'search' : false;
+    });
+    expect(hasInputmode).toBe(true);
+  });
+});
+
+test.describe('Domain Add Loading State', () => {
+  test('addHostname function includes button loading logic', async ({ page }) => {
+    await page.goto('/');
+
+    const hasLoading = await page.evaluate(() => {
+      const scripts = document.querySelectorAll('script');
+      for (let i = 0; i < scripts.length; i++) {
+        const text = scripts[i].textContent || '';
+        if (text.includes('domain-add-btn') && text.includes('Adding') && text.includes('disabled')) {
+          return true;
+        }
+      }
+      return false;
+    });
+    expect(hasLoading).toBe(true);
+  });
+});
+
+test.describe('Placeholder Contrast', () => {
+  test('input-field placeholder uses text-secondary not text-muted', async ({ page }) => {
+    await page.goto('/');
+
+    const usesSecondary = await page.evaluate(() => {
+      const styles = Array.from(document.querySelectorAll('style')).map(s => s.textContent).join('');
+      return styles.includes('.input-field::placeholder') && styles.includes('var(--text-secondary)');
+    });
+    expect(usesSecondary).toBe(true);
+  });
+});
