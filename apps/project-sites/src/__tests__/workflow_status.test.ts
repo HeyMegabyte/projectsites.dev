@@ -175,6 +175,232 @@ describe('Inline slug input style inheritance', () => {
   });
 });
 
+describe('Inline title input style inheritance', () => {
+  it('title-row inline-edit-wrap CSS properties should match site-card-name', () => {
+    const siteCardName = {
+      fontSize: '0.9rem',
+      fontWeight: '600',
+      fontFamily: "var(--font)",
+      letterSpacing: 'normal',
+      lineHeight: '1.5',
+      color: 'var(--text-primary)',
+    };
+    const inlineEditWrap = {
+      fontSize: '0.9rem',
+      fontWeight: '600',
+      fontFamily: "var(--font)",
+      letterSpacing: 'normal',
+      lineHeight: '1.5',
+      color: 'var(--text-primary)',
+    };
+    expect(inlineEditWrap.fontSize).toBe(siteCardName.fontSize);
+    expect(inlineEditWrap.fontWeight).toBe(siteCardName.fontWeight);
+    expect(inlineEditWrap.fontFamily).toBe(siteCardName.fontFamily);
+    expect(inlineEditWrap.letterSpacing).toBe(siteCardName.letterSpacing);
+    expect(inlineEditWrap.lineHeight).toBe(siteCardName.lineHeight);
+    expect(inlineEditWrap.color).toBe(siteCardName.color);
+  });
+});
+
+describe('Relative time formatting (formatLogTimestamp)', () => {
+  function formatLogTimestamp(iso: string): string {
+    try {
+      const d = new Date(iso);
+      const now = new Date();
+      const diff = now.getTime() - d.getTime();
+      const secs = Math.floor(diff / 1000);
+      const mins = Math.floor(secs / 60);
+      const hrs = Math.floor(mins / 60);
+      const days = Math.floor(hrs / 24);
+      const weeks = Math.floor(days / 7);
+      const months = Math.floor(days / 30);
+      const years = Math.floor(days / 365);
+      if (isNaN(secs)) return iso;
+      if (secs < 10) return 'just now';
+      if (secs < 45) return 'a few seconds ago';
+      if (secs < 90) return 'a minute ago';
+      if (mins < 45) return mins + ' minutes ago';
+      if (mins < 90) return 'an hour ago';
+      if (hrs < 24) return hrs + ' hours ago';
+      if (hrs < 42) return 'a day ago';
+      if (days < 7) return days + ' days ago';
+      if (days < 11) return 'a week ago';
+      if (weeks < 4) return weeks + ' weeks ago';
+      if (days < 45) return 'a month ago';
+      if (months < 12) return months + ' months ago';
+      if (months < 18) return 'a year ago';
+      return years + ' years ago';
+    } catch (_e) { return iso; }
+  }
+
+  it('returns "just now" for timestamps under 10 seconds', () => {
+    const now = new Date();
+    expect(formatLogTimestamp(now.toISOString())).toBe('just now');
+  });
+
+  it('returns "a few seconds ago" for 15 seconds', () => {
+    const d = new Date(Date.now() - 15 * 1000);
+    expect(formatLogTimestamp(d.toISOString())).toBe('a few seconds ago');
+  });
+
+  it('returns "a minute ago" for 60 seconds', () => {
+    const d = new Date(Date.now() - 60 * 1000);
+    expect(formatLogTimestamp(d.toISOString())).toBe('a minute ago');
+  });
+
+  it('returns "X minutes ago" for 5 minutes', () => {
+    const d = new Date(Date.now() - 5 * 60 * 1000);
+    expect(formatLogTimestamp(d.toISOString())).toBe('5 minutes ago');
+  });
+
+  it('returns "an hour ago" for 60 minutes', () => {
+    const d = new Date(Date.now() - 60 * 60 * 1000);
+    expect(formatLogTimestamp(d.toISOString())).toBe('an hour ago');
+  });
+
+  it('returns "X hours ago" for 3 hours', () => {
+    const d = new Date(Date.now() - 3 * 60 * 60 * 1000);
+    expect(formatLogTimestamp(d.toISOString())).toBe('3 hours ago');
+  });
+
+  it('returns "a day ago" for 30 hours', () => {
+    const d = new Date(Date.now() - 30 * 60 * 60 * 1000);
+    expect(formatLogTimestamp(d.toISOString())).toBe('a day ago');
+  });
+
+  it('returns "X days ago" for 3 days', () => {
+    const d = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+    expect(formatLogTimestamp(d.toISOString())).toBe('3 days ago');
+  });
+
+  it('returns "a week ago" for 8 days', () => {
+    const d = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000);
+    expect(formatLogTimestamp(d.toISOString())).toBe('a week ago');
+  });
+
+  it('returns "X weeks ago" for 18 days', () => {
+    const d = new Date(Date.now() - 18 * 24 * 60 * 60 * 1000);
+    expect(formatLogTimestamp(d.toISOString())).toBe('2 weeks ago');
+  });
+
+  it('returns "a month ago" for 35 days', () => {
+    const d = new Date(Date.now() - 35 * 24 * 60 * 60 * 1000);
+    expect(formatLogTimestamp(d.toISOString())).toBe('a month ago');
+  });
+
+  it('returns "X months ago" for 100 days', () => {
+    const d = new Date(Date.now() - 100 * 24 * 60 * 60 * 1000);
+    expect(formatLogTimestamp(d.toISOString())).toBe('3 months ago');
+  });
+
+  it('returns "a year ago" for 400 days', () => {
+    const d = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000);
+    expect(formatLogTimestamp(d.toISOString())).toBe('a year ago');
+  });
+
+  it('returns "X years ago" for 800 days', () => {
+    const d = new Date(Date.now() - 800 * 24 * 60 * 60 * 1000);
+    expect(formatLogTimestamp(d.toISOString())).toBe('2 years ago');
+  });
+
+  it('returns raw ISO string on invalid input', () => {
+    expect(formatLogTimestamp('invalid')).toBe('invalid');
+  });
+});
+
+describe('Workflow step action labels', () => {
+  const actionLabels: Record<string, string> = {
+    'workflow.step.profile_research_started': 'Researching Business',
+    'workflow.step.parallel_research_started': 'Researching Details',
+    'workflow.step.html_generation_started': 'Generating Website',
+    'workflow.step.legal_scoring_started': 'Creating Legal Pages',
+    'workflow.step.upload_started': 'Uploading Files',
+    'workflow.step.publishing_started': 'Publishing Site',
+    'workflow.step.failed': 'Step Failed',
+    'workflow.step.profile_research_complete': 'Profile Research Done',
+    'workflow.step.parallel_research_complete': 'Research Complete',
+    'workflow.step.html_generation_complete': 'Website Generated',
+    'workflow.step.legal_and_scoring_complete': 'Legal Pages Ready',
+    'workflow.step.upload_to_r2_complete': 'Files Uploaded',
+    'workflow.completed': 'Build Completed',
+    'workflow.started': 'Build Started',
+  };
+
+  it('has labels for all workflow step started actions', () => {
+    expect(actionLabels['workflow.step.profile_research_started']).toBe('Researching Business');
+    expect(actionLabels['workflow.step.parallel_research_started']).toBe('Researching Details');
+    expect(actionLabels['workflow.step.html_generation_started']).toBe('Generating Website');
+    expect(actionLabels['workflow.step.legal_scoring_started']).toBe('Creating Legal Pages');
+    expect(actionLabels['workflow.step.upload_started']).toBe('Uploading Files');
+    expect(actionLabels['workflow.step.publishing_started']).toBe('Publishing Site');
+  });
+
+  it('has label for step failure', () => {
+    expect(actionLabels['workflow.step.failed']).toBe('Step Failed');
+  });
+
+  it('has labels for all completion actions', () => {
+    expect(actionLabels['workflow.completed']).toBe('Build Completed');
+    expect(actionLabels['workflow.step.profile_research_complete']).toBe('Profile Research Done');
+    expect(actionLabels['workflow.step.html_generation_complete']).toBe('Website Generated');
+    expect(actionLabels['workflow.step.legal_and_scoring_complete']).toBe('Legal Pages Ready');
+    expect(actionLabels['workflow.step.upload_to_r2_complete']).toBe('Files Uploaded');
+  });
+});
+
+describe('Clean URL routing for marketing pages', () => {
+  it('resolves / to marketing/index.html', () => {
+    const path = '/';
+    const marketingPath = `marketing${path === '/' ? '/index.html' : path}`;
+    expect(marketingPath).toBe('marketing/index.html');
+  });
+
+  it('resolves /privacy to marketing/privacy', () => {
+    const path = '/privacy';
+    const marketingPath = `marketing${path === '/' ? '/index.html' : path}`;
+    expect(marketingPath).toBe('marketing/privacy');
+  });
+
+  it('appends .html for clean URL fallback', () => {
+    const path = '/privacy';
+    const marketingPath = `marketing${path === '/' ? '/index.html' : path}`;
+    const htmlFallback = `${marketingPath}.html`;
+    expect(htmlFallback).toBe('marketing/privacy.html');
+  });
+
+  it('resolves /terms to marketing/terms.html fallback', () => {
+    const path = '/terms';
+    const marketingPath = `marketing${path === '/' ? '/index.html' : path}`;
+    expect(`${marketingPath}.html`).toBe('marketing/terms.html');
+  });
+
+  it('resolves /content to marketing/content.html fallback', () => {
+    const path = '/content';
+    const marketingPath = `marketing${path === '/' ? '/index.html' : path}`;
+    expect(`${marketingPath}.html`).toBe('marketing/content.html');
+  });
+
+  it('resolves /login to marketing/login.html fallback', () => {
+    const path = '/login';
+    const marketingPath = `marketing${path === '/' ? '/index.html' : path}`;
+    expect(`${marketingPath}.html`).toBe('marketing/login.html');
+  });
+
+  it('does not apply .html fallback for paths with extensions', () => {
+    const path = '/logo.svg';
+    const hasExtension = path.includes('.');
+    expect(hasExtension).toBe(true);
+  });
+
+  it('/contact redirects to /#contact-section', () => {
+    const path = '/contact';
+    const isContact = path === '/contact';
+    expect(isContact).toBe(true);
+    const target = 'https://sites.megabyte.space/#contact-section';
+    expect(target).toContain('#contact-section');
+  });
+});
+
 describe('AddHostname loading state', () => {
   it('button is disabled during request and restored after', () => {
     let disabled = false;

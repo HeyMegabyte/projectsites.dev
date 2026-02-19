@@ -87,6 +87,163 @@ test.describe('CTA Buttons', () => {
   });
 });
 
+test.describe('Relative Time Formatting', () => {
+  test('formatLogTimestamp returns "just now" for recent timestamps', async ({ page }) => {
+    await page.goto('/');
+
+    const result = await page.evaluate(() => {
+      const fn = (window as unknown as Record<string, (s: string) => string>).formatLogTimestamp;
+      if (typeof fn !== 'function') return null;
+      return fn(new Date().toISOString());
+    });
+    expect(result).toBe('just now');
+  });
+
+  test('formatLogTimestamp returns "a few seconds ago" for 20s old', async ({ page }) => {
+    await page.goto('/');
+
+    const result = await page.evaluate(() => {
+      const fn = (window as unknown as Record<string, (s: string) => string>).formatLogTimestamp;
+      if (typeof fn !== 'function') return null;
+      return fn(new Date(Date.now() - 20000).toISOString());
+    });
+    expect(result).toBe('a few seconds ago');
+  });
+
+  test('formatLogTimestamp returns "X minutes ago" for 5 minutes', async ({ page }) => {
+    await page.goto('/');
+
+    const result = await page.evaluate(() => {
+      const fn = (window as unknown as Record<string, (s: string) => string>).formatLogTimestamp;
+      if (typeof fn !== 'function') return null;
+      return fn(new Date(Date.now() - 5 * 60 * 1000).toISOString());
+    });
+    expect(result).toBe('5 minutes ago');
+  });
+
+  test('formatLogTimestamp returns "X hours ago" for 3 hours', async ({ page }) => {
+    await page.goto('/');
+
+    const result = await page.evaluate(() => {
+      const fn = (window as unknown as Record<string, (s: string) => string>).formatLogTimestamp;
+      if (typeof fn !== 'function') return null;
+      return fn(new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString());
+    });
+    expect(result).toBe('3 hours ago');
+  });
+});
+
+test.describe('Workflow Step Action Labels', () => {
+  test('formatActionLabel has labels for new workflow step actions', async ({ page }) => {
+    await page.goto('/');
+
+    const labels = await page.evaluate(() => {
+      const fn = (window as unknown as Record<string, (s: string) => string>).formatActionLabel;
+      if (typeof fn !== 'function') return null;
+      return {
+        profileStarted: fn('workflow.step.profile_research_started'),
+        parallelStarted: fn('workflow.step.parallel_research_started'),
+        htmlStarted: fn('workflow.step.html_generation_started'),
+        legalStarted: fn('workflow.step.legal_scoring_started'),
+        uploadStarted: fn('workflow.step.upload_started'),
+        publishStarted: fn('workflow.step.publishing_started'),
+        stepFailed: fn('workflow.step.failed'),
+      };
+    });
+
+    expect(labels).not.toBeNull();
+    if (labels) {
+      expect(labels.profileStarted).toBe('Researching Business');
+      expect(labels.parallelStarted).toBe('Researching Details');
+      expect(labels.htmlStarted).toBe('Generating Website');
+      expect(labels.legalStarted).toBe('Creating Legal Pages');
+      expect(labels.uploadStarted).toBe('Uploading Files');
+      expect(labels.publishStarted).toBe('Publishing Site');
+      expect(labels.stepFailed).toBe('Step Failed');
+    }
+  });
+
+  test('formatLogMeta displays step field from meta', async ({ page }) => {
+    await page.goto('/');
+
+    const result = await page.evaluate(() => {
+      const fn = (window as unknown as Record<string, (m: Record<string, string>) => string>).formatLogMeta;
+      if (typeof fn !== 'function') return null;
+      return fn({ step: 'research-profile', business_name: 'Test Biz' });
+    });
+
+    expect(result).not.toBeNull();
+    if (result) {
+      expect(result).toContain('step:');
+      expect(result).toContain('research-profile');
+    }
+  });
+});
+
+test.describe('Title Inline Edit Style Sync', () => {
+  test('site-card-title-row .inline-edit-wrap has matching font properties', async ({ page }) => {
+    await page.goto('/');
+
+    // Verify CSS rule exists for .site-card-title-row .inline-edit-wrap
+    const styles = await page.evaluate(() => {
+      for (const sheet of document.styleSheets) {
+        try {
+          for (const rule of sheet.cssRules) {
+            const cssRule = rule as CSSStyleRule;
+            if (cssRule.selectorText === '.site-card-title-row .inline-edit-wrap') {
+              return {
+                fontSize: cssRule.style.fontSize,
+                fontWeight: cssRule.style.fontWeight,
+                fontFamily: cssRule.style.fontFamily,
+                letterSpacing: cssRule.style.letterSpacing,
+                lineHeight: cssRule.style.lineHeight,
+              };
+            }
+          }
+        } catch (_e) { /* cross-origin */ }
+      }
+      return null;
+    });
+
+    expect(styles).not.toBeNull();
+    if (styles) {
+      expect(styles.fontSize).toBe('0.9rem');
+      expect(styles.fontWeight).toBe('600');
+      expect(styles.letterSpacing).toBe('normal');
+      expect(styles.lineHeight).toBe('1.5');
+    }
+  });
+});
+
+test.describe('Footer legal links point to local pages', () => {
+  test('footer links use local paths instead of external URLs', async ({ page }) => {
+    await page.goto('/');
+
+    const privacyHref = await page.locator('.footer-bottom a:has-text("Privacy Policy")').getAttribute('href');
+    const termsHref = await page.locator('.footer-bottom a:has-text("Terms of Service")').getAttribute('href');
+    const contentHref = await page.locator('.footer-bottom a:has-text("Content Policy")').getAttribute('href');
+
+    expect(privacyHref).toBe('/privacy');
+    expect(termsHref).toBe('/terms');
+    expect(contentHref).toBe('/content');
+  });
+
+  test('signin footer legal links use local paths', async ({ page }) => {
+    await page.goto('/');
+
+    // Navigate to signin screen
+    await page.evaluate(() => {
+      (window as unknown as Record<string, (s: string) => void>).navigateTo('signin');
+    });
+
+    const privacyLink = page.locator('.signin-footer-legal a:has-text("Privacy")');
+    await expect(privacyLink).toHaveAttribute('href', '/privacy');
+
+    const termsLink = page.locator('.signin-footer-legal a:has-text("Terms")');
+    await expect(termsLink).toHaveAttribute('href', '/terms');
+  });
+});
+
 test.describe('Google Place ID UI', () => {
   test('Place ID info element has a link and close button', async ({ page }) => {
     await page.goto('/');

@@ -121,18 +121,18 @@ app.all('*', async (c) => {
     const marketingPath = `marketing${path === '/' ? '/index.html' : path}`;
     let marketingAsset = await c.env.SITES_BUCKET.get(marketingPath);
 
-    // Removed pages (/privacy, /terms, /content) redirect to homepage.
-    // /contact scrolls to contact section on homepage.
+    // Clean URL support: try .html extension for paths like /privacy → marketing/privacy.html
     if (!marketingAsset && !path.includes('.') && path !== '/') {
-      const redirectPaths = ['/privacy', '/terms', '/content', '/contact'];
-      if (redirectPaths.includes(path)) {
-        const baseUrl =
-          hostname === DOMAINS.SITES_STAGING
-            ? `https://${DOMAINS.SITES_STAGING}`
-            : `https://${DOMAINS.SITES_BASE}`;
-        const target = path === '/contact' ? `${baseUrl}/#contact-section` : `${baseUrl}/`;
-        return Response.redirect(target, 301);
-      }
+      marketingAsset = await c.env.SITES_BUCKET.get(`${marketingPath}.html`);
+    }
+
+    // /contact scrolls to contact section on homepage
+    if (!marketingAsset && path === '/contact') {
+      const baseUrl =
+        hostname === DOMAINS.SITES_STAGING
+          ? `https://${DOMAINS.SITES_STAGING}`
+          : `https://${DOMAINS.SITES_BASE}`;
+      return Response.redirect(`${baseUrl}/#contact-section`, 301);
     }
 
     if (marketingAsset) {

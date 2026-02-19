@@ -130,21 +130,36 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
 
     // ── Step 1: Profile Research ──────────────────────────────
     // Returns JSON-stringified validated profile data
-    const profileJson = await step.do('research-profile', RETRY_3, async () => {
-      const { runPrompt } = await import('../services/ai_workflows.js');
-      const { validatePromptOutput } = await import('../prompts/schemas.js');
-
-      const result = await runPrompt(env, 'research_profile', 1, {
-        business_name: params.businessName,
-        business_address: params.businessAddress ?? '',
-        business_phone: params.businessPhone ?? '',
-        google_place_id: params.googlePlaceId ?? '',
-        additional_context: params.additionalContext ?? '',
-      });
-
-      const validated = validatePromptOutput('research_profile', extractJsonFromText(result.output));
-      return JSON.stringify(validated);
+    await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.profile_research_started', {
+      step: 'research-profile',
+      business_name: params.businessName,
     });
+
+    let profileJson: string;
+    try {
+      profileJson = await step.do('research-profile', RETRY_3, async () => {
+        const { runPrompt } = await import('../services/ai_workflows.js');
+        const { validatePromptOutput } = await import('../prompts/schemas.js');
+
+        const result = await runPrompt(env, 'research_profile', 1, {
+          business_name: params.businessName,
+          business_address: params.businessAddress ?? '',
+          business_phone: params.businessPhone ?? '',
+          google_place_id: params.googlePlaceId ?? '',
+          additional_context: params.additionalContext ?? '',
+        });
+
+        const validated = validatePromptOutput('research_profile', extractJsonFromText(result.output));
+        return JSON.stringify(validated);
+      });
+    } catch (err) {
+      await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.failed', {
+        step: 'research-profile',
+        error: err instanceof Error ? err.message : String(err),
+      });
+      await updateSiteStatus(env.DB, params.siteId, 'error');
+      throw err;
+    }
 
     const profile = JSON.parse(profileJson) as ProfileData;
 
@@ -157,6 +172,11 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
 
     // ── Step 2: Parallel Research ─────────────────────────────
     const servicesJson = JSON.stringify(profile.services.map((s) => s.name));
+
+    await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.parallel_research_started', {
+      steps: ['research-social', 'research-brand', 'research-selling-points', 'research-images'],
+      business_type: profile.business_type,
+    });
 
     const socialJsonPromise = step.do('research-social', RETRY_3, async () => {
       const { runPrompt } = await import('../services/ai_workflows.js');
@@ -210,12 +230,22 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
       return JSON.stringify(validatePromptOutput('research_images', extractJsonFromText(result.output)));
     });
 
-    const [socialJson, brandJson, sellingPointsJson, imagesJson] = await Promise.all([
-      socialJsonPromise,
-      brandJsonPromise,
-      sellingPointsJsonPromise,
-      imagesJsonPromise,
-    ]);
+    let socialJson: string, brandJson: string, sellingPointsJson: string, imagesJson: string;
+    try {
+      [socialJson, brandJson, sellingPointsJson, imagesJson] = await Promise.all([
+        socialJsonPromise,
+        brandJsonPromise,
+        sellingPointsJsonPromise,
+        imagesJsonPromise,
+      ]);
+    } catch (err) {
+      await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.failed', {
+        step: 'parallel-research',
+        error: err instanceof Error ? err.message : String(err),
+      });
+      await updateSiteStatus(env.DB, params.siteId, 'error');
+      throw err;
+    }
 
     const social = JSON.parse(socialJson) as SocialData;
     const brand = JSON.parse(brandJson) as Record<string, unknown>;
@@ -235,7 +265,13 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
     await updateSiteStatus(env.DB, params.siteId, 'generating');
 
     // ── Step 3: Generate Website HTML ─────────────────────────
-    const html = await step.do('generate-website', RETRY_HTML, async () => {
+    await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.html_generation_started', {
+      step: 'generate-website',
+    });
+
+    let html: string;
+    try {
+      html = await step.do('generate-website', RETRY_HTML, async () => {
       const { runPrompt } = await import('../services/ai_workflows.js');
       const { validatePromptOutput } = await import('../prompts/schemas.js');
       const result = await runPrompt(env, 'generate_website', 1, {
@@ -249,6 +285,14 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
       validatePromptOutput('generate_website', result.output);
       return result.output;
     });
+    } catch (err) {
+      await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.failed', {
+        step: 'generate-website',
+        error: err instanceof Error ? err.message : String(err),
+      });
+      await updateSiteStatus(env.DB, params.siteId, 'error');
+      throw err;
+    }
 
     await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.html_generation_complete', {
       html_length: html.length,
@@ -256,6 +300,10 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
     });
 
     // ── Step 4: Legal Pages + Quality Score (parallel) ────────
+    await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.legal_scoring_started', {
+      steps: ['generate-privacy-page', 'generate-terms-page', 'score-website'],
+    });
+
     const addr = profile.address;
     const addressStr = [addr.street, addr.city, addr.state, addr.zip]
       .filter(Boolean)
@@ -311,11 +359,21 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
       },
     );
 
-    const [privacyHtml, termsHtml, qualityJson] = await Promise.all([
-      privacyPromise,
-      termsPromise,
-      qualityJsonPromise,
-    ]);
+    let privacyHtml: string, termsHtml: string, qualityJson: string;
+    try {
+      [privacyHtml, termsHtml, qualityJson] = await Promise.all([
+        privacyPromise,
+        termsPromise,
+        qualityJsonPromise,
+      ]);
+    } catch (err) {
+      await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.failed', {
+        step: 'legal-and-scoring',
+        error: err instanceof Error ? err.message : String(err),
+      });
+      await updateSiteStatus(env.DB, params.siteId, 'error');
+      throw err;
+    }
 
     const quality = JSON.parse(qualityJson) as QualityData;
 
@@ -329,7 +387,15 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
     await updateSiteStatus(env.DB, params.siteId, 'uploading');
 
     // ── Step 5: Upload to R2 ──────────────────────────────────
-    const version = await step.do(
+    await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.upload_started', {
+      step: 'upload-to-r2',
+      slug: params.slug,
+      files: ['index.html', 'privacy.html', 'terms.html', 'research.json'],
+    });
+
+    let version: string;
+    try {
+      version = await step.do(
       'upload-to-r2',
       {
         retries: { limit: 3, delay: '5 seconds', backoff: 'exponential' },
@@ -359,6 +425,14 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
         return ver;
       },
     );
+    } catch (err) {
+      await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.failed', {
+        step: 'upload-to-r2',
+        error: err instanceof Error ? err.message : String(err),
+      });
+      await updateSiteStatus(env.DB, params.siteId, 'error');
+      throw err;
+    }
 
     await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.upload_to_r2_complete', {
       version,
@@ -367,7 +441,13 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
     });
 
     // ── Step 6: Update D1 status ──────────────────────────────
-    await step.do(
+    await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.publishing_started', {
+      step: 'update-site-status',
+      version,
+    });
+
+    try {
+      await step.do(
       'update-site-status',
       {
         retries: { limit: 3, delay: '5 seconds', backoff: 'exponential' },
@@ -388,6 +468,13 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
         return `published:${version}`;
       },
     );
+    } catch (err) {
+      await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.failed', {
+        step: 'update-site-status',
+        error: err instanceof Error ? err.message : String(err),
+      });
+      throw err;
+    }
 
     await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.completed', {
       slug: params.slug,

@@ -819,16 +819,30 @@ test.describe('Workflow Log Labels', () => {
         legal: fn('workflow.step.legal_and_scoring_complete'),
         upload: fn('workflow.step.upload_to_r2_complete'),
         completed: fn('workflow.completed'),
+        profileStarted: fn('workflow.step.profile_research_started'),
+        parallelStarted: fn('workflow.step.parallel_research_started'),
+        htmlStarted: fn('workflow.step.html_generation_started'),
+        legalStarted: fn('workflow.step.legal_scoring_started'),
+        uploadStarted: fn('workflow.step.upload_started'),
+        publishStarted: fn('workflow.step.publishing_started'),
+        stepFailed: fn('workflow.step.failed'),
       };
     });
     expect(labels.queued).toBe('Build Queued');
     expect(labels.started).toBe('Build Started');
     expect(labels.profile).toBe('Profile Research Done');
     expect(labels.parallel).toBe('Research Complete');
-    expect(labels.html).toBe('HTML Generated');
-    expect(labels.legal).toBe('Legal Pages + Score Done');
-    expect(labels.upload).toBe('Files Uploaded to CDN');
+    expect(labels.html).toBe('Website Generated');
+    expect(labels.legal).toBe('Legal Pages Ready');
+    expect(labels.upload).toBe('Files Uploaded');
     expect(labels.completed).toBe('Build Completed');
+    expect(labels.profileStarted).toBe('Researching Business');
+    expect(labels.parallelStarted).toBe('Researching Details');
+    expect(labels.htmlStarted).toBe('Generating Website');
+    expect(labels.legalStarted).toBe('Creating Legal Pages');
+    expect(labels.uploadStarted).toBe('Uploading Files');
+    expect(labels.publishStarted).toBe('Publishing Site');
+    expect(labels.stepFailed).toBe('Step Failed');
   });
 });
 

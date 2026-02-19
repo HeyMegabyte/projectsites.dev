@@ -1,0 +1,18 @@
+---
+/**
+ * Site header with logo and auth button.
+ * Auth state is managed client-side via localStorage.
+ */
+---
+
+<header class="header">
+  <div class="header-inner">
+    <a class="logo" href="/">
+      <img src="/logo-header.svg" alt="Project Sites" style="flex-shrink:0; height:auto; max-height:48px; max-width:300px;">
+    </a>
+    <div id="header-auth" class="header-auth">
+      <span id="header-auth-user" class="header-auth-user" style="display:none;"></span>
+      <button id="header-auth-btn" class="header-auth-btn">Sign In</button>
+    </div>
+  </div>
+</header>

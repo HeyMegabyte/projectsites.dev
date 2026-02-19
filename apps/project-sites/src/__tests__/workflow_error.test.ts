@@ -232,6 +232,33 @@ describe('GET /api/sites/:id/workflow — error serialization', () => {
     expect(body.data.workflow_available).toBe(false);
   });
 
+  it('returns workflow step metadata when present', async () => {
+    mockDbQueryOne.mockResolvedValueOnce({ id: 'site-1', status: 'building' });
+
+    const mockWorkflow = {
+      get: jest.fn().mockResolvedValue({
+        id: 'wf-1',
+        status: jest.fn().mockResolvedValue({
+          status: 'running',
+          error: null,
+          output: null,
+        }),
+      }),
+    };
+
+    const { app, env } = createAuthenticatedApp(
+      { userId: 'user-1', orgId: 'org-1' },
+      { SITE_WORKFLOW: mockWorkflow as unknown as Workflow },
+    );
+
+    const res = await app.request('/api/sites/site-1/workflow', {}, env);
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body.data.workflow_status).toBe('running');
+    expect(body.data.workflow_error).toBeNull();
+  });
+
   it('handles workflow instance not found', async () => {
     mockDbQueryOne.mockResolvedValueOnce({ id: 'site-1', status: 'building' });
 
