@@ -74,8 +74,8 @@ test.describe('Inline Edit Action Zones', () => {
     expect(result).toBeTruthy();
     if (result) {
       expect(result.display).toBe('inline-flex');
-      expect(result.width).toBe('28px');
-      expect(result.minWidth).toBe('28px');
+      expect(result.width).toBe('34px');
+      expect(result.minWidth).toBe('34px');
     }
   });
 

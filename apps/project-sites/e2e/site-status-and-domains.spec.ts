@@ -129,28 +129,26 @@ test.describe('Modified Date Right-Aligned', () => {
   });
 });
 
-test.describe('No Edit Icon on URL', () => {
-  test('slug-editable does not have inline-edit-btn sibling in renderAdminSites', async ({ page }) => {
+test.describe('Slug Edit Button Position', () => {
+  test('slug edit button is inside inline-slug-actions between slug and domain suffix', async ({ page }) => {
     await page.goto('/');
 
-    // The slug line in renderAdminSites should NOT have an inline-edit-btn inside it
-    // It should only have the slug-editable span
-    const hasEditBtnInSlugLine = await page.evaluate(() => {
+    // The slug line in renderAdminSites should have the edit button inside
+    // .inline-slug-actions BETWEEN the slug text and -sites.megabyte.space
+    const hasCorrectLayout = await page.evaluate(() => {
       const scripts = document.querySelectorAll('script');
       for (let i = 0; i < scripts.length; i++) {
         const text = scripts[i].textContent || '';
-        // Look for the renderAdminSites slug section - should NOT have inline-edit-btn
         if (text.includes('slug-editable') && text.includes('renderAdminSites')) {
-          // Count slug-editable occurrences vs inline-edit-btn in same area
-          // In the old code, each slug-editable had an inline-edit-btn
-          // In the new code, there's no inline-edit-btn next to slug-editable
-          const slugEditableInUrl = text.indexOf("</span></span>-sites.megabyte.space");
-          return slugEditableInUrl !== -1; // Found the pattern without edit btn
+          // New layout: slug</span></span><span class="inline-slug-actions">...pencil...</span>-sites.megabyte.space
+          const pattern = 'inline-slug-actions';
+          const hasPencilInActions = text.includes(pattern) && text.includes('Edit URL slug');
+          return hasPencilInActions;
         }
       }
       return false;
     });
-    expect(hasEditBtnInSlugLine).toBe(true);
+    expect(hasCorrectLayout).toBe(true);
   });
 });
 
@@ -216,12 +214,12 @@ test.describe('Register New Styling', () => {
     expect(hasCss).toBe(true);
   });
 
-  test('domain-result-item uses 1px separator', async ({ page }) => {
+  test('domain-result-item uses transparent border with hover highlight', async ({ page }) => {
     await page.goto('/');
 
     const hasCss = await page.evaluate(() => {
       const styles = Array.from(document.querySelectorAll('style')).map(s => s.textContent).join('');
-      return styles.includes('border-bottom: 1px solid rgba(255,255,255,0.06)');
+      return styles.includes('.domain-result-item') && styles.includes('border: 1px solid transparent');
     });
     expect(hasCss).toBe(true);
   });

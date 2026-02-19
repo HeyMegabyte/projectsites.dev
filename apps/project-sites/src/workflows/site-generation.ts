@@ -30,8 +30,17 @@ async function updateSiteStatus(db: D1Database, siteId: string, status: string):
       .prepare('UPDATE sites SET status = ?, updated_at = datetime(\'now\') WHERE id = ?')
       .bind(status, siteId)
       .run();
-  } catch {
-    // Best-effort — workflow must not fail due to status update errors
+  } catch (err) {
+    console.warn(
+      JSON.stringify({
+        level: 'warn',
+        service: 'workflow',
+        message: 'Failed to update site status',
+        siteId,
+        status,
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
   }
 }
 
@@ -56,6 +65,8 @@ async function workflowLog(
   metadata: Record<string, unknown> = {},
 ): Promise<void> {
   try {
+    // Always include site_id in metadata for robust audit_log querying
+    const enrichedMeta = { ...metadata, site_id: siteId };
     await db
       .prepare(
         `INSERT INTO audit_logs (id, org_id, actor_id, action, target_type, target_id, metadata_json, created_at)
@@ -66,11 +77,21 @@ async function workflowLog(
         orgId,
         action,
         siteId,
-        JSON.stringify(metadata),
+        JSON.stringify(enrichedMeta),
       )
       .run();
-  } catch {
+  } catch (err) {
     // Best-effort logging — workflow must not fail due to audit log errors
+    console.warn(
+      JSON.stringify({
+        level: 'warn',
+        service: 'workflow',
+        message: 'Failed to write workflow audit log',
+        action,
+        siteId,
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
   }
 }
 

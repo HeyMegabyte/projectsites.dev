@@ -439,3 +439,127 @@ test.describe('Deploy Upload Zone', () => {
     expect(section).toContain('14px');
   });
 });
+
+// ─── Inline Slug Actions ───────────────────────────────────
+
+test.describe('Inline Slug Actions', () => {
+  test('inline-slug-actions has 34px width matching inline-edit-actions', async ({ page }) => {
+    await page.goto('/');
+    const html = await page.content();
+    const idx = html.indexOf('.inline-slug-actions {');
+    expect(idx).toBeGreaterThan(-1);
+    const section = html.substring(idx, idx + 300);
+    expect(section).toContain('width: 34px');
+    expect(section).toContain('min-width: 34px');
+  });
+
+  test('inline-edit-actions and inline-slug-actions use same width', async ({ page }) => {
+    await page.goto('/');
+    const html = await page.content();
+    const editIdx = html.indexOf('.inline-edit-actions {');
+    const slugIdx = html.indexOf('.inline-slug-actions {');
+    expect(editIdx).toBeGreaterThan(-1);
+    expect(slugIdx).toBeGreaterThan(-1);
+    const editSection = html.substring(editIdx, editIdx + 200);
+    const slugSection = html.substring(slugIdx, slugIdx + 200);
+    // Both should contain 34px
+    expect(editSection).toContain('34px');
+    expect(slugSection).toContain('34px');
+  });
+});
+
+// ─── Domain Modal Independence ─────────────────────────────
+
+test.describe('Domain Modal Slug Independence', () => {
+  test('domain modal uses dm- prefixed element IDs', async ({ page }) => {
+    await page.goto('/');
+    const html = await page.content();
+    // The JS function should reference dm-slug-url for domain modal context
+    expect(html).toContain("case 'url': return 'dm-slug-url'");
+    expect(html).toContain("case 'wrap': return 'dm-slug-wrap'");
+    expect(html).toContain("case 'input': return 'dm-input-slug'");
+  });
+
+  test('domain modal onclick passes dm context', async ({ page }) => {
+    await page.goto('/');
+    const html = await page.content();
+    // The loadHostnames function should pass 'dm' context for domain modal slug editing
+    expect(html).toContain("'dm')");
+    expect(html).toContain("id=\"dm-slug-wrap\"");
+  });
+
+  test('getSlugElId helper function exists', async ({ page }) => {
+    await page.goto('/');
+    const html = await page.content();
+    expect(html).toContain('function getSlugElId(type, siteId, ctx)');
+  });
+});
+
+// ─── CodeMirror Editor ─────────────────────────────────────
+
+test.describe('CodeMirror Editor Integration', () => {
+  test('CodeMirror CSS is linked in head', async ({ page }) => {
+    await page.goto('/');
+    const html = await page.content();
+    expect(html).toContain('codemirror.min.css');
+  });
+
+  test('CodeMirror JS scripts are loaded', async ({ page }) => {
+    await page.goto('/');
+    const html = await page.content();
+    expect(html).toContain('codemirror.min.js');
+    expect(html).toContain('mode/htmlmixed/htmlmixed.min.js');
+    expect(html).toContain('mode/css/css.min.js');
+    expect(html).toContain('mode/javascript/javascript.min.js');
+  });
+
+  test('custom bolt-dark theme CSS exists', async ({ page }) => {
+    await page.goto('/');
+    const html = await page.content();
+    expect(html).toContain('.cm-s-bolt-dark');
+    expect(html).toContain('.cm-s-bolt-dark .CodeMirror-gutters');
+    expect(html).toContain('.cm-s-bolt-dark .cm-keyword');
+  });
+
+  test('ensureCMEditor helper function exists', async ({ page }) => {
+    await page.goto('/');
+    const html = await page.content();
+    expect(html).toContain('function ensureCMEditor(mode)');
+    expect(html).toContain('function getEditorMode(name)');
+    expect(html).toContain('function getEditorContent()');
+    expect(html).toContain('function setEditorContent(content, mode)');
+  });
+
+  test('saveCurrentFile uses getEditorContent', async ({ page }) => {
+    await page.goto('/');
+    const html = await page.content();
+    expect(html).toContain('var content = getEditorContent()');
+  });
+});
+
+// ─── Editor Toolbar Labels ─────────────────────────────────
+
+test.describe('Editor Toolbar Labels', () => {
+  test('toolbar buttons have text labels', async ({ page }) => {
+    await page.goto('/');
+    const html = await page.content();
+    // Back button has label
+    expect(html).toContain('>Back</button>');
+    // Wrap button has label
+    expect(html).toContain('>Wrap</button>');
+    // Refresh button has label
+    expect(html).toContain('>Refresh</button>');
+  });
+
+  test('files-editor-name uses files-breadcrumb class', async ({ page }) => {
+    await page.goto('/');
+    const html = await page.content();
+    expect(html).toContain('id="files-editor-name" class="files-breadcrumb"');
+  });
+
+  test('files-modal-msg is removed (unused)', async ({ page }) => {
+    await page.goto('/');
+    const html = await page.content();
+    expect(html).not.toContain('id="files-modal-msg"');
+  });
+});

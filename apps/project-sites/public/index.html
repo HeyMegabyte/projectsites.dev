@@ -183,6 +183,7 @@
 
   <!-- Stylesheets -->
   <link href="https://releases.transloadit.com/uppy/v4.12.1/uppy.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.css" rel="stylesheet">
   <style>
     /* ======================================================
        CSS Custom Properties
@@ -1350,10 +1351,10 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 28px;
-      min-width: 28px;
+      width: 34px;
+      min-width: 34px;
       flex-shrink: 0;
-      gap: 1px;
+      gap: 2px;
       vertical-align: middle;
     }
     .inline-slug-actions .inline-edit-btn {
@@ -3988,7 +3989,7 @@
       white-space: nowrap;
     }
 
-    /* ── Code editor with line numbers ────────────── */
+    /* ── Code editor with CodeMirror / textarea fallback ────────────── */
     .code-editor-wrap {
       display: flex;
       flex: 1;
@@ -3999,6 +4000,7 @@
       overflow: hidden;
       position: relative;
     }
+    /* Fallback line numbers (only used when CodeMirror not loaded) */
     .code-line-numbers {
       width: 40px;
       min-width: 40px;
@@ -4030,6 +4032,47 @@
       outline: none;
       tab-size: 2;
     }
+    /* CodeMirror dark theme — matches app styling */
+    .CodeMirror.cm-s-bolt-dark {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 0.78rem;
+      line-height: 1.6;
+      height: 100%;
+      border-radius: var(--radius);
+    }
+    .cm-s-bolt-dark .CodeMirror-gutters {
+      background: rgba(0,0,0,0.15);
+      border-right: 1px solid var(--border);
+      color: rgba(100, 255, 218, 0.25);
+    }
+    .cm-s-bolt-dark .CodeMirror-linenumber { color: rgba(80, 165, 219, 0.3); }
+    .cm-s-bolt-dark .CodeMirror-cursor { border-left: 2px solid var(--accent); }
+    .cm-s-bolt-dark .CodeMirror-selected { background: rgba(80, 165, 219, 0.15); }
+    .cm-s-bolt-dark .CodeMirror-activeline-background { background: rgba(80, 165, 219, 0.04); }
+    .cm-s-bolt-dark .cm-keyword { color: #c792ea; }
+    .cm-s-bolt-dark .cm-atom { color: #f78c6c; }
+    .cm-s-bolt-dark .cm-number { color: #f78c6c; }
+    .cm-s-bolt-dark .cm-def { color: #82aaff; }
+    .cm-s-bolt-dark .cm-variable { color: var(--text-primary); }
+    .cm-s-bolt-dark .cm-variable-2 { color: #eeffff; }
+    .cm-s-bolt-dark .cm-property { color: #80d8ff; }
+    .cm-s-bolt-dark .cm-operator { color: #89ddff; }
+    .cm-s-bolt-dark .cm-comment { color: #546e7a; font-style: italic; }
+    .cm-s-bolt-dark .cm-string { color: #c3e88d; }
+    .cm-s-bolt-dark .cm-string-2 { color: #f07178; }
+    .cm-s-bolt-dark .cm-meta { color: #ffcb6b; }
+    .cm-s-bolt-dark .cm-qualifier { color: #decb6b; }
+    .cm-s-bolt-dark .cm-builtin { color: #decb6b; }
+    .cm-s-bolt-dark .cm-bracket { color: #89ddff; }
+    .cm-s-bolt-dark .cm-tag { color: #f07178; }
+    .cm-s-bolt-dark .cm-attribute { color: #c792ea; }
+    .cm-s-bolt-dark .cm-hr { color: #546e7a; }
+    .cm-s-bolt-dark .cm-link { color: #c792ea; }
+    .cm-s-bolt-dark .cm-error { color: #ff5370; }
+    .cm-s-bolt-dark .CodeMirror-matchingbracket { color: #80d8ff !important; text-decoration: underline; }
+    .code-editor-wrap .CodeMirror { flex: 1; height: auto; min-height: 280px; }
     /* Editor toolbar */
     .editor-toolbar {
       display: flex;
@@ -4250,7 +4293,7 @@
       <div class="modal-title" style="display:flex;align-items:center;gap:8px;">
         <span id="files-modal-title" style="flex:1;">Files</span>
         <span id="files-count" style="font-size:0.68rem;color:var(--text-muted);"></span>
-        <button class="editor-toolbar-btn" onclick="loadFilesForSite()" title="Refresh file list"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
+        <button class="editor-toolbar-btn" onclick="loadFilesForSite()" title="Refresh file list"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Refresh</button>
         <button class="modal-close" onclick="closeFilesModal()">&times;</button>
       </div>
       <div id="files-toolbar" class="files-toolbar-compact">
@@ -4262,19 +4305,19 @@
         <div class="editor-toolbar">
           <button class="editor-toolbar-btn" onclick="closeFileEditor()" title="Back to file list"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>Back</button>
           <span class="editor-toolbar-sep"></span>
-          <span id="files-editor-name" style="font-size:0.75rem;color:var(--accent);font-family:'SF Mono','Fira Code',monospace;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+          <span id="files-editor-name" class="files-breadcrumb" style="color:var(--accent);"></span>
           <span id="files-editor-size" style="font-size:0.68rem;color:var(--text-muted);"></span>
           <span class="editor-toolbar-sep"></span>
-          <button class="editor-toolbar-btn" onclick="editorWordWrap()" title="Toggle word wrap" id="editor-wrap-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M3 12h15a3 3 0 1 1 0 6h-4"/><polyline points="16 16 14 18 16 20"/><path d="M3 18h7"/></svg></button>
+          <button class="editor-toolbar-btn" onclick="editorWordWrap()" title="Toggle word wrap" id="editor-wrap-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M3 12h15a3 3 0 1 1 0 6h-4"/><polyline points="16 16 14 18 16 20"/><path d="M3 18h7"/></svg>Wrap</button>
           <button class="btn btn-accent" id="files-save-btn" onclick="saveCurrentFile()" style="font-size:0.72rem;padding:4px 14px;" title="Save file (Ctrl+S)">Save</button>
         </div>
-        <div class="code-editor-wrap">
-          <div class="code-line-numbers" id="code-line-numbers"></div>
-          <textarea id="files-editor-content" spellcheck="false" onkeydown="handleEditorKeydown(event)" oninput="updateLineNumbers()" onscroll="syncLineScroll()"></textarea>
+        <div class="code-editor-wrap" id="code-editor-wrap">
+          <!-- CodeMirror mounts here when available; fallback to textarea otherwise -->
+          <div class="code-line-numbers" id="code-line-numbers" style="display:none;"></div>
+          <textarea id="files-editor-content" spellcheck="false" onkeydown="handleEditorKeydown(event)" oninput="updateLineNumbers()" onscroll="syncLineScroll()" style="display:none;"></textarea>
         </div>
         <div id="files-editor-msg" class="msg" style="margin-top:8px;"></div>
       </div>
-      <div id="files-modal-msg" class="msg" style="margin-top:12px;"></div>
     </div>
   </div>
 
@@ -5342,7 +5385,7 @@
           var cnameHost = slug + '-sites.megabyte.space';
           var cnameUrl = 'https://' + cnameHost;
           html += '<div class="site-card-url-row" id="inline-slug-wrap-' + s.id + '">';
-          html += '<span class="inline-slug-url status-default" id="inline-slug-url-' + s.id + '">https://<span class="inline-edit-wrap inline-edit-inline" id="inline-slug-' + s.id + '"><span class="inline-text slug-editable" tabindex="0" role="button" onclick="startInlineEdit(\'' + escapeJsString(s.id) + '\', \'slug\', \'' + escapeJsString(slug) + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();startInlineEdit(\'' + escapeJsString(s.id) + '\', \'slug\', \'' + escapeJsString(slug) + '\')}">' + escapeHtml(slug) + '</span></span>-sites.megabyte.space<span class="inline-slug-actions"><button class="inline-edit-btn" onclick="startInlineEdit(\'' + escapeJsString(s.id) + '\', \'slug\', \'' + escapeJsString(slug) + '\')" title="Edit URL slug" aria-label="Edit URL slug"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button></span></span>';
+          html += '<span class="inline-slug-url status-default" id="inline-slug-url-' + s.id + '">https://<span class="inline-edit-wrap inline-edit-inline" id="inline-slug-' + s.id + '"><span class="inline-text slug-editable" tabindex="0" role="button" onclick="startInlineEdit(\'' + escapeJsString(s.id) + '\', \'slug\', \'' + escapeJsString(slug) + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();startInlineEdit(\'' + escapeJsString(s.id) + '\', \'slug\', \'' + escapeJsString(slug) + '\')}">' + escapeHtml(slug) + '</span></span><span class="inline-slug-actions"><button class="inline-edit-btn" onclick="startInlineEdit(\'' + escapeJsString(s.id) + '\', \'slug\', \'' + escapeJsString(slug) + '\')" title="Edit URL slug" aria-label="Edit URL slug"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button></span>-sites.megabyte.space</span>';
           html += '<button class="site-card-copy-btn" onclick="copyUrl(\'' + escapeAttr(cnameUrl) + '\', this)" title="Copy URL"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>';
           html += '<button class="site-card-copy-btn" onclick="window.open(\'' + escapeAttr(cnameUrl) + '\', \'_blank\')" title="Open in new tab"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></button>';
           html += '</div>';
@@ -5490,13 +5533,13 @@
             for (var pi = 0; pi < hostnames.length; pi++) {
               if (hostnames[pi].is_primary === 1 || hostnames[pi].is_primary === true) { cnameIsPrimary = false; break; }
             }
-            html += '<div class="hostname-item site-card-url-row" style="background:rgba(80,165,219,0.04);border:1px solid rgba(80,165,219,0.12);border-radius:8px;padding:10px 12px;margin-bottom:8px;">';
+            html += '<div class="hostname-item site-card-url-row" id="dm-slug-wrap" style="background:rgba(80,165,219,0.04);border:1px solid rgba(80,165,219,0.12);border-radius:8px;padding:10px 12px;margin-bottom:8px;">';
             html += '<div style="display:flex;align-items:center;gap:8px;width:100%;">';
             html += '<span class="hostname-status-square active"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>';
             html += '<div style="flex:1;min-width:0;">';
-            // URL row — same styling as site card (editable slug, monospace, copy/open buttons)
+            // URL row — independent slug editing (uses 'dm' context to avoid touching homepage card)
             html += '<div style="display:flex;align-items:center;gap:4px;">';
-            html += '<span class="inline-slug-url status-default" id="domain-modal-slug-url" style="font-size:0.78rem;">https://<span class="inline-edit-wrap inline-edit-inline" id="domain-modal-slug-edit"><span class="inline-text slug-editable" tabindex="0" role="button" onclick="startInlineEdit(\'' + escapeJsString(adminDomainModalSiteId) + '\', \'slug\', \'' + escapeJsString(adminDomainModalSlug) + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();startInlineEdit(\'' + escapeJsString(adminDomainModalSiteId) + '\', \'slug\', \'' + escapeJsString(adminDomainModalSlug) + '\')}">' + escapeHtml(adminDomainModalSlug) + '</span></span>-sites.megabyte.space<span class="inline-slug-actions"><button class="inline-edit-btn" onclick="startInlineEdit(\'' + escapeJsString(adminDomainModalSiteId) + '\', \'slug\', \'' + escapeJsString(adminDomainModalSlug) + '\')" title="Edit URL slug" aria-label="Edit URL slug"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button></span></span>';
+            html += '<span class="inline-slug-url status-default" id="dm-slug-url" style="font-size:0.78rem;">https://<span class="inline-edit-wrap inline-edit-inline" id="dm-slug-edit"><span class="inline-text slug-editable" tabindex="0" role="button" onclick="startInlineEdit(\'' + escapeJsString(adminDomainModalSiteId) + '\', \'slug\', \'' + escapeJsString(adminDomainModalSlug) + '\', \'dm\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();startInlineEdit(\'' + escapeJsString(adminDomainModalSiteId) + '\', \'slug\', \'' + escapeJsString(adminDomainModalSlug) + '\', \'dm\')}">' + escapeHtml(adminDomainModalSlug) + '</span></span><span class="inline-slug-actions"><button class="inline-edit-btn" onclick="startInlineEdit(\'' + escapeJsString(adminDomainModalSiteId) + '\', \'slug\', \'' + escapeJsString(adminDomainModalSlug) + '\', \'dm\')" title="Edit URL slug" aria-label="Edit URL slug"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button></span>-sites.megabyte.space</span>';
             html += '<button class="site-card-copy-btn" onclick="copyUrl(\'' + escapeAttr(cnameUrl) + '\', this)" title="Copy URL" style="position:relative;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>';
             html += '<button class="site-card-copy-btn" onclick="window.open(\'' + escapeAttr(cnameUrl) + '\', \'_blank\')" title="Open in new tab"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></button>';
             html += '</div>';
@@ -7582,20 +7625,40 @@
       return { valid: true };
     }
 
-    function startInlineEdit(siteId, field, currentValue) {
+    /** Resolve slug-related element IDs based on context ('' = homepage card, 'dm' = domain modal) */
+    function getSlugElId(type, siteId, ctx) {
+      if (ctx === 'dm') {
+        switch(type) {
+          case 'url': return 'dm-slug-url';
+          case 'wrap': return 'dm-slug-wrap';
+          case 'input': return 'dm-input-slug';
+          case 'save': return 'dm-save-slug';
+          case 'edit': return 'dm-slug-edit';
+        }
+      }
+      switch(type) {
+        case 'url': return 'inline-slug-url-' + siteId;
+        case 'wrap': return 'inline-slug-wrap-' + siteId;
+        case 'input': return 'inline-input-slug-' + siteId;
+        case 'save': return 'inline-save-slug-' + siteId;
+        case 'edit': return 'inline-slug-' + siteId;
+      }
+    }
+
+    function startInlineEdit(siteId, field, currentValue, ctx) {
       var isSlug = (field === 'slug');
+      var ctxArg = ctx ? ", '" + ctx + "'" : '';
 
       if (isSlug) {
         // For slug: replace the URL line content with https://[input]-sites.megabyte.space
-        var urlEl = document.getElementById('inline-slug-url-' + siteId);
+        var urlEl = document.getElementById(getSlugElId('url', siteId, ctx));
         if (!urlEl) return;
         urlEl.className = 'inline-slug-url status-default';
-        urlEl.innerHTML = 'https://<input type="text" class="inline-input slug-input" id="inline-input-slug-' + siteId + '" value="' + escapeHtml(currentValue) + '" maxlength="100" />'
-          + '-sites.megabyte.space'
+        urlEl.innerHTML = 'https://<input type="text" class="inline-input slug-input" id="' + getSlugElId('input', siteId, ctx) + '" value="' + escapeHtml(currentValue) + '" maxlength="100" />'
           + '<span class="inline-slug-actions">'
-          + '<button class="inline-save-btn" id="inline-save-slug-' + siteId + '" onclick="saveInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(currentValue) + '\')" title="Save" aria-label="Save"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>'
-          + '<button class="inline-cancel-btn" onclick="cancelInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(currentValue) + '\')" title="Cancel" aria-label="Cancel"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>'
-          + '</span>';
+          + '<button class="inline-save-btn" id="' + getSlugElId('save', siteId, ctx) + '" onclick="saveInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(currentValue) + '\'' + ctxArg + ')" title="Save" aria-label="Save"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>'
+          + '<button class="inline-cancel-btn" onclick="cancelInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(currentValue) + '\'' + ctxArg + ')" title="Cancel" aria-label="Cancel"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>'
+          + '</span>-sites.megabyte.space';
       } else {
         // For name: replace the wrap content with input + save/cancel in fixed action zone
         var wrap = document.getElementById('inline-name-' + siteId);
@@ -7607,14 +7670,14 @@
           + '</span>';
       }
 
-      var input = document.getElementById('inline-input-' + field + '-' + siteId);
+      var input = document.getElementById(isSlug ? getSlugElId('input', siteId, ctx) : ('inline-input-' + field + '-' + siteId));
       if (input) {
         input.focus();
         input.select();
 
         if (isSlug) {
           input.addEventListener('input', function() {
-            onSlugInput(siteId, currentValue);
+            onSlugInput(siteId, currentValue, ctx);
           });
           // Size input to content width
           input.style.width = Math.max(40, Math.min(160, currentValue.length * 7 + 16)) + 'px';
@@ -7632,18 +7695,18 @@
         input.addEventListener('keydown', function(e) {
           if (e.key === 'Enter') {
             e.preventDefault();
-            saveInlineEdit(siteId, field, currentValue);
+            saveInlineEdit(siteId, field, currentValue, ctx);
           } else if (e.key === 'Escape') {
             e.preventDefault();
-            cancelInlineEdit(siteId, field, currentValue);
+            cancelInlineEdit(siteId, field, currentValue, ctx);
           }
         });
       }
     }
 
-    function showSaveToast(siteId, field) {
+    function showSaveToast(siteId, field, ctx) {
       var anchor = (field === 'slug')
-        ? document.getElementById('inline-slug-wrap-' + siteId)
+        ? document.getElementById(getSlugElId('wrap', siteId, ctx))
         : document.getElementById('inline-name-' + siteId);
       if (!anchor) return;
       anchor.style.position = 'relative';
@@ -7656,8 +7719,8 @@
       setTimeout(function() { if (toast.parentNode) toast.remove(); }, 1500);
     }
 
-    function showSlugHint(siteId, message, cls) {
-      var wrap = document.getElementById('inline-slug-wrap-' + siteId);
+    function showSlugHint(siteId, message, cls, ctx) {
+      var wrap = document.getElementById(getSlugElId('wrap', siteId, ctx));
       if (!wrap) return;
       var existing = wrap.querySelector('.slug-hint');
       if (existing) existing.remove();
@@ -7667,17 +7730,17 @@
       wrap.appendChild(hint);
     }
 
-    function clearSlugHint(siteId) {
-      var wrap = document.getElementById('inline-slug-wrap-' + siteId);
+    function clearSlugHint(siteId, ctx) {
+      var wrap = document.getElementById(getSlugElId('wrap', siteId, ctx));
       if (!wrap) return;
       var existing = wrap.querySelector('.slug-hint');
       if (existing) existing.remove();
     }
 
-    function onSlugInput(siteId, originalSlug) {
-      var input = document.getElementById('inline-input-slug-' + siteId);
-      var urlEl = document.getElementById('inline-slug-url-' + siteId);
-      var saveBtn = document.getElementById('inline-save-slug-' + siteId);
+    function onSlugInput(siteId, originalSlug, ctx) {
+      var input = document.getElementById(getSlugElId('input', siteId, ctx));
+      var urlEl = document.getElementById(getSlugElId('url', siteId, ctx));
+      var saveBtn = document.getElementById(getSlugElId('save', siteId, ctx));
       if (!input || !urlEl) return;
 
       var raw = input.value;
@@ -7686,7 +7749,7 @@
       if (!result.valid) {
         urlEl.className = 'inline-slug-url status-invalid';
         if (saveBtn) saveBtn.disabled = true;
-        showSlugHint(siteId, result.reason || 'Invalid slug', 'hint-error');
+        showSlugHint(siteId, result.reason || 'Invalid slug', 'hint-error', ctx);
         return;
       }
 
@@ -7696,25 +7759,25 @@
       if (normalized === originalSlug) {
         urlEl.className = 'inline-slug-url status-default';
         if (saveBtn) saveBtn.disabled = false;
-        clearSlugHint(siteId);
+        clearSlugHint(siteId, ctx);
         return;
       }
 
       // Changed — check availability with debounce
       urlEl.className = 'inline-slug-url status-checking';
       if (saveBtn) saveBtn.disabled = true;
-      showSlugHint(siteId, 'Checking availability\u2026', 'hint-checking');
+      showSlugHint(siteId, 'Checking availability\u2026', 'hint-checking', ctx);
 
       if (inlineSlugCheckTimer) clearTimeout(inlineSlugCheckTimer);
       inlineSlugCheckTimer = setTimeout(function() {
-        checkSlugAvailability(siteId, normalized, originalSlug);
+        checkSlugAvailability(siteId, normalized, originalSlug, ctx);
       }, 400);
     }
 
-    function checkSlugAvailability(siteId, slug, originalSlug) {
+    function checkSlugAvailability(siteId, slug, originalSlug, ctx) {
       if (!state.session || !state.session.token) return;
-      var urlEl = document.getElementById('inline-slug-url-' + siteId);
-      var saveBtn = document.getElementById('inline-save-slug-' + siteId);
+      var urlEl = document.getElementById(getSlugElId('url', siteId, ctx));
+      var saveBtn = document.getElementById(getSlugElId('save', siteId, ctx));
 
       var excludeId = siteId;
       var requestId = ++inlineSlugCheckCounter; // track this request
@@ -7727,7 +7790,7 @@
           // Ignore stale responses (newer request already in flight)
           if (requestId !== inlineSlugCheckCounter) return;
           if (!urlEl) return;
-          var input = document.getElementById('inline-input-slug-' + siteId);
+          var input = document.getElementById(getSlugElId('input', siteId, ctx));
           if (!input) return;
           var currentNormalized = validateSlugLocal(input.value).normalized;
           if (currentNormalized !== slug) return;
@@ -7735,11 +7798,11 @@
           if (d.data && d.data.available) {
             urlEl.className = 'inline-slug-url status-available';
             if (saveBtn) saveBtn.disabled = false;
-            showSlugHint(siteId, 'Available!', 'hint-available');
+            showSlugHint(siteId, 'Available!', 'hint-available', ctx);
           } else {
             urlEl.className = 'inline-slug-url status-taken';
             if (saveBtn) saveBtn.disabled = true;
-            showSlugHint(siteId, 'Already taken', 'hint-taken');
+            showSlugHint(siteId, 'Already taken', 'hint-taken', ctx);
           }
         })
         .catch(function() {
@@ -7750,18 +7813,27 @@
         });
     }
 
-    function cancelInlineEdit(siteId, field, originalValue) {
+    function cancelInlineEdit(siteId, field, originalValue, ctx) {
       // Clear any pending slug check timer
       if (inlineSlugCheckTimer) { clearTimeout(inlineSlugCheckTimer); inlineSlugCheckTimer = null; }
 
       var isSlug = (field === 'slug');
+      var ctxArg = ctx ? ", '" + ctx + "'" : '';
       if (isSlug) {
-        clearSlugHint(siteId);
+        clearSlugHint(siteId, ctx);
         // Restore the combined URL line with edit icon in fixed action zone
-        var urlEl = document.getElementById('inline-slug-url-' + siteId);
+        var urlEl = document.getElementById(getSlugElId('url', siteId, ctx));
         if (urlEl) {
           urlEl.className = 'inline-slug-url status-default';
-          urlEl.innerHTML = 'https://<span class="inline-edit-wrap inline-edit-inline" id="inline-slug-' + siteId + '"><span class="inline-text slug-editable" tabindex="0" role="button" onclick="startInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(originalValue) + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();startInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(originalValue) + '\')}">' + escapeHtml(originalValue) + '</span></span>-sites.megabyte.space<span class="inline-slug-actions"><button class="inline-edit-btn" onclick="startInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(originalValue) + '\')" title="Edit URL slug" aria-label="Edit URL slug"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button></span>';
+          urlEl.innerHTML = 'https://<span class="inline-edit-wrap inline-edit-inline" id="' + getSlugElId('edit', siteId, ctx) + '"><span class="inline-text slug-editable" tabindex="0" role="button" onclick="startInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(originalValue) + '\'' + ctxArg + ')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();startInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(originalValue) + '\'' + ctxArg + ')}">' + escapeHtml(originalValue) + '</span></span><span class="inline-slug-actions"><button class="inline-edit-btn" onclick="startInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(originalValue) + '\'' + ctxArg + ')" title="Edit URL slug" aria-label="Edit URL slug"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button></span>-sites.megabyte.space';
+        }
+        // If editing from domain modal, also refresh homepage card slug display
+        if (ctx === 'dm') {
+          var homeUrlEl = document.getElementById('inline-slug-url-' + siteId);
+          if (homeUrlEl) {
+            homeUrlEl.className = 'inline-slug-url status-default';
+            homeUrlEl.innerHTML = 'https://<span class="inline-edit-wrap inline-edit-inline" id="inline-slug-' + siteId + '"><span class="inline-text slug-editable" tabindex="0" role="button" onclick="startInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(originalValue) + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();startInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(originalValue) + '\')}">' + escapeHtml(originalValue) + '</span></span><span class="inline-slug-actions"><button class="inline-edit-btn" onclick="startInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(originalValue) + '\')" title="Edit URL slug" aria-label="Edit URL slug"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button></span>-sites.megabyte.space';
+          }
         }
       } else {
         var wrap = document.getElementById('inline-name-' + siteId);
@@ -7771,26 +7843,26 @@
       }
     }
 
-    function saveInlineEdit(siteId, field, originalValue) {
+    function saveInlineEdit(siteId, field, originalValue, ctx) {
       if (!state.session || !state.session.token) return;
 
-      var input = document.getElementById('inline-input-' + field + '-' + siteId);
+      var isSlug = (field === 'slug');
+      var input = document.getElementById(isSlug ? getSlugElId('input', siteId, ctx) : ('inline-input-' + field + '-' + siteId));
       if (!input) return;
 
       var value = input.value.trim();
-      var isSlug = (field === 'slug');
 
       // Validate
       if (isSlug) {
         var slugResult = validateSlugLocal(value);
         if (!slugResult.valid) {
-          var slugUrlEl = document.getElementById('inline-slug-url-' + siteId);
+          var slugUrlEl = document.getElementById(getSlugElId('url', siteId, ctx));
           if (slugUrlEl) { slugUrlEl.className = 'inline-slug-url status-invalid'; }
           return;
         }
         value = slugResult.normalized;
         if (value === originalValue) {
-          cancelInlineEdit(siteId, field, originalValue);
+          cancelInlineEdit(siteId, field, originalValue, ctx);
           return;
         }
       } else {
@@ -7807,7 +7879,7 @@
       }
 
       // Show saving feedback
-      var saveBtn = document.getElementById('inline-save-' + field + '-' + siteId);
+      var saveBtn = document.getElementById(isSlug ? getSlugElId('save', siteId, ctx) : ('inline-save-' + field + '-' + siteId));
       if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<span style="font-size:10px;">...</span>'; }
       input.disabled = true;
       input.style.opacity = '0.6';
@@ -7837,6 +7909,8 @@
             if (adminSites[i].id === siteId) {
               if (isSlug) {
                 adminSites[i].slug = value;
+                // Also update domain modal slug reference
+                if (adminDomainModalSiteId === siteId) adminDomainModalSlug = value;
               } else {
                 adminSites[i].business_name = value;
               }
@@ -7844,15 +7918,22 @@
             }
           }
           // Targeted update — restore display mode with new value (no full re-render)
-          cancelInlineEdit(siteId, field, value);
+          cancelInlineEdit(siteId, field, value, ctx);
           // Show save success toast
-          showSaveToast(siteId, isSlug ? 'slug' : 'name');
+          showSaveToast(siteId, isSlug ? 'slug' : 'name', ctx);
           // Update site card preview URL if slug changed
           if (isSlug) {
             var previewLink = document.querySelector('#site-card-' + siteId + ' .site-card-preview a');
             if (previewLink) previewLink.href = 'https://' + value + '-sites.megabyte.space';
             var visitBtn = document.querySelector('#site-card-' + siteId + ' .btn-visit');
             if (visitBtn) visitBtn.setAttribute('onclick', "window.open('https://" + escapeJsString(value) + "-sites.megabyte.space','_blank')");
+            // Update copy/open buttons on both homepage card and domain modal
+            var wrapRow = document.getElementById('inline-slug-wrap-' + siteId);
+            if (wrapRow) {
+              var copyBtns = wrapRow.querySelectorAll('.site-card-copy-btn');
+              if (copyBtns.length >= 1) copyBtns[0].setAttribute('onclick', "copyUrl('https://" + escapeJsString(value) + "-sites.megabyte.space', this)");
+              if (copyBtns.length >= 2) copyBtns[1].setAttribute('onclick', "window.open('https://" + escapeJsString(value) + "-sites.megabyte.space', '_blank')");
+            }
           }
         })
         .catch(function(err) {
@@ -7862,7 +7943,7 @@
             saveBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
           }
           if (isSlug) {
-            var urlEl = document.getElementById('inline-slug-url-' + siteId);
+            var urlEl = document.getElementById(getSlugElId('url', siteId, ctx));
             if (urlEl) {
               urlEl.className = 'inline-slug-url status-taken';
             }
@@ -8622,7 +8703,6 @@
       document.getElementById('files-modal').classList.add('visible');
       document.getElementById('files-editor').style.display = 'none';
       document.getElementById('files-list').style.display = '';
-      hideMsg('files-modal-msg');
       loadFilesForSite();
     }
 
@@ -8676,15 +8756,110 @@
         });
     }
 
+    /** CodeMirror editor instance (null if CodeMirror not loaded — textarea fallback) */
+    var cmEditor = null;
+    var cmEditorReady = false;
+
+    /** Check if CodeMirror is available */
+    function hasCM() { return typeof CodeMirror !== 'undefined'; }
+
+    /** Get file mode based on extension */
+    function getEditorMode(name) {
+      var ext = (name || '').split('.').pop().toLowerCase();
+      if (ext === 'css') return 'css';
+      if (ext === 'js' || ext === 'json') return { name: 'javascript', json: ext === 'json' };
+      if (ext === 'xml' || ext === 'svg') return 'xml';
+      if (ext === 'html' || ext === 'htm') return 'htmlmixed';
+      return 'htmlmixed';
+    }
+
+    /** Initialize or get CodeMirror editor */
+    function ensureCMEditor(mode) {
+      var wrap = document.getElementById('code-editor-wrap');
+      if (!wrap) return null;
+
+      if (cmEditor) {
+        cmEditor.setOption('mode', mode);
+        return cmEditor;
+      }
+
+      if (!hasCM()) return null;
+
+      // Hide textarea fallback elements
+      var textarea = document.getElementById('files-editor-content');
+      var gutter = document.getElementById('code-line-numbers');
+      if (textarea) textarea.style.display = 'none';
+      if (gutter) gutter.style.display = 'none';
+
+      cmEditor = CodeMirror(wrap, {
+        value: '',
+        mode: mode,
+        theme: 'bolt-dark',
+        lineNumbers: true,
+        tabSize: 2,
+        indentUnit: 2,
+        indentWithTabs: false,
+        lineWrapping: false,
+        matchBrackets: true,
+        autoCloseBrackets: true,
+        styleActiveLine: true,
+        extraKeys: {
+          'Ctrl-S': function() { saveCurrentFile(); },
+          'Cmd-S': function() { saveCurrentFile(); },
+          Tab: function(cm) {
+            if (cm.somethingSelected()) {
+              cm.indentSelection('add');
+            } else {
+              cm.replaceSelection('  ', 'end');
+            }
+          },
+          'Shift-Tab': function(cm) { cm.indentSelection('subtract'); }
+        }
+      });
+      cmEditorReady = true;
+      return cmEditor;
+    }
+
+    /** Get current editor content (CodeMirror or textarea) */
+    function getEditorContent() {
+      if (cmEditor && cmEditorReady) return cmEditor.getValue();
+      var textarea = document.getElementById('files-editor-content');
+      return textarea ? textarea.value : '';
+    }
+
+    /** Set editor content (CodeMirror or textarea) */
+    function setEditorContent(content, mode) {
+      if (cmEditor && cmEditorReady) {
+        cmEditor.setValue(content);
+        if (mode) cmEditor.setOption('mode', mode);
+        setTimeout(function() { cmEditor.refresh(); }, 10);
+        return;
+      }
+      var textarea = document.getElementById('files-editor-content');
+      if (textarea) {
+        textarea.value = content;
+        textarea.style.display = '';
+      }
+      var gutter = document.getElementById('code-line-numbers');
+      if (gutter) gutter.style.display = '';
+      updateLineNumbers();
+    }
+
     function openFileForEdit(key, name) {
       filesModalCurrentKey = key;
       document.getElementById('files-editor-name').textContent = name;
-      document.getElementById('files-editor-content').value = 'Loading...';
       document.getElementById('files-editor').style.display = 'flex';
       document.getElementById('files-list').style.display = 'none';
       document.getElementById('files-toolbar').style.display = 'none';
       hideMsg('files-editor-msg');
-      updateLineNumbers();
+
+      var mode = getEditorMode(name);
+      var editor = ensureCMEditor(mode);
+      if (editor) {
+        editor.setValue('Loading...');
+      } else {
+        setEditorContent('Loading...');
+      }
 
       var hdrs = {};
       if (state.session && state.session.token) hdrs['Authorization'] = 'Bearer ' + state.session.token;
@@ -8696,10 +8871,9 @@
         })
         .then(function(d) {
           var content = d.data.content || '';
-          document.getElementById('files-editor-content').value = content;
+          setEditorContent(content, mode);
           var sizeEl = document.getElementById('files-editor-size');
           if (sizeEl) sizeEl.textContent = formatFileSize(content.length);
-          updateLineNumbers();
         })
         .catch(function(err) {
           showMsg('files-editor-msg', 'error', err.message || 'Failed to load file');
@@ -8713,8 +8887,9 @@
       filesModalCurrentKey = null;
     }
 
-    /** Update line number gutter to match textarea content */
+    /** Update line number gutter to match textarea content (fallback only) */
     function updateLineNumbers() {
+      if (cmEditor && cmEditorReady) return; // CodeMirror handles its own line numbers
       var textarea = document.getElementById('files-editor-content');
       var gutter = document.getElementById('code-line-numbers');
       if (!textarea || !gutter) return;
@@ -8724,15 +8899,17 @@
       gutter.textContent = nums;
     }
 
-    /** Sync line number scroll with textarea scroll */
+    /** Sync line number scroll with textarea scroll (fallback only) */
     function syncLineScroll() {
+      if (cmEditor && cmEditorReady) return;
       var textarea = document.getElementById('files-editor-content');
       var gutter = document.getElementById('code-line-numbers');
       if (textarea && gutter) gutter.scrollTop = textarea.scrollTop;
     }
 
-    /** Handle editor keydown: Tab indent, Ctrl+S save */
+    /** Handle editor keydown: Tab indent, Ctrl+S save (fallback only) */
     function handleEditorKeydown(event) {
+      if (cmEditor && cmEditorReady) return; // CodeMirror handles its own keybindings
       if (event.key === 'Tab') {
         event.preventDefault();
         var t = event.target;
@@ -8746,15 +8923,19 @@
       }
     }
 
-    /** Toggle word wrap on editor textarea */
+    /** Toggle word wrap on editor */
     var editorWrapping = false;
     function editorWordWrap() {
       editorWrapping = !editorWrapping;
-      var textarea = document.getElementById('files-editor-content');
       var btn = document.getElementById('editor-wrap-btn');
-      if (textarea) {
-        textarea.style.whiteSpace = editorWrapping ? 'pre-wrap' : 'pre';
-        textarea.style.wordBreak = editorWrapping ? 'break-all' : 'normal';
+      if (cmEditor && cmEditorReady) {
+        cmEditor.setOption('lineWrapping', editorWrapping);
+      } else {
+        var textarea = document.getElementById('files-editor-content');
+        if (textarea) {
+          textarea.style.whiteSpace = editorWrapping ? 'pre-wrap' : 'pre';
+          textarea.style.wordBreak = editorWrapping ? 'break-all' : 'normal';
+        }
       }
       if (btn) {
         btn.style.color = editorWrapping ? 'var(--accent)' : '';
@@ -8764,7 +8945,7 @@
 
     function saveCurrentFile() {
       if (!filesModalSiteId || !filesModalCurrentKey) return;
-      var content = document.getElementById('files-editor-content').value;
+      var content = getEditorContent();
       var saveBtn = document.getElementById('files-save-btn');
       if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving\u2026'; }
 
@@ -9691,5 +9872,14 @@
       }
     }
   </script>
+  <!-- CodeMirror 5 — code editor with syntax highlighting -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/xml/xml.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/javascript/javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/css/css.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/htmlmixed/htmlmixed.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/edit/matchbrackets.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/edit/closebrackets.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/selection/active-line.min.js"></script>
 </body>
 </html>
