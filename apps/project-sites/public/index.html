@@ -223,6 +223,29 @@
 
     html { scroll-behavior: smooth; height: 100%; }
 
+    /* Center-out underline hover animation for links */
+    a:not(.btn):not(.logo):not(.modal-close):not(.details-modal-close):not(.back-link):not(.domain-tab):not(.header-auth-btn):not(.signin-btn):not(.site-card-btn):not(.hostname-delete-btn):not(.dc-btn):not(.hostname-chip-setprimary):not(.topbar-cta):not([class*="btn"]) {
+      position: relative;
+      text-decoration: none;
+    }
+    a:not(.btn):not(.logo):not(.modal-close):not(.details-modal-close):not(.back-link):not(.domain-tab):not(.header-auth-btn):not(.signin-btn):not(.site-card-btn):not(.hostname-delete-btn):not(.dc-btn):not(.hostname-chip-setprimary):not(.topbar-cta):not([class*="btn"])::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      width: 0;
+      height: 1px;
+      background: currentColor;
+      transition: width 0.3s ease, left 0.3s ease;
+    }
+    a:not(.btn):not(.logo):not(.modal-close):not(.details-modal-close):not(.back-link):not(.domain-tab):not(.header-auth-btn):not(.signin-btn):not(.site-card-btn):not(.hostname-delete-btn):not(.dc-btn):not(.hostname-chip-setprimary):not(.topbar-cta):not([class*="btn"]):hover::after {
+      width: 100%;
+      left: 0;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      a::after { transition: none !important; }
+    }
+
     body {
       font-family: var(--font);
       background: var(--bg-primary);
@@ -2916,6 +2939,8 @@
 
     /* ── Improve with AI overlay ────────── */
     .improve-ai-link {
+      position: relative;
+      bottom: -2px;
       font-size: 0.78rem;
       color: var(--accent);
       cursor: pointer;
@@ -5763,7 +5788,7 @@
             html += '</div>';
             // Chips below URL
             html += '<div class="hostname-chips">';
-            html += '<span class="hostname-chip default" data-tip="Free subdomain included with your site. Upgrade for a custom domain.">Default</span>';
+            html += '<span class="hostname-chip default" data-tip="Default URL for this site">Default</span>';
             if (cnameIsPrimary) html += '<span class="hostname-chip primary" data-tip="Your main URL. All other domains redirect here.">Primary</span>';
             else html += '<button class="hostname-chip-setprimary" onclick="resetPrimaryToDefault(\'' + escapeAttr(adminDomainModalSiteId) + '\')">Set as primary</button>';
             html += '</div>';
@@ -8286,6 +8311,7 @@
        Site Logs Modal
        =========================================================== */
     var siteLogsModalId = null;
+    var _logsAutoRefreshTimer = null;
 
     function openSiteLogsModal(siteId, siteName) {
       siteLogsModalId = siteId;
@@ -8295,12 +8321,19 @@
       document.getElementById('site-logs-modal').classList.add('visible');
       fetchSiteLogs(siteId);
       document.body.style.overflow = 'hidden';
+      // Auto-refresh every 5s while modal is open (catches new workflow logs)
+      clearInterval(_logsAutoRefreshTimer);
+      _logsAutoRefreshTimer = setInterval(function() {
+        if (siteLogsModalId) fetchSiteLogs(siteLogsModalId);
+      }, 5000);
     }
 
     function closeSiteLogsModal() {
       document.getElementById('site-logs-modal').classList.remove('visible');
       siteLogsModalId = null;
       document.body.style.overflow = '';
+      clearInterval(_logsAutoRefreshTimer);
+      _logsAutoRefreshTimer = null;
     }
 
     function refreshSiteLogs() {
@@ -8426,6 +8459,7 @@
         'site.updated': 'Site Updated',
         'site.reset': 'Site Reset',
         'site.deployed': 'Site Deployed',
+        'site.deploy_started': 'Deploy Started',
         'site.slug_changed': 'URL Changed',
         'site.name_changed': 'Name Changed',
         'file.updated': 'File Saved',

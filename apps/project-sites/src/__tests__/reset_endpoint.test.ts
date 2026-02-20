@@ -240,6 +240,7 @@ describe('POST /api/sites/:id/reset', () => {
     expect(createArgs.params.businessAddress).toBe('123 Main St');
     expect(createArgs.params.additionalContext).toBe('We have 5-star reviews');
     expect(createArgs.params.isReset).toBe(true);
+    expect(createArgs.params.orgId).toBe(TEST_ORG_ID);
   });
 
   it('handles workflow creation failure gracefully', async () => {
@@ -314,9 +315,10 @@ describe('POST /api/sites/:id/reset', () => {
     expect(body.data.workflow_instance_id).toBe(`${TEST_SITE_ID}-reset-12345`);
     expect(mockCreate).toHaveBeenCalledTimes(2);
 
-    // Verify the retry used a suffixed ID
+    // Verify the retry used a suffixed ID and includes orgId
     const retryArgs = mockCreate.mock.calls[1][0];
     expect(retryArgs.id).toMatch(new RegExp(`^${TEST_SITE_ID}-reset-\\d+$`));
+    expect(retryArgs.params.orgId).toBe(TEST_ORG_ID);
   });
 
   it('writes audit log on successful reset', async () => {

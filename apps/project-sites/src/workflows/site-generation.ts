@@ -160,6 +160,7 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
       has_uploaded_assets: !!(params.uploadedAssets && params.uploadedAssets.length),
       uploaded_asset_count: params.uploadedAssets?.length ?? 0,
       phase: 'initialization',
+      message: 'AI build workflow started for ' + params.businessName + ' (' + params.slug + ')',
     });
 
     // Update site status to 'collecting' for real-time UI

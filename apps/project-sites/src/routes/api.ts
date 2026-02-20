@@ -1481,6 +1481,7 @@ api.post('/api/sites/:id/reset', async (c) => {
         id: siteId,
         params: {
           siteId,
+          orgId,
           slug: site.slug,
           businessName: body.business?.name || '',
           businessAddress: body.business?.address || '',
@@ -1498,6 +1499,7 @@ api.post('/api/sites/:id/reset', async (c) => {
           id: resetId,
           params: {
             siteId,
+            orgId,
             slug: site.slug,
             businessName: body.business?.name || '',
             businessAddress: body.business?.address || '',
@@ -1602,6 +1604,23 @@ api.post('/api/sites/:id/deploy', async (c) => {
   const distPath = ((formData.get('dist_path') as string) || 'dist/').replace(/\/$/, '') + '/';
 
   if (!zipFile) throw badRequest('ZIP file is required');
+
+  // Log deploy start immediately so it shows in Logs modal
+  await auditService.writeAuditLog(c.env.DB, {
+    org_id: orgId,
+    actor_id: c.get('userId') ?? null,
+    action: 'site.deploy_started',
+    target_type: 'site',
+    target_id: siteId,
+    metadata_json: {
+      site_id: siteId,
+      slug: site.slug,
+      zip_size_kb: Math.round(zipFile.size / 1024),
+      has_chat: !!chatFile,
+      message: 'ZIP deploy initiated (' + Math.round(zipFile.size / 1024) + ' KB)',
+    },
+    request_id: c.get('requestId'),
+  });
 
   // Read ZIP file
   const JSZip = (await import('jszip')).default;
