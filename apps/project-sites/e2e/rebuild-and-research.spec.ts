@@ -207,6 +207,65 @@ test.describe('Research JSON Endpoint', () => {
     // Should get 401 (needs auth) or 404 (not found), not 405 (method not allowed)
     expect(res.status()).not.toBe(405);
   });
+
+  test('research.json is downloadable from production for vitos-mens-saln', async ({ request }) => {
+    // This test verifies the full end-to-end: workflow generates research, uploads to R2,
+    // and the public endpoint returns the JSON with all required sections.
+    // Skip if external network is unavailable (CI / sandbox environments).
+    let res;
+    try {
+      res = await request.fetch(
+        'https://sites.megabyte.space/api/sites/by-slug/vitos-mens-saln/research.json',
+        { timeout: 10000 },
+      );
+    } catch {
+      test.skip(true, 'External network unavailable — skipping production research.json test');
+      return;
+    }
+    expect(res.status()).toBe(200);
+    expect(res.headers()['content-type']).toContain('application/json');
+
+    const data = await res.json();
+    // Must have all 5 research sections
+    expect(data).toHaveProperty('profile');
+    expect(data).toHaveProperty('social');
+    expect(data).toHaveProperty('brand');
+    expect(data).toHaveProperty('sellingPoints');
+    expect(data).toHaveProperty('images');
+
+    // Profile must have business info
+    expect(data.profile).toHaveProperty('business_name');
+    expect(data.profile).toHaveProperty('services');
+    expect(data.profile).toHaveProperty('business_type');
+
+    // Brand must have color scheme
+    expect(data.brand).toHaveProperty('logo');
+    expect(data.brand).toHaveProperty('color_palette');
+
+    // Selling points must have array
+    expect(data.sellingPoints).toHaveProperty('selling_points');
+    expect(Array.isArray(data.sellingPoints.selling_points)).toBe(true);
+
+    // Images must have hero images
+    expect(data.images).toHaveProperty('hero_images');
+    expect(Array.isArray(data.images.hero_images)).toBe(true);
+  });
+
+  test('formatActionLabel includes score debug labels', async ({ page }) => {
+    await page.goto('/');
+    const labels = await page.evaluate(() => {
+      const fn = (window as unknown as Record<string, (...args: unknown[]) => string>).formatActionLabel;
+      if (!fn) return {};
+      return {
+        score_text_fallback: fn('workflow.debug.score_text_fallback'),
+        score_fallback: fn('workflow.debug.score_fallback'),
+      };
+    });
+    expect(labels).toEqual({
+      score_text_fallback: 'Score Parsed from Text',
+      score_fallback: 'Score Defaulted',
+    });
+  });
 });
 
 test.describe('Rebuild API', () => {
