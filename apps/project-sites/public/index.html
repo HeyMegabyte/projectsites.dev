@@ -4543,6 +4543,9 @@
       </div>
       <div class="logs-toolbar">
         <span class="logs-count" id="logs-count-label"></span>
+        <button class="logs-refresh-btn" onclick="copyLogsForAI()" title="Copy logs in AI-friendly format">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px;margin-right:3px;"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy for AI
+        </button>
         <button class="logs-refresh-btn" onclick="refreshSiteLogs()">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px;margin-right:3px;"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Refresh
         </button>
@@ -8326,6 +8329,8 @@
       _logsAutoRefreshTimer = setInterval(function() {
         if (siteLogsModalId) fetchSiteLogs(siteLogsModalId);
       }, 5000);
+      // Start real-time timestamp updater (every 10s)
+      startTimestampUpdater();
     }
 
     function closeSiteLogsModal() {
@@ -8334,10 +8339,72 @@
       document.body.style.overflow = '';
       clearInterval(_logsAutoRefreshTimer);
       _logsAutoRefreshTimer = null;
+      clearInterval(_timestampTimer);
+      _timestampTimer = null;
     }
 
     function refreshSiteLogs() {
       if (siteLogsModalId) fetchSiteLogs(siteLogsModalId);
+    }
+
+    var _rawLogsData = [];
+
+    function copyLogsForAI() {
+      if (!_rawLogsData || _rawLogsData.length === 0) {
+        showToast('No logs to copy', 'warn');
+        return;
+      }
+      var siteName = document.getElementById('logs-modal-site-name').textContent || 'unknown';
+      var lines = [];
+      lines.push('# Site Logs: ' + siteName);
+      lines.push('Exported: ' + new Date().toISOString());
+      lines.push('Total entries: ' + _rawLogsData.length);
+      lines.push('');
+      lines.push('| # | Timestamp (UTC) | Action | Label | Message | Metadata |');
+      lines.push('|---|----------------|--------|-------|---------|----------|');
+      for (var i = 0; i < _rawLogsData.length; i++) {
+        var log = _rawLogsData[i];
+        var action = log.action || 'unknown';
+        var label = formatActionLabel(action);
+        var meta = {};
+        try { meta = typeof log.metadata_json === 'string' ? JSON.parse(log.metadata_json) : (log.metadata_json || {}); } catch(e) {}
+        var msg = meta.message || '';
+        var metaStr = '';
+        var metaKeys = Object.keys(meta).filter(function(k) { return k !== 'message'; });
+        metaStr = metaKeys.map(function(k) { return k + '=' + JSON.stringify(meta[k]); }).join(', ');
+        lines.push('| ' + (i + 1) + ' | ' + (log.created_at || '') + ' | `' + action + '` | ' + label + ' | ' + msg.replace(/\|/g, '/') + ' | ' + metaStr.replace(/\|/g, '/').substring(0, 200) + ' |');
+      }
+      lines.push('');
+      lines.push('## Raw JSON');
+      lines.push('```json');
+      lines.push(JSON.stringify(_rawLogsData.map(function(l) {
+        var m = {};
+        try { m = typeof l.metadata_json === 'string' ? JSON.parse(l.metadata_json) : (l.metadata_json || {}); } catch(e) {}
+        return { time: l.created_at, action: l.action, label: formatActionLabel(l.action || ''), metadata: m };
+      }), null, 2));
+      lines.push('```');
+
+      var text = lines.join('\n');
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function() {
+          showToast('Logs copied to clipboard (' + _rawLogsData.length + ' entries)', 'ok');
+        }).catch(function() {
+          fallbackCopy(text);
+        });
+      } else {
+        fallbackCopy(text);
+      }
+    }
+    function fallbackCopy(text) {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      showToast('Logs copied to clipboard', 'ok');
     }
 
     var _lastLogIds = [];
@@ -8354,7 +8421,7 @@
       html += '<div class="log-edge"></div>';
       html += '<div class="log-icon">' + iconSvg + '</div>';
       html += '<div class="log-body">';
-      html += '<div class="log-header"><span class="log-action">' + escapeHtml(actionLabel) + '</span><span class="log-ts">' + escapeHtml(ts) + '</span></div>';
+      html += '<div class="log-header"><span class="log-action">' + escapeHtml(actionLabel) + '</span><span class="log-ts" data-iso="' + escapeAttr(log.created_at || '') + '">' + escapeHtml(ts) + '</span></div>';
       if (meta) html += '<div class="log-meta">' + meta + '</div>';
       html += '</div>';
       html += '</div>';
@@ -8385,6 +8452,7 @@
         })
         .then(function(d) {
           var logs = d.data || [];
+          _rawLogsData = logs;
           if (countLabel) countLabel.textContent = logs.length + ' log entr' + (logs.length === 1 ? 'y' : 'ies');
           if (!logs.length) {
             container.innerHTML = '<div class="logs-empty">No logs yet for this site.</div>';
@@ -8457,7 +8525,14 @@
 
     function formatLogTimestamp(iso) {
       try {
-        var d = new Date(iso);
+        // D1 stores dates as "YYYY-MM-DD HH:MM:SS" without timezone — treat as UTC
+        var normalized = iso;
+        if (iso && iso.indexOf('T') === -1 && iso.indexOf('Z') === -1) {
+          normalized = iso.replace(' ', 'T') + 'Z';
+        } else if (iso && iso.indexOf('Z') === -1 && iso.indexOf('+') === -1) {
+          normalized = iso + 'Z';
+        }
+        var d = new Date(normalized);
         var now = new Date();
         var diff = now - d;
         var secs = Math.floor(diff / 1000);
@@ -8467,22 +8542,37 @@
         var weeks = Math.floor(days / 7);
         var months = Math.floor(days / 30);
         var years = Math.floor(days / 365);
-        if (isNaN(secs)) return iso;
+        if (isNaN(secs) || secs < 0) return iso;
         if (secs < 10) return 'just now';
-        if (secs < 45) return 'a few seconds ago';
-        if (secs < 90) return 'a minute ago';
-        if (mins < 45) return mins + ' minutes ago';
-        if (mins < 90) return 'an hour ago';
-        if (hrs < 24) return hrs + ' hours ago';
-        if (hrs < 42) return 'a day ago';
+        if (secs < 45) return secs + 's ago';
+        if (secs < 90) return '1 min ago';
+        if (mins < 45) return mins + ' min ago';
+        if (mins < 90) return '1 hr ago';
+        if (hrs < 24) return hrs + ' hr ago';
+        if (hrs < 42) return '1 day ago';
         if (days < 7) return days + ' days ago';
-        if (days < 11) return 'a week ago';
+        if (days < 11) return '1 week ago';
         if (weeks < 4) return weeks + ' weeks ago';
-        if (days < 45) return 'a month ago';
+        if (days < 45) return '1 month ago';
         if (months < 12) return months + ' months ago';
-        if (months < 18) return 'a year ago';
+        if (months < 18) return '1 year ago';
         return years + ' years ago';
       } catch (e) { return iso; }
+    }
+
+    // Continuous timestamp updater — updates every 10s for all visible log entries
+    var _timestampTimer = null;
+    function startTimestampUpdater() {
+      if (_timestampTimer) clearInterval(_timestampTimer);
+      _timestampTimer = setInterval(function() {
+        var entries = document.querySelectorAll('#logs-container .log-entry');
+        entries.forEach(function(entry) {
+          var tsEl = entry.querySelector('.log-ts');
+          if (tsEl && tsEl.dataset.iso) {
+            tsEl.textContent = formatLogTimestamp(tsEl.dataset.iso);
+          }
+        });
+      }, 10000);
     }
 
     function getLogColorClass(action) {
@@ -8578,6 +8668,9 @@
         'webhook.processing_failed': 'Webhook Processing Failed',
         'workflow.retry_created': 'Workflow Retried',
         'workflow.creation_failed': 'Workflow Failed to Start',
+        'workflow.debug.llm_output': 'AI Response Received',
+        'workflow.debug.json_extraction_failed': 'JSON Parse Failed',
+        'workflow.debug.validation_failed': 'Schema Validation Failed',
         'webhook.stripe.checkout.session.completed': 'Payment Received',
         'webhook.stripe.customer.subscription.updated': 'Subscription Updated',
         'webhook.stripe.customer.subscription.deleted': 'Subscription Canceled',

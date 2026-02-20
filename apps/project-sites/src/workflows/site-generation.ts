@@ -136,6 +136,65 @@ const RETRY_HTML = { retries: { limit: 3, delay: '15 seconds' as const, backoff:
 const RETRY_LEGAL = { retries: { limit: 3, delay: '10 seconds' as const, backoff: 'exponential' as const }, timeout: '3 minutes' as const };
 
 /**
+ * Safely validate LLM JSON output with enriched error messages.
+ * Catches ZodError inside step.do() before Cloudflare Workflows serializes it,
+ * then re-throws with field-level details baked into the Error message.
+ */
+async function safeValidateAndLog(
+  db: D1Database,
+  orgId: string,
+  siteId: string,
+  stepName: string,
+  promptId: string,
+  rawOutput: string,
+  modelUsed: string,
+): Promise<string> {
+  const { validatePromptOutput } = await import('../prompts/schemas.js');
+
+  // Log raw LLM output for debugging
+  await workflowLog(db, orgId, siteId, 'workflow.debug.llm_output', {
+    step: stepName,
+    output_length: rawOutput.length,
+    output_preview: rawOutput.substring(0, 300),
+    model: modelUsed,
+    message: 'LLM returned ' + rawOutput.length + ' chars for ' + stepName + ' (model: ' + modelUsed + ')',
+  });
+
+  let extracted: unknown;
+  try {
+    extracted = extractJsonFromText(rawOutput);
+  } catch (jsonErr) {
+    await workflowLog(db, orgId, siteId, 'workflow.debug.json_extraction_failed', {
+      step: stepName,
+      error: jsonErr instanceof Error ? jsonErr.message : String(jsonErr),
+      output_preview: rawOutput.substring(0, 500),
+      message: 'Failed to extract JSON from LLM output for ' + stepName + ' — raw: ' + rawOutput.substring(0, 200),
+    });
+    throw new Error('JSON extraction failed for ' + stepName + ': ' + (jsonErr instanceof Error ? jsonErr.message : String(jsonErr)));
+  }
+
+  try {
+    const validated = validatePromptOutput(promptId, extracted);
+    return JSON.stringify(validated);
+  } catch (zodErr) {
+    let zodDetails = '';
+    if (zodErr && typeof zodErr === 'object' && 'issues' in zodErr) {
+      const issues = (zodErr as { issues: Array<{ path: (string | number)[]; message: string }> }).issues;
+      zodDetails = issues.map((i) => i.path.join('.') + ': ' + i.message).join('; ');
+    }
+    const keys = extracted && typeof extracted === 'object' ? Object.keys(extracted as Record<string, unknown>) : [];
+    await workflowLog(db, orgId, siteId, 'workflow.debug.validation_failed', {
+      step: stepName,
+      zod_details: zodDetails || null,
+      extracted_keys: keys,
+      extracted_preview: JSON.stringify(extracted).substring(0, 500),
+      message: 'Schema validation failed for ' + stepName + (zodDetails ? ': ' + zodDetails : '') + ' — keys: ' + keys.join(', '),
+    });
+    throw new Error('ZodError in ' + stepName + ': ' + (zodDetails || 'validation failed') + ' · Keys present: ' + keys.join(', '));
+  }
+}
+
+/**
  * Cloudflare Workflow for AI site generation.
  *
  * Deployed as `site-generation-workflow` and bound to `SITE_WORKFLOW`.
@@ -186,7 +245,6 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
     try {
       profileJson = await step.do('research-profile', RETRY_3, async () => {
         const { runPrompt } = await import('../services/ai_workflows.js');
-        const { validatePromptOutput } = await import('../prompts/schemas.js');
 
         const result = await runPrompt(env, 'research_profile', 1, {
           business_name: params.businessName,
@@ -196,27 +254,22 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           additional_context: params.additionalContext ?? '',
         });
 
-        const validated = validatePromptOutput('research_profile', extractJsonFromText(result.output));
-        return JSON.stringify(validated);
+        return safeValidateAndLog(env.DB, params.orgId, params.siteId, 'research-profile', 'research_profile', result.output, result.model);
       });
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
-      // Extract ZodError details for better debugging
-      let zodDetails = '';
-      if (err && typeof err === 'object' && 'issues' in err) {
-        const issues = (err as { issues: Array<{ path: (string | number)[]; message: string }> }).issues;
-        zodDetails = issues.map((i) => i.path.join('.') + ': ' + i.message).join('; ');
-      }
+      // The ZodError details are now in the error message itself (enriched inside step.do)
+      const isZod = errorMsg.includes('ZodError');
       await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.failed', {
         step: 'research-profile',
         error: errorMsg,
-        zod_details: zodDetails || null,
         elapsed_ms: elapsed('research-profile'),
-        message: 'Profile research failed: ' + (zodDetails ? 'Validation error — ' + zodDetails : errorMsg),
+        message: 'Profile research failed: ' + errorMsg,
         phase: 'data_collection',
         business_name: params.businessName,
         slug: params.slug,
         recoverable: false,
+        is_validation_error: isZod,
       });
       await updateSiteStatus(env.DB, params.siteId, 'error');
       throw err;
@@ -249,18 +302,16 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
 
     const socialJsonPromise = step.do('research-social', RETRY_3, async () => {
       const { runPrompt } = await import('../services/ai_workflows.js');
-      const { validatePromptOutput } = await import('../prompts/schemas.js');
       const result = await runPrompt(env, 'research_social', 1, {
         business_name: params.businessName,
         business_address: params.businessAddress ?? '',
         business_type: profile.business_type,
       });
-      return JSON.stringify(validatePromptOutput('research_social', extractJsonFromText(result.output)));
+      return safeValidateAndLog(env.DB, params.orgId, params.siteId, 'research-social', 'research_social', result.output, result.model);
     });
 
     const brandJsonPromise = step.do('research-brand', RETRY_3, async () => {
       const { runPrompt } = await import('../services/ai_workflows.js');
-      const { validatePromptOutput } = await import('../prompts/schemas.js');
       const result = await runPrompt(env, 'research_brand', 1, {
         business_name: params.businessName,
         business_type: profile.business_type,
@@ -268,12 +319,11 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
         website_url: '',
         additional_context: params.additionalContext ?? '',
       });
-      return JSON.stringify(validatePromptOutput('research_brand', extractJsonFromText(result.output)));
+      return safeValidateAndLog(env.DB, params.orgId, params.siteId, 'research-brand', 'research_brand', result.output, result.model);
     });
 
     const sellingPointsJsonPromise = step.do('research-selling-points', RETRY_3, async () => {
       const { runPrompt } = await import('../services/ai_workflows.js');
-      const { validatePromptOutput } = await import('../prompts/schemas.js');
       const result = await runPrompt(env, 'research_selling_points', 1, {
         business_name: params.businessName,
         business_type: profile.business_type,
@@ -281,14 +331,11 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
         description: profile.description,
         additional_context: params.additionalContext ?? '',
       });
-      return JSON.stringify(
-        validatePromptOutput('research_selling_points', extractJsonFromText(result.output)),
-      );
+      return safeValidateAndLog(env.DB, params.orgId, params.siteId, 'research-selling-points', 'research_selling_points', result.output, result.model);
     });
 
     const imagesJsonPromise = step.do('research-images', RETRY_3, async () => {
       const { runPrompt } = await import('../services/ai_workflows.js');
-      const { validatePromptOutput } = await import('../prompts/schemas.js');
       const result = await runPrompt(env, 'research_images', 1, {
         business_name: params.businessName,
         business_type: profile.business_type,
@@ -296,7 +343,7 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
         services_json: servicesJson,
         additional_context: params.additionalContext ?? '',
       });
-      return JSON.stringify(validatePromptOutput('research_images', extractJsonFromText(result.output)));
+      return safeValidateAndLog(env.DB, params.orgId, params.siteId, 'research-images', 'research_images', result.output, result.model);
     });
 
     let socialJson: string, brandJson: string, sellingPointsJson: string, imagesJson: string;
@@ -309,17 +356,11 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
       ]);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
-      let zodDetails = '';
-      if (err && typeof err === 'object' && 'issues' in err) {
-        const issues = (err as { issues: Array<{ path: (string | number)[]; message: string }> }).issues;
-        zodDetails = issues.map((i) => i.path.join('.') + ': ' + i.message).join('; ');
-      }
       await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.failed', {
         step: 'parallel-research',
         error: errorMsg,
-        zod_details: zodDetails || null,
         elapsed_ms: elapsed('parallel-research'),
-        message: 'Parallel research failed: ' + (zodDetails || errorMsg),
+        message: 'Parallel research failed: ' + errorMsg,
         phase: 'data_collection',
         business_name: params.businessName,
         slug: params.slug,

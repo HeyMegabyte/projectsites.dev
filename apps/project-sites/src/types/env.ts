@@ -133,6 +133,10 @@ export interface Env {
   // ── Metering ──────────────────────────────────────────────
   /** Metering provider identifier (e.g. `"lago"`, `"stripe"`). */
   METERING_PROVIDER?: string;
+
+  // ── Feature Flags ──────────────────────────────────────────
+  /** When "true", research.json is publicly accessible at /api/sites/by-slug/:slug/research.json */
+  RESEARCH_JSON_PUBLIC?: string;
 }
 
 /**

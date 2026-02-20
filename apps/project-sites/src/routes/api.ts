@@ -1207,6 +1207,61 @@ api.get('/api/sites/by-slug/:slug/chat', async (c) => {
   });
 });
 
+// ─── Research JSON (public or gated by env var) ──────────────
+
+/**
+ * Retrieve the AI-generated research JSON for a given site slug.
+ * Controlled by env.RESEARCH_JSON_PUBLIC: when "true", no auth required.
+ * Otherwise, requires authentication and org ownership.
+ */
+api.get('/api/sites/by-slug/:slug/research.json', async (c) => {
+  const slug = c.req.param('slug');
+  const isPublic = c.env.RESEARCH_JSON_PUBLIC === 'true';
+
+  if (!isPublic) {
+    const orgId = c.get('orgId');
+    if (!orgId) throw unauthorized('Research data requires authentication (or set RESEARCH_JSON_PUBLIC=true)');
+
+    // Verify the site belongs to the user's org
+    const site = await dbQueryOne<{ id: string }>(
+      c.env.DB,
+      'SELECT id FROM sites WHERE slug = ? AND org_id = ? AND deleted_at IS NULL',
+      [slug, orgId],
+    );
+    if (!site) throw notFound('Site not found');
+  }
+
+  // Read manifest to get current version
+  const manifest = await c.env.SITES_BUCKET.get(`sites/${slug}/_manifest.json`);
+  if (!manifest) throw notFound('Site not found or no version published');
+
+  const manifestData = (await manifest.json()) as { current_version: string };
+  if (!manifestData.current_version) throw notFound('No published version found');
+
+  // Try versioned path first, then direct research.json
+  let researchObj = await c.env.SITES_BUCKET.get(
+    `sites/${slug}/${manifestData.current_version}/research.json`,
+  );
+
+  if (!researchObj) {
+    // Fallback: check if research.json exists at the root of the site
+    researchObj = await c.env.SITES_BUCKET.get(`sites/${slug}/research.json`);
+  }
+
+  if (!researchObj) throw notFound('No research data found for this site');
+
+  const researchData = await researchObj.text();
+
+  return new Response(researchData, {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'public, max-age=300',
+      'Access-Control-Allow-Origin': '*',
+    },
+  });
+});
+
 // ─── Update Site (Title / Slug) ──────────────────────────────
 
 api.patch('/api/sites/:id', async (c) => {

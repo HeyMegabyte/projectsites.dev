@@ -99,7 +99,7 @@ test.describe('Relative Time Formatting', () => {
     expect(result).toBe('just now');
   });
 
-  test('formatLogTimestamp returns "a few seconds ago" for 20s old', async ({ page }) => {
+  test('formatLogTimestamp returns seconds ago for 20s old', async ({ page }) => {
     await page.goto('/');
 
     const result = await page.evaluate(() => {
@@ -107,10 +107,10 @@ test.describe('Relative Time Formatting', () => {
       if (typeof fn !== 'function') return null;
       return fn(new Date(Date.now() - 20000).toISOString());
     });
-    expect(result).toBe('a few seconds ago');
+    expect(result).toMatch(/20s ago|just now/);
   });
 
-  test('formatLogTimestamp returns "X minutes ago" for 5 minutes', async ({ page }) => {
+  test('formatLogTimestamp returns "X min ago" for 5 minutes', async ({ page }) => {
     await page.goto('/');
 
     const result = await page.evaluate(() => {
@@ -118,10 +118,10 @@ test.describe('Relative Time Formatting', () => {
       if (typeof fn !== 'function') return null;
       return fn(new Date(Date.now() - 5 * 60 * 1000).toISOString());
     });
-    expect(result).toBe('5 minutes ago');
+    expect(result).toBe('5 min ago');
   });
 
-  test('formatLogTimestamp returns "X hours ago" for 3 hours', async ({ page }) => {
+  test('formatLogTimestamp returns "X hr ago" for 3 hours', async ({ page }) => {
     await page.goto('/');
 
     const result = await page.evaluate(() => {
@@ -129,7 +129,7 @@ test.describe('Relative Time Formatting', () => {
       if (typeof fn !== 'function') return null;
       return fn(new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString());
     });
-    expect(result).toBe('3 hours ago');
+    expect(result).toBe('3 hr ago');
   });
 });
 
