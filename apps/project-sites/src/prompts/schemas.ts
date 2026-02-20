@@ -96,20 +96,20 @@ export type ResearchProfileInput = z.infer<typeof ResearchProfileInput>;
 
 export const ResearchProfileOutput = z.object({
   business_name: z.string(),
-  tagline: z.string().optional().default(''),
-  description: z.string().optional().default(''),
-  mission_statement: z.string().optional().default(''),
-  business_type: z.string().optional().default('general'),
+  tagline: z.string().nullable().optional().default(''),
+  description: z.string().nullable().optional().default(''),
+  mission_statement: z.string().nullable().optional().default(''),
+  business_type: z.string().nullable().optional().default('general'),
   services: z.array(z.object({
     name: z.string(),
-    description: z.string().optional().default(''),
+    description: z.string().nullable().optional().default(''),
     price_hint: z.string().nullable().optional().default(null),
   })).optional().default([]),
   hours: z.array(z.object({
     day: z.string(),
-    open: z.string().optional().default(''),
-    close: z.string().optional().default(''),
-    closed: z.boolean().optional().default(false),
+    open: z.string().nullable().optional().default(null),
+    close: z.string().nullable().optional().default(null),
+    closed: z.boolean().nullable().optional().default(false),
   })).optional().default([]),
   phone: z.string().nullable().optional().default(null),
   email: z.string().nullable().optional().default(null),
@@ -118,11 +118,11 @@ export const ResearchProfileOutput = z.object({
     city: z.string().nullable().optional().default(null),
     state: z.string().nullable().optional().default(null),
     zip: z.string().nullable().optional().default(null),
-    country: z.string().optional().default('US'),
+    country: z.string().nullable().optional().default('US'),
   }).optional().default({}),
-  faq: z.array(z.object({ question: z.string(), answer: z.string() })).optional().default([]),
-  seo_title: z.string().optional().default(''),
-  seo_description: z.string().optional().default(''),
+  faq: z.array(z.object({ question: z.string(), answer: z.string().nullable().optional().default('') })).optional().default([]),
+  seo_title: z.string().nullable().optional().default(''),
+  seo_description: z.string().nullable().optional().default(''),
 });
 export type ResearchProfileOutput = z.infer<typeof ResearchProfileOutput>;
 
@@ -139,7 +139,7 @@ export const ResearchSocialOutput = z.object({
   social_links: z.array(z.object({
     platform: z.string(),
     url: z.string().nullable(),
-    confidence: z.number().min(0).max(1),
+    confidence: z.number().min(0).max(1).nullable().optional().default(0.5),
   })).optional().default([]),
   website_url: z.string().nullable().optional().default(null),
   review_platforms: z.array(z.object({
