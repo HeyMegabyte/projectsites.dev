@@ -505,26 +505,59 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           html_content: html.substring(0, 6000),
           business_name: params.businessName,
         });
+
+        // Try JSON extraction first, fall back to text-based score parsing
+        let parsed: unknown;
+        try {
+          parsed = extractJsonFromText(result.output);
+        } catch (_jsonErr) {
+          // LLM returned plain text scores — extract decimal values
+          const text = result.output;
+          const extract = (label: string): number => {
+            const re = new RegExp(label + '[:\\s]*([0-9]+(\\.[0-9]+)?)', 'i');
+            const m = text.match(re);
+            return m ? Math.min(1, Math.max(0, parseFloat(m[1]) > 1 ? parseFloat(m[1]) / 100 : parseFloat(m[1]))) : 0.5;
+          };
+          parsed = {
+            scores: {
+              visual_design: extract('visual.design'),
+              content_quality: extract('content.quality'),
+              completeness: extract('completeness'),
+              responsiveness: extract('responsiveness'),
+              accessibility: extract('accessibility'),
+              seo: extract('seo'),
+              performance: extract('performance'),
+              brand_consistency: extract('brand.consistency'),
+            },
+            overall: extract('overall'),
+            issues: [],
+            suggestions: [],
+            missing_sections: [],
+          };
+          await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.debug.score_text_fallback', {
+            raw_preview: text.substring(0, 300),
+            parsed_overall: (parsed as Record<string, unknown>).overall,
+            message: 'Score step returned plain text — used regex fallback parser',
+          });
+        }
+
         return JSON.stringify(
-          validatePromptOutput('score_website', extractJsonFromText(result.output)),
+          validatePromptOutput('score_website', parsed),
         );
       },
     );
 
+    // Await legal pages (required) and scoring (optional — fallback to defaults)
     let privacyHtml: string, termsHtml: string, qualityJson: string;
     try {
-      [privacyHtml, termsHtml, qualityJson] = await Promise.all([
-        privacyPromise,
-        termsPromise,
-        qualityJsonPromise,
-      ]);
+      [privacyHtml, termsHtml] = await Promise.all([privacyPromise, termsPromise]);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.failed', {
-        step: 'legal-and-scoring',
+        step: 'legal-pages',
         error: errorMsg,
         elapsed_ms: elapsed('legal-scoring'),
-        message: 'Legal pages / quality scoring failed: ' + errorMsg,
+        message: 'Legal page generation failed: ' + errorMsg,
         phase: 'generation',
         business_name: params.businessName,
         slug: params.slug,
@@ -532,6 +565,18 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
       });
       await updateSiteStatus(env.DB, params.siteId, 'error');
       throw err;
+    }
+
+    // Scoring is non-blocking — if it fails, use default scores
+    try {
+      qualityJson = await qualityJsonPromise;
+    } catch (scoreErr) {
+      const scoreMsg = scoreErr instanceof Error ? scoreErr.message : String(scoreErr);
+      await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.debug.score_fallback', {
+        error: scoreMsg,
+        message: 'Quality scoring failed — using default scores',
+      });
+      qualityJson = JSON.stringify({ overall: 0.5, scores: {}, issues: [], suggestions: [], missing_sections: [] });
     }
 
     const quality = JSON.parse(qualityJson) as QualityData;
