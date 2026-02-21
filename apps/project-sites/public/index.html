@@ -891,17 +891,16 @@
       color: var(--text-muted);
     }
     .logs-toolbar .logs-refresh-btn {
-      background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(255,255,255,0.06);
-      border-radius: 6px;
-      color: var(--text-secondary);
+      background: transparent;
+      border: none;
+      border-radius: 4px;
+      color: var(--text-muted);
       cursor: pointer;
-      padding: 5px 12px;
-      font-size: 0.72rem;
-      font-weight: 500;
-      transition: border-color 0.2s, color 0.2s, background 0.2s;
+      padding: 4px;
+      line-height: 0;
+      transition: color 0.2s, background 0.2s;
     }
-    .logs-toolbar .logs-refresh-btn:hover { border-color: rgba(80,165,219,0.25); color: var(--accent); background: rgba(80,165,219,0.06); }
+    .logs-toolbar .logs-refresh-btn:hover { color: var(--accent); background: rgba(80,165,219,0.08); }
 
     .hostname-list {
       display: flex;
@@ -1900,6 +1899,35 @@
       from { opacity: 0; transform: translateX(-50%) translateY(4px); }
       to { opacity: 1; transform: translateX(-50%) translateY(0); }
     }
+
+    /* Universal tooltip system */
+    [data-tooltip] { position: relative; }
+    [data-tooltip]::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15,15,42,0.96);
+      color: var(--text-secondary);
+      font-size: 0.62rem;
+      font-weight: 400;
+      letter-spacing: 0;
+      padding: 5px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s;
+      z-index: 9999;
+      line-height: 1.3;
+    }
+    [data-tooltip]:hover::after { opacity: 1; }
+    [data-tooltip].tt-right::after { left: auto; right: 0; transform: none; }
+    [data-tooltip].tt-left::after { left: 0; right: auto; transform: none; }
+    [data-tooltip].tt-below::after { bottom: auto; top: calc(100% + 6px); }
+    [data-tooltip].tt-wide::after { white-space: normal; max-width: 220px; text-align: center; min-width: 120px; }
 
     /* Login page centered layout */
     .screen-signin-centered {
@@ -4408,7 +4436,7 @@
       </a>
       <div id="header-auth" class="header-auth">
         <span id="header-auth-user" class="header-auth-user" style="display:none;"></span>
-        <button id="header-auth-btn" class="header-auth-btn" onclick="handleHeaderAuth()">Sign In</button>
+        <button id="header-auth-btn" class="header-auth-btn" onclick="handleHeaderAuth()" data-tooltip="Sign in to manage sites">Sign In</button>
       </div>
     </div>
   </header>
@@ -4425,14 +4453,14 @@
           <span id="admin-credits-pill" class="credits-pill" style="display:none;"></span>
         </div>
         <div class="admin-panel-actions">
-          <button class="admin-btn" id="admin-refresh-btn" onclick="loadAdminDashboard()" title="Refresh">
+          <button class="admin-btn" id="admin-refresh-btn" onclick="loadAdminDashboard()" data-tooltip="Reload all sites" aria-label="Refresh dashboard">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
           </button>
-          <button class="admin-btn" id="admin-billing-btn" onclick="openBillingPortal()">
+          <button class="admin-btn" id="admin-billing-btn" onclick="openBillingPortal()" data-tooltip="Manage subscription" aria-label="Billing portal">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
             Billing
           </button>
-          <button class="admin-btn admin-btn-accent" onclick="openNewWebsiteModal()">
+          <button class="admin-btn admin-btn-accent" onclick="openNewWebsiteModal()" data-tooltip="Create a new website">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             New Website
           </button>
@@ -4478,9 +4506,9 @@
 
       <!-- Tabs -->
       <div class="domain-tabs" role="tablist" aria-label="Domain management tabs">
-        <button class="domain-tab active" id="domain-tab-existing" role="tab" aria-selected="true" aria-controls="domain-panel-existing" onclick="switchDomainTab('existing')">Your Domains</button>
-        <button class="domain-tab" id="domain-tab-connect" role="tab" aria-selected="false" aria-controls="domain-panel-connect" onclick="switchDomainTab('connect')">Connect Domain</button>
-        <button class="domain-tab" id="domain-tab-register" role="tab" aria-selected="false" aria-controls="domain-panel-register" onclick="switchDomainTab('register')">Register New</button>
+        <button class="domain-tab active" id="domain-tab-existing" role="tab" aria-selected="true" aria-controls="domain-panel-existing" onclick="switchDomainTab('existing')" data-tooltip="View connected domains">Your Domains</button>
+        <button class="domain-tab" id="domain-tab-connect" role="tab" aria-selected="false" aria-controls="domain-panel-connect" onclick="switchDomainTab('connect')" data-tooltip="Connect a domain you own">Connect Domain</button>
+        <button class="domain-tab" id="domain-tab-register" role="tab" aria-selected="false" aria-controls="domain-panel-register" onclick="switchDomainTab('register')" data-tooltip="Search and register a new domain">Register New</button>
       </div>
 
       <!-- Tab: Existing Domains -->
@@ -4495,7 +4523,7 @@
         <div class="hostname-add-form">
           <label for="domain-add-input" class="sr-only">Domain name</label>
           <input type="text" id="domain-add-input" inputmode="url" placeholder="www.mybusiness.com" onkeydown="if(event.key==='Enter'){event.preventDefault();addHostname();}" />
-          <button id="domain-add-btn" onclick="addHostname()">Add</button>
+          <button id="domain-add-btn" onclick="addHostname()" data-tooltip="Connect a custom domain">Add</button>
         </div>
         <div id="domain-connect-upgrade-cta" style="display:none;margin-top:14px;padding:14px 18px;background:linear-gradient(135deg,rgba(124,58,237,0.08),rgba(80,165,219,0.06));border:1px solid rgba(124,58,237,0.15);border-radius:10px;text-align:center;">
           <div style="font-size:0.82rem;font-weight:600;color:var(--text-primary);margin-bottom:4px;">Unlock Custom Domains</div>
@@ -4529,7 +4557,7 @@
       <div class="modal-title" style="display:flex;align-items:center;gap:8px;">
         <span id="files-modal-title" style="flex:1;">Files</span>
         <span id="files-count" style="font-size:0.68rem;color:var(--text-muted);"></span>
-        <button class="editor-toolbar-btn" onclick="loadFilesForSite()" title="Refresh file list"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Refresh</button>
+        <button class="editor-toolbar-btn" onclick="loadFilesForSite()" data-tooltip="Refresh file list" aria-label="Refresh file list"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Refresh</button>
         <button class="modal-close" onclick="closeFilesModal()">&times;</button>
       </div>
       <div id="files-toolbar" class="files-toolbar-compact">
@@ -4540,24 +4568,24 @@
       <!-- Inline file editor -->
       <div id="files-editor" style="display:none;flex:1;flex-direction:column;min-height:300px;margin-top:10px;">
         <div class="editor-toolbar">
-          <button class="editor-toolbar-btn" onclick="closeFileEditor()" title="Back to file list"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>Back</button>
+          <button class="editor-toolbar-btn" onclick="closeFileEditor()" data-tooltip="Back to file list" aria-label="Back to file list"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>Back</button>
           <span class="editor-toolbar-sep"></span>
           <!-- Filename display with inline rename (matches slug URL edit style) -->
           <div id="files-editor-name-wrap" style="display:flex;align-items:center;gap:4px;min-width:0;flex:1 1 auto;">
             <span id="files-editor-path-prefix" style="font-size:0.65rem;color:rgba(148,163,184,0.4);font-family:'SF Mono','Fira Code',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
-            <span id="files-editor-name" class="files-breadcrumb editor-filename" style="cursor:pointer;padding:2px 6px;border-radius:4px;border:1px solid transparent;transition:border-color 0.15s,background 0.15s;" onclick="startFileRename()" onmouseover="this.style.borderColor='rgba(80,165,219,0.2)';this.style.background='rgba(80,165,219,0.04)'" onmouseout="this.style.borderColor='transparent';this.style.background='transparent'" title="Click to rename"></span>
+            <span id="files-editor-name" class="files-breadcrumb editor-filename" style="cursor:pointer;padding:2px 6px;border-radius:4px;border:1px solid transparent;transition:border-color 0.15s,background 0.15s;" onclick="startFileRename()" onmouseover="this.style.borderColor='rgba(80,165,219,0.2)';this.style.background='rgba(80,165,219,0.04)'" onmouseout="this.style.borderColor='transparent';this.style.background='transparent'" data-tooltip="Click to rename"></span>
             <div id="files-rename-wrap" style="display:none;align-items:center;gap:3px;flex:1;min-width:0;">
               <input type="text" id="files-rename-input" style="background:rgba(80,165,219,0.04);border:1px solid rgba(80,165,219,0.25);color:var(--text-primary);font-size:0.72rem;font-family:'SF Mono','Fira Code',Consolas,monospace;padding:2px 6px;border-radius:4px;outline:none;min-width:100px;max-width:260px;flex:1;transition:border-color 0.2s,box-shadow 0.2s;" onfocus="this.style.borderColor='var(--accent)';this.style.boxShadow='0 0 0 2px rgba(80,165,219,0.12)'" onblur="this.style.borderColor='rgba(80,165,219,0.25)';this.style.boxShadow='none'" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmFileRename();}if(event.key==='Escape'){cancelFileRename();}" />
-              <button onclick="confirmFileRename()" title="Confirm" style="background:none;border:none;padding:2px;cursor:pointer;color:#22c55e;display:flex;align-items:center;transition:opacity 0.15s;" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></button>
-              <button onclick="cancelFileRename()" title="Cancel" style="background:none;border:none;padding:2px;cursor:pointer;color:#ef4444;display:flex;align-items:center;transition:opacity 0.15s;" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+              <button onclick="confirmFileRename()" data-tooltip="Save" aria-label="Confirm rename" style="background:none;border:none;padding:2px;cursor:pointer;color:#22c55e;display:flex;align-items:center;transition:opacity 0.15s;" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></button>
+              <button onclick="cancelFileRename()" data-tooltip="Cancel" aria-label="Cancel rename" style="background:none;border:none;padding:2px;cursor:pointer;color:#ef4444;display:flex;align-items:center;transition:opacity 0.15s;" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
             </div>
           </div>
           <span id="files-editor-size" style="font-size:0.68rem;color:var(--text-muted);"></span>
           <span class="editor-toolbar-sep"></span>
-          <button class="editor-toolbar-btn" onclick="editorWordWrap()" title="Toggle word wrap" id="editor-wrap-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M3 12h15a3 3 0 1 1 0 6h-4"/><polyline points="16 16 14 18 16 20"/><path d="M3 18h7"/></svg>Wrap</button>
+          <button class="editor-toolbar-btn" onclick="editorWordWrap()" data-tooltip="Toggle word wrap" aria-label="Toggle word wrap" id="editor-wrap-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M3 12h15a3 3 0 1 1 0 6h-4"/><polyline points="16 16 14 18 16 20"/><path d="M3 18h7"/></svg>Wrap</button>
           <span style="flex:1;"></span>
           <span id="files-editor-lang" style="font-size:0.65rem;color:var(--text-muted);padding:3px 8px;background:rgba(255,255,255,0.03);border-radius:4px;font-family:monospace;"></span>
-          <button class="btn btn-accent" id="files-save-btn" onclick="saveCurrentFile()" style="font-size:0.72rem;padding:5px 16px;border-radius:6px;font-weight:600;" title="Save file (Ctrl+S)">Save</button>
+          <button class="btn btn-accent" id="files-save-btn" onclick="saveCurrentFile()" style="font-size:0.72rem;padding:5px 16px;border-radius:6px;font-weight:600;" data-tooltip="Save file (Ctrl+S)" aria-label="Save file">Save</button>
         </div>
         <div class="code-editor-wrap" id="code-editor-wrap">
           <!-- CodeMirror mounts here when available; fallback to textarea otherwise -->
@@ -4603,12 +4631,14 @@
       </div>
       <div class="logs-toolbar">
         <span class="logs-count" id="logs-count-label"></span>
-        <button class="logs-refresh-btn" onclick="copyLogsForAI()" title="Copy logs in AI-friendly format">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px;margin-right:3px;"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy for AI
-        </button>
-        <button class="logs-refresh-btn" onclick="refreshSiteLogs()">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px;margin-right:3px;"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Refresh
-        </button>
+        <div style="display:flex;align-items:center;gap:4px;margin-left:auto;">
+          <button class="logs-refresh-btn" onclick="copyLogsForAI()" data-tooltip="Copy logs for AI" aria-label="Copy logs in AI-friendly format">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+          <button class="logs-refresh-btn" onclick="refreshSiteLogs()" data-tooltip="Refresh logs" aria-label="Refresh logs">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          </button>
+        </div>
       </div>
       <div class="logs-container" id="logs-container">
         <div class="logs-empty">Loading logs...</div>
@@ -4678,7 +4708,7 @@
   <!-- Details Modal (Describe your custom website) -->
   <div id="details-modal" class="details-modal-overlay" onclick="if(event.target===this)closeDetailsModal()">
     <div class="details-card">
-      <button class="details-modal-close" onclick="closeDetailsModal()" title="Close">&times;</button>
+      <button class="details-modal-close" onclick="closeDetailsModal()" data-tooltip="Close" aria-label="Close">&times;</button>
       <h2 id="details-title">Describe your custom website</h2>
       <p class="details-subtitle" id="details-subtitle">Include everything important for your website. We'll also search the web for public info about your business.</p>
 
@@ -4693,7 +4723,7 @@
           <div class="badge-name" id="badge-biz-name"></div>
           <div class="badge-addr" id="badge-biz-addr"></div>
         </div>
-        <button class="badge-dismiss" onclick="dismissBusinessBadge()" title="Remove selection">
+        <button class="badge-dismiss" onclick="dismissBusinessBadge()" data-tooltip="Clear selection" aria-label="Remove selected business">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
@@ -4719,13 +4749,13 @@
           <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(100,255,218,0.05);border:1px solid rgba(100,255,218,0.15);border-radius:var(--radius);font-size:0.72rem;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
             <span style="color:var(--text-secondary);flex:1;">Google Place ID: <a id="details-place-id-text" href="#" target="_blank" rel="noopener noreferrer" style="color:var(--accent);font-size:0.68rem;font-family:monospace;text-decoration:underline;text-underline-offset:2px;"></a></span>
-            <button onclick="removeGooglePlaceId()" title="Remove Google Place ID" aria-label="Remove Google Place ID" style="background:none;border:none;cursor:pointer;padding:2px;line-height:1;color:var(--text-muted);font-size:1rem;opacity:0.7;transition:opacity 0.2s;" onmouseover="this.style.opacity='1';this.style.color='var(--accent)'" onmouseout="this.style.opacity='0.7';this.style.color='var(--text-muted)'">&times;</button>
+            <button onclick="removeGooglePlaceId()" data-tooltip="Remove Place ID" aria-label="Remove Google Place ID" style="background:none;border:none;cursor:pointer;padding:2px;line-height:1;color:var(--text-muted);font-size:1rem;opacity:0.7;transition:opacity 0.2s;" onmouseover="this.style.opacity='1';this.style.color='var(--accent)'" onmouseout="this.style.opacity='0.7';this.style.color='var(--text-muted)'">&times;</button>
           </div>
         </div>
       </div>
 
       <div class="input-group" style="position:relative;">
-        <label for="details-textarea">Tell us about your business <a class="improve-ai-link" onclick="improveWithAI()" id="improve-ai-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg> Improve with AI</a></label>
+        <label for="details-textarea">Tell us about your business <a class="improve-ai-link" onclick="improveWithAI()" id="improve-ai-btn" data-tooltip="Let AI enhance your description"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg> Improve with AI</a></label>
         <div style="position:relative;">
           <textarea
             id="details-textarea"
@@ -5505,6 +5535,22 @@
       return labels[status] || status.charAt(0).toUpperCase() + status.slice(1);
     }
 
+    /** Map a site status to a tooltip description. */
+    function mapStatusTooltip(status) {
+      var tips = {
+        'published': 'Site is live and publicly accessible',
+        'building': 'Site is currently being built',
+        'queued': 'Waiting in the build queue',
+        'collecting': 'Gathering business data',
+        'generating': 'AI is generating site content',
+        'uploading': 'Uploading files to CDN',
+        'error': 'Build failed \u2014 check logs for details',
+        'failed': 'Build failed \u2014 check logs for details',
+        'draft': 'Not yet published'
+      };
+      return tips[status] || '';
+    }
+
     /** Map a site status to its CSS class. */
     function mapStatusClass(status) {
       if (status === 'failed') return 'error';
@@ -5651,16 +5697,17 @@
         var sitePlan = s.plan || 'free';
         html += '<div class="site-card-plan-row">';
         if (sitePlan === 'paid') {
-          html += '<span class="plan-badge paid">Paid</span>';
+          html += '<span class="plan-badge paid" data-tooltip="Custom domain enabled">Paid</span>';
         } else {
-          html += '<span class="plan-badge free">Free</span>';
-          html += '<button class="site-card-upgrade-btn" onclick="openSiteCheckout(\'' + escapeAttr(s.id) + '\')">Upgrade to Paid</button>';
+          html += '<span class="plan-badge free" data-tooltip="Upgrade for custom domains">Free</span>';
+          html += '<button class="site-card-upgrade-btn" onclick="openSiteCheckout(\'' + escapeAttr(s.id) + '\')" data-tooltip="Get a custom domain">Upgrade to Paid</button>';
         }
         html += '</div>';
 
         // Status badge + Site name row (status left of title)
         html += '<div class="site-card-title-row">';
-        html += '<div class="site-card-status ' + statusClass + '">';
+        var statusTip = mapStatusTooltip(status);
+        html += '<div class="site-card-status ' + statusClass + '"' + (statusTip ? ' data-tooltip="' + escapeAttr(statusTip) + '"' : '') + '>';
         if (status === 'published') html += '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
         if (status === 'building' || status === 'queued') html += '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>';
         if (status === 'error' || status === 'failed') html += '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
@@ -5668,7 +5715,7 @@
         // Site name — inline editable (click title to edit)
         html += '<div class="inline-edit-wrap" id="inline-name-' + s.id + '" style="flex:1;min-width:0;">';
         html += '<span class="inline-text site-card-name" tabindex="0" role="button" title="' + escapeHtml(name) + '" onclick="startInlineEdit(\'' + escapeJsString(s.id) + '\', \'name\', \'' + escapeJsString(name) + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();startInlineEdit(\'' + escapeJsString(s.id) + '\', \'name\', \'' + escapeJsString(name) + '\')}" style="cursor:pointer;">' + escapeHtml(name) + '</span>';
-        html += '<span class="inline-edit-actions"><button class="inline-edit-btn" onclick="startInlineEdit(\'' + escapeJsString(s.id) + '\', \'name\', \'' + escapeJsString(name) + '\')" title="Edit title" aria-label="Edit title"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button></span>';
+        html += '<span class="inline-edit-actions"><button class="inline-edit-btn" onclick="startInlineEdit(\'' + escapeJsString(s.id) + '\', \'name\', \'' + escapeJsString(name) + '\')" data-tooltip="Edit title" aria-label="Edit title"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button></span>';
         html += '</div>';
         html += '</div>';
 
@@ -5677,9 +5724,9 @@
           var cnameHost = slug + '-sites.megabyte.space';
           var cnameUrl = 'https://' + cnameHost;
           html += '<div class="site-card-url-row" id="inline-slug-wrap-' + s.id + '">';
-          html += '<span class="inline-slug-url status-default" id="inline-slug-url-' + s.id + '"><a class="slug-url-link" href="' + escapeAttr(cnameUrl) + '" target="_blank" onclick="event.stopPropagation()">https://</a><span class="inline-edit-wrap inline-edit-inline" id="inline-slug-' + s.id + '"><span class="inline-text slug-editable" tabindex="0" role="button" onclick="startInlineEdit(\'' + escapeJsString(s.id) + '\', \'slug\', \'' + escapeJsString(slug) + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();startInlineEdit(\'' + escapeJsString(s.id) + '\', \'slug\', \'' + escapeJsString(slug) + '\')}">' + escapeHtml(slug) + '</span></span><span class="inline-slug-actions"><button class="inline-edit-btn" onclick="startInlineEdit(\'' + escapeJsString(s.id) + '\', \'slug\', \'' + escapeJsString(slug) + '\')" title="Edit URL slug" aria-label="Edit URL slug"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button></span><a class="slug-url-link" href="' + escapeAttr(cnameUrl) + '" target="_blank" onclick="event.stopPropagation()">-sites.megabyte.space</a></span>';
-          html += '<button class="site-card-copy-btn" onclick="copyUrl(\'' + escapeAttr(cnameUrl) + '\', this)" title="Copy URL"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>';
-          html += '<button class="site-card-copy-btn" onclick="window.open(\'' + escapeAttr(cnameUrl) + '\', \'_blank\')" title="Open in new tab"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></button>';
+          html += '<span class="inline-slug-url status-default" id="inline-slug-url-' + s.id + '"><a class="slug-url-link" href="' + escapeAttr(cnameUrl) + '" target="_blank" onclick="event.stopPropagation()">https://</a><span class="inline-edit-wrap inline-edit-inline" id="inline-slug-' + s.id + '"><span class="inline-text slug-editable" tabindex="0" role="button" onclick="startInlineEdit(\'' + escapeJsString(s.id) + '\', \'slug\', \'' + escapeJsString(slug) + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();startInlineEdit(\'' + escapeJsString(s.id) + '\', \'slug\', \'' + escapeJsString(slug) + '\')}">' + escapeHtml(slug) + '</span></span><span class="inline-slug-actions"><button class="inline-edit-btn" onclick="startInlineEdit(\'' + escapeJsString(s.id) + '\', \'slug\', \'' + escapeJsString(slug) + '\')" data-tooltip="Edit URL slug" aria-label="Edit URL slug" aria-label="Edit URL slug"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button></span><a class="slug-url-link" href="' + escapeAttr(cnameUrl) + '" target="_blank" onclick="event.stopPropagation()">-sites.megabyte.space</a></span>';
+          html += '<button class="site-card-copy-btn" onclick="copyUrl(\'' + escapeAttr(cnameUrl) + '\', this)" data-tooltip="Copy URL" aria-label="Copy URL"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>';
+          html += '<button class="site-card-copy-btn" onclick="window.open(\'' + escapeAttr(cnameUrl) + '\', \'_blank\')" data-tooltip="Open in new tab" aria-label="Open in new tab"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></button>';
           html += '</div>';
           // If custom primary domain, show it separately
           var hasPrimaryCustom = s.primary_hostname && s.primary_hostname !== cnameHost;
@@ -5688,10 +5735,10 @@
             html += '<div class="site-card-url-row">';
             html += '<div class="site-card-domain"><a href="' + escapeHtml(primaryUrl) + '" target="_blank">' + escapeHtml(s.primary_hostname) + '</a></div>';
             if (s.has_premium_domain) {
-              html += '<span class="premium-domain-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>PREMIUM</span>';
+              html += '<span class="premium-domain-badge" data-tooltip="Premium domain included"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>PREMIUM</span>';
             }
-            html += '<button class="site-card-copy-btn" onclick="copyUrl(\'' + escapeAttr(primaryUrl) + '\', this)" title="Copy URL"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>';
-            html += '<button class="site-card-copy-btn" onclick="window.open(\'' + escapeAttr(primaryUrl) + '\', \'_blank\')" title="Open in new tab"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></button>';
+            html += '<button class="site-card-copy-btn" onclick="copyUrl(\'' + escapeAttr(primaryUrl) + '\', this)" data-tooltip="Copy URL" aria-label="Copy URL"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>';
+            html += '<button class="site-card-copy-btn" onclick="window.open(\'' + escapeAttr(primaryUrl) + '\', \'_blank\')" data-tooltip="Open in new tab" aria-label="Open in new tab"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></button>';
             html += '</div>';
           }
         }
@@ -5709,17 +5756,17 @@
         // Action buttons — Row 1: primary actions
         html += '<div class="site-card-actions">';
         if (status === 'published' && siteUrl) {
-          html += '<button class="site-card-btn btn-visit" onclick="window.open(\'' + escapeJsString(siteUrl) + '\', \'_blank\')">Visit</button>';
+          html += '<button class="site-card-btn btn-visit" onclick="window.open(\'' + escapeJsString(siteUrl) + '\', \'_blank\')" data-tooltip="Open live site">Visit</button>';
         }
         if (status === 'published' && slug) {
-          html += '<button class="site-card-btn" onclick="editSiteInBolt(\'' + escapeJsString(slug) + '\')" title="Edit in AI Editor">AI Edit</button>';
+          html += '<button class="site-card-btn" onclick="editSiteInBolt(\'' + escapeJsString(slug) + '\')" data-tooltip="Edit in AI code editor">AI Edit</button>';
         }
-        html += '<button class="site-card-btn" onclick="openDomainModal(\'' + escapeJsString(s.id) + '\', \'' + escapeJsString(name) + '\', \'' + escapeJsString(slug) + '\')">Domains</button>';
+        html += '<button class="site-card-btn" onclick="openDomainModal(\'' + escapeJsString(s.id) + '\', \'' + escapeJsString(name) + '\', \'' + escapeJsString(slug) + '\')" data-tooltip="Manage custom domains">Domains</button>';
         html += '</div>';
         // Action buttons — Row 2: management dropdown
         html += '<div class="site-card-actions">';
-        html += '<button class="site-card-btn" onclick="openFilesModal(\'' + escapeJsString(s.id) + '\', \'' + escapeJsString(name) + '\', \'' + escapeJsString(slug) + '\')">Files</button>';
-        html += '<button class="site-card-btn" onclick="openSiteLogsModal(\'' + escapeJsString(s.id) + '\', \'' + escapeJsString(name) + '\')">Logs</button>';
+        html += '<button class="site-card-btn" onclick="openFilesModal(\'' + escapeJsString(s.id) + '\', \'' + escapeJsString(name) + '\', \'' + escapeJsString(slug) + '\')" data-tooltip="Browse and edit files">Files</button>';
+        html += '<button class="site-card-btn" onclick="openSiteLogsModal(\'' + escapeJsString(s.id) + '\', \'' + escapeJsString(name) + '\')" data-tooltip="View build logs">Logs</button>';
         // "More" dropdown for less-frequent actions
         html += '<div class="site-card-dropdown-wrap">';
         html += '<button class="site-card-btn" onclick="toggleCardDropdown(this.parentNode)">More <svg class="dd-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></button>';
@@ -5870,15 +5917,15 @@
             html += '<div style="flex:1;min-width:0;">';
             // URL row — independent slug editing (uses 'dm' context to avoid touching homepage card)
             html += '<div style="display:flex;align-items:center;gap:4px;">';
-            html += '<span class="inline-slug-url status-default" id="dm-slug-url" style="font-size:0.78rem;"><a class="slug-url-link" href="' + escapeAttr(cnameUrl) + '" target="_blank" onclick="event.stopPropagation()">https://</a><span class="inline-edit-wrap inline-edit-inline" id="dm-slug-edit"><span class="inline-text slug-editable" tabindex="0" role="button" onclick="startInlineEdit(\'' + escapeJsString(adminDomainModalSiteId) + '\', \'slug\', \'' + escapeJsString(adminDomainModalSlug) + '\', \'dm\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();startInlineEdit(\'' + escapeJsString(adminDomainModalSiteId) + '\', \'slug\', \'' + escapeJsString(adminDomainModalSlug) + '\', \'dm\')}">' + escapeHtml(adminDomainModalSlug) + '</span></span><span class="inline-slug-actions"><button class="inline-edit-btn" onclick="startInlineEdit(\'' + escapeJsString(adminDomainModalSiteId) + '\', \'slug\', \'' + escapeJsString(adminDomainModalSlug) + '\', \'dm\')" title="Edit URL slug" aria-label="Edit URL slug"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button></span><a class="slug-url-link" href="' + escapeAttr(cnameUrl) + '" target="_blank" onclick="event.stopPropagation()">-sites.megabyte.space</a></span>';
-            html += '<button class="site-card-copy-btn" onclick="copyUrl(\'' + escapeAttr(cnameUrl) + '\', this)" title="Copy URL" style="position:relative;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>';
-            html += '<button class="site-card-copy-btn" onclick="window.open(\'' + escapeAttr(cnameUrl) + '\', \'_blank\')" title="Open in new tab"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></button>';
+            html += '<span class="inline-slug-url status-default" id="dm-slug-url" style="font-size:0.78rem;"><a class="slug-url-link" href="' + escapeAttr(cnameUrl) + '" target="_blank" onclick="event.stopPropagation()">https://</a><span class="inline-edit-wrap inline-edit-inline" id="dm-slug-edit"><span class="inline-text slug-editable" tabindex="0" role="button" onclick="startInlineEdit(\'' + escapeJsString(adminDomainModalSiteId) + '\', \'slug\', \'' + escapeJsString(adminDomainModalSlug) + '\', \'dm\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();startInlineEdit(\'' + escapeJsString(adminDomainModalSiteId) + '\', \'slug\', \'' + escapeJsString(adminDomainModalSlug) + '\', \'dm\')}">' + escapeHtml(adminDomainModalSlug) + '</span></span><span class="inline-slug-actions"><button class="inline-edit-btn" onclick="startInlineEdit(\'' + escapeJsString(adminDomainModalSiteId) + '\', \'slug\', \'' + escapeJsString(adminDomainModalSlug) + '\', \'dm\')" data-tooltip="Edit URL slug" aria-label="Edit URL slug" aria-label="Edit URL slug"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button></span><a class="slug-url-link" href="' + escapeAttr(cnameUrl) + '" target="_blank" onclick="event.stopPropagation()">-sites.megabyte.space</a></span>';
+            html += '<button class="site-card-copy-btn" onclick="copyUrl(\'' + escapeAttr(cnameUrl) + '\', this)" data-tooltip="Copy URL" aria-label="Copy URL" style="position:relative;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>';
+            html += '<button class="site-card-copy-btn" onclick="window.open(\'' + escapeAttr(cnameUrl) + '\', \'_blank\')" data-tooltip="Open in new tab" aria-label="Open in new tab"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></button>';
             html += '</div>';
             // Chips below URL
             html += '<div class="hostname-chips">';
             html += '<span class="hostname-chip default" data-tip="Default URL for this site">Default</span>';
             if (cnameIsPrimary) html += '<span class="hostname-chip primary" data-tip="Your main URL. All other domains redirect here.">Primary</span>';
-            else html += '<button class="hostname-chip-setprimary" onclick="resetPrimaryToDefault(\'' + escapeAttr(adminDomainModalSiteId) + '\')">Set as primary</button>';
+            else html += '<button class="hostname-chip-setprimary" onclick="resetPrimaryToDefault(\'' + escapeAttr(adminDomainModalSiteId) + '\')" data-tooltip="Make this your default URL">Set as primary</button>';
             html += '</div>';
             html += '</div>';
             html += '</div>';
@@ -5920,7 +5967,8 @@
             var hasDomainSub = (h.type === 'custom_cname');
             html += '<div class="hostname-item">';
             // Green/yellow/red status square
-            html += '<span class="hostname-status-square ' + (isVerified ? 'active' : (isPending ? 'pending' : 'inactive')) + '">';
+            var hStatusTip = isVerified ? 'Domain verified and active' : (isPending ? 'DNS verification pending' : 'Domain inactive');
+            html += '<span class="hostname-status-square ' + (isVerified ? 'active' : (isPending ? 'pending' : 'inactive')) + '" data-tooltip="' + hStatusTip + '">';
             if (isVerified) {
               html += '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
             } else if (isPending) {
@@ -5933,7 +5981,7 @@
             html += '<div class="hostname-item-name" style="display:flex;align-items:center;gap:6px;">';
             html += '<a href="' + escapeHtml(url) + '" target="_blank" style="color:var(--text-primary);text-decoration:none;">' + escapeHtml(h.hostname) + '</a>';
             if (hasDomainSub) {
-              html += '<span class="premium-domain-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>PREMIUM</span>';
+              html += '<span class="premium-domain-badge" data-tooltip="Premium domain included"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>PREMIUM</span>';
             }
             html += '</div>';
             // CNAME verification status for pending custom domains
@@ -5949,7 +5997,7 @@
               var gdUrl = 'https://dcc.godaddy.com/manage/v2/domainTemplates/providers/megabyte.space/services/cname/apply?domain=' + encodeURIComponent(dcDomain) + dcHostParam;
               html += '<div style="display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap;">';
               html += '<span style="font-size:0.6rem;color:var(--text-muted);">One-click setup:</span>';
-              html += '<a href="' + escapeAttr(gdUrl) + '" target="_blank" rel="noopener" class="dc-btn dc-btn-gd" title="Auto-configure CNAME via GoDaddy DomainConnect">';
+              html += '<a href="' + escapeAttr(gdUrl) + '" target="_blank" rel="noopener" class="dc-btn dc-btn-gd" data-tooltip="Auto-configure DNS via GoDaddy">';
               html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>';
               html += 'GoDaddy</a>';
               html += '</div>';
@@ -5960,22 +6008,22 @@
             // Chips below URL
             html += '<div class="hostname-chips">';
             if (isPrimary) html += '<span class="hostname-chip primary" data-tip="Your main URL. All other domains redirect here.">Primary</span>';
-            else html += '<button class="hostname-chip-setprimary" onclick="setPrimaryHostname(\'' + escapeAttr(adminDomainModalSiteId) + '\', \'' + escapeAttr(h.id) + '\')">Set as primary</button>';
+            else html += '<button class="hostname-chip-setprimary" onclick="setPrimaryHostname(\'' + escapeAttr(adminDomainModalSiteId) + '\', \'' + escapeAttr(h.id) + '\')" data-tooltip="Make this your default URL">Set as primary</button>';
             html += '</div>';
             html += '</div>';
             html += '<div style="display:flex;align-items:center;gap:4px;">';
             // Re-verify button for pending/failed hostnames
             if (isPending) {
-              html += '<button class="hostname-delete-btn" onclick="verifyHostname(\'' + escapeAttr(h.id) + '\')" title="Re-verify domain" style="color:#22c55e;">';
+              html += '<button class="hostname-delete-btn" onclick="verifyHostname(\'' + escapeAttr(h.id) + '\')" data-tooltip="Re-verify DNS" aria-label="Re-verify domain" style="color:#22c55e;">';
               html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>';
               html += '</button>';
             }
             if (hasDomainSub) {
-              html += '<button class="hostname-delete-btn" onclick="unsubscribeDomain(\'' + escapeAttr(adminDomainModalSiteId) + '\', \'' + escapeAttr(h.id) + '\', \'' + escapeAttr(h.hostname) + '\')" title="Unsubscribe & remove domain" style="color:#fbbf24;">';
+              html += '<button class="hostname-delete-btn" onclick="unsubscribeDomain(\'' + escapeAttr(adminDomainModalSiteId) + '\', \'' + escapeAttr(h.id) + '\', \'' + escapeAttr(h.hostname) + '\')" data-tooltip="Unsubscribe domain" aria-label="Unsubscribe and remove domain" style="color:#fbbf24;">';
               html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>';
               html += '</button>';
             }
-            html += '<button class="hostname-delete-btn" onclick="deleteHostnameWithWarning(\'' + escapeAttr(adminDomainModalSiteId) + '\', \'' + escapeAttr(h.id) + '\', \'' + escapeAttr(h.hostname) + '\', ' + (hasDomainSub ? 'true' : 'false') + ')" title="Remove">';
+            html += '<button class="hostname-delete-btn" onclick="deleteHostnameWithWarning(\'' + escapeAttr(adminDomainModalSiteId) + '\', \'' + escapeAttr(h.id) + '\', \'' + escapeAttr(h.hostname) + '\', ' + (hasDomainSub ? 'true' : 'false') + ')" data-tooltip="Remove domain" aria-label="Remove domain">';
             html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
             html += '</button>';
             html += '</div>';
@@ -8125,8 +8173,8 @@
         urlEl.className = 'inline-slug-url status-default';
         urlEl.innerHTML = 'https://<input type="text" class="inline-input slug-input" id="' + getSlugElId('input', siteId, ctx) + '" value="' + escapeHtml(currentValue) + '" maxlength="100" />'
           + '<span class="inline-slug-actions">'
-          + '<button class="inline-save-btn" id="' + getSlugElId('save', siteId, ctx) + '" onclick="saveInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(currentValue) + '\'' + ctxArg + ')" title="Save" aria-label="Save"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>'
-          + '<button class="inline-cancel-btn" onclick="cancelInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(currentValue) + '\'' + ctxArg + ')" title="Cancel" aria-label="Cancel"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>'
+          + '<button class="inline-save-btn" id="' + getSlugElId('save', siteId, ctx) + '" onclick="saveInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(currentValue) + '\'' + ctxArg + ')" data-tooltip="Save" aria-label="Save"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>'
+          + '<button class="inline-cancel-btn" onclick="cancelInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(currentValue) + '\'' + ctxArg + ')" data-tooltip="Cancel" aria-label="Cancel"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>'
           + '</span>-sites.megabyte.space';
       } else {
         // For name: replace the wrap content with input + save/cancel in fixed action zone
@@ -8134,8 +8182,8 @@
         if (!wrap) return;
         wrap.innerHTML = '<input type="text" class="inline-input" id="inline-input-name-' + siteId + '" value="' + escapeHtml(currentValue) + '" maxlength="200" />'
           + '<span class="inline-edit-actions">'
-          + '<button class="inline-save-btn" id="inline-save-name-' + siteId + '" onclick="saveInlineEdit(\'' + escapeJsString(siteId) + '\', \'name\', \'' + escapeJsString(currentValue) + '\')" title="Save" aria-label="Save"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>'
-          + '<button class="inline-cancel-btn" onclick="cancelInlineEdit(\'' + escapeJsString(siteId) + '\', \'name\', \'' + escapeJsString(currentValue) + '\')" title="Cancel" aria-label="Cancel"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>'
+          + '<button class="inline-save-btn" id="inline-save-name-' + siteId + '" onclick="saveInlineEdit(\'' + escapeJsString(siteId) + '\', \'name\', \'' + escapeJsString(currentValue) + '\')" data-tooltip="Save" aria-label="Save"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>'
+          + '<button class="inline-cancel-btn" onclick="cancelInlineEdit(\'' + escapeJsString(siteId) + '\', \'name\', \'' + escapeJsString(currentValue) + '\')" data-tooltip="Cancel" aria-label="Cancel"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>'
           + '</span>';
       }
 
@@ -8300,21 +8348,21 @@
         var urlEl = document.getElementById(getSlugElId('url', siteId, ctx));
         if (urlEl) {
           urlEl.className = 'inline-slug-url status-default';
-          urlEl.innerHTML = 'https://<span class="inline-edit-wrap inline-edit-inline" id="' + getSlugElId('edit', siteId, ctx) + '"><span class="inline-text slug-editable" tabindex="0" role="button" onclick="startInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(originalValue) + '\'' + ctxArg + ')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();startInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(originalValue) + '\'' + ctxArg + ')}">' + escapeHtml(originalValue) + '</span></span><span class="inline-slug-actions"><button class="inline-edit-btn" onclick="startInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(originalValue) + '\'' + ctxArg + ')" title="Edit URL slug" aria-label="Edit URL slug"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button></span>-sites.megabyte.space';
+          urlEl.innerHTML = 'https://<span class="inline-edit-wrap inline-edit-inline" id="' + getSlugElId('edit', siteId, ctx) + '"><span class="inline-text slug-editable" tabindex="0" role="button" onclick="startInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(originalValue) + '\'' + ctxArg + ')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();startInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(originalValue) + '\'' + ctxArg + ')}">' + escapeHtml(originalValue) + '</span></span><span class="inline-slug-actions"><button class="inline-edit-btn" onclick="startInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(originalValue) + '\'' + ctxArg + ')" data-tooltip="Edit URL slug" aria-label="Edit URL slug" aria-label="Edit URL slug"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button></span>-sites.megabyte.space';
         }
         // If editing from domain modal, also refresh homepage card slug display
         if (ctx === 'dm') {
           var homeUrlEl = document.getElementById('inline-slug-url-' + siteId);
           if (homeUrlEl) {
             homeUrlEl.className = 'inline-slug-url status-default';
-            homeUrlEl.innerHTML = 'https://<span class="inline-edit-wrap inline-edit-inline" id="inline-slug-' + siteId + '"><span class="inline-text slug-editable" tabindex="0" role="button" onclick="startInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(originalValue) + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();startInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(originalValue) + '\')}">' + escapeHtml(originalValue) + '</span></span><span class="inline-slug-actions"><button class="inline-edit-btn" onclick="startInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(originalValue) + '\')" title="Edit URL slug" aria-label="Edit URL slug"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button></span>-sites.megabyte.space';
+            homeUrlEl.innerHTML = 'https://<span class="inline-edit-wrap inline-edit-inline" id="inline-slug-' + siteId + '"><span class="inline-text slug-editable" tabindex="0" role="button" onclick="startInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(originalValue) + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();startInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(originalValue) + '\')}">' + escapeHtml(originalValue) + '</span></span><span class="inline-slug-actions"><button class="inline-edit-btn" onclick="startInlineEdit(\'' + escapeJsString(siteId) + '\', \'slug\', \'' + escapeJsString(originalValue) + '\')" data-tooltip="Edit URL slug" aria-label="Edit URL slug" aria-label="Edit URL slug"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button></span>-sites.megabyte.space';
           }
         }
       } else {
         var wrap = document.getElementById('inline-name-' + siteId);
         if (!wrap) return;
         wrap.innerHTML = '<span class="inline-text site-card-name" tabindex="0" role="button" title="' + escapeHtml(originalValue) + '" onclick="startInlineEdit(\'' + escapeJsString(siteId) + '\', \'name\', \'' + escapeJsString(originalValue) + '\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();startInlineEdit(\'' + escapeJsString(siteId) + '\', \'name\', \'' + escapeJsString(originalValue) + '\')}" style="cursor:pointer;">' + escapeHtml(originalValue) + '</span>'
-          + '<span class="inline-edit-actions"><button class="inline-edit-btn" onclick="startInlineEdit(\'' + escapeJsString(siteId) + '\', \'name\', \'' + escapeJsString(originalValue) + '\')" title="Edit title" aria-label="Edit title"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button></span>';
+          + '<span class="inline-edit-actions"><button class="inline-edit-btn" onclick="startInlineEdit(\'' + escapeJsString(siteId) + '\', \'name\', \'' + escapeJsString(originalValue) + '\')" data-tooltip="Edit title" aria-label="Edit title"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button></span>';
       }
     }
 
@@ -9507,9 +9555,9 @@
       var html = renderFolderNode(tree, '', 0);
       // Action buttons at bottom (centered)
       html += '<div style="display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border-top:1px solid rgba(255,255,255,0.06);">';
-      html += '<button class="editor-toolbar-btn" style="color:#22c55e;padding:5px 14px;font-size:0.74rem;" onclick="promptNewFile()" title="Create a new file"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="margin-right:4px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New File</button>';
-      html += '<button class="editor-toolbar-btn" style="color:var(--accent);padding:5px 14px;font-size:0.74rem;" onclick="promptNewFolder(\'\')" title="Create a new folder"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="margin-right:4px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>New Folder</button>';
-      html += '<button class="editor-toolbar-btn" style="color:#a78bfa;padding:5px 14px;font-size:0.74rem;" onclick="triggerFileUpload(\'\')" title="Upload files"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="margin-right:4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Upload</button>';
+      html += '<button class="editor-toolbar-btn" style="color:#22c55e;padding:5px 14px;font-size:0.74rem;" onclick="promptNewFile()" data-tooltip="Create a new file"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="margin-right:4px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New File</button>';
+      html += '<button class="editor-toolbar-btn" style="color:var(--accent);padding:5px 14px;font-size:0.74rem;" onclick="promptNewFolder(\'\')" data-tooltip="Create a new folder"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="margin-right:4px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>New Folder</button>';
+      html += '<button class="editor-toolbar-btn" style="color:#a78bfa;padding:5px 14px;font-size:0.74rem;" onclick="triggerFileUpload(\'\')" data-tooltip="Upload files"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="margin-right:4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Upload</button>';
       html += '</div>';
       list.innerHTML = html;
     }
@@ -9536,9 +9584,9 @@
         if (grayed) html += '<span style="font-size:0.58rem;color:var(--text-muted);padding:1px 5px;border:1px solid var(--border);border-radius:3px;">Click to expand</span>';
         // Folder actions: new folder, upload, delete
         html += '<span style="display:flex;gap:2px;flex-shrink:0;" onclick="event.stopPropagation()">';
-        html += '<button onclick="promptNewFolder(\'' + escapeAttr(folderPath + '/') + '\')" title="New subfolder" style="background:none;border:none;padding:2px;cursor:pointer;color:var(--text-muted);transition:color 0.15s;display:flex;align-items:center;" onmouseover="this.style.color=\'var(--accent)\'" onmouseout="this.style.color=\'var(--text-muted)\'"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg></button>';
-        html += '<button onclick="triggerFileUpload(\'' + escapeAttr(folderPath) + '\')" title="Upload to folder" style="background:none;border:none;padding:2px;cursor:pointer;color:var(--text-muted);transition:color 0.15s;display:flex;align-items:center;" onmouseover="this.style.color=\'#a78bfa\'" onmouseout="this.style.color=\'var(--text-muted)\'"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></button>';
-        html += '<button onclick="confirmDeleteFolder(\'' + escapeAttr(folderPath + '/') + '\', \'' + escapeAttr(fname) + '\')" title="Delete folder" style="background:none;border:none;padding:2px;cursor:pointer;color:var(--text-muted);transition:color 0.15s;display:flex;align-items:center;" onmouseover="this.style.color=\'#ef4444\'" onmouseout="this.style.color=\'var(--text-muted)\'"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
+        html += '<button onclick="promptNewFolder(\'' + escapeAttr(folderPath + '/') + '\')" data-tooltip="New subfolder" style="background:none;border:none;padding:2px;cursor:pointer;color:var(--text-muted);transition:color 0.15s;display:flex;align-items:center;" onmouseover="this.style.color=\'var(--accent)\'" onmouseout="this.style.color=\'var(--text-muted)\'"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg></button>';
+        html += '<button onclick="triggerFileUpload(\'' + escapeAttr(folderPath) + '\')" data-tooltip="Upload to folder" style="background:none;border:none;padding:2px;cursor:pointer;color:var(--text-muted);transition:color 0.15s;display:flex;align-items:center;" onmouseover="this.style.color=\'#a78bfa\'" onmouseout="this.style.color=\'var(--text-muted)\'"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></button>';
+        html += '<button onclick="confirmDeleteFolder(\'' + escapeAttr(folderPath + '/') + '\', \'' + escapeAttr(fname) + '\')" data-tooltip="Delete folder" style="background:none;border:none;padding:2px;cursor:pointer;color:var(--text-muted);transition:color 0.15s;display:flex;align-items:center;" onmouseover="this.style.color=\'#ef4444\'" onmouseout="this.style.color=\'var(--text-muted)\'"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
         html += '</span>';
         html += '</div>';
 
@@ -9559,7 +9607,7 @@
         html += '<span style="flex:1;font-size:0.76rem;font-family:\'SF Mono\',\'Fira Code\',monospace;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(fileName) + '</span>';
         html += '<span style="font-size:0.65rem;color:var(--text-muted);flex-shrink:0;">' + sizeStr + '</span>';
         if (isEditable) html += '<span style="font-size:0.56rem;color:rgba(148,163,184,0.5);flex-shrink:0;letter-spacing:0.03em;">editable</span>';
-        html += '<button onclick="event.stopPropagation();confirmDeleteFile(\'' + escapeAttr(f.key) + '\', \'' + escapeAttr(fileName) + '\')" title="Delete file" style="flex-shrink:0;background:none;border:1px solid rgba(239,68,68,0.15);border-radius:4px;padding:2px 4px;cursor:pointer;color:var(--text-muted);transition:all 0.15s;display:flex;align-items:center;" onmouseover="this.style.color=\'#ef4444\';this.style.borderColor=\'rgba(239,68,68,0.4)\'" onmouseout="this.style.color=\'var(--text-muted)\';this.style.borderColor=\'rgba(239,68,68,0.15)\'"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
+        html += '<button onclick="event.stopPropagation();confirmDeleteFile(\'' + escapeAttr(f.key) + '\', \'' + escapeAttr(fileName) + '\')" data-tooltip="Delete file" style="flex-shrink:0;background:none;border:1px solid rgba(239,68,68,0.15);border-radius:4px;padding:2px 4px;cursor:pointer;color:var(--text-muted);transition:all 0.15s;display:flex;align-items:center;" onmouseover="this.style.color=\'#ef4444\';this.style.borderColor=\'rgba(239,68,68,0.4)\'" onmouseout="this.style.color=\'var(--text-muted)\';this.style.borderColor=\'rgba(239,68,68,0.15)\'"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
         html += '</div>';
       }
       return html;
