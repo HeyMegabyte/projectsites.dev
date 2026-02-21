@@ -172,6 +172,29 @@ describe('GET /api/sites/by-slug/:slug/chat', () => {
     expect(res.status).toBe(404);
   });
 
+  it('falls back to root chat.json when _meta/chat.json is missing', async () => {
+    const r2Get = jest.fn()
+      .mockImplementation((key: string) => {
+        if (key === 'sites/root-chat/_manifest.json') {
+          return Promise.resolve(createMockR2Object({ current_version: 'v1' }));
+        }
+        if (key === 'sites/root-chat/v1/_meta/chat.json') {
+          return Promise.resolve(null); // _meta not found
+        }
+        if (key === 'sites/root-chat/v1/chat.json') {
+          return Promise.resolve(createMockR2Object(validChatData)); // found in root
+        }
+        return Promise.resolve(null);
+      });
+
+    const { app, env } = createApp(r2Get);
+    const res = await app.request('/api/sites/by-slug/root-chat/chat', {}, env);
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.messages).toHaveLength(2);
+  });
+
   it('returns 404 when chat.json does not exist in R2', async () => {
     const r2Get = jest.fn()
       .mockImplementation((key: string) => {

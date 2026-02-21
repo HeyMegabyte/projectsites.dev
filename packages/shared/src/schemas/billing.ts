@@ -77,6 +77,19 @@ export const createCheckoutSessionSchema = z.object({
 });
 
 /**
+ * Validation schema for creating an **embedded** Stripe Checkout session.
+ *
+ * Uses `ui_mode: 'embedded'` so the checkout form renders inline on the page
+ * via Stripe.js `initEmbeddedCheckout()`. Requires a `return_url` with a
+ * `{CHECKOUT_SESSION_ID}` placeholder that Stripe replaces on completion.
+ */
+export const createEmbeddedCheckoutSchema = z.object({
+  org_id: uuidSchema,
+  site_id: uuidSchema.optional(),
+  return_url: z.string().url().max(2048),
+});
+
+/**
  * Tuple of Stripe webhook event types that the system processes.
  *
  * Used to filter incoming Stripe webhooks to only the events the billing
@@ -145,6 +158,9 @@ export type Subscription = z.infer<typeof subscriptionSchema>;
 
 /** Inferred TypeScript type for the create-checkout-session request payload. */
 export type CreateCheckoutSession = z.infer<typeof createCheckoutSessionSchema>;
+
+/** Inferred TypeScript type for the embedded-checkout request payload. */
+export type CreateEmbeddedCheckout = z.infer<typeof createEmbeddedCheckoutSchema>;
 
 /** Inferred TypeScript type for the entitlements response object. */
 export type Entitlements = z.infer<typeof entitlementsSchema>;

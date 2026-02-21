@@ -13,7 +13,7 @@ import {
 } from '../schemas/base';
 import { createOrgSchema, membershipSchema } from '../schemas/org';
 import { createSiteSchema, siteSchema } from '../schemas/site';
-import { createCheckoutSessionSchema, entitlementsSchema, saleWebhookPayloadSchema } from '../schemas/billing';
+import { createCheckoutSessionSchema, createEmbeddedCheckoutSchema, entitlementsSchema, saleWebhookPayloadSchema } from '../schemas/billing';
 import { createMagicLinkSchema, googleOAuthCallbackSchema } from '../schemas/auth';
 import { createAuditLogSchema } from '../schemas/audit';
 import { webhookIngestionSchema } from '../schemas/webhook';
@@ -332,6 +332,47 @@ describe('createCheckoutSessionSchema', () => {
         org_id: validUuid,
         success_url: 'not-a-url',
         cancel_url: 'https://example.com/cancel',
+      }),
+    ).toThrow();
+  });
+});
+
+describe('createEmbeddedCheckoutSchema', () => {
+  const validUuid = '00000000-0000-4000-8000-000000000001';
+
+  it('accepts valid embedded checkout payload', () => {
+    const result = createEmbeddedCheckoutSchema.parse({
+      org_id: validUuid,
+      return_url: 'https://example.com/?billing=success',
+    });
+    expect(result.org_id).toBe(validUuid);
+    expect(result.return_url).toBe('https://example.com/?billing=success');
+  });
+
+  it('accepts optional site_id', () => {
+    const siteUuid = '00000000-0000-4000-8000-000000000002';
+    const result = createEmbeddedCheckoutSchema.parse({
+      org_id: validUuid,
+      site_id: siteUuid,
+      return_url: 'https://example.com/?billing=success',
+    });
+    expect(result.site_id).toBe(siteUuid);
+  });
+
+  it('rejects non-uuid org_id', () => {
+    expect(() =>
+      createEmbeddedCheckoutSchema.parse({
+        org_id: 'not-uuid',
+        return_url: 'https://example.com/?billing=success',
+      }),
+    ).toThrow();
+  });
+
+  it('rejects non-URL return_url', () => {
+    expect(() =>
+      createEmbeddedCheckoutSchema.parse({
+        org_id: validUuid,
+        return_url: 'not-a-url',
       }),
     ).toThrow();
   });

@@ -657,7 +657,7 @@
       border: 1px solid var(--border-hover);
       border-radius: 8px;
       box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-      z-index: 100;
+      z-index: 200;
       overflow: hidden;
       min-width: 140px;
     }
@@ -4380,6 +4380,7 @@
       posthog.init(__phKey.content, { api_host: 'https://us.i.posthog.com', person_profiles: 'identified_only' });
     }
   </script>
+  <script src="https://js.stripe.com/v3/" async></script>
 </head>
 <body>
   <!-- Google Tag Manager (noscript) -->
@@ -4539,10 +4540,9 @@
           <!-- Filename display with inline rename (matches slug URL edit style) -->
           <div id="files-editor-name-wrap" style="display:flex;align-items:center;gap:4px;min-width:0;flex:1 1 auto;">
             <span id="files-editor-path-prefix" style="font-size:0.65rem;color:rgba(148,163,184,0.4);font-family:'SF Mono','Fira Code',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
-            <span id="files-editor-name" class="files-breadcrumb editor-filename" style="cursor:pointer;" onclick="startFileRename()" title="Click to rename"></span>
-            <button class="editor-toolbar-btn" id="files-rename-btn" onclick="startFileRename()" title="Rename file" style="font-size:0.62rem;padding:2px 6px;color:rgba(148,163,184,0.4);border:none;background:none;">Rename</button>
+            <span id="files-editor-name" class="files-breadcrumb editor-filename" style="cursor:pointer;padding:2px 6px;border-radius:4px;border:1px solid transparent;transition:border-color 0.15s,background 0.15s;" onclick="startFileRename()" onmouseover="this.style.borderColor='rgba(80,165,219,0.2)';this.style.background='rgba(80,165,219,0.04)'" onmouseout="this.style.borderColor='transparent';this.style.background='transparent'" title="Click to rename"></span>
             <div id="files-rename-wrap" style="display:none;align-items:center;gap:3px;flex:1;min-width:0;">
-              <input type="text" id="files-rename-input" style="background:transparent;border:none;border-bottom:1px solid rgba(80,165,219,0.3);color:var(--text-primary);font-size:0.72rem;font-family:'SF Mono','Fira Code',Consolas,monospace;padding:2px 4px;outline:none;min-width:100px;max-width:260px;flex:1;" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmFileRename();}if(event.key==='Escape'){cancelFileRename();}" />
+              <input type="text" id="files-rename-input" style="background:rgba(80,165,219,0.04);border:1px solid rgba(80,165,219,0.25);color:var(--text-primary);font-size:0.72rem;font-family:'SF Mono','Fira Code',Consolas,monospace;padding:2px 6px;border-radius:4px;outline:none;min-width:100px;max-width:260px;flex:1;transition:border-color 0.2s,box-shadow 0.2s;" onfocus="this.style.borderColor='var(--accent)';this.style.boxShadow='0 0 0 2px rgba(80,165,219,0.12)'" onblur="this.style.borderColor='rgba(80,165,219,0.25)';this.style.boxShadow='none'" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmFileRename();}if(event.key==='Escape'){cancelFileRename();}" />
               <button onclick="confirmFileRename()" title="Confirm" style="background:none;border:none;padding:2px;cursor:pointer;color:#22c55e;display:flex;align-items:center;transition:opacity 0.15s;" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></button>
               <button onclick="cancelFileRename()" title="Cancel" style="background:none;border:none;padding:2px;cursor:pointer;color:#ef4444;display:flex;align-items:center;transition:opacity 0.15s;" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
             </div>
@@ -4656,6 +4656,17 @@
 
       <div id="deploy-msg" class="msg" style="margin-bottom:12px;"></div>
       <button class="btn btn-accent btn-full" id="deploy-submit-btn" onclick="submitDeploy()">Deploy</button>
+    </div>
+  </div>
+
+  <!-- Stripe Embedded Checkout Modal -->
+  <div id="checkout-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-label="Upgrade to Pro" onclick="if(event.target===this)closeCheckoutModal()" style="display:none;">
+    <div class="modal" style="max-width:520px;min-height:400px;padding:0;overflow:hidden;">
+      <div style="display:flex;align-items:center;justify-content:between;padding:18px 22px 14px;border-bottom:1px solid var(--border);">
+        <span style="font-size:1rem;font-weight:700;color:var(--text-primary);flex:1;">Upgrade to Pro</span>
+        <button class="modal-close" onclick="closeCheckoutModal()" style="position:static;margin:0;">&times;</button>
+      </div>
+      <div id="checkout-mount" style="min-height:350px;"></div>
     </div>
   </div>
 
@@ -6345,10 +6356,31 @@
       openDetailsModal();
     }
 
-    /* ── Per-site Checkout ────────────────────────── */
+    /* ── Stripe Embedded Checkout ────────────────── */
 
-    function openSiteCheckout(siteId) {
+    var _stripeInstance = null;
+    var _embeddedCheckout = null;
+
+    function getStripe() {
+      if (_stripeInstance) return Promise.resolve(_stripeInstance);
+      var pkMeta = document.querySelector('meta[name="x-stripe-pk"]');
+      var pk = pkMeta ? pkMeta.getAttribute('content') : null;
+      if (!pk || typeof Stripe === 'undefined') return Promise.reject(new Error('Stripe not loaded'));
+      _stripeInstance = Stripe(pk);
+      return Promise.resolve(_stripeInstance);
+    }
+
+    function openCheckoutModal(siteId) {
       if (!state.session || !state.session.token) return;
+
+      var modal = document.getElementById('checkout-modal');
+      var mountEl = document.getElementById('checkout-mount');
+      if (!modal || !mountEl) return;
+
+      // Show modal with loading state
+      modal.style.display = '';
+      modal.classList.add('visible');
+      mountEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:350px;color:var(--text-muted);font-size:0.85rem;">Loading checkout\u2026</div>';
 
       var headers = {
         'Content-Type': 'application/json',
@@ -6358,30 +6390,54 @@
       fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + state.session.token } })
         .then(function(res) { return res.ok ? res.json() : null; })
         .then(function(d) {
-          if (!d || !d.data || !d.data.org_id) return;
-          return fetch('/api/billing/checkout', {
+          if (!d || !d.data || !d.data.org_id) throw new Error('Not authenticated');
+          var body = {
+            org_id: d.data.org_id,
+            return_url: window.location.origin + '/?billing=success'
+          };
+          if (siteId) body.site_id = siteId;
+          return fetch('/api/billing/embedded-checkout', {
             method: 'POST',
             headers: headers,
-            body: JSON.stringify({
-              org_id: d.data.org_id,
-              site_id: siteId,
-              success_url: window.location.origin + '/?billing=success',
-              cancel_url: window.location.origin + '/?billing=cancel'
-            })
+            body: JSON.stringify(body)
           });
         })
         .then(function(res) {
-          if (!res || !res.ok) return;
+          if (!res.ok) return res.json().then(function(e) { throw new Error(e.error || 'Checkout failed'); });
           return res.json();
         })
         .then(function(d) {
-          if (d && d.data && d.data.checkout_url) {
-            window.location.href = d.data.checkout_url;
-          }
+          if (!d || !d.data || !d.data.client_secret) throw new Error('No checkout session');
+          return getStripe().then(function(stripe) {
+            return stripe.initEmbeddedCheckout({ clientSecret: d.data.client_secret });
+          });
         })
-        .catch(function() {
-          /* silently fail - billing may not be configured */
+        .then(function(checkout) {
+          _embeddedCheckout = checkout;
+          mountEl.innerHTML = '';
+          checkout.mount('#checkout-mount');
+        })
+        .catch(function(err) {
+          // Fallback to redirect checkout if embedded fails
+          closeCheckoutModal();
+          _openRedirectCheckout(siteId);
         });
+    }
+
+    function closeCheckoutModal() {
+      var modal = document.getElementById('checkout-modal');
+      if (modal) {
+        modal.classList.remove('visible');
+        setTimeout(function() { modal.style.display = 'none'; }, 300);
+      }
+      if (_embeddedCheckout) {
+        try { _embeddedCheckout.destroy(); } catch(e) {}
+        _embeddedCheckout = null;
+      }
+    }
+
+    function openSiteCheckout(siteId) {
+      openCheckoutModal(siteId);
     }
 
     /* ── Billing Actions ─────────────────────────── */
@@ -6415,15 +6471,19 @@
           }
         })
         .catch(function(err) {
-          // If no billing account, redirect to checkout instead
+          // If no billing account, open inline checkout instead
           openBillingCheckout();
         });
     }
 
     function openBillingCheckout() {
+      openCheckoutModal(null);
+    }
+
+    /** Fallback: redirect to Stripe hosted checkout if embedded fails */
+    function _openRedirectCheckout(siteId) {
       if (!state.session || !state.session.token) return;
 
-      // Get orgId from /api/auth/me if we don't have it
       var headers = {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + state.session.token
@@ -6433,14 +6493,16 @@
         .then(function(res) { return res.ok ? res.json() : null; })
         .then(function(d) {
           if (!d || !d.data || !d.data.org_id) return;
+          var body = {
+            org_id: d.data.org_id,
+            success_url: window.location.origin + '/?billing=success',
+            cancel_url: window.location.origin + '/?billing=cancel'
+          };
+          if (siteId) body.site_id = siteId;
           return fetch('/api/billing/checkout', {
             method: 'POST',
             headers: headers,
-            body: JSON.stringify({
-              org_id: d.data.org_id,
-              success_url: window.location.origin + '/?billing=success',
-              cancel_url: window.location.origin + '/?billing=cancel'
-            })
+            body: JSON.stringify(body)
           });
         })
         .then(function(res) {
@@ -9605,14 +9667,12 @@
     function startFileRename() {
       if (!filesModalCurrentKey) return;
       var nameEl = document.getElementById('files-editor-name');
-      var renameBtn = document.getElementById('files-rename-btn');
       var renameWrap = document.getElementById('files-rename-wrap');
       var renameInput = document.getElementById('files-rename-input');
       if (!nameEl || !renameWrap || !renameInput) return;
       var currentName = filesModalCurrentKey.split('/').pop() || '';
       renameInput.value = currentName;
       nameEl.style.display = 'none';
-      renameBtn.style.display = 'none';
       renameWrap.style.display = 'flex';
       renameInput.focus();
       renameInput.select();
@@ -9620,10 +9680,8 @@
 
     function cancelFileRename() {
       var nameEl = document.getElementById('files-editor-name');
-      var renameBtn = document.getElementById('files-rename-btn');
       var renameWrap = document.getElementById('files-rename-wrap');
       if (nameEl) nameEl.style.display = '';
-      if (renameBtn) renameBtn.style.display = '';
       if (renameWrap) renameWrap.style.display = 'none';
     }
 

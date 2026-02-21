@@ -27,12 +27,13 @@ test.describe('Files Modal v2', () => {
     expect(style).toContain('border-top:none');
   });
 
-  test('files editor has Rename button', async ({ page }) => {
+  test('files editor has clickable filename instead of separate Rename button', async ({ page }) => {
     await page.goto('/');
-    const renameBtn = page.locator('#files-rename-btn');
-    await expect(renameBtn).toBeAttached();
-    const text = await renameBtn.textContent();
-    expect(text).toBe('Rename');
+    // Rename button was removed — clicking filename triggers inline rename
+    const nameEl = page.locator('#files-editor-name');
+    await expect(nameEl).toBeAttached();
+    const title = await nameEl.getAttribute('title');
+    expect(title).toContain('rename');
   });
 
   test('filename display is clickable to rename', async ({ page }) => {
@@ -49,13 +50,13 @@ test.describe('Files Modal v2', () => {
     await expect(pathPrefix).toBeAttached();
   });
 
-  test('inline rename input has transparent background and bottom border', async ({ page }) => {
+  test('inline rename input has styled appearance matching filename area', async ({ page }) => {
     await page.goto('/');
     const renameInput = page.locator('#files-rename-input');
     await expect(renameInput).toBeAttached();
     const style = await renameInput.getAttribute('style');
-    expect(style).toContain('background:transparent');
-    expect(style).toContain('border-bottom:1px solid');
+    expect(style).toContain('border-radius:4px');
+    expect(style).toContain('border:1px solid');
   });
 
   test('rename wrap is hidden by default', async ({ page }) => {

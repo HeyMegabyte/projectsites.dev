@@ -33,6 +33,7 @@ import { dbInsert, dbQuery, dbQueryOne } from '../services/db.js';
 import {
   createSiteSchema,
   createCheckoutSessionSchema,
+  createEmbeddedCheckoutSchema,
   createMagicLinkSchema,
   verifyMagicLinkSchema,
   createHostnameSchema,
@@ -544,6 +545,41 @@ api.post('/api/billing/checkout', async (c) => {
   try { posthog.trackSite(c.env, c.executionCtx, 'checkout_created', c.get('userId') || orgId, { site_id: validated.site_id }); } catch { /* fire-and-forget */ }
 
   return c.json({ data: result });
+});
+
+api.post('/api/billing/embedded-checkout', async (c) => {
+  const body = await c.req.json();
+  const validated = createEmbeddedCheckoutSchema.parse(body);
+
+  const orgId = c.get('orgId');
+  if (!orgId || orgId !== validated.org_id) {
+    throw forbidden('Cannot create checkout for another org');
+  }
+
+  const result = await billingService.createEmbeddedCheckoutSession(c.env.DB, c.env, {
+    orgId: validated.org_id,
+    siteId: validated.site_id,
+    customerEmail: '',
+    returnUrl: validated.return_url,
+  });
+
+  auditService.writeAuditLog(c.env.DB, {
+    org_id: orgId,
+    actor_id: c.get('userId') ?? null,
+    action: 'billing.embedded_checkout_created',
+    target_type: 'billing',
+    target_id: validated.site_id || orgId,
+    metadata_json: {
+      site_id: validated.site_id,
+      session_id: result.session_id || null,
+      message: 'Stripe embedded checkout session created for plan upgrade',
+    },
+    request_id: c.get('requestId'),
+  }).catch(() => {});
+
+  try { posthog.trackSite(c.env, c.executionCtx, 'embedded_checkout_created', c.get('userId') || orgId, { site_id: validated.site_id }); } catch { /* fire-and-forget */ }
+
+  return c.json({ data: { client_secret: result.client_secret, publishable_key: c.env.STRIPE_PUBLISHABLE_KEY } });
 });
 
 api.get('/api/billing/subscription', async (c) => {
@@ -1186,10 +1222,16 @@ api.get('/api/sites/by-slug/:slug/chat', async (c) => {
     throw notFound('No published version found');
   }
 
-  // Read chat JSON from R2
-  const chatObj = await c.env.SITES_BUCKET.get(
+  // Read chat JSON from R2 — try _meta/ first, fallback to root
+  let chatObj = await c.env.SITES_BUCKET.get(
     `sites/${slug}/${manifestData.current_version}/_meta/chat.json`,
   );
+
+  if (!chatObj) {
+    chatObj = await c.env.SITES_BUCKET.get(
+      `sites/${slug}/${manifestData.current_version}/chat.json`,
+    );
+  }
 
   if (!chatObj) {
     throw notFound('No chat export found for this site');

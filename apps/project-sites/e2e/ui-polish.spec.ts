@@ -542,7 +542,7 @@ test.describe('Editor Toolbar Labels', () => {
   test('files-editor-name uses files-breadcrumb class', async ({ page }) => {
     await page.goto('/');
     const html = await page.content();
-    expect(html).toContain('id="files-editor-name" class="files-breadcrumb"');
+    expect(html).toContain('id="files-editor-name" class="files-breadcrumb editor-filename"');
   });
 
   test('files-modal-msg is removed (unused)', async ({ page }) => {

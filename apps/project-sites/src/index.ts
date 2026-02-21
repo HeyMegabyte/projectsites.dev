@@ -156,7 +156,8 @@ app.all('*', async (c) => {
       if (ext === 'html') {
         let html = await marketingAsset.text();
         const phKey = c.env.POSTHOG_API_KEY ?? 'none';
-        html = html.replace('</head>', `<meta name="x-posthog-key" content="${phKey}">\n</head>`);
+        const stripePk = c.env.STRIPE_PUBLISHABLE_KEY ?? '';
+        html = html.replace('</head>', `<meta name="x-posthog-key" content="${phKey}">\n<meta name="x-stripe-pk" content="${stripePk}">\n</head>`);
         return new Response(html, {
           headers: {
             'Content-Type': 'text/html',

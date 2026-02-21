@@ -17,6 +17,7 @@ import { dbQueryOne, dbInsert, dbUpdate } from '../services/db.js';
 import {
   getOrCreateStripeCustomer,
   createCheckoutSession,
+  createEmbeddedCheckoutSession,
   handleCheckoutCompleted,
   handleSubscriptionUpdated,
   handleSubscriptionDeleted,
@@ -170,6 +171,104 @@ describe('createCheckoutSession', () => {
     await expect(createCheckoutSession(mockDb, mockEnv, opts)).rejects.toThrow(
       'Failed to create Stripe checkout',
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createEmbeddedCheckoutSession
+// ---------------------------------------------------------------------------
+describe('createEmbeddedCheckoutSession', () => {
+  const opts = {
+    orgId: 'org_1',
+    customerEmail: 'a@b.com',
+    returnUrl: 'https://example.com/?billing=success',
+  };
+
+  function mockExistingCustomer() {
+    mockQueryOne.mockResolvedValueOnce({ id: 'sub_1', stripe_customer_id: 'cus_existing' });
+  }
+
+  it('returns client_secret and session_id on success', async () => {
+    mockExistingCustomer();
+
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ id: 'cs_123', client_secret: 'cs_123_secret_abc' }),
+      text: async () => '',
+    });
+
+    const result = await createEmbeddedCheckoutSession(mockDb, mockEnv, opts);
+
+    expect(result).toEqual({
+      client_secret: 'cs_123_secret_abc',
+      session_id: 'cs_123',
+    });
+  });
+
+  it('sends ui_mode=embedded to Stripe API', async () => {
+    mockExistingCustomer();
+
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ id: 'cs_123', client_secret: 'cs_123_secret_abc' }),
+      text: async () => '',
+    });
+
+    await createEmbeddedCheckoutSession(mockDb, mockEnv, opts);
+
+    const fetchCall = (global.fetch as jest.Mock).mock.calls[0];
+    const body = fetchCall[1].body as URLSearchParams;
+    expect(body.get('ui_mode')).toBe('embedded');
+    expect(body.get('return_url')).toBe('https://example.com/?billing=success');
+  });
+
+  it('includes org_id in metadata', async () => {
+    mockExistingCustomer();
+
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ id: 'cs_123', client_secret: 'cs_123_secret_abc' }),
+      text: async () => '',
+    });
+
+    await createEmbeddedCheckoutSession(mockDb, mockEnv, opts);
+
+    const fetchCall = (global.fetch as jest.Mock).mock.calls[0];
+    const body = fetchCall[1].body as URLSearchParams;
+    expect(body.get('metadata[org_id]')).toBe('org_1');
+  });
+
+  it('throws on Stripe API failure', async () => {
+    mockExistingCustomer();
+
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({}),
+      text: async () => 'Embedded checkout error',
+    });
+
+    await expect(createEmbeddedCheckoutSession(mockDb, mockEnv, opts)).rejects.toThrow(
+      'Failed to create Stripe embedded checkout',
+    );
+  });
+
+  it('includes site_id in metadata when provided', async () => {
+    mockExistingCustomer();
+
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ id: 'cs_456', client_secret: 'cs_456_secret_xyz' }),
+      text: async () => '',
+    });
+
+    await createEmbeddedCheckoutSession(mockDb, mockEnv, {
+      ...opts,
+      siteId: 'site_99',
+    });
+
+    const fetchCall = (global.fetch as jest.Mock).mock.calls[0];
+    const body = fetchCall[1].body as URLSearchParams;
+    expect(body.get('metadata[site_id]')).toBe('site_99');
   });
 });
 

@@ -201,6 +201,73 @@ export async function createCheckoutSession(
 }
 
 /**
+ * Create a Stripe Checkout Session in **embedded** (`ui_mode: 'embedded'`) mode.
+ *
+ * Returns a `client_secret` that the frontend uses with `stripe.initEmbeddedCheckout()`
+ * to render the checkout form inline, avoiding a full-page redirect.
+ */
+export async function createEmbeddedCheckoutSession(
+  db: D1Database,
+  env: Env,
+  opts: {
+    orgId: string;
+    siteId?: string;
+    customerEmail: string;
+    returnUrl: string;
+  },
+): Promise<{ client_secret: string; session_id: string }> {
+  const { stripe_customer_id } = await getOrCreateStripeCustomer(
+    db,
+    env,
+    opts.orgId,
+    opts.customerEmail,
+  );
+
+  const params = new URLSearchParams({
+    mode: 'subscription',
+    ui_mode: 'embedded',
+    customer: stripe_customer_id,
+    return_url: opts.returnUrl,
+    'payment_method_types[0]': 'card',
+    'payment_method_types[1]': 'link',
+    'line_items[0][price_data][currency]': PRICING.CURRENCY,
+    'line_items[0][price_data][unit_amount]': String(PRICING.MONTHLY_CENTS),
+    'line_items[0][price_data][recurring][interval]': 'month',
+    'line_items[0][price_data][product_data][name]': 'Project Sites Pro',
+    'line_items[0][price_data][product_data][description]':
+      'Remove top bar, custom domains, analytics',
+    'line_items[0][quantity]': '1',
+    allow_promotion_codes: 'true',
+    billing_address_collection: 'auto',
+  });
+
+  if (opts.siteId) {
+    params.append('metadata[site_id]', opts.siteId);
+  }
+  params.append('metadata[org_id]', opts.orgId);
+
+  const response = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: params,
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    console.warn(JSON.stringify({ level: 'error', service: 'billing', message: 'Stripe embedded checkout creation failed', org_id: opts.orgId, status: response.status }));
+    throw badRequest(`Failed to create Stripe embedded checkout: ${err}`);
+  }
+
+  const session = (await response.json()) as { id: string; client_secret: string };
+  console.warn(JSON.stringify({ level: 'info', service: 'billing', message: 'Embedded checkout session created', org_id: opts.orgId, session_id: session.id }));
+
+  return { client_secret: session.client_secret, session_id: session.id };
+}
+
+/**
  * Handle the `checkout.session.completed` Stripe webhook event.
  *
  * Updates the organisation's subscription row to `plan = 'paid'` and
