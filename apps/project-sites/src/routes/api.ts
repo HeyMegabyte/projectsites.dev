@@ -1799,64 +1799,100 @@ api.post('/api/sites/:id/deploy', async (c) => {
   });
 });
 
-// ─── Domain Search (Cloudflare Registrar) ────────────────────
+// ─── Domain Search (Domainr / Fastly Domain Research API) ────
 
 api.get('/api/domains/search', async (c) => {
   const query = c.req.query('q');
-  if (!query || query.trim().length < 3 || query.trim().length > 63) {
+  if (!query || query.trim().length < 2 || query.trim().length > 63) {
     return c.json({ data: [] });
   }
 
   const domain = query.trim().toLowerCase().replace(/[^a-z0-9.-]/g, '');
-
-  // Generate TLD variants to check
   const baseName = domain.replace(/\.[^.]+$/, '').replace(/\./g, '');
-  const tlds = ['.com', '.net', '.org', '.io', '.co', '.dev', '.app', '.site', '.online'];
-  const candidates = domain.includes('.')
-    ? [domain, ...tlds.filter((t) => !domain.endsWith(t)).map((t) => baseName + t)]
-    : tlds.map((t) => baseName + t);
 
-  // Check availability via Cloudflare Registrar API
-  const results: Array<{ domain: string; available: boolean; price: number }> = [];
+  const results: Array<{ domain: string; available: boolean; price: number; zone: string; path: string }> = [];
 
   try {
-    const checkUrl = `https://api.cloudflare.com/client/v4/accounts/${
-      c.env.CF_API_TOKEN ? '84fa0d1b16ff8086dd958c468ce7fd59' : ''
-    }/registrar/domains?query=${encodeURIComponent(baseName)}`;
-
-    const cfRes = await fetch(checkUrl, {
+    // Step 1: Get domain suggestions from Domainr Search API
+    const searchUrl = `https://domainr.p.rapidapi.com/v2/search?query=${encodeURIComponent(domain)}`;
+    const searchRes = await fetch(searchUrl, {
       headers: {
-        Authorization: `Bearer ${c.env.CF_API_TOKEN}`,
-        'Content-Type': 'application/json',
+        'X-RapidAPI-Key': c.env.DOMAINR_API_KEY || '',
+        'X-RapidAPI-Host': 'domainr.p.rapidapi.com',
       },
     });
 
-    if (cfRes.ok) {
-      const cfData = (await cfRes.json()) as {
-        result?: Array<{
-          name: string;
-          available: boolean;
+    if (!searchRes.ok) {
+      console.warn(JSON.stringify({ level: 'warn', service: 'domain_search', message: 'Domainr search failed', status: searchRes.status }));
+      // Fall back to generated candidates
+      const tlds = ['.com', '.net', '.org', '.io', '.co', '.dev', '.app', '.site', '.online', '.store', '.shop', '.biz'];
+      for (const tld of tlds) {
+        results.push({ domain: baseName + tld, available: false, price: 0, zone: tld.slice(1), path: '' });
+      }
+      return c.json({ data: results });
+    }
+
+    const searchData = (await searchRes.json()) as {
+      results?: Array<{ domain: string; zone: string; path: string }>;
+    };
+
+    const suggestions = searchData.results || [];
+    if (suggestions.length === 0) {
+      return c.json({ data: [] });
+    }
+
+    // Step 2: Check availability + pricing for all suggestions via Domainr Status API
+    const domainList = suggestions.map((s) => s.domain).join(',');
+    const statusUrl = `https://domainr.p.rapidapi.com/v2/status?domain=${encodeURIComponent(domainList)}`;
+    const statusRes = await fetch(statusUrl, {
+      headers: {
+        'X-RapidAPI-Key': c.env.DOMAINR_API_KEY || '',
+        'X-RapidAPI-Host': 'domainr.p.rapidapi.com',
+      },
+    });
+
+    const statusMap = new Map<string, { available: boolean; price: number }>();
+
+    if (statusRes.ok) {
+      const statusData = (await statusRes.json()) as {
+        status?: Array<{
+          domain: string;
+          zone: string;
+          status: string;
+          summary: string;
           price?: number;
         }>;
       };
-      if (cfData.result) {
-        for (const r of cfData.result) {
-          results.push({
-            domain: r.name,
-            available: r.available,
-            price: r.price ? Math.round(r.price * 100) : 0, // Convert to cents
+
+      if (statusData.status) {
+        for (const s of statusData.status) {
+          // Domainr status field: "undelegated" = available, "active" = taken
+          const isAvailable = s.summary === 'inactive' || s.status.includes('undelegated') || s.status.includes('inactive');
+          statusMap.set(s.domain, {
+            available: isAvailable,
+            price: s.price ? Math.round(s.price * 100) : 0, // cents
           });
         }
       }
     }
-  } catch {
-    // Cloudflare Registrar API may not be available
-  }
 
-  // If API returned no results, return candidates as unknown/unavailable
-  if (results.length === 0) {
-    for (const candidate of candidates.slice(0, 9)) {
-      results.push({ domain: candidate, available: false, price: 0 });
+    // Combine suggestions with status data
+    for (const suggestion of suggestions) {
+      const status = statusMap.get(suggestion.domain);
+      results.push({
+        domain: suggestion.domain,
+        available: status?.available ?? false,
+        price: status?.price ?? 0,
+        zone: suggestion.zone,
+        path: suggestion.path || '',
+      });
+    }
+  } catch (err) {
+    console.warn(JSON.stringify({ level: 'error', service: 'domain_search', message: 'Domain search error', error: String(err) }));
+    // Fallback: return TLD candidates as unknown
+    const tlds = ['.com', '.net', '.org', '.io', '.co', '.dev', '.app', '.site', '.online'];
+    for (const tld of tlds) {
+      results.push({ domain: baseName + tld, available: false, price: 0, zone: tld.slice(1), path: '' });
     }
   }
 

@@ -5,8 +5,8 @@ describe('generateTopBar', () => {
   it('generates valid HTML with CTA', () => {
     const html = generateTopBar('my-biz');
     expect(html).toContain('ps-topbar');
-    expect(html).toContain('Register Now');
-    expect(html).toContain('$50/mo');
+    expect(html).toContain('Get Started');
+    expect(html).toContain('$50/month');
   });
 
   it('includes upgrade link with slug', () => {
@@ -22,7 +22,7 @@ describe('generateTopBar', () => {
 
   it('sets body padding', () => {
     const html = generateTopBar('test');
-    expect(html).toContain('padding-top:36px');
+    expect(html).toContain('padding-top:52px');
   });
 
   it('links to the main domain', () => {

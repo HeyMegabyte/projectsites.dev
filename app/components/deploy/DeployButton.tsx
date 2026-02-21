@@ -17,6 +17,7 @@ import { useS3Deploy } from '~/components/deploy/S3Deploy.client';
 import { GitHubDeploymentDialog } from '~/components/deploy/GitHubDeploymentDialog';
 import { GitLabDeploymentDialog } from '~/components/deploy/GitLabDeploymentDialog';
 import { s3Connection } from '~/lib/stores/s3';
+import { toast } from 'react-toastify';
 
 interface DeployButtonProps {
   onVercelDeploy?: () => Promise<void>;
@@ -24,6 +25,7 @@ interface DeployButtonProps {
   onGitHubDeploy?: () => Promise<void>;
   onGitLabDeploy?: () => Promise<void>;
   onS3Deploy?: () => Promise<void>;
+  onProjectSitesDeploy?: () => Promise<void>;
 }
 
 export const DeployButton = ({
@@ -32,6 +34,7 @@ export const DeployButton = ({
   onGitHubDeploy,
   onGitLabDeploy,
   onS3Deploy,
+  onProjectSitesDeploy,
 }: DeployButtonProps) => {
   const netlifyConn = useStore(netlifyConnection);
   const vercelConn = useStore(vercelConnection);
@@ -141,6 +144,100 @@ export const DeployButton = ({
       } else {
         await handleS3Deploy();
       }
+    } finally {
+      setIsDeploying(false);
+      setDeployingTo(null);
+    }
+  };
+
+  const [showProjectSitesDialog, setShowProjectSitesDialog] = useState(false);
+  const [projectSitesSlug, setProjectSitesSlug] = useState('');
+  const [projectSitesBuildFolder, setProjectSitesBuildFolder] = useState('dist/');
+
+  const handleProjectSitesDeployClick = async () => {
+    if (onProjectSitesDeploy) {
+      setIsDeploying(true);
+      setDeployingTo(null);
+
+      try {
+        await onProjectSitesDeploy();
+      } finally {
+        setIsDeploying(false);
+        setDeployingTo(null);
+      }
+    } else {
+      setShowProjectSitesDialog(true);
+    }
+  };
+
+  const handleProjectSitesDeployConfirm = async () => {
+    if (!projectSitesSlug.trim()) {
+      toast.error('Please enter a site slug');
+      return;
+    }
+
+    setShowProjectSitesDialog(false);
+    setIsDeploying(true);
+    setDeployingTo(null);
+
+    try {
+      toast.info('Packaging site for Project Sites...');
+
+      // Get the project files and create a ZIP
+      const zip = await workbenchStore.getZipBlob(projectSitesBuildFolder || undefined);
+
+      if (!zip) {
+        toast.error('Failed to package project files');
+        return;
+      }
+
+      // Also get the chat export
+      const chatData = {
+        messages: [],
+        description: 'Deployed from Bolt',
+        exportDate: new Date().toISOString(),
+      };
+
+      const formData = new FormData();
+      formData.append('zip', zip, 'site.zip');
+      formData.append('chat', new Blob([JSON.stringify(chatData)], { type: 'application/json' }), 'chat.json');
+      formData.append('dist_path', projectSitesBuildFolder || 'dist/');
+
+      // Find or create the site, then deploy
+      const siteBaseUrl = 'https://sites.megabyte.space';
+      const lookupRes = await fetch(`${siteBaseUrl}/api/sites/lookup?slug=${encodeURIComponent(projectSitesSlug)}`);
+
+      let siteId: string | null = null;
+
+      if (lookupRes.ok) {
+        const lookupData = (await lookupRes.json()) as { data?: { id: string } };
+        siteId = lookupData.data?.id || null;
+      }
+
+      if (!siteId) {
+        toast.info('Site not found. Please create the site at sites.megabyte.space first, then deploy.');
+        window.open(`${siteBaseUrl}/?create=${encodeURIComponent(projectSitesSlug)}`, '_blank');
+
+        return;
+      }
+
+      toast.info('Deploying to Project Sites...');
+
+      const deployRes = await fetch(`${siteBaseUrl}/api/sites/${siteId}/deploy`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!deployRes.ok) {
+        const errText = await deployRes.text();
+        toast.error('Deploy failed: ' + errText);
+
+        return;
+      }
+
+      toast.success(`Deployed to ${projectSitesSlug}-sites.megabyte.space!`);
+    } catch (err) {
+      toast.error('Deploy failed: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
       setIsDeploying(false);
       setDeployingTo(null);
@@ -281,6 +378,24 @@ export const DeployButton = ({
                   : `Deploy to ${s3Conn.provider === 'r2' ? 'Cloudflare R2' : 'AWS S3'}`}
               </span>
             </DropdownMenu.Item>
+
+            <DropdownMenu.Separator className="h-px bg-bolt-elements-borderColor my-1" />
+
+            <DropdownMenu.Item
+              className={classNames(
+                'cursor-pointer flex items-center w-full px-4 py-2 text-sm text-bolt-elements-textPrimary hover:bg-bolt-elements-item-backgroundActive gap-2 rounded-md group relative',
+                {
+                  'opacity-60 cursor-not-allowed': isDeploying || !activePreview,
+                },
+              )}
+              disabled={isDeploying || !activePreview}
+              onClick={handleProjectSitesDeployClick}
+            >
+              <div className="w-5 h-5 flex items-center justify-center">
+                <div className="i-ph:globe-simple-duotone text-lg text-purple-500" />
+              </div>
+              <span className="mx-auto">Deploy to Project Sites</span>
+            </DropdownMenu.Item>
           </DropdownMenu.Content>
         </DropdownMenu.Root>
       </div>
@@ -303,6 +418,68 @@ export const DeployButton = ({
           projectName={gitlabProjectName}
           files={gitlabDeploymentFiles}
         />
+      )}
+
+      {/* Project Sites Deployment Dialog */}
+      {showProjectSitesDialog && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-bolt-elements-background-depth-2 border border-bolt-elements-borderColor rounded-xl p-6 w-full max-w-md shadow-2xl">
+            <h3 className="text-lg font-semibold text-bolt-elements-textPrimary mb-4 flex items-center gap-2">
+              <div className="i-ph:globe-simple-duotone text-xl text-purple-500" />
+              Deploy to Project Sites
+            </h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs text-bolt-elements-textSecondary mb-1.5 font-medium">
+                  Site Slug <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={projectSitesSlug}
+                  onChange={(e) => setProjectSitesSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                  placeholder="my-site"
+                  className="w-full bg-bolt-elements-background-depth-3 border border-bolt-elements-borderColor rounded-lg px-3 py-2 text-sm text-bolt-elements-textPrimary focus:outline-none focus:border-purple-500"
+                />
+                <p className="text-xs text-bolt-elements-textTertiary mt-1">
+                  Your site will be at{' '}
+                  <span className="text-purple-400">{projectSitesSlug || 'slug'}-sites.megabyte.space</span>
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs text-bolt-elements-textSecondary mb-1.5 font-medium">
+                  Build Folder
+                </label>
+                <input
+                  type="text"
+                  value={projectSitesBuildFolder}
+                  onChange={(e) => setProjectSitesBuildFolder(e.target.value)}
+                  placeholder="dist/"
+                  className="w-full bg-bolt-elements-background-depth-3 border border-bolt-elements-borderColor rounded-lg px-3 py-2 text-sm text-bolt-elements-textPrimary focus:outline-none focus:border-purple-500"
+                />
+                <p className="text-xs text-bolt-elements-textTertiary mt-1">
+                  The folder containing your built site (e.g. dist/, build/, public/)
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6 justify-end">
+              <button
+                onClick={() => setShowProjectSitesDialog(false)}
+                className="px-4 py-2 text-sm rounded-lg border border-bolt-elements-borderColor text-bolt-elements-textSecondary hover:bg-bolt-elements-background-depth-3 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleProjectSitesDeployConfirm}
+                className="px-4 py-2 text-sm rounded-lg bg-purple-600 text-white hover:bg-purple-700 transition-colors font-medium"
+              >
+                Deploy
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

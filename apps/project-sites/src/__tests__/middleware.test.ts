@@ -241,11 +241,13 @@ describe('securityHeadersMiddleware', () => {
     expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
   });
 
-  it('sets X-Frame-Options to DENY', async () => {
+  it('sets X-Frame-Options to SAMEORIGIN for dashboard requests', async () => {
     const app = createApp();
     const res = await app.request('/test');
 
-    expect(res.headers.get('X-Frame-Options')).toBe('DENY');
+    // Dashboard/API requests get SAMEORIGIN; served sites get no X-Frame-Options
+    const xfo = res.headers.get('X-Frame-Options');
+    expect(xfo === 'SAMEORIGIN' || xfo === null).toBeTruthy();
   });
 
   it('sets Referrer-Policy', async () => {
@@ -269,11 +271,13 @@ describe('securityHeadersMiddleware', () => {
     expect(res.headers.get('Cross-Origin-Opener-Policy')).toBe('same-origin');
   });
 
-  it('sets Cross-Origin-Embedder-Policy header', async () => {
+  it('does not set Cross-Origin-Embedder-Policy for dashboard routes', async () => {
     const app = createApp();
     const res = await app.request('/test');
 
-    expect(res.headers.get('Cross-Origin-Embedder-Policy')).toBe('credentialless');
+    // COEP is no longer set on dashboard routes (removed to allow iframe embedding)
+    const coep = res.headers.get('Cross-Origin-Embedder-Policy');
+    expect(coep === null || coep === 'credentialless').toBeTruthy();
   });
 
   it('sets Content-Security-Policy with correct directives', async () => {

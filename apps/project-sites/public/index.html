@@ -496,19 +496,20 @@
       transform: translateY(-2px);
     }
     .site-card-preview {
-      height: 100px;
+      width: 100%;
+      max-height: 120px;
       border-radius: 10px;
       background: linear-gradient(135deg, rgba(80, 165, 219, 0.06), rgba(124, 58, 237, 0.08));
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: center;
       overflow: hidden;
       position: relative;
     }
     .site-card-preview iframe {
-      width: 800px;
-      height: 600px;
-      transform: scale(0.26);
+      width: 1280px;
+      height: 800px;
+      transform: scale(0.22);
       transform-origin: top left;
       pointer-events: none;
       border: none;
@@ -721,14 +722,24 @@
       display: none;
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0, 0, 0, 0.75);
+      background: rgba(0, 0, 0, 0.82);
       backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
       z-index: 1000;
       animation: fadeIn 0.15s ease;
       align-items: center;
       justify-content: center;
+      will-change: opacity;
+      isolation: isolate;
+      pointer-events: auto;
     }
     .modal-overlay.visible { display: flex; }
+    .modal-overlay > .modal,
+    .modal-overlay > .logs-modal,
+    .modal-overlay > div {
+      position: relative;
+      z-index: 1001;
+    }
     .modal {
       background: linear-gradient(145deg, rgba(22, 22, 53, 0.98), rgba(15, 15, 42, 1));
       border: 1px solid rgba(80, 165, 219, 0.12);
@@ -766,7 +777,7 @@
     .modal-close:active { opacity: 0.6; transition: opacity 0.06s; }
 
     /* Site Logs Modal — Timeline Design */
-    .logs-modal { max-width: 700px; width: 95%; max-height: 90vh; padding: 24px; border-radius: 20px; }
+    .logs-modal { max-width: 840px; width: 95%; max-height: 90vh; padding: 24px; border-radius: 20px; }
     .logs-container {
       background: rgba(6, 6, 18, 0.85);
       border: 1px solid rgba(80, 165, 219, 0.06);
@@ -4288,13 +4299,17 @@
       background: rgba(255,255,255,0.06);
       margin: 0 2px;
     }
-    /* Files modal toolbar compact */
+    /* Files modal toolbar compact — merged with file list */
     .files-toolbar-compact {
       display: flex;
       align-items: center;
-      gap: 6px;
-      padding: 0 2px;
-      margin-bottom: 10px;
+      gap: 0;
+      padding: 8px 12px;
+      margin-bottom: 0;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-bottom: none;
+      border-radius: var(--radius) var(--radius) 0 0;
     }
     .files-breadcrumb-label {
       display: inline-flex;
@@ -4306,10 +4321,12 @@
       text-transform: uppercase;
       letter-spacing: 0.06em;
       flex-shrink: 0;
-      padding: 4px 8px;
-      background: rgba(80,165,219,0.06);
-      border: 1px solid rgba(80,165,219,0.12);
-      border-radius: 5px;
+      padding: 3px 8px 3px 0;
+      background: none;
+      border: none;
+      border-right: 1px solid rgba(255,255,255,0.06);
+      border-radius: 0;
+      margin-right: 8px;
     }
     .files-toolbar-compact .files-breadcrumb {
       font-size: 0.72rem;
@@ -4319,10 +4336,10 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      padding: 4px 10px;
-      background: rgba(0,0,0,0.2);
-      border-radius: 6px;
-      border: 1px solid rgba(255,255,255,0.04);
+      padding: 2px 6px;
+      background: none;
+      border-radius: 0;
+      border: none;
     }
     .files-breadcrumb.editor-filename {
       color: rgba(148,163,184,0.6);
@@ -4425,7 +4442,7 @@
 
   <!-- Domain Management Modal -->
   <div id="domain-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-label="Manage Domains" onclick="if(event.target===this)closeDomainModal()">
-    <div class="modal" style="max-width:560px;min-height:510px;">
+    <div class="modal" style="max-width:520px;min-height:420px;padding:22px;">
       <div class="modal-title">
         <span id="domain-modal-title">Manage Domains</span>
         <button class="modal-close" onclick="closeDomainModal()">&times;</button>
@@ -4484,7 +4501,7 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
           <div>
             <div style="font-size:0.85rem;color:var(--text-primary);font-weight:600;margin-bottom:3px;">Register a new domain</div>
-            <div style="font-size:0.78rem;color:var(--text-secondary);line-height:1.5;">Domains are billed at <span style="color:#F6821F;font-weight:700;">CloudFlare</span> wholesale prices &mdash; no markup.</div>
+            <div style="font-size:0.78rem;color:var(--text-secondary);line-height:1.5;">Search available domains &mdash; competitive annual pricing with instant activation.</div>
           </div>
         </div>
         <div class="domain-search-wrap">
@@ -4514,13 +4531,22 @@
         <span class="files-breadcrumb-label"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Path</span>
         <span id="files-breadcrumb" class="files-breadcrumb"></span>
       </div>
-      <div id="files-list" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-primary);min-height:200px;"></div>
+      <div id="files-list" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-top:1px solid rgba(255,255,255,0.04);border-radius:0 0 var(--radius) var(--radius);background:var(--bg-primary);min-height:200px;"></div>
       <!-- Inline file editor -->
       <div id="files-editor" style="display:none;flex:1;flex-direction:column;min-height:300px;margin-top:10px;">
         <div class="editor-toolbar">
           <button class="editor-toolbar-btn" onclick="closeFileEditor()" title="Back to file list"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>Back</button>
           <span class="editor-toolbar-sep"></span>
-          <span id="files-editor-name" class="files-breadcrumb editor-filename"></span>
+          <!-- Filename display with inline rename -->
+          <div id="files-editor-name-wrap" style="display:flex;align-items:center;gap:6px;min-width:0;flex:0 1 auto;">
+            <span id="files-editor-name" class="files-breadcrumb editor-filename" style="cursor:default;"></span>
+            <button class="editor-toolbar-btn" id="files-rename-btn" onclick="startFileRename()" title="Rename file" style="font-size:0.68rem;padding:2px 8px;">Rename</button>
+            <div id="files-rename-wrap" style="display:none;align-items:center;gap:4px;">
+              <input type="text" id="files-rename-input" style="background:transparent;border:none;color:var(--text-primary);font-size:0.72rem;font-family:'SF Mono','Fira Code',Consolas,monospace;padding:2px 4px;outline:none;min-width:120px;max-width:260px;" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmFileRename();}if(event.key==='Escape'){cancelFileRename();}" />
+              <button class="editor-toolbar-btn" onclick="confirmFileRename()" title="Confirm rename" style="color:#22c55e;padding:2px 4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></button>
+              <button class="editor-toolbar-btn" onclick="cancelFileRename()" title="Cancel rename" style="color:#ef4444;padding:2px 4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            </div>
+          </div>
           <span id="files-editor-size" style="font-size:0.68rem;color:var(--text-muted);"></span>
           <span class="editor-toolbar-sep"></span>
           <button class="editor-toolbar-btn" onclick="editorWordWrap()" title="Toggle word wrap" id="editor-wrap-btn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M3 12h15a3 3 0 1 1 0 6h-4"/><polyline points="16 16 14 18 16 20"/><path d="M3 18h7"/></svg>Wrap</button>
@@ -5574,7 +5600,7 @@
         // Preview thumbnail
         html += '<div class="site-card-preview">';
         if (status === 'published' && siteUrl) {
-          html += '<iframe src="' + escapeHtml(siteUrl) + '?_t=' + (s.updated_at ? new Date(s.updated_at).getTime() : Date.now()) + '" loading="lazy" sandbox tabindex="-1" data-site-id="' + escapeAttr(s.id) + '"></iframe>';
+          html += '<iframe src="' + escapeHtml(siteUrl) + '?_t=' + (s.updated_at ? new Date(s.updated_at).getTime() : Date.now()) + '" loading="lazy" sandbox="allow-scripts allow-same-origin" tabindex="-1" data-site-id="' + escapeAttr(s.id) + '" referrerpolicy="no-referrer"></iframe>';
         } else {
           html += '<div class="site-card-preview-placeholder">';
           if (status === 'building' || status === 'queued') {
@@ -9402,10 +9428,11 @@
       var list = document.getElementById('files-list');
       var tree = buildFolderTree(_filesTreeData);
       var html = renderFolderNode(tree, '', 0);
-      // Add new file button at bottom
-      html += '<div class="file-item" style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;transition:background 0.15s;border-top:1px solid rgba(255,255,255,0.06);" onclick="promptNewFile()" onmouseover="this.style.background=\'rgba(34,197,94,0.04)\'" onmouseout="this.style.background=\'transparent\'">';
-      html += '<span style="color:#22c55e;flex-shrink:0;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>';
-      html += '<span style="flex:1;font-size:0.78rem;color:#22c55e;font-weight:500;">Add new file</span>';
+      // Action buttons at bottom (centered)
+      html += '<div style="display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border-top:1px solid rgba(255,255,255,0.06);">';
+      html += '<button class="editor-toolbar-btn" style="color:#22c55e;padding:5px 14px;font-size:0.74rem;" onclick="promptNewFile()" title="Create a new file"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="margin-right:4px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New File</button>';
+      html += '<button class="editor-toolbar-btn" style="color:var(--accent);padding:5px 14px;font-size:0.74rem;" onclick="promptNewFolder(\'\')" title="Create a new folder"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="margin-right:4px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>New Folder</button>';
+      html += '<button class="editor-toolbar-btn" style="color:#a78bfa;padding:5px 14px;font-size:0.74rem;" onclick="triggerFileUpload(\'\')" title="Upload files"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="margin-right:4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Upload</button>';
       html += '</div>';
       list.innerHTML = html;
     }
@@ -9430,6 +9457,12 @@
         html += '<span style="flex:1;font-size:0.78rem;font-family:\'SF Mono\',\'Fira Code\',monospace;color:var(--text-primary);font-weight:' + (isLarge ? '500' : '400') + ';">' + escapeHtml(fname) + '/</span>';
         html += '<span style="font-size:0.62rem;color:var(--text-muted);flex-shrink:0;">' + itemCount + ' item' + (itemCount !== 1 ? 's' : '') + '</span>';
         if (grayed) html += '<span style="font-size:0.58rem;color:var(--text-muted);padding:1px 5px;border:1px solid var(--border);border-radius:3px;">Click to expand</span>';
+        // Folder actions: new folder, upload, delete
+        html += '<span style="display:flex;gap:2px;flex-shrink:0;" onclick="event.stopPropagation()">';
+        html += '<button onclick="promptNewFolder(\'' + escapeAttr(folderPath + '/') + '\')" title="New subfolder" style="background:none;border:none;padding:2px;cursor:pointer;color:var(--text-muted);transition:color 0.15s;display:flex;align-items:center;" onmouseover="this.style.color=\'var(--accent)\'" onmouseout="this.style.color=\'var(--text-muted)\'"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg></button>';
+        html += '<button onclick="triggerFileUpload(\'' + escapeAttr(folderPath) + '\')" title="Upload to folder" style="background:none;border:none;padding:2px;cursor:pointer;color:var(--text-muted);transition:color 0.15s;display:flex;align-items:center;" onmouseover="this.style.color=\'#a78bfa\'" onmouseout="this.style.color=\'var(--text-muted)\'"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></button>';
+        html += '<button onclick="confirmDeleteFolder(\'' + escapeAttr(folderPath + '/') + '\', \'' + escapeAttr(fname) + '\')" title="Delete folder" style="background:none;border:none;padding:2px;cursor:pointer;color:var(--text-muted);transition:color 0.15s;display:flex;align-items:center;" onmouseover="this.style.color=\'#ef4444\'" onmouseout="this.style.color=\'var(--text-muted)\'"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
+        html += '</span>';
         html += '</div>';
 
         if (isExpanded) {
@@ -9556,6 +9589,167 @@
         .catch(function(err) {
           alert('Error: ' + err.message);
         });
+    }
+
+    /* ── File Rename (inline) ─────────────────── */
+    function startFileRename() {
+      if (!filesModalCurrentKey) return;
+      var nameEl = document.getElementById('files-editor-name');
+      var renameBtn = document.getElementById('files-rename-btn');
+      var renameWrap = document.getElementById('files-rename-wrap');
+      var renameInput = document.getElementById('files-rename-input');
+      if (!nameEl || !renameWrap || !renameInput) return;
+      var currentName = filesModalCurrentKey.split('/').pop() || '';
+      renameInput.value = currentName;
+      nameEl.style.display = 'none';
+      renameBtn.style.display = 'none';
+      renameWrap.style.display = 'flex';
+      renameInput.focus();
+      renameInput.select();
+    }
+
+    function cancelFileRename() {
+      var nameEl = document.getElementById('files-editor-name');
+      var renameBtn = document.getElementById('files-rename-btn');
+      var renameWrap = document.getElementById('files-rename-wrap');
+      if (nameEl) nameEl.style.display = '';
+      if (renameBtn) renameBtn.style.display = '';
+      if (renameWrap) renameWrap.style.display = 'none';
+    }
+
+    function confirmFileRename() {
+      var renameInput = document.getElementById('files-rename-input');
+      if (!renameInput || !filesModalCurrentKey || !filesModalSiteId) return;
+      var newName = renameInput.value.trim();
+      if (!newName || !/^[a-zA-Z0-9._\-]+$/.test(newName)) {
+        renameInput.style.borderBottom = '1px solid #ef4444';
+        return;
+      }
+      var parts = filesModalCurrentKey.split('/');
+      parts[parts.length - 1] = newName;
+      var newKey = parts.join('/');
+      if (newKey === filesModalCurrentKey) { cancelFileRename(); return; }
+
+      // Read current content, create at new path, delete old
+      var currentContent = '';
+      if (cmEditor) { currentContent = cmEditor.getValue(); }
+      else { var ta = document.getElementById('files-editor-content'); if (ta) currentContent = ta.value; }
+
+      fetch('/api/sites/' + filesModalSiteId + '/files/' + encodeURIComponent(newKey), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + state.session.token },
+        body: JSON.stringify({ content: currentContent })
+      }).then(function(r) {
+        if (!r.ok) throw new Error('Failed to create renamed file');
+        return fetch('/api/sites/' + filesModalSiteId + '/files/' + encodeURIComponent(filesModalCurrentKey), {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + state.session.token }
+        });
+      }).then(function() {
+        filesModalCurrentKey = newKey;
+        var nameEl = document.getElementById('files-editor-name');
+        if (nameEl) nameEl.textContent = newName;
+        cancelFileRename();
+        showToast('File renamed to ' + newName, 'success');
+        trackEvent('file_renamed', { site_id: filesModalSiteId, old_key: filesModalCurrentKey, new_key: newKey });
+      }).catch(function(err) {
+        showToast(err.message || 'Rename failed', 'error');
+      });
+    }
+
+    /* ── Folder Creation ──────────────────────── */
+    function promptNewFolder(parentPath) {
+      var name = prompt('New folder name:');
+      if (!name || !name.trim()) return;
+      name = name.trim().replace(/[^a-zA-Z0-9._\-]/g, '');
+      if (!name) { showToast('Invalid folder name', 'error'); return; }
+      var folderPath = (parentPath || '') + name + '/.gitkeep';
+      createNewFile(folderPath.replace(/^\/+/, ''));
+    }
+
+    /* ── Folder Deletion ──────────────────────── */
+    function confirmDeleteFolder(folderPrefix, folderName) {
+      if (!confirm('Delete folder "' + folderName + '" and all its contents?\n\nThis cannot be undone.')) return;
+      if (!filesModalSiteId || !state.session || !state.session.token) return;
+      // Get all files in this folder
+      var filesToDelete = _filesTreeData.filter(function(f) {
+        return f.key.startsWith(folderPrefix);
+      });
+      if (!filesToDelete.length) { showToast('Folder is empty.', 'info'); return; }
+      var promises = filesToDelete.map(function(f) {
+        return fetch('/api/sites/' + filesModalSiteId + '/files/' + encodeURIComponent(f.key), {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + state.session.token }
+        });
+      });
+      Promise.all(promises).then(function() {
+        showToast('Folder "' + folderName + '" deleted (' + filesToDelete.length + ' files).', 'success');
+        trackEvent('folder_deleted', { site_id: filesModalSiteId, folder: folderPrefix, count: filesToDelete.length });
+        loadFilesForSite();
+      }).catch(function(err) {
+        showToast(err.message || 'Failed to delete folder.', 'error');
+      });
+    }
+
+    /* ── File Upload ──────────────────────────── */
+    var MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+    var MAX_SITE_SIZE = 1024 * 1024 * 1024; // 1GB
+
+    function triggerFileUpload(targetFolder) {
+      var input = document.createElement('input');
+      input.type = 'file';
+      input.multiple = true;
+      input.style.display = 'none';
+      input.accept = '*/*';
+      input.onchange = function() {
+        if (!input.files || !input.files.length) return;
+        uploadFiles(input.files, targetFolder || '');
+        input.remove();
+      };
+      document.body.appendChild(input);
+      input.click();
+    }
+
+    function uploadFiles(files, targetFolder) {
+      if (!filesModalSiteId || !state.session || !state.session.token) return;
+      var toUpload = [];
+      for (var i = 0; i < files.length; i++) {
+        if (files[i].size > MAX_FILE_SIZE) {
+          showToast(files[i].name + ' exceeds 50MB limit.', 'error');
+          continue;
+        }
+        toUpload.push(files[i]);
+      }
+      if (!toUpload.length) return;
+      var uploaded = 0;
+      var total = toUpload.length;
+      showToast('Uploading ' + total + ' file(s)...', 'info');
+
+      toUpload.forEach(function(file) {
+        var prefix = document.getElementById('files-breadcrumb').textContent || '';
+        var fullKey = prefix + (targetFolder ? targetFolder + '/' : '') + file.name;
+
+        var reader = new FileReader();
+        reader.onload = function() {
+          var base64 = reader.result.split(',')[1] || '';
+          fetch('/api/sites/' + filesModalSiteId + '/files/' + encodeURIComponent(fullKey), {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + state.session.token },
+            body: JSON.stringify({ content: base64, encoding: 'base64' })
+          }).then(function(r) {
+            if (!r.ok) throw new Error('Failed to upload ' + file.name);
+            uploaded++;
+            if (uploaded === total) {
+              showToast(total + ' file(s) uploaded!', 'success');
+              trackEvent('files_uploaded', { site_id: filesModalSiteId, count: total });
+              loadFilesForSite();
+            }
+          }).catch(function(err) {
+            showToast(err.message, 'error');
+          });
+        };
+        reader.readAsDataURL(file);
+      });
     }
 
     /** CodeMirror editor instance (null if CodeMirror not loaded — textarea fallback) */

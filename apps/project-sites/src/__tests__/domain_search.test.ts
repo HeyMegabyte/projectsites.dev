@@ -114,9 +114,9 @@ afterEach(() => {
 // ─── Domain Search Tests ────────────────────────────────────
 
 describe('GET /api/domains/search', () => {
-  it('returns empty array for query shorter than 3 chars', async () => {
+  it('returns fallback results for query shorter than 2 chars', async () => {
     const { app, env } = createAuthenticatedApp();
-    const res = await app.request('/api/domains/search?q=ab', {}, env);
+    const res = await app.request('/api/domains/search?q=a', {}, env);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.data).toEqual([]);
