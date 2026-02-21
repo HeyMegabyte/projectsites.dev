@@ -239,7 +239,7 @@ test.describe('Domain Modal Styling', () => {
     const domainModal = page.locator('#domain-modal .modal');
     await expect(domainModal).toBeAttached();
     const style = await domainModal.getAttribute('style');
-    expect(style).toContain('min-height:510px');
+    expect(style).toContain('min-height:440px');
   });
 });
 
@@ -252,20 +252,20 @@ test.describe('Domain Search Input Styling', () => {
     expect(html).toContain('position: relative');
   });
 
-  test('domain search input focus uses white border', async ({ page }) => {
+  test('domain search input focus uses accent border', async ({ page }) => {
     await page.goto('/');
 
     const html = await page.content();
     expect(html).toContain('.domain-search-input:focus');
-    expect(html).toContain('border-color: white');
+    expect(html).toContain('border-color: var(--accent)');
   });
 
-  test('domain search results has padding-top and negative margin', async ({ page }) => {
+  test('domain search results has margin-top spacing', async ({ page }) => {
     await page.goto('/');
 
     const html = await page.content();
-    expect(html).toContain('padding-top: 10px');
-    expect(html).toContain('margin-top: -10px');
+    expect(html).toContain('.domain-search-results');
+    expect(html).toContain('margin-top: 8px');
   });
 });
 
