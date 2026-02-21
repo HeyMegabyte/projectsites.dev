@@ -667,6 +667,7 @@
       min-width: 140px;
     }
     .site-card-dropdown-menu.open { display: block; animation: fadeInScale 0.15s ease-out; }
+    .site-card:has(.site-card-dropdown-menu.open) { z-index: 201; position: relative; }
     .site-card-dropdown-item {
       display: flex; align-items: center; gap: 8px;
       padding: 8px 12px;
@@ -756,9 +757,10 @@
       border: 1px solid rgba(80, 165, 219, 0.1);
       border-radius: 22px;
       padding: 28px;
-      max-width: 700px;
+      max-width: 720px;
       width: 95%;
-      max-height: 85vh;
+      max-height: 90vh;
+      min-height: 0;
       overflow-y: auto;
       animation: fadeInScale 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
       box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(80, 165, 219, 0.06), 0 0 80px rgba(80, 165, 219, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.04);
@@ -4696,12 +4698,23 @@
 
   <!-- Stripe Embedded Checkout Modal -->
   <div id="checkout-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-label="Upgrade to Pro" onclick="if(event.target===this)closeCheckoutModal()" style="display:none;">
-    <div class="modal" style="max-width:520px;min-height:400px;padding:0;overflow:hidden;">
+    <div class="modal" style="max-width:520px;padding:0;overflow:hidden;">
       <div style="display:flex;align-items:center;justify-content:between;padding:18px 22px 14px;border-bottom:1px solid var(--border);">
         <span style="font-size:1rem;font-weight:700;color:var(--text-primary);flex:1;">Upgrade to Pro</span>
         <button class="modal-close" onclick="closeCheckoutModal()" style="position:static;margin:0;">&times;</button>
       </div>
       <div id="checkout-mount" style="min-height:350px;"></div>
+    </div>
+  </div>
+
+  <!-- Billing Portal Modal -->
+  <div id="billing-portal-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-label="Billing Portal" onclick="if(event.target===this)closeBillingPortalModal()" style="display:none;">
+    <div class="modal" style="padding:0;overflow:hidden;">
+      <div style="display:flex;align-items:center;justify-content:between;padding:18px 22px 14px;border-bottom:1px solid var(--border);">
+        <span style="font-size:1rem;font-weight:700;color:var(--text-primary);flex:1;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px;"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>Billing &amp; Subscription</span>
+        <button class="modal-close" onclick="closeBillingPortalModal()" style="position:static;margin:0;">&times;</button>
+      </div>
+      <div id="billing-portal-mount" style="min-height:400px;"></div>
     </div>
   </div>
 
@@ -5695,12 +5708,12 @@
 
         // Plan badge row (Free / Paid per site)
         var sitePlan = s.plan || 'free';
-        html += '<div class="site-card-plan-row">';
+        html += '<div class="site-card-plan-row" id="plan-row-' + s.id + '">';
         if (sitePlan === 'paid') {
           html += '<span class="plan-badge paid" data-tooltip="Custom domain enabled">Paid</span>';
         } else {
           html += '<span class="plan-badge free" data-tooltip="Upgrade for custom domains">Free</span>';
-          html += '<button class="site-card-upgrade-btn" onclick="openSiteCheckout(\'' + escapeAttr(s.id) + '\')" data-tooltip="Get a custom domain">Upgrade to Paid</button>';
+          html += '<button class="site-card-upgrade-btn" onclick="inlineCheckout(\'' + escapeAttr(s.id) + '\')" data-tooltip="Get a custom domain">Upgrade to Paid</button>';
         }
         html += '</div>';
 
@@ -6493,10 +6506,63 @@
       openCheckoutModal(siteId);
     }
 
+    /** Inline checkout: expand Stripe embedded checkout inside the site card */
+    var _inlineCheckouts = {};
+    function inlineCheckout(siteId) {
+      if (!state.session || !state.session.token) return;
+      var planRow = document.getElementById('plan-row-' + siteId);
+      if (!planRow) { openCheckoutModal(siteId); return; }
+
+      // Replace row with inline checkout mount
+      var mountId = 'inline-checkout-' + siteId;
+      planRow.innerHTML = '<div id="' + mountId + '" style="min-height:320px;border-radius:12px;overflow:hidden;border:1px solid var(--border);"><div style="display:flex;align-items:center;justify-content:center;min-height:320px;color:var(--text-muted);font-size:0.8rem;">Loading checkout\u2026</div></div>';
+
+      var headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + state.session.token
+      };
+      fetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + state.session.token } })
+        .then(function(res) { return res.ok ? res.json() : null; })
+        .then(function(d) {
+          if (!d || !d.data || !d.data.org_id) throw new Error('Not authenticated');
+          return fetch('/api/billing/embedded-checkout', {
+            method: 'POST', headers: headers,
+            body: JSON.stringify({ org_id: d.data.org_id, site_id: siteId, return_url: window.location.origin + '/?billing=success' })
+          });
+        })
+        .then(function(res) {
+          if (!res.ok) return res.json().then(function(e) { throw new Error(e.error || 'Checkout failed'); });
+          return res.json();
+        })
+        .then(function(d) {
+          if (!d || !d.data || !d.data.client_secret) throw new Error('No checkout session');
+          return getStripe().then(function(stripe) {
+            return stripe.initEmbeddedCheckout({ clientSecret: d.data.client_secret });
+          });
+        })
+        .then(function(checkout) {
+          _inlineCheckouts[siteId] = checkout;
+          var el = document.getElementById(mountId);
+          if (el) { el.innerHTML = ''; checkout.mount('#' + mountId); }
+        })
+        .catch(function() {
+          // Fallback to modal
+          if (planRow) planRow.innerHTML = '<span class="plan-badge free">Free</span><button class="site-card-upgrade-btn" onclick="openCheckoutModal(\'' + siteId + '\')">Upgrade to Paid</button>';
+        });
+    }
+
     /* ── Billing Actions ─────────────────────────── */
 
     function openBillingPortal() {
       if (!state.session || !state.session.token) return;
+
+      var modal = document.getElementById('billing-portal-modal');
+      var mountEl = document.getElementById('billing-portal-mount');
+      if (!modal || !mountEl) return;
+
+      modal.style.display = '';
+      modal.classList.add('visible');
+      mountEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;min-height:400px;color:var(--text-muted);font-size:0.85rem;">Loading billing portal\u2026</div>';
 
       var headers = {
         'Content-Type': 'application/json',
@@ -6506,7 +6572,7 @@
       fetch('/api/billing/portal', {
         method: 'POST',
         headers: headers,
-        body: JSON.stringify({ return_url: window.location.href })
+        body: JSON.stringify({ return_url: window.location.origin + '/?billing=portal' })
       })
         .then(function(res) {
           if (!res.ok) return res.json().then(function(d) {
@@ -6520,13 +6586,21 @@
         })
         .then(function(d) {
           if (d.data && d.data.portal_url) {
-            window.location.href = d.data.portal_url;
+            mountEl.innerHTML = '<iframe src="' + d.data.portal_url + '" style="width:100%;min-height:70vh;border:none;border-radius:0 0 22px 22px;"></iframe>';
           }
         })
         .catch(function(err) {
-          // If no billing account, open inline checkout instead
+          closeBillingPortalModal();
           openBillingCheckout();
         });
+    }
+
+    function closeBillingPortalModal() {
+      var modal = document.getElementById('billing-portal-modal');
+      if (modal) {
+        modal.classList.remove('visible');
+        setTimeout(function() { modal.style.display = 'none'; }, 300);
+      }
     }
 
     function openBillingCheckout() {

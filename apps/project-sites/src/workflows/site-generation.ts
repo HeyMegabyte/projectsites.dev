@@ -129,6 +129,9 @@ interface SocialData {
 /** Shape of the quality score data. */
 interface QualityData {
   overall: number;
+  issues?: string[];
+  suggestions?: string[];
+  missing_sections?: string[];
 }
 
 // Step callbacks return JSON-stringified data (string is always Serializable).
@@ -639,7 +642,85 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
       qualityJson = JSON.stringify({ overall: 0.5, scores: {}, issues: [], suggestions: [], missing_sections: [] });
     }
 
-    const quality = JSON.parse(qualityJson) as QualityData;
+    let quality = JSON.parse(qualityJson) as QualityData;
+    const MIN_QUALITY = 0.6;
+
+    // If quality is below threshold, regenerate the main page once
+    if (quality.overall < MIN_QUALITY) {
+      await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.quality_below_threshold', {
+        quality_score: quality.overall,
+        threshold: MIN_QUALITY,
+        issues: quality.issues ?? [],
+        suggestions: quality.suggestions ?? [],
+        message: 'Quality score ' + quality.overall + ' below threshold ' + MIN_QUALITY + ' — regenerating website',
+        phase: 'generation',
+      });
+
+      try {
+        const regeneratedHtml = await step.do(
+          'regenerate-website',
+          {
+            retries: { limit: 2, delay: '10 seconds', backoff: 'exponential' },
+            timeout: '5 minutes',
+          },
+          async () => {
+            const { runPrompt } = await import('../services/ai_workflows.js');
+            const { validatePromptOutput } = await import('../prompts/schemas.js');
+            const feedbackNote = (quality.issues ?? []).concat(quality.suggestions ?? []).join('; ');
+            const result = await runPrompt(env, 'generate_website', 1, {
+              profile_json: JSON.stringify(research.profile),
+              brand_json: JSON.stringify(research.brand),
+              selling_points_json: JSON.stringify(research.sellingPoints),
+              social_json: JSON.stringify(research.social),
+              images_json: JSON.stringify(research.images),
+              uploads_json: params.uploadedAssets ? JSON.stringify(params.uploadedAssets) : '',
+              quality_feedback: feedbackNote || 'Improve overall quality — ensure strong visuals, complete content, good SEO, and accessibility',
+            });
+            validatePromptOutput('generate_website', result.output);
+            return result.output;
+          },
+        );
+
+        html = regeneratedHtml;
+
+        // Re-score the regenerated page
+        try {
+          const rescoreResult = await step.do(
+            'rescore-website',
+            {
+              retries: { limit: 1, delay: '5 seconds', backoff: 'exponential' },
+              timeout: '1 minute',
+            },
+            async () => {
+              const { runPrompt } = await import('../services/ai_workflows.js');
+              const { validatePromptOutput: vpo } = await import('../prompts/schemas.js');
+              const result = await runPrompt(env, 'score_website', 1, {
+                html_content: html.substring(0, 6000),
+                business_name: params.businessName,
+              });
+              return JSON.stringify(vpo('score_website', extractJsonFromText(result.output)));
+            },
+          );
+          quality = JSON.parse(rescoreResult) as QualityData;
+        } catch {
+          // Re-scoring failed, keep original quality data
+        }
+
+        await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.quality_regenerated', {
+          new_quality_score: quality.overall,
+          improved: quality.overall >= MIN_QUALITY,
+          message: 'Regenerated website · New score: ' + quality.overall + '/100',
+          phase: 'generation',
+        });
+      } catch (regenErr) {
+        const msg = regenErr instanceof Error ? regenErr.message : String(regenErr);
+        await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.quality_regen_failed', {
+          error: msg,
+          message: 'Regeneration failed — publishing original: ' + msg,
+          phase: 'generation',
+        });
+      }
+    }
 
     await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.legal_and_scoring_complete', {
       quality_score: quality.overall,

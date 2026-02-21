@@ -2195,8 +2195,8 @@ api.post('/api/admin/domains/:hostnameId/verify', async (c) => {
       const { notifyDomainVerified } = await import('../services/notifications.js');
       const owner = await dbQueryOne<{ email: string }>(
         c.env.DB,
-        'SELECT u.email FROM users u JOIN organizations o ON u.id = o.owner_id WHERE o.id = ?',
-        [orgId],
+        'SELECT u.email FROM users u JOIN memberships m ON u.id = m.user_id WHERE m.org_id = ? AND m.role = ? AND m.deleted_at IS NULL',
+        [orgId, 'owner'],
       );
       if (owner?.email) {
         const site = await dbQueryOne<{ slug: string; business_name: string }>(
@@ -2205,10 +2205,10 @@ api.post('/api/admin/domains/:hostnameId/verify', async (c) => {
           [hostname.site_id],
         );
         const defaultDomain = (site?.slug || 'unknown') + '-sites.megabyte.space';
-        // Find primary hostname
+        // Find primary hostname (use COALESCE for optional is_primary column)
         const primary = await dbQueryOne<{ hostname: string }>(
           c.env.DB,
-          'SELECT hostname FROM hostnames WHERE site_id = ? AND is_primary = 1 AND deleted_at IS NULL',
+          'SELECT hostname FROM hostnames WHERE site_id = ? AND deleted_at IS NULL ORDER BY COALESCE(is_primary, 0) DESC, created_at ASC LIMIT 1',
           [hostname.site_id],
         );
         await notifyDomainVerified(c.env, {
