@@ -1,0 +1,124 @@
+.screen-waiting {
+  min-height: calc(100vh - 60px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  position: relative;
+  z-index: 1;
+}
+
+.waiting-card {
+  width: 100%;
+  max-width: 560px;
+  background: linear-gradient(145deg, rgba(22, 22, 53, 0.95), rgba(15, 15, 42, 0.98));
+  border: 1px solid rgba(80, 165, 219, 0.12);
+  border-radius: 16px;
+  overflow: hidden;
+  animation: fadeInScale 0.3s ease;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+}
+
+.waiting-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  background: rgba(0, 0, 0, 0.3);
+  border-bottom: 1px solid rgba(80, 165, 219, 0.06);
+}
+
+.terminal-dots {
+  display: flex;
+  gap: 6px;
+
+  .dot {
+    width: 10px; height: 10px; border-radius: 50%;
+  }
+  .red { background: #ff5f57; }
+  .yellow { background: #febc2e; }
+  .green { background: #28c840; }
+}
+
+.terminal-title {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  font-family: 'Menlo', 'Consolas', monospace;
+}
+
+.terminal-body {
+  padding: 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.terminal-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.88rem;
+  font-family: 'Menlo', 'Consolas', monospace;
+  color: var(--text-muted);
+  transition: color 0.3s;
+
+  &.step-done { color: var(--success); }
+  &.step-active { color: var(--accent); }
+  &.step-error { color: var(--error); }
+}
+
+.step-indicator {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.step-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  opacity: 0.4;
+}
+
+.spinner-small {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+.waiting-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 20px;
+  text-align: center;
+  animation: fadeInUp 0.3s ease;
+
+  p { color: var(--success); font-weight: 600; }
+}
+
+.waiting-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 20px;
+  text-align: center;
+
+  p { color: var(--error); font-size: 0.9rem; }
+}
+
+.waiting-actions {
+  padding: 16px 20px;
+  border-top: 1px solid rgba(80, 165, 219, 0.06);
+  display: flex;
+  justify-content: center;
+}

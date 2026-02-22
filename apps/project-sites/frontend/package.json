@@ -1,14 +1,45 @@
 {
   "name": "@project-sites/frontend",
   "version": "1.0.0",
-  "private": true,
-  "type": "module",
   "scripts": {
-    "dev": "astro dev",
-    "build": "astro build",
-    "preview": "astro preview"
+    "ng": "ng",
+    "start": "ng serve",
+    "build": "ng build",
+    "build:prod": "ng build --configuration production",
+    "watch": "ng build --watch --configuration development",
+    "test": "ng test",
+    "deploy:staging": "npm run build:prod && cd .. && node -e \"const{execSync:e}=require('child_process');const fs=require('fs');const p='frontend/dist/project-sites-frontend/browser';fs.readdirSync(p).forEach(f=>{const ct=f.endsWith('.html')?'text/html':f.endsWith('.js')?'application/javascript':f.endsWith('.css')?'text/css':f.endsWith('.ico')?'image/x-icon':'application/octet-stream';e('npx wrangler r2 object put project-sites-staging/marketing/'+f+' --file '+p+'/'+f+' --content-type '+ct+' --remote',{stdio:'inherit'})})\"",
+    "deploy:production": "npm run build:prod && cd .. && node -e \"const{execSync:e}=require('child_process');const fs=require('fs');const p='frontend/dist/project-sites-frontend/browser';fs.readdirSync(p).forEach(f=>{const ct=f.endsWith('.html')?'text/html':f.endsWith('.js')?'application/javascript':f.endsWith('.css')?'text/css':f.endsWith('.ico')?'image/x-icon':'application/octet-stream';e('npx wrangler r2 object put project-sites/marketing/'+f+' --file '+p+'/'+f+' --content-type '+ct+' --remote',{stdio:'inherit'})})\""
   },
+  "private": true,
   "dependencies": {
-    "astro": "^5.17.3"
+    "@angular/animations": "^19.2.0",
+    "@angular/cdk": "^19.2.0",
+    "@angular/common": "^19.2.0",
+    "@angular/compiler": "^19.2.0",
+    "@angular/core": "^19.2.0",
+    "@angular/forms": "^19.2.0",
+    "@angular/platform-browser": "^19.2.0",
+    "@angular/platform-browser-dynamic": "^19.2.0",
+    "@angular/router": "^19.2.0",
+    "@primeng/themes": "^21.0.4",
+    "primeicons": "^7.0.0",
+    "primeng": "^21.1.1",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.3.0",
+    "zone.js": "~0.15.0"
+  },
+  "devDependencies": {
+    "@angular-devkit/build-angular": "^19.2.20",
+    "@angular/cli": "^19.2.20",
+    "@angular/compiler-cli": "^19.2.0",
+    "@types/jasmine": "~5.1.0",
+    "jasmine-core": "~5.6.0",
+    "karma": "~6.4.0",
+    "karma-chrome-launcher": "~3.2.0",
+    "karma-coverage": "~2.2.0",
+    "karma-jasmine": "~5.1.0",
+    "karma-jasmine-html-reporter": "~2.1.0",
+    "typescript": "~5.7.2"
   }
 }

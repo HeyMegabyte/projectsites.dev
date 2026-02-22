@@ -1,0 +1,60 @@
+<section class="screen-waiting">
+  <div class="waiting-card">
+    <div class="waiting-header">
+      <div class="terminal-dots">
+        <span class="dot red"></span>
+        <span class="dot yellow"></span>
+        <span class="dot green"></span>
+      </div>
+      <span class="terminal-title">Building your website...</span>
+    </div>
+
+    <div class="terminal-body">
+      @for (step of steps(); track step.label; let i = $index) {
+        <div class="terminal-line" [class]="'step-' + step.status">
+          <span class="step-indicator">
+            @switch (step.status) {
+              @case ('done') {
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              }
+              @case ('active') {
+                <span class="spinner-small"></span>
+              }
+              @case ('error') {
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2">
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              }
+              @default {
+                <span class="step-dot"></span>
+              }
+            }
+          </span>
+          <span class="step-label">{{ step.label }}</span>
+        </div>
+      }
+    </div>
+
+    @if (status() === 'published') {
+      <div class="waiting-success">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><path d="M22 4 12 14.01l-3-3" />
+        </svg>
+        <p>Your site is live! Redirecting...</p>
+      </div>
+    }
+
+    @if (status() === 'error') {
+      <div class="waiting-error">
+        <p>Something went wrong during the build.</p>
+        <button class="btn btn-secondary-outline" (click)="goHome()">Try Again</button>
+      </div>
+    }
+
+    <div class="waiting-actions">
+      <button class="btn btn-secondary-outline" (click)="goAdmin()">Go to Dashboard</button>
+    </div>
+  </div>
+</section>

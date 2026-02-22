@@ -1,0 +1,307 @@
+# E2E Coverage Mapping
+# Maps every feature from FEATURES.md to one or more Playwright spec files.
+# CI gate: fail if any feature lacks coverage mapping.
+
+coverage:
+  # ── Product Area 1: App Shell & Navigation ──
+  A01_homepage_renders:
+    feature: Homepage renders
+    specs:
+      - e2e/specs/app-shell.spec.ts
+  A02_global_navigation:
+    feature: Global navigation (sidebar)
+    specs:
+      - e2e/specs/app-shell.spec.ts
+  A03_theme_toggle:
+    feature: Theme toggle
+    specs:
+      - e2e/specs/app-shell.spec.ts
+  A04_not_found:
+    feature: 404 not found UX
+    specs:
+      - e2e/specs/app-shell.spec.ts
+  A05_loading_skeletons:
+    feature: Loading skeletons
+    specs:
+      - e2e/specs/app-shell.spec.ts
+  A06_responsive_layout:
+    feature: Responsive layout
+    specs:
+      - e2e/specs/app-shell.spec.ts
+  A07_keyboard_shortcuts:
+    feature: Keyboard shortcuts
+    specs:
+      - e2e/specs/app-shell.spec.ts
+
+  # ── Product Area 2: Chat Interface ──
+  B01_send_message:
+    feature: Send message
+    specs:
+      - e2e/specs/chat-interface.spec.ts
+  B02_example_prompts:
+    feature: Example prompts
+    specs:
+      - e2e/specs/chat-interface.spec.ts
+  B03_chat_streaming:
+    feature: Chat streaming
+    specs:
+      - e2e/specs/chat-streaming.spec.ts
+  B04_chat_history:
+    feature: Chat history in sidebar
+    specs:
+      - e2e/specs/chat-history.spec.ts
+  B05_delete_chat:
+    feature: Delete chat
+    specs:
+      - e2e/specs/chat-history.spec.ts
+  B06_duplicate_chat:
+    feature: Duplicate chat
+    specs:
+      - e2e/specs/chat-history.spec.ts
+  B07_search_chat:
+    feature: Search chat history
+    specs:
+      - e2e/specs/chat-history.spec.ts
+  B08_chat_modes:
+    feature: Chat modes (Build/Discuss)
+    specs:
+      - e2e/specs/chat-interface.spec.ts
+  B09_message_rewind:
+    feature: Message rewind
+    specs:
+      - e2e/specs/chat-interface.spec.ts
+  B10_message_fork:
+    feature: Message fork
+    specs:
+      - e2e/specs/chat-interface.spec.ts
+  B11_chat_persistence:
+    feature: Chat persistence
+    specs:
+      - e2e/specs/chat-persistence.spec.ts
+  B12_chat_import_export:
+    feature: Chat import/export
+    specs:
+      - e2e/specs/chat-persistence.spec.ts
+
+  # ── Product Area 3: Provider & Model Configuration ──
+  C01_provider_selection:
+    feature: Provider selection
+    specs:
+      - e2e/specs/provider-config.spec.ts
+  C02_model_selection:
+    feature: Model selection
+    specs:
+      - e2e/specs/provider-config.spec.ts
+  C03_api_key_entry:
+    feature: API key entry
+    specs:
+      - e2e/specs/provider-config.spec.ts
+  C04_provider_toggle:
+    feature: Provider enable/disable
+    specs:
+      - e2e/specs/provider-config.spec.ts
+  C05_local_provider:
+    feature: Local provider setup
+    specs:
+      - e2e/specs/provider-config.spec.ts
+  C06_connection_test:
+    feature: Connection test
+    specs:
+      - e2e/specs/provider-config.spec.ts
+  C07_context_display:
+    feature: Model context display
+    specs:
+      - e2e/specs/provider-config.spec.ts
+
+  # ── Product Area 4: File Management ──
+  D01_file_tree:
+    feature: File tree display
+    specs:
+      - e2e/specs/file-management.spec.ts
+  D02_file_selection:
+    feature: File selection
+    specs:
+      - e2e/specs/file-management.spec.ts
+  D03_create_file:
+    feature: Create file
+    specs:
+      - e2e/specs/file-management.spec.ts
+  D04_file_tabs:
+    feature: File tabs
+    specs:
+      - e2e/specs/file-management.spec.ts
+  D05_unsaved_indicator:
+    feature: Unsaved indicator
+    specs:
+      - e2e/specs/file-management.spec.ts
+  D06_import_folder:
+    feature: Import folder
+    specs:
+      - e2e/specs/file-management.spec.ts
+  D07_git_clone:
+    feature: Git clone
+    specs:
+      - e2e/specs/git-integration.spec.ts
+  D08_file_search:
+    feature: File search
+    specs:
+      - e2e/specs/file-management.spec.ts
+
+  # ── Product Area 5: Code Editor ──
+  E01_syntax_highlighting:
+    feature: Syntax highlighting
+    specs:
+      - e2e/specs/code-editor.spec.ts
+  E02_breadcrumb_nav:
+    feature: Breadcrumb nav
+    specs:
+      - e2e/specs/code-editor.spec.ts
+  E03_diff_view:
+    feature: Diff view
+    specs:
+      - e2e/specs/code-editor.spec.ts
+  E04_editor_tabs:
+    feature: Editor tabs
+    specs:
+      - e2e/specs/code-editor.spec.ts
+
+  # ── Product Area 6: Preview & Terminal ──
+  F01_live_preview:
+    feature: Live preview
+    specs:
+      - e2e/specs/preview-terminal.spec.ts
+  F02_device_frames:
+    feature: Device frames
+    specs:
+      - e2e/specs/preview-terminal.spec.ts
+  F03_preview_reload:
+    feature: Preview reload
+    specs:
+      - e2e/specs/preview-terminal.spec.ts
+  F04_terminal_output:
+    feature: Terminal output
+    specs:
+      - e2e/specs/preview-terminal.spec.ts
+  F05_multiple_terminals:
+    feature: Multiple terminals
+    specs:
+      - e2e/specs/preview-terminal.spec.ts
+  F06_fullscreen_preview:
+    feature: Fullscreen preview
+    specs:
+      - e2e/specs/preview-terminal.spec.ts
+
+  # ── Product Area 7: Deployment ──
+  G01_deploy_menu:
+    feature: Deploy menu
+    specs:
+      - e2e/specs/deployment.spec.ts
+  G02_github_deploy:
+    feature: GitHub deploy
+    specs:
+      - e2e/specs/deployment.spec.ts
+  G03_netlify_deploy:
+    feature: Netlify deploy
+    specs:
+      - e2e/specs/deployment.spec.ts
+  G04_vercel_deploy:
+    feature: Vercel deploy
+    specs:
+      - e2e/specs/deployment.spec.ts
+
+  # ── Product Area 8: Settings & Configuration ──
+  H01_settings_panel:
+    feature: Settings panel
+    specs:
+      - e2e/specs/settings.spec.ts
+  H02_profile_settings:
+    feature: Profile settings
+    specs:
+      - e2e/specs/settings.spec.ts
+  H03_feature_toggles:
+    feature: Feature toggles
+    specs:
+      - e2e/specs/settings.spec.ts
+  H04_event_logs:
+    feature: Event logs
+    specs:
+      - e2e/specs/settings.spec.ts
+  H05_data_management:
+    feature: Data management
+    specs:
+      - e2e/specs/settings.spec.ts
+  H06_mcp_configuration:
+    feature: MCP configuration
+    specs:
+      - e2e/specs/settings.spec.ts
+
+  # ── Product Area 9: Starter Templates ──
+  I01_template_selection:
+    feature: Template selection
+    specs:
+      - e2e/specs/starter-templates.spec.ts
+  I02_template_variety:
+    feature: Template variety
+    specs:
+      - e2e/specs/starter-templates.spec.ts
+
+  # ── Product Area 10: Error Handling ──
+  J01_api_error_display:
+    feature: API error display
+    specs:
+      - e2e/specs/error-handling.spec.ts
+  J02_stream_recovery:
+    feature: Stream recovery
+    specs:
+      - e2e/specs/error-handling.spec.ts
+  J03_empty_states:
+    feature: Empty states
+    specs:
+      - e2e/specs/error-handling.spec.ts
+  J04_large_file_handling:
+    feature: Large file handling
+    specs:
+      - e2e/specs/error-handling.spec.ts
+
+  # ── Product Area 11: Project Sites Worker ──
+  PS01_marketing_homepage:
+    feature: Marketing homepage
+    specs:
+      - apps/project-sites/e2e/homepage.spec.ts
+  PS02_business_search:
+    feature: Business search
+    specs:
+      - apps/project-sites/e2e/golden-path.spec.ts
+  PS03_search_selection:
+    feature: Search result selection
+    specs:
+      - apps/project-sites/e2e/golden-path.spec.ts
+  PS04_email_signin:
+    feature: Email sign-in
+    specs:
+      - apps/project-sites/e2e/golden-path.spec.ts
+  PS05_google_oauth:
+    feature: Google OAuth
+    specs:
+      - apps/project-sites/e2e/golden-path.spec.ts
+  PS06_ai_generation:
+    feature: AI site generation
+    specs:
+      - apps/project-sites/e2e/ai-workflow.spec.ts
+  PS07_site_preview:
+    feature: Site preview
+    specs:
+      - apps/project-sites/e2e/site-preview-and-logs.spec.ts
+  PS08_custom_domains:
+    feature: Custom domains
+    specs:
+      - apps/project-sites/e2e/domain-management.spec.ts
+      - apps/project-sites/e2e/domain-management-v2.spec.ts
+  PS09_billing:
+    feature: Billing/Stripe
+    specs:
+      - apps/project-sites/e2e/golden-path.spec.ts
+  PS10_site_serving:
+    feature: Site serving
+    specs:
+      - apps/project-sites/e2e/site-serving.spec.ts

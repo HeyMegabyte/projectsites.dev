@@ -1,0 +1,82 @@
+<div class="details-modal-overlay visible">
+  <div class="details-card">
+    <button class="details-modal-close" (click)="goBack()" aria-label="Close">&times;</button>
+    <h2>Almost there</h2>
+    <p class="details-subtitle">Tell us about your business so we can build the perfect site.</p>
+
+    <!-- Selected business badge -->
+    @if (mode() === 'business' && business()) {
+      <div class="selected-business-badge">
+        <div class="badge-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
+          </svg>
+        </div>
+        <div class="badge-text">
+          <div class="badge-name">{{ business()!.name }}</div>
+          <div class="badge-addr">{{ business()!.address }}</div>
+        </div>
+        <button class="badge-dismiss" (click)="dismissBusiness()" aria-label="Remove">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+    }
+
+    <!-- Manual entry fields (custom mode or badge dismissed) -->
+    @if (mode() === 'custom' || !business()) {
+      <div class="input-group">
+        <label for="business-name">Business Name</label>
+        <input
+          id="business-name"
+          type="text"
+          class="input-field"
+          placeholder="e.g., Vito's Salon"
+          [(ngModel)]="businessName"
+        />
+      </div>
+
+      <div class="input-group">
+        <label for="business-address">Business Address</label>
+        <input
+          id="business-address"
+          type="text"
+          class="input-field"
+          placeholder="e.g., 123 Main St, New York, NY"
+          [(ngModel)]="businessAddress"
+        />
+      </div>
+    }
+
+    <!-- Additional context -->
+    <div class="input-group">
+      <label for="details-textarea">
+        Additional Context
+        <span class="label-hint">(optional)</span>
+      </label>
+      <textarea
+        id="details-textarea"
+        class="input-field"
+        placeholder="Describe your business, services, style preferences, colors..."
+        [(ngModel)]="additionalContext"
+        maxlength="5000"
+      ></textarea>
+      <span class="char-count">{{ additionalContext.length }} / 5000</span>
+    </div>
+
+    <!-- Submit -->
+    <button
+      class="btn btn-accent btn-full btn-large"
+      [disabled]="submitting()"
+      (click)="submitBuild()"
+    >
+      @if (submitting()) {
+        <span class="loading-dots"><span></span><span></span><span></span></span>
+        Building...
+      } @else {
+        Build My Website
+      }
+    </button>
+  </div>
+</div>

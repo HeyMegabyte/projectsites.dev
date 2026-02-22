@@ -1,0 +1,218 @@
+<section class="admin-panel">
+  <div class="admin-panel-inner">
+    <!-- Header -->
+    <div class="admin-panel-header">
+      <div class="admin-panel-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
+          <rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
+        </svg>
+        My Sites
+      </div>
+      <div class="admin-panel-actions">
+        <button class="admin-btn" (click)="newSite()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          New Site
+        </button>
+      </div>
+    </div>
+
+    <!-- Domain summary -->
+    @if (domainSummary().total > 0) {
+      <div class="domain-summary">
+        <span>Domains: {{ domainSummary().total }}</span>
+        <span class="ds-active">Active: {{ domainSummary().active }}</span>
+        @if (domainSummary().pending > 0) {
+          <span class="ds-pending">Pending: {{ domainSummary().pending }}</span>
+        }
+        @if (domainSummary().failed > 0) {
+          <span class="ds-failed">Failed: {{ domainSummary().failed }}</span>
+        }
+      </div>
+    }
+
+    <!-- Loading -->
+    @if (loading()) {
+      <div class="admin-loading">
+        <span class="loading-dots"><span></span><span></span><span></span></span>
+        Loading your sites...
+      </div>
+    }
+
+    <!-- Sites grid -->
+    @if (!loading()) {
+      @if (sites().length === 0) {
+        <div class="admin-empty">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" />
+          </svg>
+          <p>No sites yet. Create your first AI-powered website!</p>
+          <button class="btn btn-accent" (click)="newSite()">Create Site</button>
+        </div>
+      } @else {
+        <div class="site-grid">
+          @for (site of sites(); track site.id) {
+            <div class="site-card">
+              <!-- Preview -->
+              <div class="site-card-preview">
+                @if (site.status === 'published' && site.current_build_version) {
+                  <iframe
+                    [src]="getSiteUrl(site)"
+                    sandbox="allow-scripts"
+                    loading="lazy"
+                    [style.transform]="'scale(' + (280/1440) + ')'"
+                  ></iframe>
+                } @else {
+                  <div class="site-card-preview-placeholder">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" />
+                    </svg>
+                    <span>{{ site.status === 'error' ? 'Build failed' : 'Building...' }}</span>
+                  </div>
+                }
+              </div>
+
+              <!-- Title row -->
+              <div class="site-card-title-row">
+                <span class="site-card-status" [class]="getStatusClass(site.status)">
+                  {{ site.status }}
+                </span>
+                @if (editingSiteId() === site.id && editingField() === 'name') {
+                  <input
+                    class="inline-edit-input"
+                    [(ngModel)]="editValue"
+                    (keyup.enter)="saveEdit(site.id)"
+                    (keyup.escape)="cancelEdit()"
+                    (blur)="cancelEdit()"
+                  />
+                } @else {
+                  <span class="site-card-name" (dblclick)="startEdit(site.id, 'name', site.business_name)">
+                    {{ site.business_name }}
+                  </span>
+                }
+              </div>
+
+              <!-- URL -->
+              <div class="site-card-domain">
+                <a [href]="getSiteUrl(site)" target="_blank" rel="noopener">
+                  {{ site.primary_hostname || site.slug + '-sites.megabyte.space' }}
+                </a>
+              </div>
+
+              <!-- Plan badge -->
+              @if (site.plan) {
+                <span class="plan-badge" [class]="site.plan">{{ site.plan }}</span>
+              }
+
+              <!-- Actions -->
+              <div class="site-card-actions">
+                @if (site.status === 'published') {
+                  <button class="site-card-btn" (click)="visitSite(site)">Visit</button>
+                }
+                <button class="site-card-btn" (click)="openDomains(site.id)">Domains</button>
+                <button class="site-card-btn" (click)="openLogs(site.id)">Logs</button>
+                <button class="site-card-btn danger" (click)="confirmDelete(site.id)">Delete</button>
+              </div>
+            </div>
+          }
+        </div>
+      }
+    }
+  </div>
+</section>
+
+<!-- Delete confirmation -->
+@if (deletingSiteId()) {
+  <div class="modal-overlay" (click)="cancelDelete()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <h3>Delete Site?</h3>
+      <p>This action cannot be undone. The site and all its data will be permanently deleted.</p>
+      <div class="modal-actions">
+        <button class="btn btn-secondary-outline" (click)="cancelDelete()">Cancel</button>
+        <button class="btn btn-danger" (click)="deleteSite(deletingSiteId()!)">Delete</button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Domain modal -->
+@if (domainModalSiteId()) {
+  <div class="modal-overlay" (click)="closeDomains()">
+    <div class="modal-card modal-wide" (click)="$event.stopPropagation()">
+      <button class="modal-close" (click)="closeDomains()">&times;</button>
+      <h3>Domain Management</h3>
+
+      @if (loadingHostnames()) {
+        <div class="modal-loading">Loading domains...</div>
+      } @else {
+        <!-- Existing hostnames -->
+        @if (hostnames().length > 0) {
+          <div class="hostname-list">
+            @for (hn of hostnames(); track hn.id) {
+              <div class="hostname-item">
+                <span class="hostname-name">
+                  {{ hn.hostname }}
+                  @if (hn.is_primary) {
+                    <span class="primary-badge">Primary</span>
+                  }
+                </span>
+                <span class="hostname-status" [class]="hn.status">{{ hn.status }}</span>
+                <div class="hostname-actions">
+                  @if (!hn.is_primary) {
+                    <button class="hostname-btn" (click)="setPrimary(hn.id)">Set Primary</button>
+                  }
+                  <button class="hostname-btn danger" (click)="deleteHostname(hn.id)">Remove</button>
+                </div>
+              </div>
+            }
+          </div>
+        } @else {
+          <p class="no-domains">No custom domains configured.</p>
+        }
+
+        <!-- Add domain -->
+        <div class="add-domain">
+          <input
+            type="text"
+            class="input-field"
+            placeholder="yourdomain.com"
+            [(ngModel)]="newHostname"
+            (keyup.enter)="addHostname()"
+          />
+          <button class="btn btn-accent" (click)="addHostname()" [disabled]="!newHostname.trim()">Add Domain</button>
+        </div>
+
+        <div class="cname-instructions">
+          <p>Point a CNAME record for your domain to <code>sites.megabyte.space</code></p>
+        </div>
+      }
+    </div>
+  </div>
+}
+
+<!-- Logs modal -->
+@if (logsModalSiteId()) {
+  <div class="modal-overlay" (click)="closeLogs()">
+    <div class="modal-card modal-wide" (click)="$event.stopPropagation()">
+      <button class="modal-close" (click)="closeLogs()">&times;</button>
+      <h3>Build Logs</h3>
+
+      @if (loadingLogs()) {
+        <div class="modal-loading">Loading logs...</div>
+      } @else if (logs().length === 0) {
+        <p class="no-logs">No logs yet.</p>
+      } @else {
+        <div class="logs-timeline">
+          @for (log of logs(); track log.created_at) {
+            <div class="log-entry">
+              <span class="log-time">{{ formatRelativeTime(log.created_at) }}</span>
+              <span class="log-action">{{ log.action }}</span>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  </div>
+}

@@ -1,0 +1,95 @@
+<section class="screen-search">
+  <!-- Hero -->
+  <div class="hero-brand">
+    <h1>
+      Your Website,
+      <span class="gradient-text">Handled.</span>
+      Finally.
+    </h1>
+    <p class="tagline">AI-powered websites for small businesses. Search and get yours in minutes.</p>
+  </div>
+
+  <!-- Search bar -->
+  <div class="search-wrapper">
+    <div class="search-input-wrap">
+      <span class="search-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+        </svg>
+      </span>
+      <input
+        #searchInput
+        type="text"
+        class="search-input"
+        placeholder="Search for your business..."
+        [(ngModel)]="query"
+        (input)="onSearchInput()"
+        (blur)="closeDropdown()"
+        autocomplete="off"
+      />
+      @if (loading()) {
+        <span class="search-spinner visible"></span>
+      }
+    </div>
+
+    <!-- Dropdown -->
+    @if (dropdownOpen() && results().length > 0) {
+      <div class="search-dropdown open">
+        @for (item of results(); track item.name + item.address) {
+          <div
+            class="search-result"
+            [class.search-result-custom]="item.type === 'custom'"
+            (mousedown)="selectItem(item)"
+          >
+            <div class="search-result-icon">
+              @if (item.type === 'custom') {
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              } @else {
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
+                </svg>
+              }
+            </div>
+            <div class="search-result-text">
+              <div class="search-result-name">
+                {{ item.name }}
+                @if (item.type === 'prebuilt') {
+                  <span class="prebuilt-badge">PRE-BUILT</span>
+                }
+              </div>
+              <div class="search-result-address">
+                {{ item.address }}
+                @if (item.distance) {
+                  <span class="distance-badge">{{ item.distance }}</span>
+                }
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  </div>
+
+  <p class="search-hint">Type your business name to get started</p>
+</section>
+
+<!-- Location permission modal -->
+@if (showLocationPrompt()) {
+  <div class="location-modal-overlay">
+    <div class="location-modal">
+      <div class="location-modal-icon">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
+        </svg>
+      </div>
+      <h3>Find nearby businesses</h3>
+      <p>Allow location access to sort search results by distance and find businesses near you.</p>
+      <div class="location-modal-actions">
+        <button class="btn-skip" (click)="skipLocation()">Not now</button>
+        <button class="btn-allow" (click)="allowLocation()">Allow</button>
+      </div>
+    </div>
+  </div>
+}
