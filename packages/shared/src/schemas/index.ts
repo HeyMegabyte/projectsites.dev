@@ -50,3 +50,5 @@ export * from './analytics.js';
 export * from './hostname.js';
 export * from './api.js';
 export * from './contact.js';
+export * from './confidence.js';
+export * from './seed-v3.js';

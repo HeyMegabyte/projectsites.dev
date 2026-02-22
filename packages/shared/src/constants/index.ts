@@ -47,7 +47,7 @@ export const ENTITLEMENTS = {
   },
   paid: {
     topBarHidden: true,
-    maxCustomDomains: 5,
+    maxCustomDomains: 10,
     chatEnabled: true,
     analyticsEnabled: true,
   },

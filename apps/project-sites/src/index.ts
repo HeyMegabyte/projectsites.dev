@@ -66,7 +66,8 @@ app.use(
   '/api/*',
   cors({
     origin: (origin) => {
-      // Allow requests from our domains
+      if (!origin) return '';
+      // Allow requests from our domains and any *sites.megabyte.space subdomain
       const allowed = [
         `https://${DOMAINS.SITES_BASE}`,
         `https://${DOMAINS.SITES_STAGING}`,
@@ -74,7 +75,10 @@ app.use(
         'http://localhost:3000',
         'http://localhost:5173',
       ];
-      if (origin && allowed.includes(origin)) {
+      if (allowed.includes(origin)) return origin;
+      // Allow any subdomain of sites.megabyte.space
+      if (origin.endsWith(DOMAINS.SITES_SUFFIX.replace('-sites.', 'sites.')) ||
+          origin.endsWith(`-${DOMAINS.SITES_BASE}`)) {
         return origin;
       }
       return '';
@@ -117,18 +121,18 @@ app.all('*', async (c) => {
     const marketingPath = `marketing${path === '/' ? '/index.html' : path}`;
     let marketingAsset = await c.env.SITES_BUCKET.get(marketingPath);
 
-    // Removed pages (/privacy, /terms, /content) redirect to homepage.
-    // /contact scrolls to contact section on homepage.
+    // Clean URL support: try .html extension for paths like /privacy → marketing/privacy.html
     if (!marketingAsset && !path.includes('.') && path !== '/') {
-      const redirectPaths = ['/privacy', '/terms', '/content', '/contact'];
-      if (redirectPaths.includes(path)) {
-        const baseUrl =
-          hostname === DOMAINS.SITES_STAGING
-            ? `https://${DOMAINS.SITES_STAGING}`
-            : `https://${DOMAINS.SITES_BASE}`;
-        const target = path === '/contact' ? `${baseUrl}/#contact-section` : `${baseUrl}/`;
-        return Response.redirect(target, 301);
-      }
+      marketingAsset = await c.env.SITES_BUCKET.get(`${marketingPath}.html`);
+    }
+
+    // /contact scrolls to contact section on homepage
+    if (!marketingAsset && path === '/contact') {
+      const baseUrl =
+        hostname === DOMAINS.SITES_STAGING
+          ? `https://${DOMAINS.SITES_STAGING}`
+          : `https://${DOMAINS.SITES_BASE}`;
+      return Response.redirect(`${baseUrl}/#contact-section`, 301);
     }
 
     if (marketingAsset) {
@@ -152,7 +156,8 @@ app.all('*', async (c) => {
       if (ext === 'html') {
         let html = await marketingAsset.text();
         const phKey = c.env.POSTHOG_API_KEY ?? 'none';
-        html = html.replace('</head>', `<meta name="x-posthog-key" content="${phKey}">\n</head>`);
+        const stripePk = c.env.STRIPE_PUBLISHABLE_KEY ?? '';
+        html = html.replace('</head>', `<meta name="x-posthog-key" content="${phKey}">\n<meta name="x-stripe-pk" content="${stripePk}">\n</head>`);
         return new Response(html, {
           headers: {
             'Content-Type': 'text/html',
@@ -324,22 +329,42 @@ export default {
   /**
    * Scheduled handler for periodic tasks (cron triggers).
    *
-   * Planned tasks:
+   * Runs:
    * - Verify pending custom hostnames via Cloudflare API
-   * - Dunning checks for past-due subscriptions
-   * - Analytics rollup
+   * - Log results for observability
    */
-  async scheduled(_event: ScheduledEvent, _env: Env, _ctx: ExecutionContext): Promise<void> {
-    // TODO: Implement scheduled tasks
-    // - verifyPendingHostnames
-    // - dunning check
-    // - analytics rollup
+  async scheduled(_event: ScheduledEvent, env: Env, _ctx: ExecutionContext): Promise<void> {
     console.warn(
       JSON.stringify({
         level: 'info',
         service: 'cron',
         message: 'Scheduled task triggered',
+        trigger: _event.cron,
       }),
     );
+
+    try {
+      const { verifyPendingHostnames } = await import('./services/domains.js');
+      const result = await verifyPendingHostnames(env.DB, env);
+
+      console.warn(
+        JSON.stringify({
+          level: 'info',
+          service: 'cron',
+          message: 'Hostname verification complete',
+          verified: result.verified,
+          failed: result.failed,
+        }),
+      );
+    } catch (err) {
+      console.warn(
+        JSON.stringify({
+          level: 'error',
+          service: 'cron',
+          message: 'Hostname verification failed',
+          error: err instanceof Error ? err.message : String(err),
+        }),
+      );
+    }
   },
 };

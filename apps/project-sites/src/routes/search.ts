@@ -50,8 +50,11 @@ search.get('/api/search/businesses', async (c) => {
     throw badRequest('Missing required query parameter: q');
   }
 
+  // Bound query length to prevent abuse
+  const boundedQ = q.trim().slice(0, 200);
+
   // Build request body with optional location bias from browser geolocation
-  const requestBody: Record<string, unknown> = { textQuery: q };
+  const requestBody: Record<string, unknown> = { textQuery: boundedQ };
 
   const lat = c.req.query('lat');
   const lng = c.req.query('lng');
@@ -267,7 +270,9 @@ search.get('/api/sites/search', async (c) => {
     return c.json({ data: [] });
   }
 
-  const searchTerm = `%${q.trim()}%`;
+  // Bound query length to prevent oversized LIKE scans
+  const bounded = q.trim().slice(0, 100);
+  const searchTerm = `%${bounded}%`;
   const { data } = await dbQuery<SiteSearchRow>(
     c.env.DB,
     'SELECT id, slug, business_name, business_address, google_place_id, status, current_build_version FROM sites WHERE business_name LIKE ? AND deleted_at IS NULL ORDER BY CASE WHEN status = \'published\' THEN 0 WHEN status = \'building\' THEN 1 ELSE 2 END, created_at DESC LIMIT 5',
@@ -481,7 +486,7 @@ search.post('/api/sites/create-from-search', async (c) => {
     });
   }
 
-  // Log audit
+  // Log audit — site creation
   await writeAuditLog(c.env.DB, {
     org_id: orgId,
     actor_id: c.get('userId') ?? null,
@@ -490,11 +495,53 @@ search.post('/api/sites/create-from-search', async (c) => {
     target_id: siteId,
     metadata_json: {
       business_name: sanitizedName,
+      slug,
       google_place_id: googlePlaceId ?? null,
+      business_address: businessAddress ?? null,
       mode,
+      message: 'New site created: ' + sanitizedName + ' (' + slug + '-sites.megabyte.space)',
     },
     request_id: c.get('requestId'),
   });
+
+  // Log workflow pipeline start with detailed info
+  await writeAuditLog(c.env.DB, {
+    org_id: orgId,
+    actor_id: c.get('userId') ?? null,
+    action: 'workflow.queued',
+    target_type: 'site',
+    target_id: siteId,
+    metadata_json: {
+      business_name: sanitizedName,
+      slug,
+      workflow_instance_id: workflowInstanceId ?? null,
+      has_additional_context: !!additionalContext,
+      message: 'AI build pipeline queued — will research, generate, and deploy website',
+    },
+    request_id: c.get('requestId'),
+  });
+
+  // Log anticipated build phases so the Logs modal shows pipeline stages
+  const buildPhases = [
+    { action: 'workflow.phase.research', message: 'Phase 1: Business profile research & data collection' },
+    { action: 'workflow.phase.generation', message: 'Phase 2: AI website HTML generation & content creation' },
+    { action: 'workflow.phase.deployment', message: 'Phase 3: Upload to CDN & publish live site' },
+  ];
+  for (const phase of buildPhases) {
+    await writeAuditLog(c.env.DB, {
+      org_id: orgId,
+      actor_id: c.get('userId') ?? null,
+      action: phase.action,
+      target_type: 'site',
+      target_id: siteId,
+      metadata_json: {
+        slug,
+        workflow_instance_id: workflowInstanceId ?? null,
+        message: phase.message,
+      },
+      request_id: c.get('requestId'),
+    }).catch(() => {});
+  }
 
   return c.json(
     {
@@ -516,38 +563,67 @@ search.post('/api/sites/improve-prompt', async (c) => {
   const businessName = typeof body.business_name === 'string' ? body.business_name.trim() : '';
   const businessAddress = typeof body.business_address === 'string' ? body.business_address.trim() : '';
 
-  if (!text || text.length < 5) {
-    throw badRequest('Text must be at least 5 characters long');
-  }
-
   if (text.length > 5000) {
     throw badRequest('Text must not exceed 5000 characters');
   }
 
   // Build the AI improvement prompt
-  const systemPrompt =
-    'You are a professional website copywriter and business consultant. ' +
-    'Your job is to take rough notes about a business and improve them into clear, well-structured ' +
-    'information that would help an AI build a great website. ' +
-    'Fix grammar, spelling, and formatting. Organize the information logically. ' +
-    'Where information seems missing or incomplete, insert FILL_ME_IN as a placeholder and ' +
-    'add a brief comment about what should go there. ' +
-    'Keep the same general meaning but make it professional and comprehensive. ' +
-    'Return ONLY the improved text, nothing else.';
+  let systemPrompt: string;
+  let userPrompt: string;
 
-  let userPrompt = 'Here is the rough text to improve:\n\n' + text;
-  if (businessName) {
-    userPrompt += '\n\nBusiness name: ' + businessName;
-  }
-  if (businessAddress) {
-    userPrompt += '\nBusiness address: ' + businessAddress;
+  if (!text) {
+    // No text provided — generate a template with placeholders
+    systemPrompt =
+      'You are a professional website copywriter and business consultant. ' +
+      'Generate a comprehensive business profile template for a small business portfolio website. ' +
+      'Use placeholders in [BRACKETS] for information the business owner needs to fill in. ' +
+      'Include sections for: business description, services/products offered, business hours, ' +
+      'contact information (phone, email, physical address), about the owner/team, ' +
+      'and any unique selling points. Make it professional and ready to customize. ' +
+      'Return ONLY the template text, nothing else.';
+
+    userPrompt = 'Generate a business profile template with placeholders for a small business website.';
+    if (businessName) {
+      userPrompt += '\n\nBusiness name: ' + businessName;
+    }
+    if (businessAddress) {
+      userPrompt += '\nBusiness address: ' + businessAddress;
+    }
+  } else {
+    systemPrompt =
+      'You are a professional website copywriter and business consultant. ' +
+      'Your job is to take rough notes about a business and improve them into clear, well-structured ' +
+      'information that would help an AI build a great website. ' +
+      'Fix grammar, spelling, and formatting. Organize the information logically. ' +
+      'Where information seems missing or incomplete, insert placeholders in [BRACKETS] and ' +
+      'add a brief comment about what should go there. ' +
+      'Keep the same general meaning but make it professional and comprehensive. ' +
+      'Return ONLY the improved text, nothing else.';
+
+    userPrompt = 'Here is the rough text to improve:\n\n' + text;
+    if (businessName) {
+      userPrompt += '\n\nBusiness name: ' + businessName;
+    }
+    if (businessAddress) {
+      userPrompt += '\nBusiness address: ' + businessAddress;
+    }
   }
 
   try {
     const ai = c.env.AI;
     if (!ai) {
-      // Fallback: return original text if AI binding not available
-      return c.json({ data: { improved_text: text } });
+      // Fallback: return a static template if AI binding not available
+      const fallbackText = text || (
+        (businessName ? businessName + ' — ' : '[Business Name] — ') +
+        'Welcome to our business!\n\n' +
+        '[Brief description of what your business does]\n\n' +
+        'Services:\n- [Service 1]\n- [Service 2]\n- [Service 3]\n\n' +
+        'Hours: [Mon-Fri 9AM-5PM]\n' +
+        'Phone: [Your phone number]\n' +
+        'Email: [Your email address]\n' +
+        'Address: ' + (businessAddress || '[Your business address]')
+      );
+      return c.json({ data: { improved_text: fallbackText } });
     }
 
     const result = await ai.run('@cf/meta/llama-3.1-8b-instruct' as Parameters<typeof ai.run>[0], {

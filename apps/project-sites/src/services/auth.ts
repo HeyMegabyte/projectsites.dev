@@ -272,6 +272,7 @@ export async function createMagicLink(
     html: buildMagicLinkEmail(verifyUrl),
   });
 
+  console.warn(JSON.stringify({ level: 'info', service: 'auth', message: 'Magic link created', email: validated.email, expires_at: expiresAt }));
   return { token, expires_at: expiresAt };
 }
 
@@ -307,16 +308,19 @@ export async function verifyMagicLink(
   }>(db, 'SELECT id, email, redirect_url, used, expires_at FROM magic_links WHERE token_hash = ? AND used = 0', [tokenHash]);
 
   if (!link) {
+    console.warn(JSON.stringify({ level: 'warn', service: 'auth', message: 'Magic link verification failed: invalid or expired token' }));
     throw unauthorized('Invalid or expired magic link');
   }
 
   if (new Date(link.expires_at) < new Date()) {
+    console.warn(JSON.stringify({ level: 'warn', service: 'auth', message: 'Magic link verification failed: expired', email: link.email }));
     throw unauthorized('Magic link has expired');
   }
 
   // Mark as used
   await dbUpdate(db, 'magic_links', { used: 1 }, 'id = ?', [link.id]);
 
+  console.warn(JSON.stringify({ level: 'info', service: 'auth', message: 'Magic link verified', email: link.email }));
   return { email: link.email, redirect_url: link.redirect_url };
 }
 
@@ -412,10 +416,12 @@ export async function handleGoogleOAuthCallback(
   );
 
   if (!stateRecord) {
+    console.warn(JSON.stringify({ level: 'warn', service: 'auth', message: 'Google OAuth callback failed: invalid state' }));
     throw unauthorized('Invalid OAuth state');
   }
 
   if (new Date(stateRecord.expires_at) < new Date()) {
+    console.warn(JSON.stringify({ level: 'warn', service: 'auth', message: 'Google OAuth callback failed: state expired' }));
     throw unauthorized('OAuth state expired');
   }
 
@@ -441,6 +447,7 @@ export async function handleGoogleOAuthCallback(
   });
 
   if (!tokenResponse.ok) {
+    console.warn(JSON.stringify({ level: 'error', service: 'auth', message: 'Google OAuth token exchange failed', status: tokenResponse.status }));
     throw badRequest('Failed to exchange OAuth code');
   }
 
@@ -452,6 +459,7 @@ export async function handleGoogleOAuthCallback(
   });
 
   if (!userInfoResponse.ok) {
+    console.warn(JSON.stringify({ level: 'error', service: 'auth', message: 'Google userinfo fetch failed', status: userInfoResponse.status }));
     throw badRequest('Failed to fetch Google user info');
   }
 
@@ -461,6 +469,7 @@ export async function handleGoogleOAuthCallback(
     picture?: string;
   };
 
+  console.warn(JSON.stringify({ level: 'info', service: 'auth', message: 'Google OAuth callback success', email: userInfo.email }));
   return {
     email: userInfo.email,
     display_name: userInfo.name ?? null,
@@ -510,6 +519,7 @@ export async function createSession(
     deleted_at: null,
   });
 
+  console.warn(JSON.stringify({ level: 'info', service: 'auth', message: 'Session created', user_id: userId, expires_at: expiresAt }));
   return { token, expires_at: expiresAt };
 }
 
@@ -569,6 +579,7 @@ export async function getSession(
  */
 export async function revokeSession(db: D1Database, sessionId: string): Promise<void> {
   await dbUpdate(db, 'sessions', { deleted_at: new Date().toISOString() }, 'id = ?', [sessionId]);
+  console.warn(JSON.stringify({ level: 'info', service: 'auth', message: 'Session revoked', session_id: sessionId }));
 }
 
 /**
@@ -690,5 +701,6 @@ export async function findOrCreateUser(
     deleted_at: null,
   });
 
+  console.warn(JSON.stringify({ level: 'info', service: 'auth', message: 'New user created', user_id: userId, org_id: orgId, email: opts.email }));
   return { user_id: userId, org_id: orgId, is_new: true };
 }

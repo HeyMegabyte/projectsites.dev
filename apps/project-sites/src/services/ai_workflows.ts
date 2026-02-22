@@ -96,6 +96,67 @@ export async function runPrompt(
   };
 }
 
+/**
+ * Extract JSON from an LLM response that may contain surrounding text.
+ *
+ * LLMs sometimes return JSON wrapped in markdown fences or preceded by
+ * explanatory text (e.g. "Based on the information..."). This function
+ * finds the first valid JSON object or array in the text and parses it.
+ *
+ * @param text - Raw LLM output text.
+ * @returns Parsed JSON value.
+ * @throws {SyntaxError} If no valid JSON can be extracted.
+ */
+export function extractJsonFromText(text: string): unknown {
+  const trimmed = text.trim();
+
+  // Fast path: already valid JSON
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    // continue to extraction
+  }
+
+  // Try to extract from markdown code fences ```json ... ``` or ``` ... ```
+  const fenceMatch = trimmed.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
+  if (fenceMatch) {
+    try {
+      return JSON.parse(fenceMatch[1]!.trim());
+    } catch {
+      // continue
+    }
+  }
+
+  // Find the first { or [ and match to the last } or ]
+  const firstBrace = trimmed.indexOf('{');
+  const firstBracket = trimmed.indexOf('[');
+  let startIdx = -1;
+  let endChar = '';
+
+  if (firstBrace === -1 && firstBracket === -1) {
+    throw new SyntaxError(`No JSON found in LLM output: ${trimmed.substring(0, 80)}...`);
+  }
+
+  if (firstBrace === -1) {
+    startIdx = firstBracket;
+    endChar = ']';
+  } else if (firstBracket === -1) {
+    startIdx = firstBrace;
+    endChar = '}';
+  } else {
+    startIdx = Math.min(firstBrace, firstBracket);
+    endChar = startIdx === firstBrace ? '}' : ']';
+  }
+
+  const lastEnd = trimmed.lastIndexOf(endChar);
+  if (lastEnd <= startIdx) {
+    throw new SyntaxError(`No matching closing bracket in LLM output: ${trimmed.substring(0, 80)}...`);
+  }
+
+  const candidate = trimmed.substring(startIdx, lastEnd + 1);
+  return JSON.parse(candidate);
+}
+
 // ── Research Business ────────────────────────────────────────
 
 export interface ResearchResult {
@@ -127,7 +188,7 @@ export async function researchBusiness(
     additional_context: input.additionalContext ?? '',
   });
 
-  const parsed = JSON.parse(result.output) as Record<string, unknown>;
+  const parsed = extractJsonFromText(result.output) as Record<string, unknown>;
 
   // Validate output schema
   const validated = validatePromptOutput('research_business', parsed) as Record<string, unknown>;
@@ -181,7 +242,7 @@ export async function scoreQuality(env: Env, htmlContent: string): Promise<Quali
     html_content: htmlContent.substring(0, 4000),
   });
 
-  const parsed = JSON.parse(result.output);
+  const parsed = extractJsonFromText(result.output);
 
   // Validate output schema
   return validatePromptOutput('score_quality', parsed) as QualityScore;
@@ -295,7 +356,7 @@ async function runResearchProfile(env: Env, input: WorkflowInput): Promise<Profi
     google_place_id: input.googlePlaceId ?? '',
     additional_context: input.additionalContext ?? '',
   });
-  return validatePromptOutput('research_profile', JSON.parse(result.output)) as ProfileResult;
+  return validatePromptOutput('research_profile', extractJsonFromText(result.output)) as ProfileResult;
 }
 
 // ── Phase 2: Parallel Research ───────────────────────────────
@@ -308,7 +369,7 @@ async function runResearchSocial(
     business_address: input.businessAddress ?? '',
     business_type: businessType,
   });
-  return validatePromptOutput('research_social', JSON.parse(result.output)) as SocialResult;
+  return validatePromptOutput('research_social', extractJsonFromText(result.output)) as SocialResult;
 }
 
 async function runResearchBrand(
@@ -321,7 +382,7 @@ async function runResearchBrand(
     website_url: websiteUrl,
     additional_context: input.additionalContext ?? '',
   });
-  return validatePromptOutput('research_brand', JSON.parse(result.output)) as BrandResult;
+  return validatePromptOutput('research_brand', extractJsonFromText(result.output)) as BrandResult;
 }
 
 async function runResearchSellingPoints(
@@ -336,7 +397,7 @@ async function runResearchSellingPoints(
     additional_context: input.additionalContext ?? '',
   });
   return validatePromptOutput(
-    'research_selling_points', JSON.parse(result.output),
+    'research_selling_points', extractJsonFromText(result.output),
   ) as SellingPointsResult;
 }
 
@@ -350,7 +411,7 @@ async function runResearchImages(
     services_json: servicesJson,
     additional_context: input.additionalContext ?? '',
   });
-  return validatePromptOutput('research_images', JSON.parse(result.output)) as ImagesResult;
+  return validatePromptOutput('research_images', extractJsonFromText(result.output)) as ImagesResult;
 }
 
 // ── Phase 3: Website Generation ──────────────────────────────
@@ -400,7 +461,7 @@ async function runScoreWebsite(
     html_content: html.substring(0, 6000),
     business_name: businessName,
   });
-  return validatePromptOutput('score_website', JSON.parse(result.output)) as WebsiteScore;
+  return validatePromptOutput('score_website', extractJsonFromText(result.output)) as WebsiteScore;
 }
 
 // ── V2 Full Workflow Orchestration ───────────────────────────
@@ -429,11 +490,14 @@ export async function runSiteGenerationWorkflowV2(
   // Phase 2: Parallel research (all depend on profile.business_type)
   const servicesJson = JSON.stringify(profile.services.map((s) => s.name));
 
+  const bizType = profile.business_type ?? 'general';
+  const bizDesc = profile.description ?? '';
+
   const [social, brand, sellingPoints, images] = await Promise.all([
-    runResearchSocial(env, input, profile.business_type),
-    runResearchBrand(env, input, profile.business_type, ''),
-    runResearchSellingPoints(env, input, profile.business_type, servicesJson, profile.description),
-    runResearchImages(env, input, profile.business_type, servicesJson),
+    runResearchSocial(env, input, bizType),
+    runResearchBrand(env, input, bizType, ''),
+    runResearchSellingPoints(env, input, bizType, servicesJson, bizDesc),
+    runResearchImages(env, input, bizType, servicesJson),
   ]);
 
   const research: WorkflowResearch = { profile, social, brand, sellingPoints, images };
@@ -441,7 +505,7 @@ export async function runSiteGenerationWorkflowV2(
   console.warn(JSON.stringify({
     level: 'info', service: 'ai_workflow', phase: 2,
     message: 'Parallel research complete',
-    social_links_found: social.social_links.filter((l) => l.url && l.confidence >= 0.9).length,
+    social_links_found: social.social_links.filter((l) => l.url && (l.confidence ?? 0) >= 0.9).length,
     logo_found: brand.logo.found_online,
   }));
 

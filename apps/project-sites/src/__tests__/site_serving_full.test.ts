@@ -236,7 +236,7 @@ describe('serveSiteFromR2', () => {
     const response = await serveSiteFromR2(env as any, site, '/page.html');
 
     expect(response.status).toBe(200);
-    expect(response.headers.get('Content-Type')).toBe('text/html');
+    expect(response.headers.get('Content-Type')).toBe('text/html; charset=utf-8');
   });
 
   it('returns file from R2 with correct content type for .css', async () => {
@@ -284,7 +284,7 @@ describe('serveSiteFromR2', () => {
     const response = await serveSiteFromR2(env as any, site, '/about/team');
 
     expect(response.status).toBe(200);
-    expect(response.headers.get('Content-Type')).toBe('text/html');
+    expect(response.headers.get('Content-Type')).toBe('text/html; charset=utf-8');
     expect(env.SITES_BUCKET.get).toHaveBeenCalledTimes(2);
     expect(env.SITES_BUCKET.get).toHaveBeenNthCalledWith(2, `sites/my-site/v1/index.html`);
   });

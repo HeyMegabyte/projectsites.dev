@@ -52,6 +52,7 @@ export default defineConfig((config) => {
           v3_throwAbortReason: true,
           v3_lazyRouteDiscovery: true,
         },
+        ignoredRouteFiles: ['**/*.spec.ts', '**/*.spec.tsx', '**/*.test.ts', '**/*.test.tsx'],
       }),
       UnoCSS(),
       tsconfigPaths(),

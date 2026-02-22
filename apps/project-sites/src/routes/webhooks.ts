@@ -161,16 +161,29 @@ webhooks.post('/webhooks/stripe', async (c) => {
       await markWebhookProcessed(db, webhookEventId, 'processed');
     }
 
-    // Log audit
-    const orgId = (event.data.object.metadata as Record<string, string> | undefined)?.org_id;
+    // Log audit with descriptive messages
+    const objMeta = event.data.object.metadata as Record<string, string> | undefined;
+    const orgId = objMeta?.org_id;
     if (orgId) {
+      const webhookMessages: Record<string, string> = {
+        'checkout.session.completed': 'Payment successful — plan upgraded',
+        'customer.subscription.updated': 'Subscription status updated',
+        'customer.subscription.deleted': 'Subscription canceled — downgraded to free plan',
+        'invoice.payment_failed': 'Payment failed — subscription may be at risk',
+        'invoice.paid': 'Invoice payment confirmed',
+      };
+      const webhookMsg = webhookMessages[event.type] || ('Stripe webhook: ' + event.type);
       await auditService.writeAuditLog(db, {
         org_id: orgId,
         actor_id: null,
         action: `webhook.stripe.${event.type}`,
         target_type: 'webhook',
         target_id: event.id,
-        metadata_json: { event_type: event.type },
+        metadata_json: {
+          event_type: event.type,
+          site_id: objMeta?.site_id ?? null,
+          message: webhookMsg,
+        },
         request_id: requestId,
       });
     }
@@ -184,16 +197,36 @@ webhooks.post('/webhooks/stripe', async (c) => {
       );
     }
 
+    const errMsg = err instanceof Error ? err.message : 'Unknown error';
     console.error(
       JSON.stringify({
         level: 'error',
         service: 'webhook',
         provider: 'stripe',
         event_type: event.type,
-        message: err instanceof Error ? err.message : 'Unknown error',
+        message: errMsg,
         request_id: requestId,
       }),
     );
+
+    // Audit log for failed webhook processing
+    const failedObjMeta = event.data.object.metadata as Record<string, string> | undefined;
+    if (failedObjMeta?.org_id) {
+      auditService.writeAuditLog(db, {
+        org_id: failedObjMeta.org_id,
+        actor_id: null,
+        action: 'webhook.processing_failed',
+        target_type: 'webhook',
+        target_id: event.id,
+        metadata_json: {
+          event_type: event.type,
+          site_id: failedObjMeta?.site_id ?? null,
+          error: errMsg,
+          message: 'Webhook processing failed for ' + event.type + ': ' + errMsg,
+        },
+        request_id: requestId,
+      }).catch(() => {});
+    }
 
     // Return 200 to Stripe to prevent retries for processing errors
     return c.json({ received: true, error: 'Processing failed' }, 200);

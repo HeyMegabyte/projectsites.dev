@@ -3,7 +3,6 @@ import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import type { KeyboardEvent } from 'react';
 import type { ModelInfo } from '~/lib/modules/llm/types';
 import { classNames } from '~/utils/classNames';
-import { DEFAULT_MODEL } from '~/utils/constants';
 import { LOCAL_PROVIDERS } from '~/lib/stores/settings';
 
 // Fuzzy search utilities

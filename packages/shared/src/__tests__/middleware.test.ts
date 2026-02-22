@@ -120,7 +120,7 @@ describe('getEntitlements', () => {
   it('returns paid entitlements', () => {
     const ent = getEntitlements(orgId, 'paid');
     expect(ent.topBarHidden).toBe(true);
-    expect(ent.maxCustomDomains).toBe(5);
+    expect(ent.maxCustomDomains).toBe(10);
     expect(ent.chatEnabled).toBe(true);
     expect(ent.analyticsEnabled).toBe(true);
     expect(ent.plan).toBe('paid');

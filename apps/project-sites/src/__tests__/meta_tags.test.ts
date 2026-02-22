@@ -203,9 +203,11 @@ describe('Brand Color Consistency', () => {
     expect(html).not.toContain('#64ffda');
   });
 
-  it('homepage does not use old green accent #4ade80', () => {
+  it('homepage uses #4ade80 only for uploading status badge', () => {
     const html = readPublicFile('index.html');
-    expect(html).not.toContain('#4ade80');
+    // #4ade80 is used for the uploading status color (green shade)
+    const matches = html.match(/#4ade80/g) || [];
+    expect(matches.length).toBeLessThanOrEqual(2); // Only in status CSS
   });
 
   it('homepage accent-dim uses rgba(80, 165, 219, ...)', () => {

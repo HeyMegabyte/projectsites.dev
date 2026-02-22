@@ -39,7 +39,9 @@ async function stubRedirects(page: Page): Promise<() => Promise<string[]>> {
 // ─── GRANULAR FULL FLOW: Every Micro-Step ────────────────────
 
 test.describe('Granular Full Flow: Search → Select → Details → Build → Sign-In → Email → Waiting', () => {
-  test('Verifies every single micro-interaction from page load to waiting screen', async ({ page }) => {
+  test('Verifies every single micro-interaction from page load to waiting screen', async ({
+    page,
+  }) => {
     // ────────────────────────────────────────────────────────
     // STEP 1: Open the page and verify initial state
     // ────────────────────────────────────────────────────────
@@ -94,26 +96,34 @@ test.describe('Granular Full Flow: Search → Select → Details → Build → S
     // First result: "Sunrise Bakery Pizza" (E2E server returns "{query} Pizza")
     const firstResult = results.nth(0);
     await expect(firstResult.locator('.search-result-name')).toContainText('Sunrise Bakery Pizza');
-    await expect(firstResult.locator('.search-result-address')).toContainText('123 Main St, New York, NY');
+    await expect(firstResult.locator('.search-result-address')).toContainText(
+      '123 Main St, New York, NY',
+    );
     await expect(firstResult.locator('.search-result-icon')).toBeVisible();
 
     // Second result: "Sunrise Bakery Plumbing"
     const secondResult = results.nth(1);
-    await expect(secondResult.locator('.search-result-name')).toContainText('Sunrise Bakery Plumbing');
-    await expect(secondResult.locator('.search-result-address')).toContainText('456 Oak Ave, Brooklyn, NY');
+    await expect(secondResult.locator('.search-result-name')).toContainText(
+      'Sunrise Bakery Plumbing',
+    );
+    await expect(secondResult.locator('.search-result-address')).toContainText(
+      '456 Oak Ave, Brooklyn, NY',
+    );
 
     // Third result: Custom Website option (always present)
     const customResult = results.nth(2);
     await expect(customResult).toHaveClass(/search-result-custom/);
     await expect(customResult.locator('.search-result-name')).toContainText('Custom Website');
-    await expect(customResult.locator('.search-result-address')).toContainText('Build a custom website from scratch');
+    await expect(customResult.locator('.search-result-address')).toContainText(
+      'Build a custom website from scratch',
+    );
 
     // ────────────────────────────────────────────────────────
     // STEP 4: Click the first search result
     // ────────────────────────────────────────────────────────
     // Intercept the lookup API call to verify it fires
-    const lookupPromise = page.waitForResponse((resp) =>
-      resp.url().includes('/api/sites/lookup') && resp.status() === 200,
+    const lookupPromise = page.waitForResponse(
+      (resp) => resp.url().includes('/api/sites/lookup') && resp.status() === 200,
     );
 
     await firstResult.click();
@@ -137,7 +147,9 @@ test.describe('Granular Full Flow: Search → Select → Details → Build → S
 
     // Title says "Tell us more about your business" (business mode, not custom)
     await expect(page.locator('#details-title')).toHaveText('Tell us more about your business');
-    await expect(page.locator('#details-subtitle')).toContainText('Any extra info helps us build the perfect website');
+    await expect(page.locator('#details-subtitle')).toContainText(
+      'Any extra info helps us build the perfect website',
+    );
 
     // Business badge is visible and populated with selected business data
     const badge = page.locator('#details-business-badge');
@@ -149,10 +161,7 @@ test.describe('Granular Full Flow: Search → Select → Details → Build → S
     const textarea = page.locator('#details-textarea');
     await expect(textarea).toBeVisible();
     await expect(textarea).toHaveValue('');
-    await expect(textarea).toHaveAttribute(
-      'placeholder',
-      /Tell us about your business/,
-    );
+    await expect(textarea).toHaveAttribute('placeholder', /Tell us about your business/);
 
     // Build button is enabled and shows correct text
     const buildBtn = page.locator('#build-btn');
@@ -170,9 +179,7 @@ test.describe('Granular Full Flow: Search → Select → Details → Build → S
     await textarea.fill(
       'We are a family-owned bakery specializing in sourdough bread and French pastries. Open since 1998. Warm rustic interior.',
     );
-    await expect(textarea).toHaveValue(
-      /family-owned bakery specializing in sourdough/,
-    );
+    await expect(textarea).toHaveValue(/family-owned bakery specializing in sourdough/);
 
     // Click the Build button
     await buildBtn.click();
@@ -231,8 +238,8 @@ test.describe('Granular Full Flow: Search → Select → Details → Build → S
     await expect(emailInput).toHaveValue('test@example.com');
 
     // Intercept the magic link API call
-    const magicLinkPromise = page.waitForResponse((resp) =>
-      resp.url().includes('/api/auth/magic-link') && resp.status() === 200,
+    const magicLinkPromise = page.waitForResponse(
+      (resp) => resp.url().includes('/api/auth/magic-link') && resp.status() === 200,
     );
 
     await sendBtn.click();
@@ -342,7 +349,9 @@ test.describe('Granular Full Flow: Search → Select → Details → Build → S
 // ─── GRANULAR FULL FLOW: Google OAuth ────────────────────────
 
 test.describe('Granular Full Flow: Google OAuth Sign-In', () => {
-  test('Verifies every micro-step of search → details → Google redirect → callback → waiting', async ({ page }) => {
+  test('Verifies every micro-step of search → details → Google redirect → callback → waiting', async ({
+    page,
+  }) => {
     // ────────────────────────────────────────────────────────
     // STEP 1: Open page and verify initial state
     // ────────────────────────────────────────────────────────
@@ -377,13 +386,15 @@ test.describe('Granular Full Flow: Google OAuth Sign-In', () => {
     // Verify first result structure
     const firstResult = results.nth(0);
     await expect(firstResult.locator('.search-result-name')).toContainText('Mountain Coffee Pizza');
-    await expect(firstResult.locator('.search-result-address')).toContainText('123 Main St, New York, NY');
+    await expect(firstResult.locator('.search-result-address')).toContainText(
+      '123 Main St, New York, NY',
+    );
 
     // ────────────────────────────────────────────────────────
     // STEP 4: Click first result and verify lookup API fires
     // ────────────────────────────────────────────────────────
-    const lookupPromise = page.waitForResponse((resp) =>
-      resp.url().includes('/api/sites/lookup') && resp.status() === 200,
+    const lookupPromise = page.waitForResponse(
+      (resp) => resp.url().includes('/api/sites/lookup') && resp.status() === 200,
     );
     await firstResult.click();
     await expect(dropdown).not.toHaveClass(/open/, { timeout: 3_000 });
@@ -408,7 +419,9 @@ test.describe('Granular Full Flow: Google OAuth Sign-In', () => {
     // STEP 6: Fill details and click Build
     // ────────────────────────────────────────────────────────
     const textarea = page.locator('#details-textarea');
-    await textarea.fill('Specialty coffee roaster and cafe. Single-origin beans, pour-over bar, cozy atmosphere.');
+    await textarea.fill(
+      'Specialty coffee roaster and cafe. Single-origin beans, pour-over bar, cozy atmosphere.',
+    );
     await expect(textarea).toHaveValue(/Specialty coffee roaster/);
 
     const buildBtn = page.locator('#build-btn');
@@ -532,7 +545,9 @@ test.describe('Granular Full Flow: Google OAuth Sign-In', () => {
 // ─── GRANULAR FULL FLOW: Email Magic Link ────────────────────
 
 test.describe('Granular Full Flow: Email Magic Link Sign-In', () => {
-  test('Verifies every micro-step of search → details → email → check-email → callback → waiting', async ({ page }) => {
+  test('Verifies every micro-step of search → details → email → check-email → callback → waiting', async ({
+    page,
+  }) => {
     // ────────────────────────────────────────────────────────
     // STEP 1: Open page and verify initial state
     // ────────────────────────────────────────────────────────
@@ -565,11 +580,15 @@ test.describe('Granular Full Flow: Email Magic Link Sign-In', () => {
     // Verify result structure
     const firstResult = results.nth(0);
     await expect(firstResult.locator('.search-result-name')).toContainText('Harbor Sushi Pizza');
-    await expect(firstResult.locator('.search-result-address')).toContainText('123 Main St, New York, NY');
+    await expect(firstResult.locator('.search-result-address')).toContainText(
+      '123 Main St, New York, NY',
+    );
     await expect(firstResult.locator('.search-result-icon')).toBeVisible();
 
     // Second result
-    await expect(results.nth(1).locator('.search-result-name')).toContainText('Harbor Sushi Plumbing');
+    await expect(results.nth(1).locator('.search-result-name')).toContainText(
+      'Harbor Sushi Plumbing',
+    );
 
     // Custom option always present
     await expect(results.nth(2)).toHaveClass(/search-result-custom/);
@@ -577,8 +596,8 @@ test.describe('Granular Full Flow: Email Magic Link Sign-In', () => {
     // ────────────────────────────────────────────────────────
     // STEP 4: Click first result and verify lookup API
     // ────────────────────────────────────────────────────────
-    const lookupPromise = page.waitForResponse((resp) =>
-      resp.url().includes('/api/sites/lookup') && resp.status() === 200,
+    const lookupPromise = page.waitForResponse(
+      (resp) => resp.url().includes('/api/sites/lookup') && resp.status() === 200,
     );
     await firstResult.click();
     await expect(dropdown).not.toHaveClass(/open/, { timeout: 3_000 });
@@ -603,7 +622,9 @@ test.describe('Granular Full Flow: Email Magic Link Sign-In', () => {
     // ────────────────────────────────────────────────────────
     // STEP 6: Fill details and click Build
     // ────────────────────────────────────────────────────────
-    await textarea.fill('Authentic Japanese sushi bar. Omakase menu, fresh fish daily, sake selection.');
+    await textarea.fill(
+      'Authentic Japanese sushi bar. Omakase menu, fresh fish daily, sake selection.',
+    );
     await expect(textarea).toHaveValue(/Authentic Japanese sushi/);
 
     const buildBtn = page.locator('#build-btn');
@@ -659,7 +680,9 @@ test.describe('Granular Full Flow: Email Magic Link Sign-In', () => {
     await expect(page.locator('#email-send-msg')).not.toBeVisible();
 
     // Back to sign-in options link
-    await expect(page.locator('#signin-email-panel .back-link')).toContainText('Back to sign-in options');
+    await expect(page.locator('#signin-email-panel .back-link')).toContainText(
+      'Back to sign-in options',
+    );
 
     // ────────────────────────────────────────────────────────
     // STEP 9: Try empty email (validation)
@@ -681,8 +704,8 @@ test.describe('Granular Full Flow: Email Magic Link Sign-In', () => {
     await expect(emailInput).toHaveValue('chef@harborsushi.com');
 
     // Intercept magic link API call
-    const magicLinkPromise = page.waitForResponse((resp) =>
-      resp.url().includes('/api/auth/magic-link') && resp.status() === 200,
+    const magicLinkPromise = page.waitForResponse(
+      (resp) => resp.url().includes('/api/auth/magic-link') && resp.status() === 200,
     );
 
     await sendBtn.click();
@@ -904,9 +927,9 @@ test.describe('Full Flow: Custom Website', () => {
 
     // Business badge should NOT be visible in custom mode
     // Fill description
-    await page.locator('#details-textarea').fill(
-      'A personal portfolio site showcasing my photography and design work.',
-    );
+    await page
+      .locator('#details-textarea')
+      .fill('A personal portfolio site showcasing my photography and design work.');
     await page.locator('#build-btn').click();
 
     // ── 3. Sign-in with email ────────────────────────────
@@ -1135,7 +1158,10 @@ test.describe('Homepage: Marketing Sections & Interactive Features', () => {
     await expect(footer.getByText(/© 2026 Megabyte LLC/)).toBeVisible();
 
     // Footer links
-    await expect(footer.getByRole('link', { name: /support/i })).toHaveAttribute('href', 'mailto:hey@megabyte.space');
+    await expect(footer.getByRole('link', { name: /support/i })).toHaveAttribute(
+      'href',
+      'mailto:hey@megabyte.space',
+    );
     await expect(footer.getByRole('link', { name: /contact/i })).toBeVisible();
 
     // Social links
@@ -1156,13 +1182,17 @@ test.describe('Search Features', () => {
     await input.pressSequentially('Test', { delay: 50 });
 
     // E2E server returns "{query} Pizza" and "{query} Plumbing"
-    await expect(page.locator('.search-result-name', { hasText: 'Test Pizza' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('.search-result-name', { hasText: 'Test Pizza' })).toBeVisible({
+      timeout: 10_000,
+    });
     await expect(page.locator('.search-result-name', { hasText: 'Test Plumbing' })).toBeVisible();
     await expect(page.locator('.search-result-address', { hasText: '123 Main St' })).toBeVisible();
 
     // Custom Website option always present
     await expect(page.locator('.search-result-custom')).toBeVisible();
-    await expect(page.locator('.search-result-custom .search-result-name')).toContainText('Custom Website');
+    await expect(page.locator('.search-result-custom .search-result-name')).toContainText(
+      'Custom Website',
+    );
 
     // ── Close and clear ──────────────────────────────────
     await input.fill('');
@@ -1221,7 +1251,12 @@ test.describe('API Integration', () => {
     expect(lookupRes.headers()['content-type']).toContain('application/json');
 
     // ── Auth-gated routes return 401 ─────────────────────
-    for (const route of ['/api/sites', '/api/billing/subscription', '/api/hostnames', '/api/audit-logs']) {
+    for (const route of [
+      '/api/sites',
+      '/api/billing/subscription',
+      '/api/hostnames',
+      '/api/audit-logs',
+    ]) {
       const res = await request.get(route);
       expect([401, 403]).toContain(res.status());
     }

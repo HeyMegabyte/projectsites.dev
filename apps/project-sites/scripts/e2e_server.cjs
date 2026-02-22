@@ -98,6 +98,34 @@ const server = http.createServer(async (req, res) => {
   setSecurityHeaders(res);
   const requestId = setRequestId(req, res);
 
+  // ─── CORS ──────────────────────────────────────────
+  const ALLOWED_ORIGINS = [
+    'https://sites.megabyte.space',
+    'https://sites-staging.megabyte.space',
+    'https://bolt.megabyte.space',
+    'http://localhost:3000',
+    'http://localhost:5173',
+  ];
+  const origin = req.headers.origin;
+  if (origin) {
+    const isDashSub =
+      /^https:\/\/[a-z0-9-]+-sites\.megabyte\.space$/.test(origin) ||
+      /^https:\/\/[a-z0-9-]+-sites-staging\.megabyte\.space$/.test(origin);
+    if (ALLOWED_ORIGINS.includes(origin) || isDashSub) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Request-ID');
+      res.setHeader('Access-Control-Max-Age', '86400');
+    }
+    // Preflight
+    if (method === 'OPTIONS') {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+  }
+
   // ─── Subdomain routing ─────────────────────────────
   // Detect non-localhost, non-base-domain hosts as subdomain sites
   const host = (req.headers.host || '').split(':')[0];
@@ -350,6 +378,37 @@ const server = http.createServer(async (req, res) => {
   // ─── Pre-built Sites Search ────────────────────────────
   if (pathname === '/api/sites/search' && method === 'GET') {
     return sendJson(res, 200, { data: [] });
+  }
+
+  // ─── Chat Export (AI Edit) ────────────────────────────
+  const chatMatch = pathname.match(/^\/api\/sites\/by-slug\/([^/]+)\/chat$/);
+  if (chatMatch && method === 'GET') {
+    const slug = decodeURIComponent(chatMatch[1]);
+
+    // "test-site" is our known mock site with chat data
+    if (slug === 'test-site' || slug === 'example-business') {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Cache-Control', 'no-cache');
+      return sendJson(res, 200, {
+        messages: [
+          { id: 'msg-1', role: 'user', content: 'Build me a website for my pizza shop called Best Pizza' },
+          { id: 'msg-2', role: 'assistant', content: 'I\'ll create a professional website for Best Pizza with a modern design, menu section, and contact information.' },
+          { id: 'msg-3', role: 'user', content: 'Add an online ordering section' },
+          { id: 'msg-4', role: 'assistant', content: 'I\'ve added an online ordering section with a cart system and checkout flow.' },
+        ],
+        description: 'Best Pizza Website',
+        exportDate: new Date().toISOString(),
+      });
+    }
+
+    // Unknown slug → 404
+    return sendJson(res, 404, {
+      error: {
+        code: 'NOT_FOUND',
+        message: 'Site not found or no version published',
+        request_id: requestId,
+      },
+    });
   }
 
   // ─── Auth endpoints ─────────────────────────────────

@@ -311,11 +311,13 @@ describe('provisionFreeDomain', () => {
 // provisionCustomDomain
 // ---------------------------------------------------------------------------
 describe('provisionCustomDomain', () => {
-  it('returns hostname and status on success', async () => {
+  it('returns hostname, status, and is_primary on success', async () => {
     // Domain limit check
     mockQuery.mockResolvedValueOnce({ data: [], error: null });
     // Existing hostname check
     mockQueryOne.mockResolvedValueOnce(null);
+    // Site custom domains check (auto-primary) — none exist
+    mockQuery.mockResolvedValueOnce({ data: [], error: null });
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
@@ -327,6 +329,9 @@ describe('provisionCustomDomain', () => {
 
     // DB insert
     mockInsert.mockResolvedValueOnce({ error: null });
+    // Auto-primary: clear + set
+    mockUpdate.mockResolvedValueOnce({ error: null, changes: 0 });
+    mockUpdate.mockResolvedValueOnce({ error: null, changes: 1 });
 
     const result = await provisionCustomDomain(mockDb, mockEnv, {
       org_id: 'org-1',
@@ -337,18 +342,19 @@ describe('provisionCustomDomain', () => {
     expect(result).toEqual({
       hostname: 'app.example.com',
       status: 'pending',
+      is_primary: true,
     });
   });
 
   it('throws conflict when max domains reached', async () => {
-    const fiveDomains = Array.from({ length: 5 }, (_, i) => ({ id: `dom-${i}` }));
-    mockQuery.mockResolvedValueOnce({ data: fiveDomains, error: null });
+    const tenDomains = Array.from({ length: 10 }, (_, i) => ({ id: `dom-${i}` }));
+    mockQuery.mockResolvedValueOnce({ data: tenDomains, error: null });
 
     await expect(
       provisionCustomDomain(mockDb, mockEnv, {
         org_id: 'org-full',
         site_id: 'site-1',
-        hostname: 'sixth.example.com',
+        hostname: 'eleventh.example.com',
       }),
     ).rejects.toThrow(/Maximum custom domains/);
   });
@@ -368,9 +374,11 @@ describe('provisionCustomDomain', () => {
     ).rejects.toThrow(/already registered/);
   });
 
-  it('creates CF hostname and DB record', async () => {
+  it('creates CF hostname and DB record and auto-sets as primary', async () => {
     mockQuery.mockResolvedValueOnce({ data: [], error: null });
     mockQueryOne.mockResolvedValueOnce(null);
+    // Site custom domains check — none exist (first custom domain)
+    mockQuery.mockResolvedValueOnce({ data: [], error: null });
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
@@ -381,12 +389,17 @@ describe('provisionCustomDomain', () => {
     });
 
     mockInsert.mockResolvedValueOnce({ error: null });
+    // Auto-primary: clear + set
+    mockUpdate.mockResolvedValueOnce({ error: null, changes: 0 });
+    mockUpdate.mockResolvedValueOnce({ error: null, changes: 1 });
 
-    await provisionCustomDomain(mockDb, mockEnv, {
+    const result = await provisionCustomDomain(mockDb, mockEnv, {
       org_id: 'org-3',
       site_id: 'site-3',
       hostname: 'custom.example.com',
     });
+
+    expect(result.is_primary).toBe(true);
 
     // CF API called with hostname
     expect(global.fetch).toHaveBeenCalledWith(
@@ -412,6 +425,52 @@ describe('provisionCustomDomain', () => {
         ssl_status: 'active',
       }),
     );
+
+    // Auto-primary dbUpdate calls
+    expect(mockUpdate).toHaveBeenCalledWith(
+      mockDb,
+      'hostnames',
+      { is_primary: 0 },
+      'site_id = ?',
+      ['site-3'],
+    );
+    expect(mockUpdate).toHaveBeenCalledWith(
+      mockDb,
+      'hostnames',
+      { is_primary: 1 },
+      'id = ?',
+      expect.any(Array),
+    );
+  });
+
+  it('does NOT auto-set primary when site already has custom domains', async () => {
+    mockQuery.mockResolvedValueOnce({ data: [], error: null });
+    mockQueryOne.mockResolvedValueOnce(null);
+    // Site already has custom domains
+    mockQuery.mockResolvedValueOnce({
+      data: [{ id: 'h-existing', type: 'custom_cname' }],
+      error: null,
+    });
+
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        result: { id: 'cf-custom-3', status: 'pending', ssl: { status: 'pending_validation' } },
+      }),
+      text: async () => '',
+    });
+
+    mockInsert.mockResolvedValueOnce({ error: null });
+
+    const result = await provisionCustomDomain(mockDb, mockEnv, {
+      org_id: 'org-1',
+      site_id: 'site-1',
+      hostname: 'second.example.com',
+    });
+
+    expect(result.is_primary).toBe(false);
+    // Should NOT call dbUpdate for primary
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 });
 

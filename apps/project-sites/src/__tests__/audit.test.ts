@@ -78,14 +78,15 @@ describe('writeAuditLog', () => {
     );
   });
 
-  it('throws on invalid entry (schema validation failure)', async () => {
+  it('does not throw on invalid entry (silently logs error)', async () => {
     const invalidEntry = {
       // Missing required org_id
       action: 'auth.login',
       actor_id: null,
     } as any;
 
-    await expect(writeAuditLog(mockDb, invalidEntry)).rejects.toThrow();
+    // writeAuditLog should never throw — it catches schema validation errors internally
+    await expect(writeAuditLog(mockDb, invalidEntry)).resolves.toBeUndefined();
   });
 
   it('adds created_at timestamp', async () => {

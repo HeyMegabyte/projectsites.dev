@@ -34,7 +34,7 @@
  */
 
 import { PRICING, type Entitlements, getEntitlements, badRequest } from '@project-sites/shared';
-import { dbQuery, dbQueryOne, dbInsert, dbUpdate } from './db.js';
+import { dbQueryOne, dbInsert, dbUpdate } from './db.js';
 import type { Env } from '../types/env.js';
 
 /**
@@ -89,10 +89,12 @@ export async function getOrCreateStripeCustomer(
 
   if (!response.ok) {
     const err = await response.text();
+    console.warn(JSON.stringify({ level: 'error', service: 'billing', message: 'Stripe customer creation failed', org_id: orgId, status: response.status }));
     throw badRequest(`Failed to create Stripe customer: ${err}`);
   }
 
   const customer = (await response.json()) as { id: string };
+  console.warn(JSON.stringify({ level: 'info', service: 'billing', message: 'Stripe customer created', org_id: orgId, stripe_customer_id: customer.id }));
 
   // Insert subscription record with free plan defaults
   await dbInsert(db, 'subscriptions', {
@@ -188,12 +190,81 @@ export async function createCheckoutSession(
 
   if (!response.ok) {
     const err = await response.text();
+    console.warn(JSON.stringify({ level: 'error', service: 'billing', message: 'Stripe checkout creation failed', org_id: opts.orgId, status: response.status }));
     throw badRequest(`Failed to create Stripe checkout: ${err}`);
   }
 
   const session = (await response.json()) as { id: string; url: string };
+  console.warn(JSON.stringify({ level: 'info', service: 'billing', message: 'Checkout session created', org_id: opts.orgId, session_id: session.id }));
 
   return { checkout_url: session.url, session_id: session.id };
+}
+
+/**
+ * Create a Stripe Checkout Session in **embedded** (`ui_mode: 'embedded'`) mode.
+ *
+ * Returns a `client_secret` that the frontend uses with `stripe.initEmbeddedCheckout()`
+ * to render the checkout form inline, avoiding a full-page redirect.
+ */
+export async function createEmbeddedCheckoutSession(
+  db: D1Database,
+  env: Env,
+  opts: {
+    orgId: string;
+    siteId?: string;
+    customerEmail: string;
+    returnUrl: string;
+  },
+): Promise<{ client_secret: string; session_id: string }> {
+  const { stripe_customer_id } = await getOrCreateStripeCustomer(
+    db,
+    env,
+    opts.orgId,
+    opts.customerEmail,
+  );
+
+  const params = new URLSearchParams({
+    mode: 'subscription',
+    ui_mode: 'embedded',
+    customer: stripe_customer_id,
+    return_url: opts.returnUrl,
+    'payment_method_types[0]': 'card',
+    'payment_method_types[1]': 'link',
+    'line_items[0][price_data][currency]': PRICING.CURRENCY,
+    'line_items[0][price_data][unit_amount]': String(PRICING.MONTHLY_CENTS),
+    'line_items[0][price_data][recurring][interval]': 'month',
+    'line_items[0][price_data][product_data][name]': 'Project Sites Pro',
+    'line_items[0][price_data][product_data][description]':
+      'Remove top bar, custom domains, analytics',
+    'line_items[0][quantity]': '1',
+    allow_promotion_codes: 'true',
+    billing_address_collection: 'auto',
+  });
+
+  if (opts.siteId) {
+    params.append('metadata[site_id]', opts.siteId);
+  }
+  params.append('metadata[org_id]', opts.orgId);
+
+  const response = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: params,
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    console.warn(JSON.stringify({ level: 'error', service: 'billing', message: 'Stripe embedded checkout creation failed', org_id: opts.orgId, status: response.status }));
+    throw badRequest(`Failed to create Stripe embedded checkout: ${err}`);
+  }
+
+  const session = (await response.json()) as { id: string; client_secret: string };
+  console.warn(JSON.stringify({ level: 'info', service: 'billing', message: 'Embedded checkout session created', org_id: opts.orgId, session_id: session.id }));
+
+  return { client_secret: session.client_secret, session_id: session.id };
 }
 
 /**
@@ -227,8 +298,11 @@ export async function handleCheckoutCompleted(
 ): Promise<void> {
   const orgId = event.metadata?.org_id;
   if (!orgId) {
+    console.warn(JSON.stringify({ level: 'error', service: 'billing', message: 'Checkout completed but missing org_id in metadata', customer: event.customer }));
     throw badRequest('Missing org_id in checkout metadata');
   }
+
+  console.warn(JSON.stringify({ level: 'info', service: 'billing', message: 'Checkout completed — upgrading to paid', org_id: orgId, subscription: event.subscription }));
 
   await dbUpdate(
     db,
@@ -248,6 +322,7 @@ export async function handleCheckoutCompleted(
   const siteId = event.metadata?.site_id;
   if (siteId) {
     await dbUpdate(db, 'sites', { plan: 'paid' }, 'id = ? AND org_id = ?', [siteId, orgId]);
+    console.warn(JSON.stringify({ level: 'info', service: 'billing', message: 'Site upgraded to paid', org_id: orgId, site_id: siteId }));
   }
 
   // Call optional sale webhook
@@ -296,6 +371,8 @@ export async function handleSubscriptionUpdated(
   const orgId = event.metadata?.org_id;
   if (!orgId) return;
 
+  console.warn(JSON.stringify({ level: 'info', service: 'billing', message: 'Subscription updated', org_id: orgId, status: event.status, cancel_at_period_end: event.cancel_at_period_end }));
+
   await dbUpdate(
     db,
     'subscriptions',
@@ -333,6 +410,8 @@ export async function handleSubscriptionDeleted(
 ): Promise<void> {
   const orgId = event.metadata?.org_id;
   if (!orgId) return;
+
+  console.warn(JSON.stringify({ level: 'warn', service: 'billing', message: 'Subscription canceled — downgrading to free', org_id: orgId, subscription_id: event.id }));
 
   await dbUpdate(
     db,
@@ -373,6 +452,8 @@ export async function handlePaymentFailed(
 ): Promise<void> {
   const orgId = event.metadata?.org_id;
   if (!orgId) return;
+
+  console.warn(JSON.stringify({ level: 'warn', service: 'billing', message: 'Payment failed — marking past_due', org_id: orgId, subscription: event.subscription }));
 
   await dbUpdate(
     db,
@@ -511,10 +592,12 @@ export async function createBillingPortalSession(
 
   if (!response.ok) {
     const err = await response.text();
+    console.warn(JSON.stringify({ level: 'error', service: 'billing', message: 'Billing portal creation failed', status: response.status }));
     throw badRequest(`Failed to create billing portal: ${err}`);
   }
 
   const session = (await response.json()) as { url: string };
+  console.warn(JSON.stringify({ level: 'info', service: 'billing', message: 'Billing portal session created', customer_id: stripeCustomerId }));
   return { portal_url: session.url };
 }
 

@@ -791,6 +791,43 @@ export class WorkbenchStore {
     return { slug, url };
   }
 
+  async getZipBlob(subFolder?: string): Promise<Blob> {
+    const zip = new JSZip();
+    const files = this.files.get();
+
+    for (const [filePath, dirent] of Object.entries(files)) {
+      if (dirent?.type === 'file' && !dirent.isBinary) {
+        let relativePath = extractRelativePath(filePath);
+
+        if (subFolder) {
+          const prefix = subFolder.endsWith('/') ? subFolder : `${subFolder}/`;
+
+          if (!relativePath.startsWith(prefix)) {
+            continue;
+          }
+
+          relativePath = relativePath.slice(prefix.length);
+        }
+
+        const pathSegments = relativePath.split('/');
+
+        if (pathSegments.length > 1) {
+          let currentFolder = zip;
+
+          for (let i = 0; i < pathSegments.length - 1; i++) {
+            currentFolder = currentFolder.folder(pathSegments[i])!;
+          }
+
+          currentFolder.file(pathSegments[pathSegments.length - 1], dirent.content);
+        } else {
+          zip.file(relativePath, dirent.content);
+        }
+      }
+    }
+
+    return await zip.generateAsync({ type: 'blob' });
+  }
+
   async downloadZip() {
     const zip = new JSZip();
     const files = this.files.get();

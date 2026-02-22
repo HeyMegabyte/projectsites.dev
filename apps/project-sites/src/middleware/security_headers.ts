@@ -57,25 +57,48 @@ export const securityHeadersMiddleware: MiddlewareHandler<{
 }> = async (c, next) => {
   await next();
 
+  const url = new URL(c.req.url);
+  const hostname = url.hostname;
+
+  // Determine if this is a served site (not the dashboard/API)
+  const isDashboard = hostname === 'sites.megabyte.space' || hostname === 'sites-staging.megabyte.space' || hostname === 'localhost';
+  const isServedSite = !isDashboard && !url.pathname.startsWith('/api/');
+
   c.header('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
   c.header('X-Content-Type-Options', 'nosniff');
-  c.header('X-Frame-Options', 'DENY');
   c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
   c.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=self');
-  c.header('Cross-Origin-Opener-Policy', 'same-origin');
-  c.header('Cross-Origin-Embedder-Policy', 'credentialless');
-  c.header(
-    'Content-Security-Policy',
-    [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' https://releases.transloadit.com https://js.stripe.com https://us.i.posthog.com https://us-assets.i.posthog.com https://static.cloudflareinsights.com",
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://releases.transloadit.com",
-      "img-src 'self' data: https:",
-      "font-src 'self' https://fonts.gstatic.com",
-      "connect-src 'self' https://api.stripe.com https://us.i.posthog.com https://us-assets.i.posthog.com https://releases.transloadit.com",
-      'frame-src https://js.stripe.com',
-      "object-src 'none'",
-      "base-uri 'self'",
-    ].join('; '),
-  );
+
+  if (isServedSite) {
+    // Served sites: allow framing from anywhere (for dashboard preview cards)
+    // Do NOT set X-Frame-Options (allows embedding in dashboard iframes)
+    // Do NOT set COOP/COEP (breaks iframe embedding)
+    c.header(
+      'Content-Security-Policy',
+      [
+        "default-src 'self' 'unsafe-inline' https: data:",
+        "frame-ancestors *",
+        "object-src 'none'",
+      ].join('; '),
+    );
+  } else {
+    // Dashboard/API: standard security headers
+    c.header('X-Frame-Options', 'SAMEORIGIN');
+    c.header('Cross-Origin-Opener-Policy', 'same-origin');
+    c.header(
+      'Content-Security-Policy',
+      [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline' https://releases.transloadit.com https://js.stripe.com https://us.i.posthog.com https://us-assets.i.posthog.com https://static.cloudflareinsights.com https://cdnjs.cloudflare.com https://www.googletagmanager.com https://www.google-analytics.com",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://releases.transloadit.com https://cdnjs.cloudflare.com",
+        "img-src 'self' data: https: https://www.googletagmanager.com https://www.google-analytics.com",
+        "font-src 'self' https://fonts.gstatic.com",
+        "connect-src 'self' https://api.stripe.com https://us.i.posthog.com https://us-assets.i.posthog.com https://releases.transloadit.com https://www.google-analytics.com https://www.googletagmanager.com https://region1.google-analytics.com https://domainr.p.rapidapi.com",
+        "frame-src https://js.stripe.com https://www.googletagmanager.com https://*.megabyte.space",
+        "frame-ancestors 'self' https://*.megabyte.space",
+        "object-src 'none'",
+        "base-uri 'self'",
+      ].join('; '),
+    );
+  }
 };

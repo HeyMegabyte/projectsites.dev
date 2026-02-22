@@ -455,19 +455,19 @@ describe('Domains Service Error Paths', () => {
   });
 
   describe('provisionCustomDomain', () => {
-    it('throws conflict when max custom domains reached (5 existing)', async () => {
-      const fiveDomains = Array.from({ length: 5 }, (_, i) => ({ id: `dom-${i}` }));
-      mockQuery.mockResolvedValueOnce({ data: fiveDomains, error: null });
+    it('throws conflict when max custom domains reached (10 existing)', async () => {
+      const tenDomains = Array.from({ length: 10 }, (_, i) => ({ id: `dom-${i}` }));
+      mockQuery.mockResolvedValueOnce({ data: tenDomains, error: null });
 
       const err = await provisionCustomDomain(mockDb, mockEnv, {
         org_id: 'org-full',
         site_id: 'site-1',
-        hostname: 'sixth.example.com',
+        hostname: 'eleventh.example.com',
       }).catch((e: unknown) => e);
 
       expect(err).toBeInstanceOf(AppError);
       expect((err as AppError).statusCode).toBe(409);
-      expect((err as AppError).message).toMatch(/Maximum custom domains.*5/);
+      expect((err as AppError).message).toMatch(/Maximum custom domains.*10/);
     });
   });
 

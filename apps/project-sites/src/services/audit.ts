@@ -53,33 +53,47 @@ import { dbInsert, dbQuery } from './db.js';
  * @param entry - Audit log fields (validated via Zod).
  */
 export async function writeAuditLog(db: D1Database, entry: CreateAuditLog): Promise<void> {
-  const validated = createAuditLogSchema.parse(entry);
+  try {
+    const validated = createAuditLogSchema.parse(entry);
 
-  const { error } = await dbInsert(db, 'audit_logs', {
-    id: crypto.randomUUID(),
-    org_id: validated.org_id,
-    actor_id: validated.actor_id ?? null,
-    action: validated.action,
-    target_type: validated.target_type ?? null,
-    target_id: validated.target_id ?? null,
-    metadata_json: validated.metadata_json ? JSON.stringify(validated.metadata_json) : null,
-    ip_address: null,
-    request_id: validated.request_id ?? null,
-    created_at: new Date().toISOString(),
-  });
+    const { error } = await dbInsert(db, 'audit_logs', {
+      id: crypto.randomUUID(),
+      org_id: validated.org_id,
+      actor_id: validated.actor_id ?? null,
+      action: validated.action,
+      target_type: validated.target_type ?? null,
+      target_id: validated.target_id ?? null,
+      metadata_json: validated.metadata_json ? JSON.stringify(validated.metadata_json) : null,
+      ip_address: null,
+      request_id: validated.request_id ?? null,
+      created_at: new Date().toISOString(),
+    });
 
-  if (error) {
+    if (error) {
+      console.error(
+        JSON.stringify({
+          level: 'error',
+          service: 'audit',
+          message: 'Failed to write audit log',
+          error,
+          entry: {
+            org_id: validated.org_id,
+            action: validated.action,
+            request_id: validated.request_id,
+          },
+        }),
+      );
+    }
+  } catch (err) {
+    // Truly never throw — audit logging must not break request flow
     console.error(
       JSON.stringify({
         level: 'error',
         service: 'audit',
-        message: 'Failed to write audit log',
-        error,
-        entry: {
-          org_id: validated.org_id,
-          action: validated.action,
-          request_id: validated.request_id,
-        },
+        message: 'Audit log write threw unexpectedly',
+        error: err instanceof Error ? err.message : String(err),
+        action: entry?.action,
+        org_id: entry?.org_id,
       }),
     );
   }
@@ -98,12 +112,48 @@ export async function getAuditLogs(
   orgId: string,
   options: { limit?: number; offset?: number } = {},
 ): Promise<{ data: unknown[]; error: string | null }> {
-  const { limit = 50, offset = 0 } = options;
+  const limit = Math.min(options.limit ?? 50, 200);
+  const offset = Math.max(options.offset ?? 0, 0);
 
   const result = await dbQuery<unknown>(
     db,
     'SELECT * FROM audit_logs WHERE org_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?',
     [orgId, limit, offset],
+  );
+
+  return { data: result.data, error: result.error };
+}
+
+/**
+ * Query audit logs for a specific site within an organization.
+ *
+ * Retrieves logs where the target_id matches the site ID, OR where
+ * metadata_json contains a reference to the site_id. This captures
+ * both direct site actions and related actions (hostname changes, etc.).
+ *
+ * @param db     - D1Database binding.
+ * @param orgId  - Organization ID to filter by.
+ * @param siteId - Site ID to filter logs for.
+ * @param options - Pagination options.
+ * @returns Paginated array of audit log entries for the site.
+ */
+export async function getSiteAuditLogs(
+  db: D1Database,
+  orgId: string,
+  siteId: string,
+  options: { limit?: number; offset?: number } = {},
+): Promise<{ data: unknown[]; error: string | null }> {
+  const limit = Math.min(options.limit ?? 100, 200);
+  const offset = Math.max(options.offset ?? 0, 0);
+
+  const result = await dbQuery<unknown>(
+    db,
+    `SELECT * FROM audit_logs
+     WHERE org_id = ?
+       AND (target_id = ? OR metadata_json LIKE ?)
+     ORDER BY created_at DESC
+     LIMIT ? OFFSET ?`,
+    [orgId, siteId, `%"site_id":"${siteId}"%`, limit, offset],
   );
 
   return { data: result.data, error: result.error };

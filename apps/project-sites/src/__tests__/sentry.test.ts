@@ -40,7 +40,7 @@ describe('captureException', () => {
     const authHeader = options.headers['X-Sentry-Auth'];
     expect(authHeader).toContain('sentry_key=abc123');
     expect(authHeader).toContain('sentry_version=7');
-    expect(authHeader).toContain('sentry_client=project-sites/0.1.0');
+    expect(authHeader).toContain('sentry_client=project-sites/0.2.0');
   });
 
   it('includes exception type, value, and stacktrace', async () => {

@@ -124,6 +124,16 @@ export interface Env {
   /** Sentry DSN for error reporting. */
   SENTRY_DSN?: string;
 
+  // ── Domain Registration (OpenSRS + Domainr) ─────────────────
+  /** Domainr (Mashape/RapidAPI) API key for domain search & pricing. */
+  DOMAINR_API_KEY?: string;
+  /** OpenSRS reseller username for domain registration. */
+  OPENSRS_USERNAME?: string;
+  /** OpenSRS private API key for domain registration. */
+  OPENSRS_API_KEY?: string;
+  /** OpenSRS API environment: 'live' or 'test'. Defaults to 'test'. */
+  OPENSRS_ENV?: string;
+
   // ── Sale Webhook ──────────────────────────────────────────
   /** External webhook URL called on successful subscription purchase. */
   SALE_WEBHOOK_URL?: string;
@@ -133,6 +143,10 @@ export interface Env {
   // ── Metering ──────────────────────────────────────────────
   /** Metering provider identifier (e.g. `"lago"`, `"stripe"`). */
   METERING_PROVIDER?: string;
+
+  // ── Feature Flags ──────────────────────────────────────────
+  /** When "true", research.json is publicly accessible at /api/sites/by-slug/:slug/research.json */
+  RESEARCH_JSON_PUBLIC?: string;
 }
 
 /**

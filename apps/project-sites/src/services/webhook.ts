@@ -45,7 +45,7 @@
  */
 
 import { type WebhookProvider, hmacSha256, timingSafeEqual } from '@project-sites/shared';
-import { dbQuery, dbQueryOne, dbInsert, dbUpdate } from './db.js';
+import { dbQueryOne, dbInsert, dbUpdate } from './db.js';
 
 /**
  * Result of a webhook signature verification attempt.
