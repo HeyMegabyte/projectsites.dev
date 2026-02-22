@@ -135,6 +135,11 @@ app.all('*', async (c) => {
       return Response.redirect(`${baseUrl}/#contact-section`, 301);
     }
 
+    // SPA fallback: serve index.html for Angular client-side routes (e.g. /signin, /admin, /details, /waiting)
+    if (!marketingAsset && !path.includes('.') && path !== '/') {
+      marketingAsset = await c.env.SITES_BUCKET.get('marketing/index.html');
+    }
+
     if (marketingAsset) {
       const resolvedPath = marketingAsset.key;
       const ext = resolvedPath.split('.').pop()?.toLowerCase() ?? 'html';
