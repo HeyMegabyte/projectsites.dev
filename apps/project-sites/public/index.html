@@ -488,6 +488,7 @@
       padding: 18px;
       transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
       position: relative;
+      z-index: 9;
       display: flex;
       flex-direction: column;
       gap: 10px;
@@ -4698,18 +4699,18 @@
 
   <!-- Stripe Embedded Checkout Modal -->
   <div id="checkout-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-label="Upgrade to Pro" onclick="if(event.target===this)closeCheckoutModal()" style="display:none;">
-    <div class="modal" style="max-width:520px;padding:0;overflow:hidden;">
-      <div style="display:flex;align-items:center;justify-content:between;padding:18px 22px 14px;border-bottom:1px solid var(--border);">
+    <div class="modal" style="max-width:520px;padding:0;overflow-y:auto;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px 14px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:2;background:linear-gradient(150deg, rgba(22, 22, 53, 0.98), rgba(12, 12, 38, 1));">
         <span style="font-size:1rem;font-weight:700;color:var(--text-primary);flex:1;">Upgrade to Pro</span>
         <button class="modal-close" onclick="closeCheckoutModal()" style="position:static;margin:0;">&times;</button>
       </div>
-      <div id="checkout-mount" style="min-height:350px;"></div>
+      <div id="checkout-mount" style="min-height:350px;overflow-y:auto;-webkit-overflow-scrolling:touch;"></div>
     </div>
   </div>
 
   <!-- Billing Portal Modal -->
   <div id="billing-portal-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-label="Billing Portal" onclick="if(event.target===this)closeBillingPortalModal()" style="display:none;">
-    <div class="modal" style="padding:0;overflow:hidden;">
+    <div class="modal" style="padding:0;overflow-y:auto;">
       <div style="display:flex;align-items:center;justify-content:between;padding:18px 22px 14px;border-bottom:1px solid var(--border);">
         <span style="font-size:1rem;font-weight:700;color:var(--text-primary);flex:1;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px;"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>Billing &amp; Subscription</span>
         <button class="modal-close" onclick="closeBillingPortalModal()" style="position:static;margin:0;">&times;</button>
