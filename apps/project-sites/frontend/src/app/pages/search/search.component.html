@@ -1,5 +1,5 @@
+<!-- Hero Section -->
 <section class="screen-search">
-  <!-- Hero -->
   <div class="hero-brand">
     <h1>
       Your Website,
@@ -7,67 +7,73 @@
       Finally.
     </h1>
     <p class="tagline">AI-powered websites for small businesses. Search and get yours in minutes.</p>
+    <div class="hero-cta">
+      <ion-button fill="solid" size="large" (click)="startBuildFlow()">
+        Get Started Free
+      </ion-button>
+      <ion-button fill="outline" size="large" color="light" (click)="startBuildFlow()">
+        See How It Works
+      </ion-button>
+    </div>
   </div>
 
   <!-- Search bar -->
   <div class="search-wrapper">
-    <div class="search-input-wrap">
-      <span class="search-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
-        </svg>
-      </span>
-      <input
-        #searchInput
-        type="text"
-        class="search-input"
-        placeholder="Search for your business..."
-        [(ngModel)]="query"
-        (input)="onSearchInput()"
-        (blur)="closeDropdown()"
-        autocomplete="off"
-      />
-      @if (loading()) {
-        <span class="search-spinner visible"></span>
-      }
-    </div>
+    <ion-searchbar
+      [value]="query"
+      (ionInput)="onSearchInput($event)"
+      (ionBlur)="closeDropdown()"
+      placeholder="Search for your business..."
+      [debounce]="0"
+      autocomplete="off"
+      animated
+    ></ion-searchbar>
+
+    @if (loading()) {
+      <div class="search-loading">
+        <ion-spinner name="crescent" color="primary"></ion-spinner>
+      </div>
+    }
 
     <!-- Dropdown -->
     @if (dropdownOpen() && results().length > 0) {
-      <div class="search-dropdown open">
-        @for (item of results(); track item.name + item.address) {
-          <div
-            class="search-result"
-            [class.search-result-custom]="item.type === 'custom'"
-            (mousedown)="selectItem(item)"
-          >
-            <div class="search-result-icon">
-              @if (item.type === 'custom') {
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M12 5v14M5 12h14" />
-                </svg>
-              } @else {
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
-                </svg>
-              }
-            </div>
-            <div class="search-result-text">
-              <div class="search-result-name">
-                {{ item.name }}
-                @if (item.type === 'prebuilt') {
-                  <span class="prebuilt-badge">PRE-BUILT</span>
+      <div class="search-dropdown">
+        <ion-list lines="none">
+          @for (item of results(); track item.name + item.address) {
+            <ion-item
+              button
+              [class.search-result-custom]="item.type === 'custom'"
+              (mousedown)="selectItem(item)"
+              detail="false"
+            >
+              <div class="search-result-icon" slot="start">
+                @if (item.type === 'custom') {
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                } @else {
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
+                  </svg>
                 }
               </div>
-              <div class="search-result-address">
-                {{ item.address }}
-                @if (item.distance) {
-                  <span class="distance-badge">{{ item.distance }}</span>
-                }
-              </div>
-            </div>
-          </div>
-        }
+              <ion-label>
+                <h3>
+                  {{ item.name }}
+                  @if (item.type === 'prebuilt') {
+                    <ion-badge color="success" class="prebuilt-badge">PRE-BUILT</ion-badge>
+                  }
+                </h3>
+                <p>
+                  {{ item.address }}
+                  @if (item.distance) {
+                    <span class="distance-badge">{{ item.distance }}</span>
+                  }
+                </p>
+              </ion-label>
+            </ion-item>
+          }
+        </ion-list>
       </div>
     }
   </div>
@@ -75,10 +81,180 @@
   <p class="search-hint">Type your business name to get started</p>
 </section>
 
+<!-- How It Works -->
+<section class="section how-it-works">
+  <h2 class="section-title">How It Works</h2>
+  <p class="section-subtitle">Three simple steps to your professional website</p>
+  <div class="steps-grid">
+    <div class="step-card">
+      <div class="step-number">1</div>
+      <h3>Search Your Business</h3>
+      <p>Find your business in our search or enter details manually. We pull data from Google Places to get started.</p>
+    </div>
+    <div class="step-card">
+      <div class="step-number">2</div>
+      <h3>AI Builds Your Site</h3>
+      <p>Our AI researches your business, designs your brand, writes content, and generates a complete website in minutes.</p>
+    </div>
+    <div class="step-card">
+      <div class="step-number">3</div>
+      <h3>Go Live Instantly</h3>
+      <p>Your site is deployed to our global CDN with SSL. Connect a custom domain or use the free subdomain we provide.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Pricing Section -->
+<section class="section pricing-section">
+  <h2 class="section-title">Simple, Transparent Pricing</h2>
+  <p class="section-subtitle">Start free, upgrade when you're ready</p>
+
+  <div class="pricing-toggle">
+    <span [class.active]="!isAnnual()">Monthly</span>
+    <ion-toggle [checked]="isAnnual()" (ionChange)="togglePricing()" mode="md"></ion-toggle>
+    <span [class.active]="isAnnual()">Annual <span class="save-badge">Save 20%</span></span>
+  </div>
+
+  <div class="pricing-grid">
+    <div class="pricing-card">
+      <h3>Free</h3>
+      <div class="price">$0<span>/forever</span></div>
+      <ul>
+        <li>AI-generated website</li>
+        <li>Free subdomain</li>
+        <li>SSL included</li>
+        <li>Global CDN hosting</li>
+        <li>Small branding bar</li>
+      </ul>
+      <ion-button expand="block" fill="outline" (click)="startBuildFlow()">Get Started</ion-button>
+    </div>
+    <div class="pricing-card featured">
+      <div class="popular-badge">Most Popular</div>
+      <h3>Pro</h3>
+      <div class="price">{{ getPrice(29) }}<span>{{ getPeriod() }}</span></div>
+      <ul>
+        <li>Everything in Free</li>
+        <li>Custom domain</li>
+        <li>No branding bar</li>
+        <li>Priority AI generation</li>
+        <li>File editor access</li>
+        <li>ZIP deploy</li>
+      </ul>
+      <ion-button expand="block" fill="solid" (click)="startBuildFlow()">Start Free Trial</ion-button>
+    </div>
+  </div>
+</section>
+
+<!-- What's Handled Section -->
+<section class="section handled-section">
+  <h2 class="section-title">What's Handled For You</h2>
+  <p class="section-subtitle">Focus on your business. We handle the tech.</p>
+  <div class="handled-grid">
+    <div class="handled-item">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <h4>SSL & Security</h4>
+      <p>Automatic HTTPS, security headers, and DDoS protection on every site.</p>
+    </div>
+    <div class="handled-item">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+      <h4>Global CDN</h4>
+      <p>Sites served from Cloudflare's edge network — fast everywhere in the world.</p>
+    </div>
+    <div class="handled-item">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8M16 17H8M10 9H8"/></svg>
+      <h4>Legal Pages</h4>
+      <p>Privacy policy and terms of service generated and included automatically.</p>
+    </div>
+    <div class="handled-item">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+      <h4>Responsive Design</h4>
+      <p>Your website looks great on desktop, tablet, and mobile — out of the box.</p>
+    </div>
+    <div class="handled-item">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      <h4>SEO Optimized</h4>
+      <p>Meta tags, structured data, and fast load times for better search rankings.</p>
+    </div>
+    <div class="handled-item">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><path d="m22 6-10 7L2 6"/></svg>
+      <h4>No Maintenance</h4>
+      <p>No servers, no updates, no hassle. We keep everything running smoothly.</p>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ Section -->
+<section class="section faq-section">
+  <h2 class="section-title">Frequently Asked Questions</h2>
+  <ion-accordion-group class="faq-group">
+    @for (item of faqItems; track item.question; let i = $index) {
+      <ion-accordion [value]="'faq-' + i">
+        <ion-item slot="header">
+          <ion-label>{{ item.question }}</ion-label>
+        </ion-item>
+        <div class="faq-answer" slot="content">
+          <p>{{ item.answer }}</p>
+        </div>
+      </ion-accordion>
+    }
+  </ion-accordion-group>
+</section>
+
+<!-- Contact Section -->
+<section class="section contact-section">
+  <h2 class="section-title">Get In Touch</h2>
+  <p class="section-subtitle">Have questions? We're here to help.</p>
+  <div class="contact-form">
+    <div class="contact-row">
+      <div class="input-group">
+        <label>Name</label>
+        <input type="text" class="input-field" placeholder="Your name" [(ngModel)]="contactName" />
+      </div>
+      <div class="input-group">
+        <label>Email</label>
+        <input type="email" class="input-field" placeholder="you@example.com" [(ngModel)]="contactEmail" />
+      </div>
+    </div>
+    <div class="input-group">
+      <label>Message</label>
+      <textarea class="input-field" placeholder="How can we help?" [(ngModel)]="contactMessage" rows="4"></textarea>
+    </div>
+    <ion-button
+      fill="solid"
+      expand="block"
+      [disabled]="contactSending()"
+      (click)="submitContactForm()"
+    >
+      @if (contactSending()) {
+        Sending...
+      } @else {
+        Send Message
+      }
+    </ion-button>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <img src="/logo-icon.svg" alt="Project Sites" width="28" height="28" />
+      <span>Project Sites</span>
+    </div>
+    <div class="footer-links">
+      <a href="/terms">Terms</a>
+      <a href="/privacy">Privacy</a>
+      <a href="https://github.com/HeyMegabyte" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://x.com/HeyMegabyte" target="_blank" rel="noopener">X</a>
+    </div>
+    <div class="footer-copy">&copy; 2026 Megabyte LLC. All rights reserved.</div>
+  </div>
+</footer>
+
 <!-- Location permission modal -->
-@if (showLocationPrompt()) {
-  <div class="location-modal-overlay">
-    <div class="location-modal">
+<ion-modal [isOpen]="showLocationPrompt()" [breakpoints]="[0, 0.5]" [initialBreakpoint]="0.5" (didDismiss)="skipLocation()">
+  <ng-template>
+    <div class="location-modal-content">
       <div class="location-modal-icon">
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
           <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
@@ -87,9 +263,9 @@
       <h3>Find nearby businesses</h3>
       <p>Allow location access to sort search results by distance and find businesses near you.</p>
       <div class="location-modal-actions">
-        <button class="btn-skip" (click)="skipLocation()">Not now</button>
-        <button class="btn-allow" (click)="allowLocation()">Allow</button>
+        <ion-button fill="outline" color="medium" (click)="skipLocation()">Not now</ion-button>
+        <ion-button fill="solid" (click)="allowLocation()">Allow</ion-button>
       </div>
     </div>
-  </div>
-}
+  </ng-template>
+</ion-modal>

@@ -2,6 +2,11 @@ import { Component, OnInit, OnDestroy, inject, signal, ElementRef, ViewChild } f
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Subject, debounceTime, distinctUntilChanged, switchMap, forkJoin, of, takeUntil } from 'rxjs';
+import {
+  IonSearchbar, IonList, IonItem, IonLabel, IonBadge, IonButton,
+  IonSpinner, IonAccordionGroup, IonAccordion,
+  IonToggle, IonModal,
+} from '@ionic/angular/standalone';
 import { ApiService, BusinessResult, PreBuiltSite } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { GeolocationService } from '../../services/geolocation.service';
@@ -27,7 +32,11 @@ interface SearchItem {
 @Component({
   selector: 'app-search',
   standalone: true,
-  imports: [FormsModule],
+  imports: [
+    FormsModule, IonSearchbar, IonList, IonItem, IonLabel, IonBadge,
+    IonButton, IonSpinner, IonAccordionGroup, IonAccordion,
+    IonToggle, IonModal,
+  ],
   templateUrl: './search.component.html',
   styleUrl: './search.component.scss',
 })
@@ -38,13 +47,28 @@ export class SearchComponent implements OnInit, OnDestroy {
   private toast = inject(ToastService);
   private router = inject(Router);
 
-  @ViewChild('searchInput') searchInput!: ElementRef<HTMLInputElement>;
-
   query = '';
   results = signal<SearchItem[]>([]);
   loading = signal(false);
   dropdownOpen = signal(false);
   showLocationPrompt = signal(false);
+  isAnnual = signal(false);
+
+  // Contact form
+  contactName = '';
+  contactEmail = '';
+  contactMessage = '';
+  contactSending = signal(false);
+
+  // FAQ items
+  faqItems = [
+    { question: 'How long does it take to build my website?', answer: 'Most websites are generated and live within 5-15 minutes. Our AI researches your business, designs your brand, writes content, and publishes — all automatically.' },
+    { question: 'Can I use my own domain name?', answer: 'Yes! You can connect your custom domain in the admin dashboard. Just add a CNAME record pointing to projectsites.dev and we handle SSL automatically.' },
+    { question: 'What if I want to make changes to my website?', answer: 'You can edit files directly in the built-in code editor, upload custom assets, or regenerate the entire site with new context. Changes deploy instantly.' },
+    { question: 'Is there a free plan?', answer: 'Yes! Every site starts on the free plan which includes AI generation, CDN hosting, and SSL. Upgrade to remove the branding bar and get custom domain support.' },
+    { question: 'What AI model powers the generation?', answer: 'We use Cloudflare Workers AI with Llama models for content generation. The AI researches your business across the web to create accurate, professional content.' },
+    { question: 'Can I cancel anytime?', answer: 'Absolutely. No contracts, no commitments. Cancel your subscription anytime from the billing portal and your site stays live on the free plan.' },
+  ];
 
   private searchSubject = new Subject<string>();
   private destroy$ = new Subject<void>();
@@ -77,7 +101,6 @@ export class SearchComponent implements OnInit, OnDestroy {
         const items: SearchItem[] = [];
         const seen = new Set<string>();
 
-        // Pre-built sites first
         for (const s of res.sites.data || []) {
           const key = s.place_id || s.business_name;
           if (!seen.has(key)) {
@@ -94,7 +117,6 @@ export class SearchComponent implements OnInit, OnDestroy {
           }
         }
 
-        // Google Places results
         for (const b of res.businesses.data || []) {
           const key = b.place_id || b.name;
           if (!seen.has(key)) {
@@ -119,14 +141,12 @@ export class SearchComponent implements OnInit, OnDestroy {
           }
         }
 
-        // Sort by distance if available
         items.sort((a, b) => {
           if (a.type === 'prebuilt' && b.type !== 'prebuilt') return -1;
           if (b.type === 'prebuilt' && a.type !== 'prebuilt') return 1;
           return (a.distanceMiles ?? Infinity) - (b.distanceMiles ?? Infinity);
         });
 
-        // Add custom option
         items.push({
           type: 'custom',
           name: 'Build a custom website',
@@ -137,7 +157,6 @@ export class SearchComponent implements OnInit, OnDestroy {
         this.dropdownOpen.set(true);
       });
 
-    // Request geolocation after delay
     if (!this.auth.isLocationDeclined()) {
       setTimeout(() => this.checkGeolocation(), 5000);
     }
@@ -148,8 +167,10 @@ export class SearchComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  onSearchInput(): void {
-    this.searchSubject.next(this.query);
+  onSearchInput(event: Event): void {
+    const val = (event as CustomEvent).detail?.value ?? this.query;
+    this.query = val;
+    this.searchSubject.next(val);
   }
 
   selectItem(item: SearchItem): void {
@@ -167,14 +188,12 @@ export class SearchComponent implements OnInit, OnDestroy {
         window.location.href = `https://${item.slug}.projectsites.dev`;
         return;
       }
-      // If building, navigate to waiting
       if (item.siteId && ['building', 'queued', 'generating'].includes(item.status || '')) {
         this.router.navigate(['/waiting'], { queryParams: { id: item.siteId, slug: item.slug } });
         return;
       }
     }
 
-    // Business or pre-built not yet published
     this.auth.setMode('business');
     this.auth.setSelectedBusiness({
       name: item.name,
@@ -187,7 +206,6 @@ export class SearchComponent implements OnInit, OnDestroy {
       lng: item.lng,
     });
 
-    // Check if site already exists
     if (item.place_id) {
       this.api.lookupSite(item.place_id).subscribe({
         next: (res) => {
@@ -204,26 +222,55 @@ export class SearchComponent implements OnInit, OnDestroy {
     }
   }
 
+  startBuildFlow(): void {
+    this.navigateToDetailsOrSignin();
+  }
+
+  togglePricing(): void {
+    this.isAnnual.update((v) => !v);
+  }
+
+  getPrice(monthly: number): string {
+    if (this.isAnnual()) {
+      return `$${Math.round(monthly * 0.8)}`;
+    }
+    return `$${monthly}`;
+  }
+
+  getPeriod(): string {
+    return this.isAnnual() ? '/year' : '/month';
+  }
+
+  submitContactForm(): void {
+    if (!this.contactName.trim() || !this.contactEmail.trim() || !this.contactMessage.trim()) {
+      this.toast.error('Please fill in all fields');
+      return;
+    }
+    this.contactSending.set(true);
+    this.api.submitContact({
+      name: this.contactName.trim(),
+      email: this.contactEmail.trim(),
+      message: this.contactMessage.trim(),
+    }).subscribe({
+      next: () => {
+        this.contactSending.set(false);
+        this.toast.success('Message sent! We\'ll get back to you soon.');
+        this.contactName = '';
+        this.contactEmail = '';
+        this.contactMessage = '';
+      },
+      error: () => {
+        this.contactSending.set(false);
+        this.toast.error('Failed to send message. Please try again.');
+      },
+    });
+  }
+
   private navigateToDetailsOrSignin(): void {
     if (this.auth.isLoggedIn()) {
       this.router.navigate(['/details']);
     } else {
       this.router.navigate(['/signin']);
-    }
-  }
-
-  private async checkGeolocation(): Promise<void> {
-    if (this.geo.hasLocation()) return;
-    try {
-      const perm = await navigator.permissions.query({ name: 'geolocation' });
-      if (perm.state === 'granted') {
-        this.geo.requestLocation();
-      } else if (perm.state === 'prompt') {
-        this.showLocationPrompt.set(true);
-      }
-    } catch {
-      // Permissions API not supported
-      this.showLocationPrompt.set(true);
     }
   }
 
@@ -239,5 +286,19 @@ export class SearchComponent implements OnInit, OnDestroy {
 
   closeDropdown(): void {
     setTimeout(() => this.dropdownOpen.set(false), 200);
+  }
+
+  private async checkGeolocation(): Promise<void> {
+    if (this.geo.hasLocation()) return;
+    try {
+      const perm = await navigator.permissions.query({ name: 'geolocation' });
+      if (perm.state === 'granted') {
+        this.geo.requestLocation();
+      } else if (perm.state === 'prompt') {
+        this.showLocationPrompt.set(true);
+      }
+    } catch {
+      this.showLocationPrompt.set(true);
+    }
   }
 }

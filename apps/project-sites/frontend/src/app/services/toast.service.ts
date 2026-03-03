@@ -1,24 +1,25 @@
-import { Injectable, signal } from '@angular/core';
-
-export interface Toast {
-  id: number;
-  message: string;
-  type: 'error' | 'success' | 'info';
-}
+import { Injectable, inject } from '@angular/core';
+import { ToastController } from '@ionic/angular/standalone';
 
 @Injectable({ providedIn: 'root' })
 export class ToastService {
-  private counter = 0;
-  readonly toasts = signal<Toast[]>([]);
+  private toastCtrl = inject(ToastController);
 
-  show(message: string, type: 'error' | 'success' | 'info' = 'info', duration = 5000): void {
-    const id = ++this.counter;
-    this.toasts.update((t) => [...t, { id, message, type }]);
-    setTimeout(() => this.dismiss(id), duration);
-  }
-
-  dismiss(id: number): void {
-    this.toasts.update((t) => t.filter((toast) => toast.id !== id));
+  async show(message: string, type: 'error' | 'success' | 'info' = 'info', duration = 5000): Promise<void> {
+    const colorMap: Record<string, string> = {
+      error: 'danger',
+      success: 'success',
+      info: 'primary',
+    };
+    const toast = await this.toastCtrl.create({
+      message,
+      duration,
+      position: 'top',
+      color: colorMap[type] || 'primary',
+      cssClass: `toast-${type}`,
+      buttons: [{ icon: 'close', role: 'cancel' }],
+    });
+    await toast.present();
   }
 
   error(message: string, duration = 5000): void {

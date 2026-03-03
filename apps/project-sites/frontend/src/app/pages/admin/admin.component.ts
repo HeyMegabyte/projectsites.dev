@@ -2,14 +2,29 @@ import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { interval, takeWhile, switchMap, forkJoin } from 'rxjs';
-import { ApiService, Site, DomainSummary, Hostname } from '../../services/api.service';
+import {
+  IonButton, IonBadge, IonSpinner,
+  ModalController,
+} from '@ionic/angular/standalone';
+import { AgGridAngular } from 'ag-grid-angular';
+import type { ColDef, GridReadyEvent, GridApi, ICellRendererParams } from 'ag-grid-community';
+import { ApiService, Site, DomainSummary, SubscriptionInfo } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
+import { DeleteModalComponent } from '../../modals/delete-modal.component';
+import { DomainModalComponent } from '../../modals/domain-modal.component';
+import { LogsModalComponent } from '../../modals/logs-modal.component';
+import { ResetModalComponent } from '../../modals/reset-modal.component';
+import { DetailsModalComponent } from '../../modals/details-modal.component';
+import { FilesModalComponent } from '../../modals/files-modal.component';
+import { DeployModalComponent } from '../../modals/deploy-modal.component';
+import { StatusModalComponent } from '../../modals/status-modal.component';
+import { CheckoutModalComponent } from '../../modals/checkout-modal.component';
 
 @Component({
   selector: 'app-admin',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, IonButton, IonBadge, IonSpinner, AgGridAngular],
   templateUrl: './admin.component.html',
   styleUrl: './admin.component.scss',
 })
@@ -18,30 +33,63 @@ export class AdminComponent implements OnInit, OnDestroy {
   private auth = inject(AuthService);
   private toast = inject(ToastService);
   private router = inject(Router);
+  private modalCtrl = inject(ModalController);
 
   sites = signal<Site[]>([]);
   domainSummary = signal<DomainSummary>({ total: 0, active: 0, pending: 0, failed: 0 });
+  subscription = signal<SubscriptionInfo | null>(null);
   loading = signal(true);
   alive = true;
+  private gridApi: GridApi | null = null;
 
-  // Inline edit state
-  editingSiteId = signal<string | null>(null);
-  editingField = signal<'name' | 'slug' | null>(null);
-  editValue = '';
+  columnDefs: ColDef<Site>[] = [
+    {
+      headerName: 'Status',
+      field: 'status',
+      width: 110,
+      cellRenderer: (params: ICellRendererParams) => {
+        const colors: Record<string, string> = {
+          published: '#22c55e', building: '#fbbf24', queued: '#fbbf24',
+          generating: '#a78bfa', error: '#ef4444', draft: '#94a3b8',
+        };
+        const color = colors[params.value] || '#94a3b8';
+        return `<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.7rem;font-weight:600;text-transform:uppercase;background:${color}22;color:${color}">${params.value}</span>`;
+      },
+    },
+    {
+      headerName: 'Business Name',
+      field: 'business_name',
+      flex: 2,
+      editable: true,
+    },
+    {
+      headerName: 'Slug',
+      field: 'slug',
+      flex: 1,
+      editable: true,
+    },
+    {
+      headerName: 'Plan',
+      field: 'plan',
+      width: 80,
+      cellRenderer: (params: ICellRendererParams) => {
+        if (!params.value) return '';
+        const color = params.value === 'paid' ? '#22c55e' : '#94a3b8';
+        return `<span style="font-size:0.65rem;font-weight:700;padding:2px 6px;border-radius:4px;text-transform:uppercase;background:${color}1f;color:${color}">${params.value}</span>`;
+      },
+    },
+    {
+      headerName: 'Actions',
+      width: 340,
+      suppressSizeToFit: true,
+      cellRenderer: () => '',
+    },
+  ];
 
-  // Domain modal
-  domainModalSiteId = signal<string | null>(null);
-  hostnames = signal<Hostname[]>([]);
-  newHostname = '';
-  loadingHostnames = signal(false);
-
-  // Logs modal
-  logsModalSiteId = signal<string | null>(null);
-  logs = signal<{ action: string; created_at: string; metadata?: string }[]>([]);
-  loadingLogs = signal(false);
-
-  // Delete confirm
-  deletingSiteId = signal<string | null>(null);
+  defaultColDef: ColDef = {
+    sortable: true,
+    resizable: true,
+  };
 
   ngOnInit(): void {
     if (!this.auth.isLoggedIn()) {
@@ -54,6 +102,33 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.alive = false;
+  }
+
+  onGridReady(event: GridReadyEvent): void {
+    this.gridApi = event.api;
+    event.api.sizeColumnsToFit();
+  }
+
+  onCellEditingStopped(event: { data: Site; colDef: ColDef; newValue: string; oldValue: string }): void {
+    if (event.newValue === event.oldValue) return;
+    const field = event.colDef.field;
+    if (!field) return;
+    const body: Partial<Site> = field === 'business_name'
+      ? { business_name: event.newValue }
+      : { slug: event.newValue };
+
+    this.api.updateSite(event.data.id, body).subscribe({
+      next: (res) => {
+        this.sites.update((sites) =>
+          sites.map((s) => (s.id === event.data.id ? { ...s, ...res.data } : s))
+        );
+        this.toast.success('Updated successfully');
+      },
+      error: (err) => {
+        this.toast.error(err?.error?.message || 'Update failed');
+        this.loadData();
+      },
+    });
   }
 
   private loadData(): void {
@@ -71,227 +146,150 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.toast.error('Failed to load dashboard data');
       },
     });
+
+    this.api.getSubscription().subscribe({
+      next: (res) => this.subscription.set(res.data),
+      error: () => { /* subscription check may fail for free users */ },
+    });
   }
 
   private startPolling(): void {
     interval(5000)
       .pipe(
-        takeWhile(() => this.alive && this.sites().some((s) => ['building', 'queued', 'generating', 'uploading'].includes(s.status))),
+        takeWhile(() => this.alive && this.sites().some((s) =>
+          ['building', 'queued', 'generating', 'uploading'].includes(s.status))),
         switchMap(() => this.api.listSites())
       )
       .subscribe({
-        next: (res) => {
-          this.sites.set(res.data || []);
-        },
+        next: (res) => this.sites.set(res.data || []),
       });
-  }
-
-  getStatusClass(status: string): string {
-    const map: Record<string, string> = {
-      published: 'published',
-      building: 'building',
-      queued: 'building',
-      collecting: 'collecting',
-      generating: 'generating',
-      uploading: 'uploading',
-      error: 'error',
-      failed: 'error',
-      draft: 'draft',
-    };
-    return map[status] || 'draft';
-  }
-
-  getSiteUrl(site: Site): string {
-    if (site.primary_hostname) return `https://${site.primary_hostname}`;
-    return `https://${site.slug}.projectsites.dev`;
-  }
-
-  visitSite(site: Site): void {
-    window.open(this.getSiteUrl(site), '_blank');
   }
 
   newSite(): void {
     this.router.navigate(['/']);
   }
 
-  // --- Inline editing ---
-  startEdit(siteId: string, field: 'name' | 'slug', currentValue: string): void {
-    this.editingSiteId.set(siteId);
-    this.editingField.set(field);
-    this.editValue = currentValue;
+  visitSite(site: Site): void {
+    const url = site.primary_hostname
+      ? `https://${site.primary_hostname}`
+      : `https://${site.slug}.projectsites.dev`;
+    window.open(url, '_blank');
   }
 
-  cancelEdit(): void {
-    this.editingSiteId.set(null);
-    this.editingField.set(null);
+  async openDetails(site: Site): Promise<void> {
+    const modal = await this.modalCtrl.create({
+      component: DetailsModalComponent,
+      componentProps: { site },
+      cssClass: 'app-modal',
+    });
+    await modal.present();
+    const { data, role } = await modal.onDidDismiss();
+    if (role === 'updated' && data) {
+      this.sites.update((sites) => sites.map((s) => s.id === data.id ? data : s));
+    }
   }
 
-  saveEdit(siteId: string): void {
-    const field = this.editingField();
-    if (!field || !this.editValue.trim()) return;
+  async openDomains(site: Site): Promise<void> {
+    const modal = await this.modalCtrl.create({
+      component: DomainModalComponent,
+      componentProps: { siteId: site.id },
+      cssClass: 'app-modal',
+    });
+    await modal.present();
+  }
 
-    const body: Partial<Site> = field === 'name'
-      ? { business_name: this.editValue.trim() }
-      : { slug: this.editValue.trim() };
+  async openLogs(site: Site): Promise<void> {
+    const modal = await this.modalCtrl.create({
+      component: LogsModalComponent,
+      componentProps: { siteId: site.id },
+      cssClass: 'app-modal',
+    });
+    await modal.present();
+  }
 
-    this.api.updateSite(siteId, body).subscribe({
+  async openStatus(site: Site): Promise<void> {
+    const modal = await this.modalCtrl.create({
+      component: StatusModalComponent,
+      componentProps: { site },
+      cssClass: 'app-modal',
+    });
+    await modal.present();
+  }
+
+  async openFiles(site: Site): Promise<void> {
+    const modal = await this.modalCtrl.create({
+      component: FilesModalComponent,
+      componentProps: { siteId: site.id },
+      cssClass: 'app-modal-fullscreen',
+    });
+    await modal.present();
+  }
+
+  async openDeploy(site: Site): Promise<void> {
+    const modal = await this.modalCtrl.create({
+      component: DeployModalComponent,
+      componentProps: { site },
+      cssClass: 'app-modal',
+    });
+    await modal.present();
+    const { role } = await modal.onDidDismiss();
+    if (role === 'deployed') this.loadData();
+  }
+
+  async openReset(site: Site): Promise<void> {
+    const modal = await this.modalCtrl.create({
+      component: ResetModalComponent,
+      componentProps: { site },
+      cssClass: 'app-modal',
+    });
+    await modal.present();
+    const { data, role } = await modal.onDidDismiss();
+    if (role === 'reset' && data) {
+      this.sites.update((sites) => sites.map((s) => s.id === data.id ? data : s));
+    }
+  }
+
+  async openDelete(site: Site): Promise<void> {
+    const modal = await this.modalCtrl.create({
+      component: DeleteModalComponent,
+      componentProps: { site },
+      cssClass: 'app-modal',
+    });
+    await modal.present();
+    const { data, role } = await modal.onDidDismiss();
+    if (role === 'deleted' && data) {
+      this.sites.update((sites) => sites.filter((s) => s.id !== data));
+    }
+  }
+
+  async openCheckout(site: Site): Promise<void> {
+    const me = await this.api.getMe().toPromise();
+    if (!me?.data?.org_id) {
+      this.toast.error('Unable to load billing info');
+      return;
+    }
+    const modal = await this.modalCtrl.create({
+      component: CheckoutModalComponent,
+      componentProps: { site, orgId: me.data.org_id },
+      cssClass: 'app-modal',
+    });
+    await modal.present();
+  }
+
+  async openBillingPortal(): Promise<void> {
+    this.api.getBillingPortal(window.location.href).subscribe({
       next: (res) => {
-        this.sites.update((sites) =>
-          sites.map((s) => (s.id === siteId ? { ...s, ...res.data } : s))
-        );
-        this.cancelEdit();
-        this.toast.success('Updated successfully');
+        if (res.data.portal_url) {
+          window.location.href = res.data.portal_url;
+        }
       },
-      error: (err) => {
-        this.toast.error(err?.error?.message || 'Update failed');
-      },
+      error: () => this.toast.error('Failed to open billing portal'),
     });
   }
 
-  // --- Delete ---
-  confirmDelete(siteId: string): void {
-    this.deletingSiteId.set(siteId);
-  }
-
-  cancelDelete(): void {
-    this.deletingSiteId.set(null);
-  }
-
-  deleteSite(siteId: string): void {
-    this.api.deleteSite(siteId).subscribe({
-      next: () => {
-        this.sites.update((sites) => sites.filter((s) => s.id !== siteId));
-        this.deletingSiteId.set(null);
-        this.toast.success('Site deleted');
-      },
-      error: () => this.toast.error('Failed to delete site'),
-    });
-  }
-
-  // --- Domain modal ---
-  openDomains(siteId: string): void {
-    this.domainModalSiteId.set(siteId);
-    this.loadHostnames(siteId);
-  }
-
-  closeDomains(): void {
-    this.domainModalSiteId.set(null);
-    this.hostnames.set([]);
-    this.newHostname = '';
-  }
-
-  private loadHostnames(siteId: string): void {
-    this.loadingHostnames.set(true);
-    this.api.getHostnames(siteId).subscribe({
-      next: (res) => {
-        this.hostnames.set(res.data || []);
-        this.loadingHostnames.set(false);
-      },
-      error: () => {
-        this.loadingHostnames.set(false);
-        this.toast.error('Failed to load domains');
-      },
-    });
-  }
-
-  addHostname(): void {
-    const siteId = this.domainModalSiteId();
-    if (!siteId || !this.newHostname.trim()) return;
-
-    this.api.addHostname(siteId, this.newHostname.trim()).subscribe({
-      next: (res) => {
-        this.hostnames.update((h) => [...h, res.data]);
-        this.newHostname = '';
-        this.toast.success('Domain added');
-      },
-      error: (err) => this.toast.error(err?.error?.message || 'Failed to add domain'),
-    });
-  }
-
-  setPrimary(hostnameId: string): void {
-    const siteId = this.domainModalSiteId();
-    if (!siteId) return;
-
-    this.api.setPrimaryHostname(siteId, hostnameId).subscribe({
-      next: () => {
-        this.hostnames.update((h) =>
-          h.map((hn) => ({ ...hn, is_primary: hn.id === hostnameId }))
-        );
-        this.toast.success('Primary domain updated');
-      },
-      error: () => this.toast.error('Failed to set primary'),
-    });
-  }
-
-  deleteHostname(hostnameId: string): void {
-    const siteId = this.domainModalSiteId();
-    if (!siteId) return;
-
-    this.api.deleteHostname(siteId, hostnameId).subscribe({
-      next: () => {
-        this.hostnames.update((h) => h.filter((hn) => hn.id !== hostnameId));
-        this.toast.success('Domain removed');
-      },
-      error: () => this.toast.error('Failed to remove domain'),
-    });
-  }
-
-  // --- Logs modal ---
-  openLogs(siteId: string): void {
-    this.logsModalSiteId.set(siteId);
-    this.loadLogs(siteId);
-  }
-
-  closeLogs(): void {
-    this.logsModalSiteId.set(null);
-    this.logs.set([]);
-  }
-
-  private loadLogs(siteId: string): void {
-    this.loadingLogs.set(true);
-    this.api.getSiteLogs(siteId).subscribe({
-      next: (res) => {
-        this.logs.set(
-          (res.data || []).map((l) => ({
-            action: this.formatLogAction(l.action),
-            created_at: l.created_at,
-            metadata: l.metadata_json,
-          }))
-        );
-        this.loadingLogs.set(false);
-      },
-      error: () => {
-        this.loadingLogs.set(false);
-        this.toast.error('Failed to load logs');
-      },
-    });
-  }
-
-  formatLogAction(action: string): string {
-    const map: Record<string, string> = {
-      'site.created': 'Site Created',
-      'workflow.started': 'Build Started',
-      'workflow.completed': 'Build Completed',
-      'workflow.failed': 'Build Failed',
-      'workflow.step.profile_research_complete': 'Profile Research Done',
-      'workflow.step.generate_website_complete': 'Website Generated',
-      'workflow.step.upload_complete': 'Upload Complete',
-      'hostname.added': 'Domain Added',
-      'hostname.verified': 'Domain Verified',
-      'billing.checkout_created': 'Checkout Started',
-      'billing.subscription_active': 'Subscription Active',
-    };
-    return map[action] || action.replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-  }
-
-  formatRelativeTime(iso: string): string {
-    const diff = Date.now() - new Date(iso).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return 'just now';
-    if (mins < 60) return `${mins} min ago`;
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours}h ago`;
-    const days = Math.floor(hours / 24);
-    return `${days}d ago`;
+  getSubscriptionLabel(): string {
+    const sub = this.subscription();
+    if (!sub) return 'Free Plan';
+    return sub.plan === 'paid' ? 'Pro Plan' : 'Free Plan';
   }
 }

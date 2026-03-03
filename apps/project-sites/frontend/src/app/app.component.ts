@@ -1,7 +1,7 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { RouterOutlet, Router, ActivatedRoute } from '@angular/router';
+import { IonApp, IonRouterOutlet } from '@ionic/angular/standalone';
 import { HeaderComponent } from './components/header/header.component';
-import { ToastComponent } from './components/toast/toast.component';
 import { BgOrbsComponent } from './components/bg-orbs/bg-orbs.component';
 import { AuthService } from './services/auth.service';
 import { ApiService } from './services/api.service';
@@ -9,14 +9,15 @@ import { ApiService } from './services/api.service';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, HeaderComponent, ToastComponent, BgOrbsComponent],
+  imports: [IonApp, IonRouterOutlet, HeaderComponent, BgOrbsComponent],
   template: `
-    <app-header />
-    <app-bg-orbs />
-    <app-toast />
-    <main class="app">
-      <router-outlet />
-    </main>
+    <ion-app>
+      <app-header />
+      <app-bg-orbs />
+      <main class="app">
+        <ion-router-outlet />
+      </main>
+    </ion-app>
   `,
   styles: [`
     .app {

@@ -175,6 +175,33 @@ export class ApiService {
   submitContact(body: { name: string; email: string; phone?: string; message: string }): Observable<void> {
     return this.post('/contact', body);
   }
+
+  /** Get workflow status */
+  getWorkflowStatus(siteId: string): Observable<{ data: WorkflowStatus }> {
+    return this.get(`/sites/${siteId}/workflow`);
+  }
+
+  /** Deploy ZIP file */
+  deployZip(siteId: string, formData: FormData): Observable<{ data: { message: string } }> {
+    return this.postFormData(`/sites/${siteId}/deploy`, formData);
+  }
+
+  /** Get site files */
+  getFiles(siteId: string, version?: number): Observable<{ data: SiteFile[] }> {
+    const params: Record<string, string> = {};
+    if (version != null) params['version'] = version.toString();
+    return this.get(`/sites/${siteId}/files`, params);
+  }
+
+  /** Update a file */
+  updateFile(siteId: string, path: string, content: string): Observable<{ data: SiteFile }> {
+    return this.put(`/sites/${siteId}/files`, { path, content });
+  }
+
+  /** Get audit logs */
+  getAuditLogs(limit = 200): Observable<{ data: LogEntry[] }> {
+    return this.get('/audit-logs', { limit: limit.toString() });
+  }
 }
 
 export interface BusinessResult {
@@ -269,4 +296,18 @@ export interface DomainSummary {
 export interface AddressResult {
   description: string;
   place_id?: string;
+}
+
+export interface WorkflowStatus {
+  status: string;
+  current_step?: string;
+  steps?: { name: string; status: string; started_at?: string; completed_at?: string }[];
+  error?: string;
+}
+
+export interface SiteFile {
+  path: string;
+  content?: string;
+  size?: number;
+  content_type?: string;
 }

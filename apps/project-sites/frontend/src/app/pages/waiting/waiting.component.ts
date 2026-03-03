@@ -1,6 +1,7 @@
 import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { interval, takeWhile, switchMap } from 'rxjs';
+import { IonButton, IonSpinner } from '@ionic/angular/standalone';
 import { ApiService } from '../../services/api.service';
 import { ToastService } from '../../services/toast.service';
 
@@ -12,6 +13,7 @@ interface BuildStep {
 @Component({
   selector: 'app-waiting',
   standalone: true,
+  imports: [IonButton, IonSpinner],
   templateUrl: './waiting.component.html',
   styleUrl: './waiting.component.scss',
 })

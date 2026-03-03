@@ -20,7 +20,7 @@
                 </svg>
               }
               @case ('active') {
-                <span class="spinner-small"></span>
+                <ion-spinner name="crescent" class="step-spinner"></ion-spinner>
               }
               @case ('error') {
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2">
@@ -49,12 +49,12 @@
     @if (status() === 'error') {
       <div class="waiting-error">
         <p>Something went wrong during the build.</p>
-        <button class="btn btn-secondary-outline" (click)="goHome()">Try Again</button>
+        <ion-button fill="outline" (click)="goHome()">Try Again</ion-button>
       </div>
     }
 
     <div class="waiting-actions">
-      <button class="btn btn-secondary-outline" (click)="goAdmin()">Go to Dashboard</button>
+      <ion-button fill="outline" color="medium" (click)="goAdmin()">Go to Dashboard</ion-button>
     </div>
   </div>
 </section>

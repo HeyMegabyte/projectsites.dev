@@ -66,17 +66,19 @@
     </div>
 
     <!-- Submit -->
-    <button
-      class="btn btn-accent btn-full btn-large"
+    <ion-button
+      expand="block"
+      fill="solid"
+      size="large"
       [disabled]="submitting()"
       (click)="submitBuild()"
     >
       @if (submitting()) {
-        <span class="loading-dots"><span></span><span></span><span></span></span>
+        <ion-spinner name="crescent" slot="start"></ion-spinner>
         Building...
       } @else {
         Build My Website
       }
-    </button>
+    </ion-button>
   </div>
 </div>

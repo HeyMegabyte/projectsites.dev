@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { IonButton, IonSpinner } from '@ionic/angular/standalone';
 import { ApiService } from '../../services/api.service';
 import { AuthService, SelectedBusiness } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
@@ -8,7 +9,7 @@ import { ToastService } from '../../services/toast.service';
 @Component({
   selector: 'app-details',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, IonButton, IonSpinner],
   templateUrl: './details.component.html',
   styleUrl: './details.component.scss',
 })

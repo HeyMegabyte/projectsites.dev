@@ -1,6 +1,23 @@
+/* AG Grid CSS */
+@import 'ag-grid-community/styles/ag-grid.css';
+@import 'ag-grid-community/styles/ag-theme-alpine.css';
+
+/* Ionic CSS */
+@import '@ionic/angular/css/core.css';
+@import '@ionic/angular/css/normalize.css';
+@import '@ionic/angular/css/structure.css';
+@import '@ionic/angular/css/typography.css';
+@import '@ionic/angular/css/display.css';
+@import '@ionic/angular/css/padding.css';
+@import '@ionic/angular/css/float-elements.css';
+@import '@ionic/angular/css/text-alignment.css';
+@import '@ionic/angular/css/text-transformation.css';
+@import '@ionic/angular/css/flex-utils.css';
+
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 
 :root {
+  /* App design tokens */
   --bg-primary: #0a0a1a;
   --bg-secondary: #111128;
   --bg-card: #161635;
@@ -26,6 +43,32 @@
   --shadow-accent: 0 0 30px rgba(80, 165, 219, 0.15);
   --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Ionic CSS variable overrides for dark theme */
+  --ion-background-color: var(--bg-primary);
+  --ion-background-color-rgb: 10, 10, 26;
+  --ion-text-color: var(--text-primary);
+  --ion-text-color-rgb: 226, 232, 240;
+  --ion-color-primary: var(--accent);
+  --ion-color-primary-rgb: 80, 165, 219;
+  --ion-color-primary-contrast: var(--bg-primary);
+  --ion-color-primary-contrast-rgb: 10, 10, 26;
+  --ion-color-primary-shade: #4691c1;
+  --ion-color-primary-tint: #62aee0;
+  --ion-color-secondary: var(--secondary);
+  --ion-color-secondary-rgb: 124, 58, 237;
+  --ion-color-danger: var(--error);
+  --ion-color-danger-rgb: 239, 68, 68;
+  --ion-color-success: var(--success);
+  --ion-color-success-rgb: 34, 197, 94;
+  --ion-color-warning: #fbbf24;
+  --ion-color-warning-rgb: 251, 191, 36;
+  --ion-toolbar-background: rgba(10, 10, 26, 0.88);
+  --ion-toolbar-color: var(--text-primary);
+  --ion-item-background: transparent;
+  --ion-card-background: var(--bg-card);
+  --ion-border-color: var(--border);
+  --ion-font-family: var(--font);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -45,6 +88,56 @@ body {
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
+}
+
+/* Ionic overrides for our dark theme */
+ion-content {
+  --background: var(--bg-primary);
+}
+
+ion-modal {
+  --background: var(--bg-card);
+  --border-radius: 20px;
+  --box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+}
+
+ion-input, ion-textarea {
+  --background: var(--bg-input);
+  --color: var(--text-primary);
+  --placeholder-color: var(--text-muted);
+  --border-color: var(--border);
+  --highlight-color-focused: var(--accent);
+}
+
+ion-searchbar {
+  --background: var(--bg-input);
+  --color: var(--text-primary);
+  --placeholder-color: var(--text-muted);
+  --border-radius: var(--radius-lg);
+  --box-shadow: none;
+}
+
+ion-toast {
+  --border-radius: 10px;
+}
+
+ion-item {
+  --background: transparent;
+  --color: var(--text-primary);
+  --border-color: var(--border);
+}
+
+ion-list {
+  --ion-item-background: transparent;
+  background: transparent;
+}
+
+ion-accordion-group {
+  background: transparent;
+}
+
+ion-accordion {
+  background: transparent;
 }
 
 ::-webkit-scrollbar { width: 6px; }
