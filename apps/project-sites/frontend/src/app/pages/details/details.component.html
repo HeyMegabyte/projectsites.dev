@@ -1,6 +1,6 @@
 <div class="details-modal-overlay visible">
   <div class="details-card">
-    <button class="details-modal-close" (click)="goBack()" aria-label="Close">&times;</button>
+    <button class="details-modal-close" (click)="goBack()" aria-label="Close" data-tooltip="Close">&times;</button>
     <h2>Almost there</h2>
     <p class="details-subtitle">Tell us about your business so we can build the perfect site.</p>
 
@@ -16,7 +16,7 @@
           <div class="badge-name">{{ business()!.name }}</div>
           <div class="badge-addr">{{ business()!.address }}</div>
         </div>
-        <button class="badge-dismiss" (click)="dismissBusiness()" aria-label="Remove">
+        <button class="badge-dismiss" (click)="dismissBusiness()" aria-label="Remove" data-tooltip="Remove selection">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M18 6 6 18M6 6l12 12" />
           </svg>

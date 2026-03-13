@@ -20,15 +20,16 @@
     letter-spacing: -0.03em;
     line-height: 1.1;
     margin-bottom: 12px;
+    color: #fff;
   }
 
   .gradient-text {
-    background: linear-gradient(135deg, var(--accent), var(--secondary), #f472b6);
-    background-size: 200% auto;
+    background: linear-gradient(135deg, #00d4ff, #67e8f9, #fff, #67e8f9, #00d4ff);
+    background-size: 300% auto;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-    animation: shimmer 5s linear infinite;
+    animation: shimmer 6s linear infinite;
   }
 
   .tagline {
@@ -61,6 +62,7 @@
   color: var(--text-muted);
   pointer-events: none;
   display: flex;
+  transition: color 0.3s;
 }
 
 .search-input {
@@ -73,16 +75,31 @@
   border-radius: var(--radius-lg);
   color: var(--text-primary);
   outline: none;
-  transition: border-color var(--transition), box-shadow var(--transition);
+  transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
   position: relative;
   z-index: 2;
 
   &::placeholder { color: var(--text-muted); }
 
+  &:hover {
+    border-color: rgba(0, 212, 255, 0.15);
+  }
+
   &:focus {
     border-color: var(--accent);
     box-shadow: 0 0 0 4px var(--accent-dim), 0 0 40px var(--accent-glow);
+    background: rgba(8, 8, 32, 0.9);
+
+    & ~ .search-icon,
+    + .search-icon {
+      color: var(--accent);
+    }
   }
+}
+
+// When input is focused, update sibling icon color
+.search-input:focus ~ .search-icon {
+  color: var(--accent);
 }
 
 .search-spinner {
@@ -119,8 +136,8 @@
 .search-result {
   padding: 14px 20px;
   cursor: pointer;
-  transition: background var(--transition);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  transition: background var(--transition), transform 0.15s ease;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
   text-align: left;
   display: flex;
   align-items: flex-start;
@@ -128,7 +145,12 @@
 
   &:first-child { padding-top: 28px; }
   &:last-child { border-bottom: none; }
-  &:hover { background: var(--bg-card-hover); }
+  &:hover {
+    background: var(--bg-card-hover);
+  }
+  &:active {
+    background: rgba(0, 212, 255, 0.06);
+  }
 }
 
 .search-result-icon {
@@ -141,8 +163,14 @@
   align-items: center;
   justify-content: center;
   margin-top: 2px;
+  transition: background 0.2s, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 
-  svg { width: 18px; height: 18px; color: var(--accent); }
+  svg { width: 18px; height: 18px; color: var(--accent); transition: color 0.2s; }
+
+  .search-result:hover & {
+    background: rgba(0, 212, 255, 0.15);
+    transform: scale(1.05);
+  }
 }
 
 .search-result-text { flex: 1; min-width: 0; }
@@ -186,18 +214,18 @@
 }
 
 .search-result-custom {
-  background: var(--secondary-dim);
-  border-top: 1px solid rgba(124, 58, 237, 0.2);
+  background: rgba(0, 212, 255, 0.04);
+  border-top: 1px solid rgba(0, 212, 255, 0.08);
 
-  &:hover { background: rgba(124, 58, 237, 0.22); }
+  &:hover { background: rgba(0, 212, 255, 0.08); }
 
   .search-result-icon {
-    background: var(--secondary-dim);
+    background: rgba(14, 165, 233, 0.12);
     svg { color: var(--secondary); }
   }
 
-  .search-result-name { color: #c4b5fd; }
-  .search-result-address { color: #a78bfa; font-style: normal; }
+  .search-result-name { color: #7dd3fc; }
+  .search-result-address { color: #38bdf8; font-style: normal; }
 }
 
 .search-hint {
@@ -212,7 +240,7 @@
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(12px);
   z-index: 10000;
   display: flex;
   align-items: center;
@@ -221,24 +249,26 @@
 }
 
 .location-modal {
-  background: linear-gradient(145deg, rgba(22, 22, 53, 0.98), rgba(15, 15, 42, 1));
-  border: 1px solid rgba(80, 165, 219, 0.12);
+  background: linear-gradient(145deg, rgba(13, 13, 40, 0.98), rgba(8, 8, 32, 1));
+  border: 1px solid rgba(0, 212, 255, 0.12);
   border-radius: 20px;
   padding: 36px;
   max-width: 400px;
   width: 90%;
   text-align: center;
   animation: fadeInScale 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5), 0 0 60px rgba(0, 212, 255, 0.04);
 }
 
 .location-modal-icon {
   margin-bottom: 16px;
   color: var(--accent);
+
+  svg { filter: drop-shadow(0 0 8px rgba(0, 212, 255, 0.3)); }
 }
 
 .location-modal h3 {
-  color: var(--text-primary);
+  color: #fff;
   font-size: 1.15rem;
   margin-bottom: 8px;
 }
@@ -257,21 +287,27 @@
   button {
     flex: 1;
     padding: 10px 16px;
-    border-radius: 8px;
+    border-radius: 10px;
     font-size: 0.9rem;
     font-weight: 600;
     cursor: pointer;
     border: none;
-    transition: var(--transition);
+    font-family: var(--font);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .btn-allow {
-    background: linear-gradient(135deg, var(--accent), var(--secondary));
-    color: #fff;
+    background: linear-gradient(135deg, var(--accent), #0891b2);
+    color: #050510;
 
     &:hover {
-      transform: translateY(-1px);
-      box-shadow: var(--shadow-accent);
+      transform: translateY(-2px);
+      box-shadow: 0 0 24px rgba(0, 212, 255, 0.3);
+      filter: brightness(1.1);
+    }
+    &:active {
+      transform: translateY(0);
+      filter: brightness(0.95);
     }
   }
 
@@ -283,6 +319,10 @@
     &:hover {
       border-color: var(--border-hover);
       color: var(--text-primary);
+      background: rgba(0, 212, 255, 0.04);
+    }
+    &:active {
+      background: rgba(0, 212, 255, 0.08);
     }
   }
 }

@@ -10,7 +10,7 @@
         My Sites
       </div>
       <div class="admin-panel-actions">
-        <button class="admin-btn" (click)="newSite()">
+        <button class="admin-btn" (click)="newSite()" data-tooltip="Create a new AI-powered site" data-tooltip-pos="bottom">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 5v14M5 12h14" />
           </svg>
@@ -88,7 +88,7 @@
                     (blur)="cancelEdit()"
                   />
                 } @else {
-                  <span class="site-card-name" (dblclick)="startEdit(site.id, 'name', site.business_name)">
+                  <span class="site-card-name" (dblclick)="startEdit(site.id, 'name', site.business_name)" data-tooltip="Double-click to rename">
                     {{ site.business_name }}
                   </span>
                 }
@@ -109,11 +109,11 @@
               <!-- Actions -->
               <div class="site-card-actions">
                 @if (site.status === 'published') {
-                  <button class="site-card-btn" (click)="visitSite(site)">Visit</button>
+                  <button class="site-card-btn" (click)="visitSite(site)" data-tooltip="Open in new tab">Visit</button>
                 }
-                <button class="site-card-btn" (click)="openDomains(site.id)">Domains</button>
-                <button class="site-card-btn" (click)="openLogs(site.id)">Logs</button>
-                <button class="site-card-btn danger" (click)="confirmDelete(site.id)">Delete</button>
+                <button class="site-card-btn" (click)="openDomains(site.id)" data-tooltip="Manage custom domains">Domains</button>
+                <button class="site-card-btn" (click)="openLogs(site.id)" data-tooltip="View build history">Logs</button>
+                <button class="site-card-btn danger" (click)="confirmDelete(site.id)" data-tooltip="Permanently delete site">Delete</button>
               </div>
             </div>
           }
