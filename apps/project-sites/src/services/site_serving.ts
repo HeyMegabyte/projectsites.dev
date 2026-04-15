@@ -35,8 +35,8 @@ import { dbQueryOne } from './db.js';
 /**
  * Generate the promotional top bar HTML injected into unpaid sites.
  *
- * The bar is fixed to the top of the viewport, includes a CTA to upgrade,
- * and can be dismissed by the visitor (closes via inline JS).
+ * The bar is fixed to the top of the viewport and includes a CTA to upgrade.
+ * It cannot be dismissed — the visitor must upgrade to remove it.
  *
  * @param slug - The site's slug (used to build the upgrade link).
  * @returns HTML string to inject after the `<body>` tag.
@@ -48,59 +48,252 @@ import { dbQueryOne } from './db.js';
  * ```
  */
 export function generateTopBar(slug: string): string {
-  const upgradeUrl = `https://${DOMAINS.SITES_BASE}/?upgrade=${encodeURIComponent(slug)}`;
-  return `<!-- Project Sites Top Bar -->
-<div id="ps-topbar" style="position:fixed;top:0;left:0;right:0;z-index:99999;background:linear-gradient(135deg,#0f0a2e 0%,#1a1145 30%,#231660 60%,#0f0a2e 100%);color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:13px;padding:0;box-shadow:0 4px 20px rgba(0,0,0,0.4);border-bottom:1px solid rgba(124,58,237,0.3)">
-  <div style="display:flex;align-items:center;justify-content:center;gap:16px;padding:10px 20px;flex-wrap:wrap;">
-    <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-      <span style="font-weight:600;font-size:12px;letter-spacing:0.02em;">Register</span>
+  return generateConversionFlow(slug);
+}
+
+/**
+ * Generate the "Wow → Own → Buy" conversion flow for unpaid sites.
+ *
+ * Two components injected:
+ * 1. Bottom bar with badge + CTA (appears after 25s or 40% scroll, animated)
+ * 2. Ownership modal (on "Claim" click — plan, domain search, Stripe checkout)
+ *
+ * Zero external dependencies. Self-contained vanilla JS/CSS.
+ */
+export function generateConversionFlow(slug: string): string {
+  const apiBase = `https://${DOMAINS.SITES_BASE}`;
+  const editUrl = `https://${DOMAINS.BOLT_BASE}/?slug=${encodeURIComponent(slug)}`;
+
+  return `<!-- ProjectSites Conversion Flow v2 -->
+<style>
+@keyframes ps-slide-up{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes ps-fade-in{from{opacity:0}to{opacity:1}}
+@keyframes ps-modal-in{from{opacity:0;transform:translateY(24px) scale(0.96)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes ps-pulse{0%,100%{box-shadow:0 0 0 0 rgba(124,58,237,0.4)}50%{box-shadow:0 0 0 6px rgba(124,58,237,0)}}
+@keyframes ps-shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+#ps-bar{position:fixed;bottom:0;left:0;right:0;z-index:99998;transform:translateY(100%);opacity:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+#ps-bar.ps-visible{animation:ps-slide-up 0.6s cubic-bezier(0.16,1,0.3,1) forwards}
+#ps-bar-inner{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;background:linear-gradient(135deg,rgba(10,6,30,0.97) 0%,rgba(22,14,56,0.97) 100%);backdrop-filter:blur(20px);border-top:1px solid rgba(124,58,237,0.15);box-shadow:0 -8px 32px rgba(0,0,0,0.4)}
+#ps-bar-left{display:flex;align-items:center;gap:12px}
+#ps-bar-brand{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);font-size:11px;color:rgba(255,255,255,0.5);transition:all 0.25s;text-decoration:none}
+#ps-bar-brand:hover{background:rgba(255,255,255,0.08);border-color:rgba(124,58,237,0.3);color:rgba(255,255,255,0.8)}
+#ps-bar-brand svg{opacity:0.5}
+#ps-bar-edit{display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:20px;background:rgba(100,255,218,0.06);border:1px solid rgba(100,255,218,0.15);color:#64ffda;font-size:11px;font-weight:600;text-decoration:none;letter-spacing:0.02em;transition:all 0.25s}
+#ps-bar-edit:hover{background:rgba(100,255,218,0.12);border-color:rgba(100,255,218,0.35);transform:translateY(-1px)}
+#ps-bar-edit:active{transform:translateY(0)}
+#ps-bar-msg{color:rgba(255,255,255,0.7);font-size:13px;margin:0}
+#ps-bar-msg strong{color:#fff}
+#ps-bar-right{display:flex;align-items:center;gap:10px}
+#ps-claim-btn{padding:8px 22px;background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;transition:all 0.25s;box-shadow:0 2px 12px rgba(124,58,237,0.3);letter-spacing:0.01em;animation:ps-pulse 2.5s infinite}
+#ps-claim-btn:hover{transform:translateY(-2px) scale(1.02);box-shadow:0 6px 24px rgba(124,58,237,0.5)}
+#ps-claim-btn:active{transform:translateY(0) scale(0.98)}
+#ps-bar-x{background:none;border:none;color:rgba(255,255,255,0.25);font-size:16px;cursor:pointer;padding:4px;transition:all 0.2s;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center}
+#ps-bar-x:hover{color:rgba(255,255,255,0.7);background:rgba(255,255,255,0.05)}
+#ps-overlay{display:none;position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,0);backdrop-filter:blur(0px);transition:all 0.3s ease;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+#ps-overlay.ps-open{display:flex;background:rgba(0,0,0,0.65);backdrop-filter:blur(10px)}
+#ps-modal{background:linear-gradient(160deg,#0c0824 0%,#12093a 40%,#0c0824 100%);border:1px solid rgba(124,58,237,0.2);border-radius:20px;max-width:480px;width:calc(100% - 32px);max-height:calc(100vh - 48px);overflow-y:auto;padding:28px;color:#fff;box-shadow:0 32px 80px rgba(0,0,0,0.7),0 0 60px rgba(124,58,237,0.08);animation:ps-modal-in 0.35s cubic-bezier(0.16,1,0.3,1)}
+#ps-modal h2{font-size:22px;font-weight:700;margin:0 0 4px;letter-spacing:-0.01em}
+#ps-modal .ps-sub{color:rgba(255,255,255,0.4);font-size:12px;margin:0 0 20px;font-family:monospace}
+.ps-plan{background:rgba(124,58,237,0.06);border:1px solid rgba(124,58,237,0.18);border-radius:14px;padding:18px;margin-bottom:16px}
+.ps-price-row{display:flex;align-items:baseline;gap:6px;margin-bottom:14px}
+.ps-price{font-size:36px;font-weight:800;background:linear-gradient(135deg,#fff,#c4b5fd);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.ps-period{font-size:13px;color:rgba(255,255,255,0.4)}
+.ps-features{list-style:none;padding:0;margin:0 0 16px;display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.ps-features li{font-size:12px;color:rgba(255,255,255,0.65);display:flex;align-items:center;gap:5px}
+.ps-check{width:14px;height:14px;flex-shrink:0;color:#4ade80}
+.ps-domain-section{margin-top:14px;position:relative}
+.ps-domain-label{display:block;font-size:11px;color:rgba(255,255,255,0.4);margin-bottom:5px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em}
+.ps-domain-wrap{position:relative}
+.ps-domain-input{width:100%;padding:10px 40px 10px 14px;background:rgba(255,255,255,0.05);border:1.5px solid rgba(124,58,237,0.25);border-radius:10px;color:#fff;font-size:14px;font-family:inherit;outline:none;transition:all 0.25s;box-sizing:border-box}
+.ps-domain-input:focus{border-color:rgba(124,58,237,0.6);box-shadow:0 0 20px rgba(124,58,237,0.15);background:rgba(255,255,255,0.08)}
+.ps-domain-input::placeholder{color:rgba(255,255,255,0.25)}
+.ps-domain-input.ps-available{border-color:rgba(74,222,128,0.5);box-shadow:0 0 16px rgba(74,222,128,0.1)}
+.ps-domain-input.ps-unavailable{border-color:rgba(239,68,68,0.4);box-shadow:0 0 12px rgba(239,68,68,0.08)}
+.ps-domain-status{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:16px;transition:all 0.2s;opacity:0}
+.ps-domain-status.ps-show{opacity:1}
+.ps-results{margin-top:8px;display:flex;flex-wrap:wrap;gap:5px;min-height:24px}
+.ps-tag{padding:3px 10px;border-radius:7px;font-size:11px;font-weight:500;transition:all 0.2s;border:1px solid transparent;cursor:default}
+.ps-tag-avail{background:rgba(74,222,128,0.08);color:#4ade80;border-color:rgba(74,222,128,0.15);cursor:pointer}
+.ps-tag-avail:hover{background:rgba(74,222,128,0.16);border-color:rgba(74,222,128,0.35);transform:translateY(-1px)}
+.ps-tag-avail.ps-sel{background:rgba(74,222,128,0.2);border-color:#4ade80;box-shadow:0 0 8px rgba(74,222,128,0.15)}
+.ps-tag-taken{background:rgba(255,255,255,0.02);color:rgba(255,255,255,0.2);text-decoration:line-through}
+.ps-tag-checking{color:rgba(255,255,255,0.3);font-size:11px;background:linear-gradient(90deg,rgba(255,255,255,0.05) 25%,rgba(255,255,255,0.1) 50%,rgba(255,255,255,0.05) 75%);background-size:200% 100%;animation:ps-shimmer 1.5s infinite;border-radius:7px;padding:3px 10px}
+#ps-go-btn{width:100%;padding:12px;background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;border:none;border-radius:11px;font-size:14px;font-weight:700;cursor:pointer;transition:all 0.25s;box-shadow:0 4px 16px rgba(124,58,237,0.3);margin-top:14px}
+#ps-go-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 8px 28px rgba(124,58,237,0.45)}
+#ps-go-btn:active:not(:disabled){transform:translateY(0)}
+#ps-go-btn:disabled{opacity:0.5;cursor:not-allowed}
+.ps-footer{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:14px}
+.ps-footer a,.ps-footer button{background:none;border:none;color:rgba(255,255,255,0.4);font-size:12px;cursor:pointer;text-decoration:none;transition:color 0.2s;font-family:inherit;padding:0}
+.ps-footer a:hover,.ps-footer button:hover{color:rgba(255,255,255,0.8)}
+#ps-close-modal{position:absolute;top:10px;right:14px;background:none;border:none;color:rgba(255,255,255,0.2);font-size:20px;cursor:pointer;transition:all 0.2s;line-height:1;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:50%}
+#ps-close-modal:hover{color:rgba(255,255,255,0.6);background:rgba(255,255,255,0.05)}
+@media(max-width:600px){#ps-bar-inner{flex-wrap:wrap;gap:8px;padding:8px 14px}#ps-bar-msg{width:100%;text-align:center;font-size:12px}#ps-bar-left{width:100%;justify-content:center}#ps-bar-right{width:100%;justify-content:center}#ps-modal{padding:20px 16px}.ps-features{grid-template-columns:1fr}}
+</style>
+
+<!-- Bottom Bar (badge + CTA integrated, hidden initially) -->
+<div id="ps-bar">
+  <div id="ps-bar-inner">
+    <div id="ps-bar-left">
+      <a id="ps-bar-brand" href="https://${DOMAINS.SITES_BASE}" target="_blank" rel="noopener" title="Built by ProjectSites">
+        <svg width="18" height="18" viewBox="0 0 32 32" fill="none"><defs><linearGradient id="psg" x1="0" y1="0" x2="32" y2="32"><stop offset="0%" stop-color="#a78bfa"/><stop offset="100%" stop-color="#6d28d9"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#psg)"/><path d="M8 12l8-4 8 4M8 16l8 4 8-4M8 20l8 4 8-4" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/><circle cx="16" cy="12" r="2" fill="#fff" opacity="0.7"/></svg>
+      </a>
+      <a id="ps-bar-edit" href="${editUrl}">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"/></svg>
+        Edit with AI
+      </a>
     </div>
-    <div id="ps-domain-wrap" style="position:relative;flex:1;max-width:320px;min-width:180px;">
-      <input id="ps-domain-input" type="text" placeholder="Search for a domain..." style="width:100%;padding:6px 12px;border-radius:8px;border:1px solid rgba(124,58,237,0.4);background:rgba(255,255,255,0.08);color:#fff;font-size:12px;outline:none;font-family:inherit;transition:border-color 0.2s,box-shadow 0.2s" onfocus="this.style.borderColor='rgba(124,58,237,0.7)';this.style.boxShadow='0 0 12px rgba(124,58,237,0.2)'" onblur="this.style.borderColor='rgba(124,58,237,0.4)';this.style.boxShadow='none'" />
-      <div id="ps-domain-results" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:#1a1145;border:1px solid rgba(124,58,237,0.3);border-radius:10px;max-height:240px;overflow-y:auto;z-index:100000;box-shadow:0 12px 40px rgba(0,0,0,0.5)"></div>
+    <p id="ps-bar-msg"><strong>This website is yours</strong> — make it official</p>
+    <div id="ps-bar-right">
+      <button id="ps-claim-btn">Claim for $50/mo</button>
+      <button id="ps-bar-x" aria-label="Dismiss">&times;</button>
     </div>
-    <span style="font-size:11px;color:rgba(255,255,255,0.6);flex-shrink:0;">to claim your FREE site for</span>
-    <span style="font-size:14px;font-weight:800;color:#22c55e;flex-shrink:0;">$50/month</span>
-    <a href="${upgradeUrl}" id="ps-checkout-btn" style="display:inline-flex;align-items:center;gap:6px;padding:8px 20px;background:linear-gradient(135deg,#7c3aed,#50a5db);color:#fff;border-radius:8px;font-size:12px;font-weight:700;text-decoration:none;transition:transform 0.15s,box-shadow 0.15s;box-shadow:0 2px 12px rgba(124,58,237,0.3)" onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 4px 20px rgba(124,58,237,0.4)'" onmouseout="this.style.transform='none';this.style.boxShadow='0 2px 12px rgba(124,58,237,0.3)'">Get Started &#8250;</a>
-    <button onclick="document.getElementById('ps-topbar').style.display='none';document.body.style.paddingTop='0'" style="background:none;border:none;color:rgba(255,255,255,0.4);font-size:18px;cursor:pointer;padding:0 4px;line-height:1;transition:color 0.2s" onmouseover="this.style.color='rgba(255,255,255,0.8)'" onmouseout="this.style.color='rgba(255,255,255,0.4)'" aria-label="Close">&times;</button>
   </div>
 </div>
-<style>body{padding-top:52px !important}#ps-domain-input::placeholder{color:rgba(255,255,255,0.35)}</style>
+
+<!-- Ownership Modal -->
+<div id="ps-overlay">
+  <div id="ps-modal" style="position:relative">
+    <button id="ps-close-modal" aria-label="Close">&times;</button>
+    <h2>Make It Yours</h2>
+    <p class="ps-sub">${slug}.projectsites.dev</p>
+
+    <div class="ps-plan">
+      <div class="ps-price-row">
+        <span class="ps-price">$50</span>
+        <span class="ps-period">/ month</span>
+      </div>
+      <ul class="ps-features">
+        <li><svg class="ps-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Custom domain</li>
+        <li><svg class="ps-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Edit with AI</li>
+        <li><svg class="ps-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>No branding</li>
+        <li><svg class="ps-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>SSL &amp; CDN</li>
+        <li><svg class="ps-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Contact form</li>
+        <li><svg class="ps-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Analytics</li>
+        <li><svg class="ps-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Google Maps</li>
+        <li><svg class="ps-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>Priority support</li>
+      </ul>
+
+      <div class="ps-domain-section">
+        <label class="ps-domain-label">Choose your domain</label>
+        <div class="ps-domain-wrap">
+          <input class="ps-domain-input" id="ps-dinput" type="text" placeholder="yourbusiness.com" autocomplete="off" spellcheck="false" />
+          <span class="ps-domain-status" id="ps-dstatus"></span>
+        </div>
+        <div class="ps-results" id="ps-dresults"></div>
+      </div>
+
+      <button id="ps-go-btn">Get Started — $50/month</button>
+    </div>
+
+    <div class="ps-footer">
+      <a href="${editUrl}">✏️ Edit with AI first</a>
+      <span style="color:rgba(255,255,255,0.1)">·</span>
+      <button onclick="document.getElementById('ps-overlay').classList.remove('ps-open')">Keep free for now</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function(){
-  var input=document.getElementById('ps-domain-input'),wrap=document.getElementById('ps-domain-results'),timer=null;
-  if(!input)return;
-  input.addEventListener('input',function(){
-    clearTimeout(timer);
-    var q=input.value.trim();
-    if(q.length<2){wrap.style.display='none';return;}
-    timer=setTimeout(function(){
-      fetch('https://${DOMAINS.SITES_BASE}/api/domains/search?q='+encodeURIComponent(q))
+  if(window!==window.top)return;
+  /* Enforce smooth scroll on all anchor links site-wide */
+  document.documentElement.style.scrollBehavior='smooth';
+  document.addEventListener('click',function(e){
+    var a=e.target.closest('a[href^="#"]');
+    if(a){var t=document.querySelector(a.getAttribute('href'));if(t){e.preventDefault();t.scrollIntoView({behavior:'smooth',block:'start'})}}
+  });
+  var S='${slug}',API='https://${DOMAINS.SITES_BASE}';
+  var bar=document.getElementById('ps-bar');
+  var overlay=document.getElementById('ps-overlay');
+  var dinput=document.getElementById('ps-dinput');
+  var dstatus=document.getElementById('ps-dstatus');
+  var dresults=document.getElementById('ps-dresults');
+  var goBtn=document.getElementById('ps-go-btn');
+  var sel='';
+  var dt;
+
+  /* Show bar after 25s or 40% scroll */
+  if(!sessionStorage.getItem('ps-x')){
+    var s=false;
+    function show(){if(!s){s=true;bar.classList.add('ps-visible')}}
+    setTimeout(show,25000);
+    window.addEventListener('scroll',function(){
+      var pct=window.scrollY/(document.documentElement.scrollHeight-window.innerHeight);
+      if(pct>0.4)show();
+    },{passive:true});
+  }
+
+  /* Open/close modal */
+  document.getElementById('ps-claim-btn').onclick=function(){overlay.classList.add('ps-open')};
+  document.getElementById('ps-close-modal').onclick=function(){overlay.classList.remove('ps-open')};
+  overlay.onclick=function(e){if(e.target===overlay)overlay.classList.remove('ps-open')};
+  document.getElementById('ps-bar-x').onclick=function(){bar.style.display='none';sessionStorage.setItem('ps-x','1')};
+
+  /* Domain search — checks exact + variations */
+  dinput.addEventListener('input',function(){
+    clearTimeout(dt);
+    var v=this.value.trim().replace(/[^a-z0-9.-]/gi,'').toLowerCase().replace(/\\.[a-z]+$/i,'');
+    if(v.length<2){dresults.innerHTML='';dstatus.className='ps-domain-status';dstatus.textContent='';sel='';return}
+    dstatus.className='ps-domain-status ps-show';dstatus.textContent='⏳';
+    dresults.innerHTML='<span class="ps-tag-checking">Checking availability...</span>';
+    dt=setTimeout(function(){
+      fetch(API+'/api/domains/availability?name='+encodeURIComponent(v))
         .then(function(r){return r.json()})
         .then(function(d){
           var items=d.data||[];
-          if(!items.length){wrap.style.display='none';return;}
-          var h='';
+          var anyAvail=items.some(function(i){return i.available});
+          /* Update input status indicator */
+          var exact=items.find(function(i){return i.domain===v+'.com'});
+          if(exact){
+            if(exact.available){dstatus.textContent='✅';dstatus.className='ps-domain-status ps-show';dinput.className='ps-domain-input ps-available'}
+            else{dstatus.textContent='❌';dstatus.className='ps-domain-status ps-show';dinput.className='ps-domain-input ps-unavailable'}
+          }else{dstatus.className='ps-domain-status';dinput.className='ps-domain-input'}
+          /* Render tags */
+          dresults.innerHTML='';sel='';
           items.forEach(function(it){
+            var t=document.createElement('span');
+            t.className='ps-tag '+(it.available?'ps-tag-avail':'ps-tag-taken');
+            t.textContent=it.domain;
             if(it.available){
-              h+='<div style="padding:8px 12px;display:flex;align-items:center;gap:8px;cursor:pointer;transition:background 0.15s;border-bottom:1px solid rgba(255,255,255,0.05)" onmouseover="this.style.background=\\'rgba(124,58,237,0.15)\\'" onmouseout="this.style.background=\\'none\\'" onclick="document.getElementById(\\'ps-domain-input\\').value=\\''+it.domain+'\\';document.getElementById(\\'ps-domain-results\\').style.display=\\'none\\'">';
-              h+='<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
-              h+='<span style="flex:1;font-size:12px;color:#e2e8f0">'+it.domain+'</span>';
-              if(it.price>0)h+='<span style="font-size:11px;font-weight:700;color:#22c55e">$'+(it.price/100).toFixed(2)+'/yr</span>';
-              h+='</div>';
+              if(!sel){sel=it.domain;t.classList.add('ps-sel')}
+              t.onclick=function(){
+                document.querySelectorAll('.ps-tag.ps-sel').forEach(function(x){x.classList.remove('ps-sel')});
+                t.classList.add('ps-sel');sel=it.domain;
+              };
             }
+            dresults.appendChild(t);
           });
-          if(!h){wrap.style.display='none';return;}
-          wrap.innerHTML=h;
-          wrap.style.display='block';
-        }).catch(function(){wrap.style.display='none';});
-    },400);
+          if(!anyAvail&&items.length>0){
+            var hint=document.createElement('span');
+            hint.style.cssText='display:block;width:100%;font-size:11px;color:rgba(255,255,255,0.3);margin-top:4px';
+            hint.textContent='Try adding a prefix like "get" or "my", or a different name';
+            dresults.appendChild(hint);
+          }
+        })
+        .catch(function(){
+          dstatus.textContent='⚠️';dstatus.className='ps-domain-status ps-show';
+          dresults.innerHTML='<span style="font-size:11px;color:rgba(255,255,255,0.3)">Domain search temporarily unavailable — you can add a domain later</span>';
+        });
+    },500);
   });
-  document.addEventListener('click',function(e){if(!e.target.closest('#ps-domain-wrap'))wrap.style.display='none';});
+
+  /* Checkout */
+  goBtn.onclick=function(){
+    goBtn.disabled=true;goBtn.textContent='Redirecting to checkout...';
+    fetch(API+'/api/conversion/checkout',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({slug:S,domain:sel||null})
+    })
+    .then(function(r){return r.json()})
+    .then(function(d){
+      if(d.data&&d.data.checkout_url)window.location.href=d.data.checkout_url;
+      else{goBtn.textContent='Error — try again';goBtn.disabled=false}
+    })
+    .catch(function(){goBtn.textContent='Connection error — try again';goBtn.disabled=false});
+  };
 })();
 </script>
-<!-- End Project Sites Top Bar -->`;
+<!-- End ProjectSites Conversion Flow -->`;
 }
 
 /**
@@ -156,10 +349,6 @@ export async function resolveSite(
 
   if (hostname.endsWith(DOMAINS.SITES_SUFFIX)) {
     slug = hostname.slice(0, -DOMAINS.SITES_SUFFIX.length);
-  } else if (hostname.endsWith(DOMAINS.SITES_STAGING_SUFFIX)) {
-    slug = hostname.slice(0, -DOMAINS.SITES_STAGING_SUFFIX.length);
-  } else if (hostname.endsWith(DOMAINS.LEGACY_SITES_SUFFIX)) {
-    slug = hostname.slice(0, -DOMAINS.LEGACY_SITES_SUFFIX.length);
   }
 
   // Don't resolve reserved subdomains as sites
@@ -302,7 +491,12 @@ export async function serveSiteFromR2(
   }
 
   const version = site.current_build_version ?? 'latest';
-  const r2Path = `sites/${site.slug}/${version}${requestPath === '/' ? '/index.html' : requestPath}`;
+
+  // Normalize path: strip leading slash for file lookup
+  let filePath = requestPath;
+  if (filePath === '/') filePath = '/index.html';
+
+  const r2Path = `sites/${site.slug}/${version}${filePath}`;
 
   console.warn(JSON.stringify({ level: 'info', action: 'serve_site_lookup', slug: site.slug, version, r2Path }));
 
@@ -326,10 +520,9 @@ export async function serveSiteFromR2(
     return new Response('Not Found', { status: 404 });
   }
 
-  // Use the resolved R2 path for content-type detection, not the raw request path.
+  // Use the resolved file path for content-type detection, not the raw request path.
   // Raw path '/' has no extension → would return 'application/octet-stream' (download).
-  const resolvedPath = requestPath === '/' ? '/index.html' : requestPath;
-  const contentType = getContentType(resolvedPath);
+  const contentType = getContentType(filePath);
   return buildSiteResponse(object, site, contentType);
 }
 

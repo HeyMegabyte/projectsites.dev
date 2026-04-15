@@ -62,69 +62,12 @@ class_name = "SiteGenerationWorkflow"
 [ai]
 binding = "AI"
 
-# ─── Staging ─────────────────────────────────────────────────
-[env.staging]
-name = "project-sites-staging"
-routes = [
-  { pattern = "sites-staging.megabyte.space", custom_domain = true }
-]
-
-[env.staging.vars]
-ENVIRONMENT = "staging"
-
-[[env.staging.workflows]]
-name = "site-generation-workflow-staging"
-binding = "SITE_WORKFLOW"
-class_name = "SiteGenerationWorkflow"
-
-[env.staging.ai]
-binding = "AI"
-
-[env.staging.observability]
-enabled = true
-head_sampling_rate = 1
-
-[env.staging.observability.logs]
-enabled = true
-head_sampling_rate = 1
-invocation_logs = true
-
-[env.staging.observability.traces]
-enabled = true
-head_sampling_rate = 1
-
-[[env.staging.kv_namespaces]]
-binding = "CACHE_KV"
-id = "1efeecd1a22c4b029beda649938e2e3c"
-
-[[env.staging.kv_namespaces]]
-binding = "PROMPT_STORE"
-id = "fd15127279a44952a3a4eb2c557722ee"
-
-[[env.staging.d1_databases]]
-binding = "DB"
-database_name = "project-sites-db-staging"
-database_id = "7bdf6256-7b5d-417f-9b29-c7466ec78508"
-
-[[env.staging.r2_buckets]]
-binding = "SITES_BUCKET"
-bucket_name = "project-sites-staging"
-
-# Uncomment when Queues is enabled on the Cloudflare account
-# [[env.staging.queues.producers]]
-# binding = "QUEUE"
-# queue = "project-sites-workflows-staging"
-
-# [[env.staging.queues.consumers]]
-# queue = "project-sites-workflows-staging"
-# max_batch_size = 10
-# max_retries = 3
-
 # ─── Production ──────────────────────────────────────────────
 [env.production]
 name = "project-sites"
 routes = [
-  { pattern = "projectsites.dev", custom_domain = true }
+  { pattern = "projectsites.dev", custom_domain = true },
+  { pattern = "*.projectsites.dev/*", zone_name = "projectsites.dev" }
 ]
 
 [env.production.vars]
@@ -137,6 +80,20 @@ class_name = "SiteGenerationWorkflow"
 
 [env.production.ai]
 binding = "AI"
+
+# Claude Code build container
+[[env.production.containers]]
+class_name = "SiteBuilderContainer"
+image = "docker.io/library/node:22-slim"
+max_instances = 3
+
+[[env.production.durable_objects.bindings]]
+name = "SITE_BUILDER"
+class_name = "SiteBuilderContainer"
+
+[[env.production.migrations]]
+tag = "v1"
+new_sqlite_classes = ["SiteBuilderContainer"]
 
 [env.production.observability]
 enabled = true
@@ -167,6 +124,10 @@ database_id = "ea3e839a-c641-4861-ae30-dfc63bff8032"
 [[env.production.r2_buckets]]
 binding = "SITES_BUCKET"
 bucket_name = "project-sites-production"
+
+# Cron trigger: every 30 minutes — verify hostnames + unstick stuck builds
+[env.production.triggers]
+crons = ["*/30 * * * *"]
 
 # Uncomment when Queues is enabled on the Cloudflare account
 # [[env.production.queues.producers]]

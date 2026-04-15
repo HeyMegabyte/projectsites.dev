@@ -2,9 +2,9 @@
  * Tests for CORS origin matching logic used in index.ts.
  *
  * The CORS middleware allows:
- * - Exact match of known domains (sites base, staging, bolt, localhost)
+ * - Exact match of known domains (sites base, bolt, localhost)
  * - Wildcard match for *projectsites.dev subdomains
- * - Dash-based subdomains like slug.projectsites.dev
+ * - Dot-based subdomains like slug.projectsites.dev
  */
 
 import { DOMAINS } from '@project-sites/shared';
@@ -17,7 +17,6 @@ function corsOriginCheck(origin: string | undefined): string {
   if (!origin) return '';
   const allowed = [
     `https://${DOMAINS.SITES_BASE}`,
-    `https://${DOMAINS.SITES_STAGING}`,
     `https://${DOMAINS.BOLT_BASE}`,
     'http://localhost:3000',
     'http://localhost:5173',
@@ -33,12 +32,6 @@ describe('CORS origin matching', () => {
     it('allows projectsites.dev', () => {
       expect(corsOriginCheck('https://projectsites.dev')).toBe(
         'https://projectsites.dev',
-      );
-    });
-
-    it('allows sites-staging.megabyte.space', () => {
-      expect(corsOriginCheck('https://sites-staging.megabyte.space')).toBe(
-        'https://sites-staging.megabyte.space',
       );
     });
 
@@ -58,13 +51,13 @@ describe('CORS origin matching', () => {
   });
 
   describe('wildcard subdomain matching', () => {
-    it('allows dash-based site subdomains (slug.projectsites.dev)', () => {
+    it('allows dot-based site subdomains (slug.projectsites.dev)', () => {
       expect(corsOriginCheck('https://my-biz.projectsites.dev')).toBe(
         'https://my-biz.projectsites.dev',
       );
     });
 
-    it('allows another dash-based site subdomain', () => {
+    it('allows another site subdomain', () => {
       expect(corsOriginCheck('https://vitos-mens-salon.projectsites.dev')).toBe(
         'https://vitos-mens-salon.projectsites.dev',
       );
@@ -105,6 +98,10 @@ describe('CORS origin matching', () => {
       expect(corsOriginCheck('https://megabyte.space')).toBe('');
     });
 
+    it('rejects staging domain (removed)', () => {
+      expect(corsOriginCheck('https://sites-staging.megabyte.space')).toBe('');
+    });
+
     it('rejects domain with our suffix appended to a different TLD', () => {
       expect(corsOriginCheck('https://evil.com.projectsites.dev')).toBe(
         // This actually DOES match because it ends with .projectsites.dev
@@ -128,10 +125,6 @@ describe('CORS origin matching', () => {
 
     it('SITES_BASE is the expected value', () => {
       expect(DOMAINS.SITES_BASE).toBe('projectsites.dev');
-    });
-
-    it('SITES_STAGING is the expected value', () => {
-      expect(DOMAINS.SITES_STAGING).toBe('sites-staging.megabyte.space');
     });
 
     it('suffix starts with dot for proper subdomain matching', () => {

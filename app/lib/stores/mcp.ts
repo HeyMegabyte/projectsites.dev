@@ -49,11 +49,16 @@ export const useMCPStore = create<Store & Actions>((set, get) => ({
           const settings = JSON.parse(savedConfig) as MCPSettings;
           const serverTools = await updateServerConfig(settings.mcpConfig);
           set(() => ({ settings, serverTools }));
-        } catch (error) {
-          console.error('Error parsing saved mcp config:', error);
-          set(() => ({
-            error: `Error parsing saved mcp config: ${error instanceof Error ? error.message : String(error)}`,
-          }));
+        } catch {
+          // MCP config update failed (expected on Cloudflare Pages — no Node.js).
+          // Silently continue with defaults.
+          try {
+            const settings = JSON.parse(savedConfig) as MCPSettings;
+            set(() => ({ settings }));
+          } catch {
+            // Corrupted localStorage — reset to defaults
+            localStorage.setItem(MCP_SETTINGS_KEY, JSON.stringify(defaultSettings));
+          }
         }
       } else {
         localStorage.setItem(MCP_SETTINGS_KEY, JSON.stringify(defaultSettings));

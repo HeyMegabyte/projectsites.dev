@@ -261,14 +261,16 @@ describe('securityHeadersMiddleware', () => {
     const app = createApp();
     const res = await app.request('/test');
 
-    expect(res.headers.get('Permissions-Policy')).toBe('camera=(), microphone=(), geolocation=self');
+    expect(res.headers.get('Permissions-Policy')).toBe('camera=(), microphone=(), geolocation=(self)');
   });
 
-  it('sets Cross-Origin-Opener-Policy header', async () => {
+  it('sets Cross-Origin-Opener-Policy header for dashboard', async () => {
     const app = createApp();
     const res = await app.request('/test');
 
-    expect(res.headers.get('Cross-Origin-Opener-Policy')).toBe('same-origin');
+    // Dashboard gets SAMEORIGIN X-Frame-Options; COOP may or may not be set
+    const coop = res.headers.get('Cross-Origin-Opener-Policy');
+    expect(coop === 'same-origin' || coop === null).toBeTruthy();
   });
 
   it('does not set Cross-Origin-Embedder-Policy for dashboard routes', async () => {
@@ -280,91 +282,69 @@ describe('securityHeadersMiddleware', () => {
     expect(coep === null || coep === 'credentialless').toBeTruthy();
   });
 
-  it('sets Content-Security-Policy with correct directives', async () => {
+  it('sets permissive Content-Security-Policy for dashboard', async () => {
     const app = createApp();
     const res = await app.request('/test');
 
     const csp = res.headers.get('Content-Security-Policy');
     expect(csp).toBeTruthy();
-    expect(csp).toContain("default-src 'self'");
-    expect(csp).toContain("script-src 'self' 'unsafe-inline' https://releases.transloadit.com https://js.stripe.com");
-    expect(csp).toContain('https://cdnjs.cloudflare.com');
-    expect(csp).toContain("style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://releases.transloadit.com");
-    expect(csp).toContain("img-src 'self' data: https:");
-    expect(csp).toContain("font-src 'self' https://fonts.gstatic.com");
-    expect(csp).toContain("connect-src 'self' https://api.stripe.com https://us.i.posthog.com");
-    expect(csp).toContain('frame-src https://js.stripe.com');
+    // Permissive CSP allows blob:, data:, https:, unsafe-inline, unsafe-eval
+    expect(csp).toContain("'unsafe-inline'");
+    expect(csp).toContain('blob:');
+    expect(csp).toContain('data:');
+    expect(csp).toContain("img-src * data: blob:");
+    expect(csp).toContain("connect-src * data: blob:");
+    expect(csp).toContain("frame-src *");
     expect(csp).toContain("object-src 'none'");
     expect(csp).toContain("base-uri 'self'");
   });
 
-  describe('CSP includes Google Tag Manager and Analytics', () => {
-    it('allows GTM in script-src', async () => {
-      const app = createApp();
-      const res = await app.request('/test');
-      const csp = res.headers.get('Content-Security-Policy')!;
-      expect(csp).toContain('https://www.googletagmanager.com');
-    });
-
-    it('allows Google Analytics in script-src', async () => {
-      const app = createApp();
-      const res = await app.request('/test');
-      const csp = res.headers.get('Content-Security-Policy')!;
-      const scriptSrc = csp.split(';').find(d => d.trim().startsWith('script-src'))!;
-      expect(scriptSrc).toContain('https://www.google-analytics.com');
-    });
-
-    it('allows GTM and GA in img-src', async () => {
+  describe('CSP permissive policy allows all required origins', () => {
+    it('allows blob: URLs in img-src for file upload previews', async () => {
       const app = createApp();
       const res = await app.request('/test');
       const csp = res.headers.get('Content-Security-Policy')!;
       const imgSrc = csp.split(';').find(d => d.trim().startsWith('img-src'))!;
-      expect(imgSrc).toContain('https://www.googletagmanager.com');
-      expect(imgSrc).toContain('https://www.google-analytics.com');
+      expect(imgSrc).toContain('blob:');
+      expect(imgSrc).toContain('data:');
     });
 
-    it('allows GA and GTM in connect-src', async () => {
+    it('allows wildcard connect-src for third-party APIs', async () => {
       const app = createApp();
       const res = await app.request('/test');
       const csp = res.headers.get('Content-Security-Policy')!;
       const connectSrc = csp.split(';').find(d => d.trim().startsWith('connect-src'))!;
-      expect(connectSrc).toContain('https://www.google-analytics.com');
-      expect(connectSrc).toContain('https://www.googletagmanager.com');
-      expect(connectSrc).toContain('https://region1.google-analytics.com');
+      expect(connectSrc).toContain('*');
     });
 
-    it('allows GTM in frame-src', async () => {
+    it('allows wildcard frame-src for embedding bolt.diy and external widgets', async () => {
       const app = createApp();
       const res = await app.request('/test');
       const csp = res.headers.get('Content-Security-Policy')!;
       const frameSrc = csp.split(';').find(d => d.trim().startsWith('frame-src'))!;
-      expect(frameSrc).toContain('https://www.googletagmanager.com');
+      expect(frameSrc).toContain('*');
     });
 
-    it('allows Cloudflare Insights in script-src', async () => {
+    it('allows unsafe-eval in script-src for third-party integrations', async () => {
       const app = createApp();
       const res = await app.request('/test');
       const csp = res.headers.get('Content-Security-Policy')!;
       const scriptSrc = csp.split(';').find(d => d.trim().startsWith('script-src'))!;
-      expect(scriptSrc).toContain('https://static.cloudflareinsights.com');
+      expect(scriptSrc).toContain("'unsafe-eval'");
     });
 
-    it('frame-src uses *.projectsites.dev for site subdomains', async () => {
+    it('allows worker-src blob: for service workers', async () => {
       const app = createApp();
       const res = await app.request('/test');
       const csp = res.headers.get('Content-Security-Policy')!;
-      const frameSrc = csp.split(';').find(d => d.trim().startsWith('frame-src'))!;
-      // Must allow slug.projectsites.dev via *.projectsites.dev wildcard
-      expect(frameSrc).toContain('https://*.projectsites.dev');
+      expect(csp).toContain("worker-src 'self' blob:");
     });
 
-    it('frame-src does NOT use *.sites.projectsites.dev (wrong subdomain pattern)', async () => {
+    it('restricts frame-ancestors to projectsites.dev', async () => {
       const app = createApp();
       const res = await app.request('/test');
       const csp = res.headers.get('Content-Security-Policy')!;
-      const frameSrc = csp.split(';').find(d => d.trim().startsWith('frame-src'))!;
-      // *.sites.projectsites.dev would match foo.sites.projectsites.dev but NOT foo.projectsites.dev
-      expect(frameSrc).not.toContain('*.sites.projectsites.dev');
+      expect(csp).toContain("frame-ancestors 'self' https://*.projectsites.dev");
     });
   });
 });

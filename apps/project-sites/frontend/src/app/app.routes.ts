@@ -12,9 +12,13 @@ export const routes: Routes = [
       import('./pages/signin/signin.component').then((m) => m.SigninComponent),
   },
   {
-    path: 'details',
+    path: 'create',
     loadComponent: () =>
-      import('./pages/details/details.component').then((m) => m.DetailsComponent),
+      import('./pages/create/create.component').then((m) => m.CreateComponent),
+  },
+  {
+    path: 'details',
+    redirectTo: 'create',
   },
   {
     path: 'waiting',
@@ -25,6 +29,29 @@ export const routes: Routes = [
     path: 'admin',
     loadComponent: () =>
       import('./pages/admin/admin.component').then((m) => m.AdminComponent),
+  },
+  {
+    path: 'editor/:slug',
+    loadComponent: () =>
+      import('./pages/editor/editor.component').then((m) => m.EditorComponent),
+  },
+  {
+    path: 'privacy',
+    loadComponent: () =>
+      import('./pages/legal/legal.component').then((m) => m.LegalComponent),
+    data: { type: 'privacy' },
+  },
+  {
+    path: 'terms',
+    loadComponent: () =>
+      import('./pages/legal/legal.component').then((m) => m.LegalComponent),
+    data: { type: 'terms' },
+  },
+  {
+    path: 'content',
+    loadComponent: () =>
+      import('./pages/legal/legal.component').then((m) => m.LegalComponent),
+    data: { type: 'content' },
   },
   { path: '**', redirectTo: '' },
 ];

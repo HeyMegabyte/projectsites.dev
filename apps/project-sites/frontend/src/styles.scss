@@ -12,8 +12,8 @@
   --secondary: #0ea5e9;
   --secondary-dim: rgba(14, 165, 233, 0.12);
   --text-primary: #f0f4f8;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
+  --text-secondary: #a8b8cc;
+  --text-muted: #7a8a9e;
   --border: rgba(0, 212, 255, 0.08);
   --border-hover: rgba(0, 212, 255, 0.25);
   --error: #ef4444;
@@ -26,6 +26,16 @@
   --shadow-accent: 0 0 30px rgba(0, 212, 255, 0.2);
   --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ── Z-index tiers (10-step scale) ────────── */
+  --z-bg: 0;            /* background orbs */
+  --z-content: 1;       /* page containers */
+  --z-dropdown: 10;     /* inline dropdowns, autocomplete */
+  --z-header: 100;      /* fixed header bar */
+  --z-popover: 200;     /* floating menus (admin more-dropdown) */
+  --z-overlay: 500;     /* modal overlays + modal cards */
+  --z-toast: 900;       /* toast notifications */
+  --z-tooltip: 950;     /* CSS tooltips */
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -35,7 +45,7 @@
   overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
 }
 
-html { scroll-behavior: smooth; height: 100%; }
+html { scroll-behavior: smooth; height: 100%; scrollbar-gutter: stable; }
 
 body {
   font-family: var(--font);
@@ -102,6 +112,65 @@ body {
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+  transition: outline-offset 0.15s ease;
+}
+
+/* ── Link hover styles — expanding underline ─────── */
+a {
+  position: relative;
+  transition: color 0.2s ease-out, opacity 0.2s ease-out;
+  text-decoration: none;
+}
+
+a::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  left: 51%;
+  right: 51%;
+  bottom: 0;
+  height: 1px;
+  transition-property: left, right;
+  transition-duration: 0.3s;
+  transition-timing-function: ease-out;
+  background: var(--accent);
+}
+
+a:hover::after {
+  left: 0;
+  right: 0;
+}
+
+a:active {
+  opacity: 0.7;
+  transition: opacity 0.05s ease-out;
+}
+
+a:focus-visible::after {
+  left: 0;
+  right: 0;
+}
+
+/* Exclude buttons, nav, icons, and UI elements from expanding underline */
+a.btn::after,
+a.btn-accent::after,
+a.btn-ghost::after,
+a.btn-outline::after,
+a.btn-secondary-outline::after,
+a.logo::after,
+a.site-card-domain::after,
+a.hostname-name::after,
+.footer-social a::after,
+.signin-footer-social a::after,
+.breadcrumb-link::after,
+.header-logo::after,
+button a::after,
+nav a::after,
+a[aria-label]::after,
+.search-result a::after,
+.address-option a::after,
+.dropdown-item a::after {
+  display: none;
 }
 
 /* ── Buttons ────────── */
@@ -207,7 +276,7 @@ textarea.input-field { resize: vertical; min-height: 120px; line-height: 1.6; }
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.2s ease, transform 0.2s ease;
-  z-index: 10002;
+  z-index: var(--z-tooltip);
 }
 [data-tooltip]::after {
   content: attr(data-tooltip);
@@ -257,4 +326,57 @@ textarea.input-field { resize: vertical; min-height: 120px; line-height: 1.6; }
 }
 [data-tooltip-pos="bottom"]:hover::after {
   transform: translateX(-50%) translateY(0);
+}
+
+/* ── Search input z-index override ────────── */
+#homepage-search {
+  position: relative;
+  z-index: 99999;
+}
+
+/* ── Cursor follower + click ripple ────────── */
+.cursor-follower {
+  position: fixed;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(0, 212, 255, 0.08);
+  border: 1px solid rgba(0, 212, 255, 0.15);
+  pointer-events: none;
+  z-index: 99999;
+  transform: translate(-50%, -50%);
+  transition: width 0.15s ease, height 0.15s ease, background 0.15s ease, opacity 0.15s ease;
+  opacity: 0;
+  mix-blend-mode: screen;
+}
+
+.cursor-follower.visible {
+  opacity: 1;
+}
+
+.cursor-follower.hover {
+  width: 40px;
+  height: 40px;
+  background: rgba(0, 212, 255, 0.05);
+  border-color: rgba(0, 212, 255, 0.25);
+}
+
+.click-ripple {
+  position: fixed;
+  border-radius: 50%;
+  background: rgba(0, 212, 255, 0.2);
+  pointer-events: none;
+  z-index: 99998;
+  transform: translate(-50%, -50%) scale(0);
+  animation: clickRipple 0.6s ease-out forwards;
+}
+
+@keyframes clickRipple {
+  0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+}
+
+/* Hide cursor follower on mobile/touch */
+@media (hover: none) {
+  .cursor-follower { display: none; }
 }

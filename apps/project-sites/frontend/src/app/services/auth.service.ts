@@ -5,6 +5,7 @@ const BUSINESS_KEY = 'ps_selected_business';
 const MODE_KEY = 'ps_mode';
 const PENDING_BUILD_KEY = 'ps_pending_build';
 const LOCATION_DECLINED_KEY = 'ps_location_declined';
+const AUTO_CREATE_KEY = 'ps_auto_create';
 
 export interface Session {
   token: string;
@@ -71,7 +72,8 @@ export class AuthService {
   }
 
   getMode(): 'business' | 'custom' {
-    return (localStorage.getItem(MODE_KEY) as 'business' | 'custom') || 'business';
+    const value = localStorage.getItem(MODE_KEY);
+    return value === 'custom' ? 'custom' : 'business';
   }
 
   setMode(mode: 'business' | 'custom'): void {
@@ -96,5 +98,17 @@ export class AuthService {
 
   setLocationDeclined(): void {
     localStorage.setItem(LOCATION_DECLINED_KEY, 'true');
+  }
+
+  getAutoCreate(): boolean {
+    return localStorage.getItem(AUTO_CREATE_KEY) === 'true';
+  }
+
+  setAutoCreate(value: boolean): void {
+    if (value) {
+      localStorage.setItem(AUTO_CREATE_KEY, 'true');
+    } else {
+      localStorage.removeItem(AUTO_CREATE_KEY);
+    }
   }
 }

@@ -1,6 +1,9 @@
 /**
- * Unit tests for the /api/sites/by-slug/:slug/chat endpoint.
- * Verifies chat.json retrieval from R2, format validation, error cases.
+ * Unit tests for the dynamic /api/sites/by-slug/:slug/chat endpoint.
+ *
+ * The endpoint reads ALL current files from R2 and dynamically constructs
+ * a bolt.diy-compatible chat JSON with boltArtifact/boltAction tags.
+ * No static chat.json is needed — always in sync with latest files.
  */
 
 jest.mock('../services/db.js', () => ({
@@ -45,10 +48,18 @@ function createMockR2Object(data: unknown) {
   };
 }
 
-function createApp(r2GetMock: jest.Mock) {
+function createApp(r2GetMock: jest.Mock, dbPrepare?: jest.Mock) {
   const env = {
     ENVIRONMENT: 'test',
-    DB: {} as D1Database,
+    DB: {
+      prepare: dbPrepare ?? jest.fn().mockReturnValue({
+        bind: jest.fn().mockReturnValue({
+          first: jest.fn().mockResolvedValue({ business_name: "Test Business" }),
+          all: jest.fn().mockResolvedValue({ results: [] }),
+          run: jest.fn().mockResolvedValue({}),
+        }),
+      }),
+    } as unknown as D1Database,
     SITES_BUCKET: {
       get: r2GetMock,
       put: jest.fn().mockResolvedValue(undefined),
@@ -80,23 +91,23 @@ afterEach(() => {
 });
 
 describe('GET /api/sites/by-slug/:slug/chat', () => {
-  const validChatData = {
-    messages: [
-      { id: 'msg-1', role: 'user', content: 'Build me a pizza shop website' },
-      { id: 'msg-2', role: 'assistant', content: 'I will create a professional pizza shop website...' },
-    ],
-    description: 'Pizza Shop Website',
-    exportDate: '2025-02-21T10:00:00.000Z',
-  };
-
-  it('returns 200 with valid chat JSON when site exists', async () => {
+  it('returns 200 with dynamically built chat JSON containing boltArtifact', async () => {
     const r2Get = jest.fn()
       .mockImplementation((key: string) => {
         if (key === 'sites/test-site/_manifest.json') {
-          return Promise.resolve(createMockR2Object({ current_version: '2025-01-01T00-00-00Z' }));
+          return Promise.resolve(createMockR2Object({
+            current_version: 'v1',
+            files: ['index.html', 'about.html', 'robots.txt'],
+          }));
         }
-        if (key === 'sites/test-site/2025-01-01T00-00-00Z/_meta/chat.json') {
-          return Promise.resolve(createMockR2Object(validChatData));
+        if (key === 'sites/test-site/v1/index.html') {
+          return Promise.resolve(createMockR2Object('<!DOCTYPE html><html><body><h1>Test</h1></body></html>'));
+        }
+        if (key === 'sites/test-site/v1/about.html') {
+          return Promise.resolve(createMockR2Object('<!DOCTYPE html><html><body><h1>About</h1></body></html>'));
+        }
+        if (key === 'sites/test-site/v1/robots.txt') {
+          return Promise.resolve(createMockR2Object('User-agent: *\nAllow: /'));
         }
         return Promise.resolve(null);
       });
@@ -106,38 +117,37 @@ describe('GET /api/sites/by-slug/:slug/chat', () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
+
+    // Must have two messages (user + assistant)
     expect(body.messages).toHaveLength(2);
     expect(body.messages[0].role).toBe('user');
     expect(body.messages[1].role).toBe('assistant');
-    expect(body.description).toBe('Pizza Shop Website');
-  });
 
-  it('returns Content-Type application/json', async () => {
-    const r2Get = jest.fn()
-      .mockImplementation((key: string) => {
-        if (key === 'sites/test-site/_manifest.json') {
-          return Promise.resolve(createMockR2Object({ current_version: 'v1' }));
-        }
-        if (key === 'sites/test-site/v1/_meta/chat.json') {
-          return Promise.resolve(createMockR2Object(validChatData));
-        }
-        return Promise.resolve(null);
-      });
+    // Assistant message must contain boltArtifact with file actions
+    const content = body.messages[1].content;
+    expect(content).toContain('<boltArtifact');
+    expect(content).toContain('</boltArtifact>');
+    expect(content).toContain('<boltAction type="file" filePath="index.html">');
+    expect(content).toContain('<boltAction type="file" filePath="about.html">');
+    expect(content).toContain('<boltAction type="file" filePath="robots.txt">');
 
-    const { app, env } = createApp(r2Get);
-    const res = await app.request('/api/sites/by-slug/test-site/chat', {}, env);
+    // File content must be embedded
+    expect(content).toContain('<!DOCTYPE html>');
+    expect(content).toContain('User-agent');
 
-    expect(res.headers.get('Content-Type')).toContain('application/json');
+    // Must have description and exportDate
+    expect(body.description).toBeTruthy();
+    expect(body.exportDate).toBeTruthy();
   });
 
   it('returns CORS header Access-Control-Allow-Origin: *', async () => {
     const r2Get = jest.fn()
       .mockImplementation((key: string) => {
         if (key === 'sites/test-site/_manifest.json') {
-          return Promise.resolve(createMockR2Object({ current_version: 'v1' }));
+          return Promise.resolve(createMockR2Object({ current_version: 'v1', files: ['index.html'] }));
         }
-        if (key === 'sites/test-site/v1/_meta/chat.json') {
-          return Promise.resolve(createMockR2Object(validChatData));
+        if (key === 'sites/test-site/v1/index.html') {
+          return Promise.resolve(createMockR2Object('<html></html>'));
         }
         return Promise.resolve(null);
       });
@@ -146,6 +156,68 @@ describe('GET /api/sites/by-slug/:slug/chat', () => {
     const res = await app.request('/api/sites/by-slug/test-site/chat', {}, env);
 
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*');
+  });
+
+  it('filters out research.json and _meta/ files', async () => {
+    const r2Get = jest.fn()
+      .mockImplementation((key: string) => {
+        if (key === 'sites/test-site/_manifest.json') {
+          return Promise.resolve(createMockR2Object({
+            current_version: 'v1',
+            files: ['index.html', 'research.json', '_meta/chat.json'],
+          }));
+        }
+        if (key === 'sites/test-site/v1/index.html') {
+          return Promise.resolve(createMockR2Object('<html></html>'));
+        }
+        return Promise.resolve(null);
+      });
+
+    const { app, env } = createApp(r2Get);
+    const res = await app.request('/api/sites/by-slug/test-site/chat', {}, env);
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const content = body.messages[1].content;
+    expect(content).not.toContain('filePath="research.json"');
+    expect(content).not.toContain('filePath="_meta/');
+  });
+
+  it('does not require authentication (slug is access token)', async () => {
+    const r2Get = jest.fn()
+      .mockImplementation((key: string) => {
+        if (key === 'sites/public-site/_manifest.json') {
+          return Promise.resolve(createMockR2Object({ current_version: 'v1', files: ['index.html'] }));
+        }
+        if (key === 'sites/public-site/v1/index.html') {
+          return Promise.resolve(createMockR2Object('<html></html>'));
+        }
+        return Promise.resolve(null);
+      });
+
+    const { app, env } = createApp(r2Get);
+    // No Authorization header
+    const res = await app.request('/api/sites/by-slug/public-site/chat', {}, env);
+
+    expect(res.status).toBe(200);
+  });
+
+  it('returns Cache-Control: no-cache, no-store, must-revalidate', async () => {
+    const r2Get = jest.fn()
+      .mockImplementation((key: string) => {
+        if (key === 'sites/test-site/_manifest.json') {
+          return Promise.resolve(createMockR2Object({ current_version: 'v1', files: ['index.html'] }));
+        }
+        if (key === 'sites/test-site/v1/index.html') {
+          return Promise.resolve(createMockR2Object('<html></html>'));
+        }
+        return Promise.resolve(null);
+      });
+
+    const { app, env } = createApp(r2Get);
+    const res = await app.request('/api/sites/by-slug/test-site/chat', {}, env);
+
+    expect(res.headers.get('Cache-Control')).toBe('no-cache, no-store, must-revalidate');
   });
 
   it('returns 404 when manifest does not exist', async () => {
@@ -172,79 +244,48 @@ describe('GET /api/sites/by-slug/:slug/chat', () => {
     expect(res.status).toBe(404);
   });
 
-  it('falls back to root chat.json when _meta/chat.json is missing', async () => {
+  it('returns 404 when no files found in R2', async () => {
     const r2Get = jest.fn()
       .mockImplementation((key: string) => {
-        if (key === 'sites/root-chat/_manifest.json') {
-          return Promise.resolve(createMockR2Object({ current_version: 'v1' }));
+        if (key === 'sites/empty-site/_manifest.json') {
+          return Promise.resolve(createMockR2Object({ current_version: 'v1', files: ['index.html'] }));
         }
-        if (key === 'sites/root-chat/v1/_meta/chat.json') {
-          return Promise.resolve(null); // _meta not found
-        }
-        if (key === 'sites/root-chat/v1/chat.json') {
-          return Promise.resolve(createMockR2Object(validChatData)); // found in root
-        }
+        // All file reads return null
         return Promise.resolve(null);
       });
 
     const { app, env } = createApp(r2Get);
-    const res = await app.request('/api/sites/by-slug/root-chat/chat', {}, env);
-
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.messages).toHaveLength(2);
-  });
-
-  it('returns 404 when chat.json does not exist in R2', async () => {
-    const r2Get = jest.fn()
-      .mockImplementation((key: string) => {
-        if (key === 'sites/no-chat/_manifest.json') {
-          return Promise.resolve(createMockR2Object({ current_version: 'v1' }));
-        }
-        // chat.json not found
-        return Promise.resolve(null);
-      });
-
-    const { app, env } = createApp(r2Get);
-    const res = await app.request('/api/sites/by-slug/no-chat/chat', {}, env);
+    const res = await app.request('/api/sites/by-slug/empty-site/chat', {}, env);
 
     expect(res.status).toBe(404);
   });
 
-  it('does not require authentication (slug is access token)', async () => {
+  it('looks up business name from D1', async () => {
+    const dbPrepare = jest.fn().mockReturnValue({
+      bind: jest.fn().mockReturnValue({
+        first: jest.fn().mockResolvedValue({ business_name: "Vito's Mens Salon" }),
+        all: jest.fn().mockResolvedValue({ results: [] }),
+        run: jest.fn().mockResolvedValue({}),
+      }),
+    });
+
     const r2Get = jest.fn()
       .mockImplementation((key: string) => {
-        if (key === 'sites/public-site/_manifest.json') {
-          return Promise.resolve(createMockR2Object({ current_version: 'v1' }));
+        if (key === 'sites/vitos-mens-salon/_manifest.json') {
+          return Promise.resolve(createMockR2Object({ current_version: 'v1', files: ['index.html'] }));
         }
-        if (key === 'sites/public-site/v1/_meta/chat.json') {
-          return Promise.resolve(createMockR2Object(validChatData));
+        if (key === 'sites/vitos-mens-salon/v1/index.html') {
+          return Promise.resolve(createMockR2Object('<html></html>'));
         }
         return Promise.resolve(null);
       });
 
-    const { app, env } = createApp(r2Get);
-    // No Authorization header
-    const res = await app.request('/api/sites/by-slug/public-site/chat', {}, env);
+    const { app, env } = createApp(r2Get, dbPrepare);
+    const res = await app.request('/api/sites/by-slug/vitos-mens-salon/chat', {}, env);
 
     expect(res.status).toBe(200);
-  });
-
-  it('returns Cache-Control: no-cache header', async () => {
-    const r2Get = jest.fn()
-      .mockImplementation((key: string) => {
-        if (key === 'sites/test-site/_manifest.json') {
-          return Promise.resolve(createMockR2Object({ current_version: 'v1' }));
-        }
-        if (key === 'sites/test-site/v1/_meta/chat.json') {
-          return Promise.resolve(createMockR2Object(validChatData));
-        }
-        return Promise.resolve(null);
-      });
-
-    const { app, env } = createApp(r2Get);
-    const res = await app.request('/api/sites/by-slug/test-site/chat', {}, env);
-
-    expect(res.headers.get('Cache-Control')).toBe('no-cache');
+    const body = await res.json();
+    expect(body.description).toContain("Vito's Mens Salon");
+    expect(body.messages[0].content).toContain("Vito's Mens Salon");
   });
 });

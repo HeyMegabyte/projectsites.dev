@@ -1,6 +1,7 @@
 import { Component, inject, signal, HostListener } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
+import { ApiService } from '../../services/api.service';
 
 @Component({
   selector: 'app-header',
@@ -8,9 +9,9 @@ import { AuthService } from '../../services/auth.service';
   template: `
     <header class="header">
       <div class="header-inner">
-        <a class="logo" (click)="goHome()" data-tooltip="Home" data-tooltip-pos="bottom">
-          <img src="/logo-icon.svg" alt="Project Sites" width="32" height="32" />
-          <span class="logo-text">Project Sites</span>
+        <a class="logo" (click)="goHome()">
+          <img src="/logo-header-icon.png" alt="Project Sites" width="48" height="48" class="logo-icon" />
+          <img src="/logo-text.png" alt="projectsites.dev" height="48" class="logo-text-img" />
         </a>
         <div class="header-right">
           @if (auth.isLoggedIn()) {
@@ -36,11 +37,17 @@ import { AuthService } from '../../services/auth.service';
                     </svg>
                     Dashboard
                   </button>
-                  <button class="dropdown-item" (click)="goHome()">
+                  <button class="dropdown-item" (click)="goCreate()">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                      <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+                      <path d="M12 5v14M5 12h14" />
                     </svg>
                     New Site
+                  </button>
+                  <button class="dropdown-item" (click)="goBilling()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="1" y="4" width="22" height="16" rx="2" /><line x1="1" y1="10" x2="23" y2="10" />
+                    </svg>
+                    Billing
                   </button>
                   <div class="dropdown-divider"></div>
                   <button class="dropdown-item logout" (click)="logout()">
@@ -66,16 +73,14 @@ import { AuthService } from '../../services/auth.service';
   `,
   styles: [`
     .header {
-      position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
-      padding: 0 24px; height: 60px; display: flex; align-items: center;
-      background: rgba(5, 5, 16, 0.92);
-      backdrop-filter: blur(20px) saturate(1.8);
-      -webkit-backdrop-filter: blur(20px) saturate(1.8);
+      position: fixed; top: 0; left: 0; right: 0; z-index: var(--z-header);
+      padding: 0 24px; height: 64px; display: flex; align-items: center;
+      background: #07071a;
       border-bottom: 1px solid rgba(0, 212, 255, 0.06);
       box-shadow: 0 1px 20px rgba(0, 0, 0, 0.4);
     }
     .header-inner {
-      max-width: 1200px; width: 100%; margin: 0 auto;
+      width: 1200px; max-width: 100%; margin: 0 auto;
       display: flex; align-items: center; justify-content: space-between;
     }
     .logo {
@@ -85,14 +90,21 @@ import { AuthService } from '../../services/auth.service';
     }
     .logo:hover { opacity: 0.85; }
     .logo:active { opacity: 0.7; }
-    .logo img { flex-shrink: 0; transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
-    .logo:hover img { transform: scale(1.05) rotate(-3deg); }
-    .logo-text {
-      font-size: 0.95rem; font-weight: 700;
-      color: #fff; letter-spacing: -0.01em;
+    .logo-icon {
+      flex-shrink: 0;
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease;
+      background: transparent;
     }
+    .logo:hover .logo-icon { transform: scale(1.05) rotate(-3deg); }
+    .logo-text-img {
+      flex-shrink: 0;
+      opacity: 0.9;
+      margin-top: 5px;
+      transition: opacity 0.2s;
+    }
+    .logo:hover .logo-text-img { opacity: 1; }
     @media (max-width: 480px) {
-      .logo-text { display: none; }
+      .logo-text-img { display: none; }
     }
     .header-right { display: flex; align-items: center; gap: 12px; }
 
@@ -177,7 +189,7 @@ import { AuthService } from '../../services/auth.service';
         0 0 0 1px rgba(0, 212, 255, 0.06),
         0 0 60px rgba(0, 212, 255, 0.04);
       animation: slideDown 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-      z-index: 100;
+      z-index: var(--z-popover);
     }
     .dropdown-header {
       display: flex; align-items: center; gap: 12px;
@@ -240,6 +252,7 @@ import { AuthService } from '../../services/auth.service';
 export class HeaderComponent {
   readonly auth = inject(AuthService);
   private router = inject(Router);
+  private api = inject(ApiService);
   menuOpen = signal(false);
 
   getInitial(): string {
@@ -268,9 +281,26 @@ export class HeaderComponent {
     this.router.navigate(['/signin']);
   }
 
+  goCreate(): void {
+    this.menuOpen.set(false);
+    this.router.navigate(['/create']);
+  }
+
   goAdmin(): void {
     this.menuOpen.set(false);
     this.router.navigate(['/admin']);
+  }
+
+  goBilling(): void {
+    this.menuOpen.set(false);
+    // Open Stripe billing portal (same as admin panel billing button)
+    this.api.getBillingPortal(window.location.href).subscribe({
+      next: (res: any) => {
+        if (res.data?.portal_url) window.open(res.data.portal_url, '_blank');
+        else this.router.navigate(['/admin']);
+      },
+      error: () => this.router.navigate(['/admin']),
+    });
   }
 
   logout(): void {

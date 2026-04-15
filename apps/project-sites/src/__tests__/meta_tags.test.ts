@@ -230,10 +230,12 @@ describe('Brand Color Consistency', () => {
     expect(html).toContain('--secondary: #7c3aed');
   });
 
-  it('top bar uses #50a5db accent', () => {
+  it('top bar uses purple accent and teal edit button', () => {
     const topBar = generateTopBar('test-slug');
-    expect(topBar).toContain('#50a5db');
-    expect(topBar).not.toContain('#64ffda');
+    expect(topBar).toContain('#7c3aed');
+    expect(topBar).toContain('#64ffda'); // Edit with AI button accent
+    expect(topBar).toContain('Edit with AI');
+    expect(topBar).toContain('/editor/test-slug');
   });
 });
 

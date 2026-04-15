@@ -47,6 +47,12 @@ export class SigninComponent {
   sendMagicLink(): void {
     if (!this.email || this.sending()) return;
 
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(this.email)) {
+      this.toast.error('Please enter a valid email address');
+      return;
+    }
+
     this.sending.set(true);
     const business = this.auth.getSelectedBusiness();
     const mode = this.auth.getMode();

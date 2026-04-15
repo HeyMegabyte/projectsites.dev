@@ -1,57 +1,18 @@
 /**
  * Security-headers middleware for the Project Sites Cloudflare Worker.
  *
- * Attaches a hardened set of HTTP response headers to **every** response that
- * passes through the Hono middleware chain. The headers enforce HTTPS via HSTS,
- * prevent MIME-sniffing, deny framing, tighten the referrer, disable
- * unnecessary browser APIs, and apply a Content-Security-Policy that allowlists
- * only the third-party origins required by the homepage SPA (Stripe, Uppy /
- * Transloadit, Lottie, Google Fonts).
- *
- * | Export                       | Description                                     |
- * | ---------------------------- | ----------------------------------------------- |
- * | `securityHeadersMiddleware`  | Hono `MiddlewareHandler` that sets all headers   |
- *
- * @example
- * ```ts
- * import { Hono } from 'hono';
- * import { securityHeadersMiddleware } from './middleware/security_headers.js';
- *
- * const app = new Hono();
- * app.use('*', securityHeadersMiddleware);
- * ```
+ * Sets standard security headers (HSTS, nosniff, referrer policy) on all
+ * responses. CSP is intentionally permissive — this is a SaaS platform that
+ * embeds iframes, loads user-uploaded images, generates blob URLs for
+ * previews, and integrates many third-party services.
  *
  * @module security_headers
- * @packageDocumentation
  */
 
 import type { MiddlewareHandler } from 'hono';
 import type { Env, Variables } from '../types/env.js';
 import { DOMAINS } from '@project-sites/shared';
 
-/**
- * Hono middleware that appends security headers to every response.
- *
- * Headers set:
- *
- * | Header                      | Value / Purpose                                            |
- * | --------------------------- | ---------------------------------------------------------- |
- * | `Strict-Transport-Security` | 2-year HSTS with `includeSubDomains` and `preload`         |
- * | `X-Content-Type-Options`    | `nosniff` -- prevents MIME-type sniffing                   |
- * | `X-Frame-Options`           | `DENY` -- blocks all framing (clickjacking defence)        |
- * | `Referrer-Policy`           | `strict-origin-when-cross-origin`                          |
- * | `Permissions-Policy`        | Disables camera, microphone, and geolocation               |
- * | `Content-Security-Policy`   | Allowlists `'self'`, inline scripts/styles, and required   |
- * |                             | CDN origins (Stripe, Transloadit, Google Fonts, Lottie)    |
- *
- * The middleware calls `await next()` first, then mutates the response headers
- * so that **all** downstream handlers benefit from the same policy.
- *
- * @remarks
- * `'unsafe-inline'` is included in `script-src` and `style-src` because the
- * marketing homepage (`public/index.html`) relies on inline `<script>` blocks
- * and inline styles. Removing it would break the SPA.
- */
 export const securityHeadersMiddleware: MiddlewareHandler<{
   Bindings: Env;
   Variables: Variables;
@@ -61,45 +22,74 @@ export const securityHeadersMiddleware: MiddlewareHandler<{
   const url = new URL(c.req.url);
   const hostname = url.hostname;
 
-  // Determine if this is a served site (not the dashboard/API)
-  const isDashboard = hostname === DOMAINS.SITES_BASE || hostname === DOMAINS.SITES_STAGING || hostname === DOMAINS.LEGACY_SITES_BASE || hostname === 'localhost';
-  const isServedSite = !isDashboard && !url.pathname.startsWith('/api/');
+  const isDashboard = hostname === DOMAINS.SITES_BASE || hostname === 'localhost';
+  const isBoltEditor = hostname === DOMAINS.BOLT_BASE;
+  const isServedSite = !isDashboard && !isBoltEditor && !url.pathname.startsWith('/api/');
 
+  // ── Universal headers ──────────────────────────────────────
   c.header('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
   c.header('X-Content-Type-Options', 'nosniff');
   c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
-  c.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=self');
+  c.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self)');
 
+  // ── bolt.diy editor ────────────────────────────────────────
+  if (isBoltEditor) {
+    const isBoltEmbedded = url.searchParams.has('embedded');
+
+    if (isBoltEmbedded) {
+      // Embedded: allow framing from projectsites.dev, no COOP (breaks postMessage)
+      c.header(
+        'Content-Security-Policy',
+        `frame-ancestors 'self' https://${DOMAINS.SITES_BASE} https://*.${DOMAINS.SITES_BASE}`,
+      );
+    } else {
+      // Standalone: cross-origin isolation for WebContainers
+      c.header('Cross-Origin-Opener-Policy', 'same-origin');
+      c.header('Cross-Origin-Embedder-Policy', 'credentialless');
+      c.header('Origin-Agent-Cluster', '?1');
+      // No CSP — bolt.diy needs full access (WASM, eval, workers, etc.)
+    }
+    return;
+  }
+
+  // ── Served sites ({slug}.projectsites.dev) ─────────────────
   if (isServedSite) {
-    // Served sites: allow framing from anywhere (for dashboard preview cards)
-    // Do NOT set X-Frame-Options (allows embedding in dashboard iframes)
-    // Do NOT set COOP/COEP (breaks iframe embedding)
+    // User-generated sites: permissive CSP, allow framing everywhere
+    c.header('Cross-Origin-Embedder-Policy', 'credentialless');
+    c.header('Cross-Origin-Resource-Policy', 'cross-origin');
     c.header(
       'Content-Security-Policy',
       [
-        "default-src 'self' 'unsafe-inline' https: data:",
+        "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:",
+        "img-src * data: blob:",
         "frame-ancestors *",
         "object-src 'none'",
       ].join('; '),
     );
-  } else {
-    // Dashboard/API: standard security headers
-    c.header('X-Frame-Options', 'SAMEORIGIN');
-    c.header('Cross-Origin-Opener-Policy', 'same-origin');
-    c.header(
-      'Content-Security-Policy',
-      [
-        "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' https://releases.transloadit.com https://js.stripe.com https://us.i.posthog.com https://us-assets.i.posthog.com https://static.cloudflareinsights.com https://cdnjs.cloudflare.com https://www.googletagmanager.com https://www.google-analytics.com",
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://releases.transloadit.com https://cdnjs.cloudflare.com",
-        "img-src 'self' data: https: https://www.googletagmanager.com https://www.google-analytics.com",
-        "font-src 'self' https://fonts.gstatic.com",
-        "connect-src 'self' https://api.stripe.com https://us.i.posthog.com https://us-assets.i.posthog.com https://releases.transloadit.com https://www.google-analytics.com https://www.googletagmanager.com https://region1.google-analytics.com https://domainr.p.rapidapi.com",
-        "frame-src https://js.stripe.com https://www.googletagmanager.com https://*.projectsites.dev https://*.megabyte.space",
-        "frame-ancestors 'self' https://*.projectsites.dev https://*.megabyte.space",
-        "object-src 'none'",
-        "base-uri 'self'",
-      ].join('; '),
-    );
+    return;
   }
+
+  // ── Dashboard / Marketing (projectsites.dev) ───────────────
+  // Permissive CSP — the dashboard uses blob URLs for image previews,
+  // embeds bolt.diy in iframes, loads images from R2/CDN, and integrates
+  // Stripe, PostHog, Google Analytics, Transloadit, etc.
+  c.header('X-Frame-Options', 'SAMEORIGIN');
+  c.header(
+    'Content-Security-Policy',
+    [
+      "default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob:",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https: blob:",
+      "style-src 'self' 'unsafe-inline' https: blob:",
+      "img-src * data: blob:",
+      "font-src 'self' https: data:",
+      "connect-src * data: blob:",
+      "media-src * data: blob:",
+      "worker-src 'self' blob:",
+      "child-src 'self' blob: https:",
+      "frame-src *",
+      "frame-ancestors 'self' https://*.projectsites.dev",
+      "object-src 'none'",
+      "base-uri 'self'",
+    ].join('; '),
+  );
 };

@@ -1,6 +1,6 @@
 # Project Sites Worker — AI Context Guide
 
-> Cloudflare Worker powering the SaaS website delivery engine at `sites.megabyte.space`.
+> Cloudflare Worker powering the SaaS website delivery engine at `projectsites.dev`.
 > Built with Hono framework, Cloudflare D1/KV/R2/Workflows/AI.
 
 ## Quick Start
@@ -188,8 +188,8 @@ dbExecute(db, sql, params)       // Raw execute
 ```
 
 ## Site Serving Flow
-1. Base domain (`sites.megabyte.space`) → serve `marketing/index.html` from R2
-2. Subdomain (`{slug}-sites.megabyte.space`) → resolve from D1 → serve from R2
+1. Base domain (`projectsites.dev`) → serve `marketing/index.html` from R2
+2. Subdomain (`{slug}.projectsites.dev`) → resolve from D1 → serve from R2
 3. Unpaid sites → inject top bar after `<body>` tag
 4. KV cache: `host:{hostname}` → site record (60s TTL)
 

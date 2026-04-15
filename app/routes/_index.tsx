@@ -4,6 +4,7 @@ import { BaseChat } from '~/components/chat/BaseChat';
 import { Chat } from '~/components/chat/Chat.client';
 import { Header } from '~/components/header/Header';
 import BackgroundRays from '~/components/ui/BackgroundRays';
+import { isEmbedded } from '~/lib/embed/embedded-mode';
 
 export const meta: MetaFunction = () => {
   return [{ title: 'Bolt' }, { name: 'description', content: 'Talk with Bolt, an AI assistant from StackBlitz' }];
@@ -16,12 +17,15 @@ export const loader = () => json({});
  * Note: Settings functionality should ONLY be accessed through the sidebar menu.
  * Do not add settings button/panel to this landing page as it was intentionally removed
  * to keep the UI clean and consistent with the design system.
+ *
+ * In embedded mode (iframe inside projectsites.dev), the header and background
+ * are hidden to maximize editor space. Communication happens via postMessage.
  */
 export default function Index() {
   return (
-    <div className="flex flex-col h-full w-full bg-bolt-elements-background-depth-1">
-      <BackgroundRays />
-      <Header />
+    <div className="flex flex-col h-full w-full bg-bolt-elements-background-depth-1" style={isEmbedded ? { '--header-height': '0px' } as React.CSSProperties : undefined}>
+      {!isEmbedded && <BackgroundRays />}
+      {!isEmbedded && <Header />}
       <ClientOnly fallback={<BaseChat />}>{() => <Chat />}</ClientOnly>
     </div>
   );

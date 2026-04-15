@@ -181,7 +181,7 @@ export const trustSchema = z.object({
   review_platforms: confSchema(z.array(z.object({
     platform: z.string(),
     url: z.string().nullable(),
-    rating: z.string().nullable().optional(),
+    rating: z.union([z.string(), z.number().transform(String)]).nullable().optional(),
   }))).optional(),
   credentials: confSchema(z.array(z.string())).optional(),
   before_after_gallery: confSchema(z.array(z.object({

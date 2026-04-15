@@ -97,12 +97,9 @@ src/
 
 ### DOMAINS
 ```typescript
-SITES_BASE: 'sites.megabyte.space'
-SITES_STAGING: 'sites-staging.megabyte.space'
-SITES_SUFFIX: '-sites.megabyte.space'
-SITES_STAGING_SUFFIX: '-sites-staging.megabyte.space'
-BOLT_BASE: 'bolt.megabyte.space'
-BOLT_STAGING: 'bolt-staging.megabyte.space'
+SITES_BASE: 'projectsites.dev'
+SITES_SUFFIX: '.projectsites.dev'
+BOLT_BASE: 'editor.projectsites.dev'
 CLAIM_BASE: 'claimyour.site'
 ```
 

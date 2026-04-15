@@ -126,22 +126,14 @@ export const BRAND = {
   REPLY_TO_EMAIL: 'brian@megabyte.space',
 } as const;
 
-/** Domain configuration */
+/** Domain configuration — production only (projectsites.dev) */
 export const DOMAINS = {
-  /** Base domain for the marketing homepage (projectsites.dev) */
+  /** Base domain for the marketing homepage */
   SITES_BASE: 'projectsites.dev',
-  /** Base domain for staging (sites-staging.megabyte.space) */
-  SITES_STAGING: 'sites-staging.megabyte.space',
   /** Suffix for customer site subdomains: {slug}.projectsites.dev */
   SITES_SUFFIX: '.projectsites.dev',
-  /** Suffix for staging customer sites: {slug}-sites-staging.megabyte.space */
-  SITES_STAGING_SUFFIX: '-sites-staging.megabyte.space',
   /** Editor domain */
   BOLT_BASE: 'editor.projectsites.dev',
-  BOLT_STAGING: 'bolt-staging.megabyte.space',
+  /** Custom claim domain */
   CLAIM_BASE: 'claimyour.site',
-  /** Legacy base domain for backward compat during migration */
-  LEGACY_SITES_BASE: 'sites.megabyte.space',
-  /** Legacy suffix for backward compat during migration */
-  LEGACY_SITES_SUFFIX: '-sites.megabyte.space',
 } as const;

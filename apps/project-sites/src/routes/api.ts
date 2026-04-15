@@ -121,10 +121,7 @@ api.get('/api/auth/magic-link/verify', async (c) => {
     }
 
     // Default: redirect to homepage with auth params
-    const baseUrl =
-      c.env.ENVIRONMENT === 'production'
-        ? `https://${DOMAINS.SITES_BASE}`
-        : `https://${DOMAINS.SITES_STAGING}`;
+    const baseUrl = `https://${DOMAINS.SITES_BASE}`;
     posthog.trackAuth(c.env, c.executionCtx, 'magic_link', 'verified', result.email);
     return c.redirect(
       `${baseUrl}/?token=${encodeURIComponent(session.token)}&email=${encodeURIComponent(result.email)}&auth_callback=email`,
@@ -221,19 +218,14 @@ api.get('/api/auth/google/callback', async (c) => {
   });
 
   // Redirect to the original redirect_url (or homepage) with token and email
-  const baseUrl =
-    c.env.ENVIRONMENT === 'production'
-      ? `https://${DOMAINS.SITES_BASE}`
-      : `https://${DOMAINS.SITES_STAGING}`;
+  const baseUrl = `https://${DOMAINS.SITES_BASE}`;
 
   const rawRedirect = result.redirect_url ?? baseUrl;
   const redirectTarget = new URL(rawRedirect);
-  // Only allow redirects to *.projectsites.dev or *.megabyte.space to prevent open redirect attacks
+  // Only allow redirects to *.projectsites.dev to prevent open redirect attacks
   if (
     !redirectTarget.hostname.endsWith('.projectsites.dev') &&
-    redirectTarget.hostname !== 'projectsites.dev' &&
-    !redirectTarget.hostname.endsWith('.megabyte.space') &&
-    redirectTarget.hostname !== 'megabyte.space'
+    redirectTarget.hostname !== 'projectsites.dev'
   ) {
     return c.redirect(`${baseUrl}/?error=invalid_redirect`);
   }
@@ -650,9 +642,9 @@ api.post('/api/sites/:siteId/hostnames', async (c) => {
       throw forbidden('Custom domains require a paid plan');
     }
 
-    // Validate CNAME points to projectsites.dev or sites.megabyte.space (legacy)
+    // Validate CNAME points to projectsites.dev
     const cnameTarget = await domainService.checkCnameTarget(validated.hostname);
-    if (!cnameTarget || (cnameTarget !== DOMAINS.SITES_BASE && cnameTarget !== DOMAINS.LEGACY_SITES_BASE)) {
+    if (!cnameTarget || cnameTarget !== DOMAINS.SITES_BASE) {
       throw badRequest(
         `The domain "${validated.hostname}" does not have a CNAME record pointing to ${DOMAINS.SITES_BASE}. ` +
         `Please add a CNAME record for "${validated.hostname}" pointing to "${DOMAINS.SITES_BASE}" in your DNS settings, then try again.`,
@@ -715,7 +707,6 @@ api.delete('/api/sites/:id', async (c) => {
   const slug = site.slug as string;
   if (slug) {
     await c.env.CACHE_KV.delete(`host:${slug}${DOMAINS.SITES_SUFFIX}`).catch(() => {});
-    await c.env.CACHE_KV.delete(`host:${slug}${DOMAINS.LEGACY_SITES_SUFFIX}`).catch(() => {});
   }
 
   // Optionally cancel the Stripe subscription
@@ -1088,13 +1079,10 @@ api.post('/api/publish/bolt', async (c) => {
   await Promise.all(uploads);
 
   // Invalidate KV cache for this slug's hostname
-  const hostSuffix = c.env.ENVIRONMENT === 'production'
-    ? DOMAINS.SITES_SUFFIX
-    : DOMAINS.SITES_STAGING_SUFFIX;
-  const cacheKey = `host:${slug}${hostSuffix}`;
+  const cacheKey = `host:${slug}${DOMAINS.SITES_SUFFIX}`;
   await c.env.CACHE_KV.delete(cacheKey);
 
-  const siteUrl = `https://${slug}${hostSuffix}`;
+  const siteUrl = `https://${slug}${DOMAINS.SITES_SUFFIX}`;
 
   // Audit: bolt.diy project published (no auth — system-level log)
   auditService.writeAuditLog(c.env.DB, {
@@ -1217,44 +1205,134 @@ async function ensureUniqueSlug(env: Env, slug: string): Promise<string> {
  *
  * No auth required — the slug serves as an access token.
  */
+/**
+ * Retrieve the build context JSON for a given site slug.
+ * Used by bolt.diy to auto-generate websites from research data.
+ * No auth required — the slug serves as an access token.
+ */
+api.get('/api/sites/by-slug/:slug/build-context', async (c) => {
+  const slug = c.req.param('slug');
+
+  const contextObj = await c.env.SITES_BUCKET.get(`sites/${slug}/assets/_build-context.json`);
+
+  if (!contextObj) {
+    throw notFound('No build context found for this site');
+  }
+
+  const contextData = await contextObj.text();
+
+  return new Response(contextData, {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache',
+      'Access-Control-Allow-Origin': '*',
+    },
+  });
+});
+
 api.get('/api/sites/by-slug/:slug/chat', async (c) => {
   const slug = c.req.param('slug');
 
-  // Read manifest to get current version
+  // Read manifest to get current version and file list
   const manifest = await c.env.SITES_BUCKET.get(`sites/${slug}/_manifest.json`);
 
   if (!manifest) {
     throw notFound('Site not found or no version published');
   }
 
-  const manifestData = (await manifest.json()) as { current_version: string };
+  const manifestData = (await manifest.json()) as {
+    current_version: string;
+    files?: string[];
+  };
 
   if (!manifestData.current_version) {
     throw notFound('No published version found');
   }
 
-  // Read chat JSON from R2 — try _meta/ first, fallback to root
-  let chatObj = await c.env.SITES_BUCKET.get(
-    `sites/${slug}/${manifestData.current_version}/_meta/chat.json`,
+  const version = manifestData.current_version;
+  const prefix = `sites/${slug}/${version}/`;
+
+  // Determine which files to include — from manifest or R2 listing
+  let filePaths: string[] = manifestData.files ?? [];
+
+  // If manifest doesn't list files, list the R2 prefix
+  if (filePaths.length === 0) {
+    const listed = await c.env.SITES_BUCKET.list({ prefix, limit: 100 });
+    filePaths = listed.objects
+      .map((obj) => obj.key.replace(prefix, ''))
+      .filter((p) => !p.startsWith('_meta/') && p !== 'research.json');
+  } else {
+    // Filter out non-site files
+    filePaths = filePaths.filter((p) => !p.startsWith('_meta/') && p !== 'research.json');
+  }
+
+  // Read all file contents in parallel
+  const fileReads = filePaths.map(async (filePath) => {
+    const obj = await c.env.SITES_BUCKET.get(`${prefix}${filePath}`);
+    if (!obj) return null;
+    const content = await obj.text();
+    return { path: filePath, content };
+  });
+
+  const files = (await Promise.all(fileReads)).filter(
+    (f): f is { path: string; content: string } => f !== null,
   );
 
-  if (!chatObj) {
-    chatObj = await c.env.SITES_BUCKET.get(
-      `sites/${slug}/${manifestData.current_version}/chat.json`,
-    );
+  if (files.length === 0) {
+    throw notFound('No files found for this site version');
   }
 
-  if (!chatObj) {
-    throw notFound('No chat export found for this site');
+  // Look up business name from D1
+  let businessName = slug.replace(/-/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase());
+  try {
+    const site = await c.env.DB
+      .prepare('SELECT business_name FROM sites WHERE slug = ? AND deleted_at IS NULL')
+      .bind(slug)
+      .first<{ business_name: string }>();
+    if (site?.business_name) businessName = site.business_name;
+  } catch {
+    // Use slug-derived name as fallback
   }
 
-  const chatData = await chatObj.text();
+  // Build bolt.diy-compatible boltArtifact content
+  const fileActions = files.map((f) =>
+    `<boltAction type="file" filePath="${f.path}">\n${f.content}\n</boltAction>`,
+  );
 
-  return new Response(chatData, {
+  const assistantContent = [
+    `I've built a professional website for ${businessName} with ${files.length} files.\n`,
+    `<boltArtifact id="site-${slug}" title="${businessName} Website">`,
+    ...fileActions,
+    '</boltArtifact>',
+  ].join('\n');
+
+  const now = new Date().toISOString();
+
+  const chatJson = {
+    messages: [
+      {
+        id: `msg-user-${slug}`,
+        role: 'user',
+        content: `Build a professional website for ${businessName}`,
+        createdAt: now,
+      },
+      {
+        id: `msg-asst-${slug}`,
+        role: 'assistant',
+        content: assistantContent,
+        createdAt: now,
+      },
+    ],
+    description: `${businessName} Website`,
+    exportDate: now,
+  };
+
+  return new Response(JSON.stringify(chatJson), {
     status: 200,
     headers: {
       'Content-Type': 'application/json',
-      'Cache-Control': 'no-cache',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
       'Access-Control-Allow-Origin': '*',
     },
   });
@@ -1388,7 +1466,6 @@ api.patch('/api/sites/:id', async (c) => {
       // Invalidate old KV cache
       if (site.slug) {
         await c.env.CACHE_KV.delete(`host:${site.slug}${DOMAINS.SITES_SUFFIX}`).catch(() => {});
-        await c.env.CACHE_KV.delete(`host:${site.slug}${DOMAINS.LEGACY_SITES_SUFFIX}`).catch(() => {});
 
         // Audit: KV cache invalidated for old hostname
         auditService.writeAuditLog(c.env.DB, {
@@ -1824,7 +1901,6 @@ api.post('/api/sites/:id/deploy', async (c) => {
 
   // Invalidate KV cache
   await c.env.CACHE_KV.delete(`host:${slug}${DOMAINS.SITES_SUFFIX}`).catch(() => {});
-  await c.env.CACHE_KV.delete(`host:${slug}${DOMAINS.LEGACY_SITES_SUFFIX}`).catch(() => {});
 
   await auditService.writeAuditLog(c.env.DB, {
     org_id: orgId,
@@ -1850,6 +1926,117 @@ api.post('/api/sites/:id/deploy', async (c) => {
       version,
       files_uploaded: uploadedFiles.length,
       status: 'published',
+    },
+  });
+});
+
+/**
+ * Publish files + chat from bolt.diy embedded editor to a site on R2.
+ * Auth required — only the site owner can publish.
+ */
+api.post('/api/sites/:id/publish-bolt', async (c) => {
+  const siteId = c.req.param('id');
+  const orgId = c.get('orgId');
+  if (!orgId) throw unauthorized('Not authenticated');
+
+  const body = await c.req.json();
+  const { files, chat, slug: providedSlug } = body as {
+    files: { path: string; content: string }[];
+    chat?: { messages: unknown[]; description?: string; exportDate?: string };
+    slug?: string;
+  };
+
+  if (!files || !Array.isArray(files) || files.length === 0) {
+    throw badRequest('No files provided');
+  }
+
+  // Verify site belongs to org
+  const site = await dbQueryOne<{ id: string; slug: string; org_id: string }>(
+    c.env.DB,
+    'SELECT id, slug, org_id FROM sites WHERE id = ? AND deleted_at IS NULL',
+    [siteId],
+  );
+  if (!site || site.org_id !== orgId) throw notFound('Site not found');
+
+  const slug = providedSlug || site.slug;
+  const version = new Date().toISOString().replace(/[:.]/g, '-');
+
+  const mimeTypes: Record<string, string> = {
+    html: 'text/html', css: 'text/css', js: 'application/javascript',
+    mjs: 'application/javascript', json: 'application/json',
+    png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+    gif: 'image/gif', svg: 'image/svg+xml', ico: 'image/x-icon',
+    webp: 'image/webp', woff: 'font/woff', woff2: 'font/woff2',
+    ttf: 'font/ttf', xml: 'application/xml', txt: 'text/plain',
+    webmanifest: 'application/manifest+json',
+  };
+
+  // Upload all files to R2
+  const uploads: Promise<R2Object>[] = files.map((f) => {
+    const ext = f.path.split('.').pop()?.toLowerCase() ?? '';
+    const contentType = mimeTypes[ext] ?? 'application/octet-stream';
+    return c.env.SITES_BUCKET.put(
+      `sites/${slug}/${version}/${f.path}`,
+      f.content,
+      { httpMetadata: { contentType } },
+    );
+  });
+
+  // Store chat export if provided
+  if (chat && chat.messages) {
+    uploads.push(
+      c.env.SITES_BUCKET.put(
+        `sites/${slug}/${version}/_meta/chat.json`,
+        JSON.stringify(chat, null, 2),
+        { httpMetadata: { contentType: 'application/json' } },
+      ),
+    );
+  }
+
+  // Write/update manifest
+  uploads.push(
+    c.env.SITES_BUCKET.put(
+      `sites/${slug}/_manifest.json`,
+      JSON.stringify({
+        current_version: version,
+        slug,
+        updated_at: new Date().toISOString(),
+        source: 'bolt-embedded',
+      }),
+      { httpMetadata: { contentType: 'application/json' } },
+    ),
+  );
+
+  await Promise.all(uploads);
+
+  // Update site status in D1
+  await c.env.DB.prepare(
+    'UPDATE sites SET status = \'published\', current_build_version = ?, updated_at = datetime(\'now\') WHERE id = ?',
+  ).bind(version, siteId).run();
+
+  // Invalidate KV cache
+  const SITES_SUFFIX = '.projectsites.dev';
+  await c.env.CACHE_KV.delete(`host:${slug}${SITES_SUFFIX}`).catch(() => {});
+
+  await auditService.writeAuditLog(c.env.DB, {
+    org_id: orgId,
+    actor_id: c.get('userId') ?? null,
+    action: 'site.published_from_bolt_embedded',
+    target_type: 'site',
+    target_id: siteId,
+    metadata_json: JSON.stringify({
+      slug,
+      version,
+      file_count: files.length,
+      has_chat: !!(chat && chat.messages?.length),
+    }),
+  });
+
+  return c.json({
+    data: {
+      slug,
+      version,
+      url: `https://${slug}${SITES_SUFFIX}`,
     },
   });
 });
@@ -2547,6 +2734,44 @@ api.get('/api/sites/:id/files', async (c) => {
   return c.json({ data: { files, prefix: fullPrefix, version: version || null } });
 });
 
+/** Export all text files for a site as a flat map (used by bolt.diy embedded mode) */
+api.get('/api/sites/:id/files-export', async (c) => {
+  const orgId = c.get('orgId');
+  if (!orgId) throw unauthorized('Must be authenticated');
+
+  const siteId = c.req.param('id');
+  const site = await dbQueryOne<{ slug: string; current_build_version: string | null }>(
+    c.env.DB,
+    'SELECT slug, current_build_version FROM sites WHERE id = ? AND org_id = ? AND deleted_at IS NULL',
+    [siteId, orgId],
+  );
+  if (!site) throw notFound('Site not found');
+
+  const version = site.current_build_version || '';
+  const prefix = version ? `sites/${site.slug}/${version}/` : `sites/${site.slug}/`;
+
+  const listed = await c.env.SITES_BUCKET.list({ prefix, limit: 200 });
+  const textExtensions = new Set(['html', 'css', 'js', 'json', 'txt', 'md', 'xml', 'svg', 'mjs', 'ts', 'jsx', 'tsx']);
+  const files: Record<string, string> = {};
+
+  await Promise.all(
+    listed.objects
+      .filter((obj) => {
+        const ext = obj.key.split('.').pop()?.toLowerCase() ?? '';
+        return textExtensions.has(ext) && obj.size < 512_000; // skip files > 500KB
+      })
+      .map(async (obj) => {
+        const r2Obj = await c.env.SITES_BUCKET.get(obj.key);
+        if (r2Obj) {
+          const name = obj.key.replace(prefix, '');
+          files[name] = await r2Obj.text();
+        }
+      }),
+  );
+
+  return c.json({ data: { files, prefix, version: version || null } });
+});
+
 /** Read a single file from R2 */
 api.get('/api/sites/:id/files/:path{.+}', async (c) => {
   const orgId = c.get('orgId');
@@ -2627,7 +2852,6 @@ api.put('/api/sites/:id/files/:path{.+}', async (c) => {
 
   // Invalidate KV cache
   await c.env.CACHE_KV.delete(`host:${site.slug}${DOMAINS.SITES_SUFFIX}`).catch(() => {});
-  await c.env.CACHE_KV.delete(`host:${site.slug}${DOMAINS.LEGACY_SITES_SUFFIX}`).catch(() => {});
 
   // Extract just the filename from the full key for display
   const fileName = fullKey.split('/').pop() || fullKey;
@@ -2679,7 +2903,6 @@ api.delete('/api/sites/:id/files/:path{.+}', async (c) => {
 
   // Invalidate KV cache
   await c.env.CACHE_KV.delete(`host:${site.slug}${DOMAINS.SITES_SUFFIX}`).catch(() => {});
-  await c.env.CACHE_KV.delete(`host:${site.slug}${DOMAINS.LEGACY_SITES_SUFFIX}`).catch(() => {});
 
   const fileName = fullKey.split('/').pop() || fullKey;
 

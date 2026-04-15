@@ -6887,7 +6887,14 @@
         target.classList.add('active');
       }
 
-      // Start polling and build terminal when on waiting screen
+      // Redirect to Angular waiting page with masonry feed
+      if (state.screen === 'waiting' && (state.siteId || state.slug)) {
+        var waitingUrl = '/waiting?id=' + encodeURIComponent(state.siteId || '') + '&slug=' + encodeURIComponent(state.slug || '');
+        window.location.href = waitingUrl;
+        return;
+      }
+
+      // Fallback: old waiting screen if no siteId/slug
       if (state.screen === 'waiting') {
         updateWaitingScreen();
         startPolling();

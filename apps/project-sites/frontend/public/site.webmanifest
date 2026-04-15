@@ -1,0 +1,65 @@
+{
+  "name": "Project Sites - Your Website, Handled.",
+  "short_name": "Project Sites",
+  "description": "AI-powered websites for small businesses. Professional sites in minutes.",
+  "start_url": "/",
+  "id": "/",
+  "scope": "/",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "screenshots": [
+    {
+      "src": "/og-image.png",
+      "sizes": "1200x630",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Project Sites homepage"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Create New Website",
+      "short_name": "Create",
+      "description": "Start building a new AI-powered website",
+      "url": "/create",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "Manage your websites",
+      "url": "/admin",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Sign In",
+      "short_name": "Sign In",
+      "description": "Sign in to your account",
+      "url": "/signin",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "share_target": {
+    "action": "/create",
+    "method": "GET",
+    "enctype": "application/x-www-form-urlencoded",
+    "params": {
+      "text": "name",
+      "url": "website"
+    }
+  },
+  "theme_color": "#050510",
+  "background_color": "#050510",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "categories": ["business", "productivity", "utilities"],
+  "lang": "en",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "edge_side_panel": {
+    "preferred_width": 480
+  }
+}

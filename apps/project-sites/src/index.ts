@@ -39,11 +39,13 @@ import { health } from './routes/health.js';
 import { api } from './routes/api.js';
 import { search } from './routes/search.js';
 import { webhooks } from './routes/webhooks.js';
+import { assets } from './routes/assets.js';
 import { resolveSite, serveSiteFromR2 } from './services/site_serving.js';
 import { dbUpdate } from './services/db.js';
 import { registerAllPrompts } from './services/ai_workflows.js';
 import { DOMAINS } from '@project-sites/shared';
 export { SiteGenerationWorkflow } from './workflows/site-generation.js';
+export { SiteBuilderContainer } from './container.js';
 
 // Register all prompt definitions at module load
 registerAllPrompts();
@@ -61,28 +63,28 @@ app.use('*', payloadLimitMiddleware);
 // Security headers
 app.use('*', securityHeadersMiddleware);
 
-// CORS for API routes
+// Permissive CORS for *.projectsites.dev on ALL routes (sites loaded in iframes, cross-subdomain requests)
 app.use(
-  '/api/*',
+  '*',
   cors({
     origin: (origin) => {
       if (!origin) return '';
       const allowed = [
         `https://${DOMAINS.SITES_BASE}`,
-        `https://${DOMAINS.SITES_STAGING}`,
         `https://${DOMAINS.BOLT_BASE}`,
-        `https://${DOMAINS.LEGACY_SITES_BASE}`,
         'http://localhost:3000',
+        'http://localhost:4200',
+        'http://localhost:4300',
         'http://localhost:5173',
       ];
       if (allowed.includes(origin)) return origin;
       // Allow any subdomain of projectsites.dev
       if (origin.endsWith(DOMAINS.SITES_SUFFIX)) return origin;
-      // Legacy: allow old subdomains during transition
-      if (origin.endsWith(DOMAINS.LEGACY_SITES_SUFFIX)) return origin;
+      // Allow any *.projectsites.dev origin (including deeply nested subdomains)
+      if (origin.endsWith(`.${DOMAINS.SITES_BASE}`)) return origin;
       return '';
     },
-    allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
     credentials: true,
     maxAge: 86400,
@@ -99,6 +101,7 @@ app.onError(errorHandler);
 
 app.route('/', health);
 app.route('/', search);  // Must come before api so /api/sites/search wins over /api/sites/:id
+app.route('/', assets);  // Asset uploads + build-assets listing
 app.route('/', api);
 app.route('/', webhooks);
 
@@ -112,10 +115,7 @@ app.all('*', async (c) => {
   // Serve the marketing site homepage for the base domain
   if (
     hostname === DOMAINS.SITES_BASE ||
-    hostname === DOMAINS.SITES_STAGING ||
-    hostname === DOMAINS.LEGACY_SITES_BASE ||
     hostname === `www.${DOMAINS.SITES_BASE}` ||
-    hostname === `www.${DOMAINS.LEGACY_SITES_BASE}` ||
     hostname.startsWith('localhost')
   ) {
     // Try to serve from R2 first (for production)
@@ -129,11 +129,7 @@ app.all('*', async (c) => {
 
     // /contact scrolls to contact section on homepage
     if (!marketingAsset && path === '/contact') {
-      const baseUrl =
-        hostname === DOMAINS.SITES_STAGING
-          ? `https://${DOMAINS.SITES_STAGING}`
-          : `https://${DOMAINS.SITES_BASE}`;
-      return Response.redirect(`${baseUrl}/#contact-section`, 301);
+      return Response.redirect(`https://${DOMAINS.SITES_BASE}/#contact-section`, 301);
     }
 
     // SPA fallback: serve index.html for Angular client-side routes (e.g. /signin, /admin, /details, /waiting)
@@ -190,6 +186,28 @@ app.all('*', async (c) => {
       },
       200,
     );
+  }
+
+  // editor.projectsites.dev → proxy to Cloudflare Pages (bolt-diy)
+  if (hostname === DOMAINS.BOLT_BASE) {
+    const pagesUrl = `https://bolt-diy-8jf.pages.dev${path}${url.search}`;
+    const pagesRes = await fetch(pagesUrl, {
+      method: c.req.method,
+      headers: c.req.raw.headers,
+      body: ['GET', 'HEAD'].includes(c.req.method) ? undefined : c.req.raw.body,
+    });
+    const res = new Response(pagesRes.body, {
+      status: pagesRes.status,
+      headers: pagesRes.headers,
+    });
+    // Cross-origin isolation required for SharedArrayBuffer (WebContainers)
+    res.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+    res.headers.set('Cross-Origin-Embedder-Policy', 'credentialless');
+    res.headers.set('Origin-Agent-Cluster', '?1');
+    // CORS so editor can talk to projectsites.dev API
+    res.headers.set('Access-Control-Allow-Origin', `https://${DOMAINS.BOLT_BASE}`);
+    res.headers.set('Access-Control-Allow-Credentials', 'true');
+    return res;
   }
 
   // Resolve the site from hostname using D1
@@ -371,6 +389,49 @@ export default {
           error: err instanceof Error ? err.message : String(err),
         }),
       );
+    }
+
+    // Unstick stuck builds — any site in 'building' status for > 30 minutes gets marked as 'error'
+    try {
+      const { dbQuery, dbExecute } = await import('./services/db.js');
+      const stuckSites = await dbQuery<{ id: string; slug: string; business_name: string }>(
+        env.DB,
+        `SELECT id, slug, business_name FROM sites
+         WHERE status IN ('building', 'queued', 'generating', 'imaging', 'uploading')
+         AND updated_at < datetime('now', '-30 minutes')
+         AND deleted_at IS NULL`,
+        [],
+      );
+
+      if (stuckSites.data.length > 0) {
+        for (const site of stuckSites.data) {
+          await dbExecute(
+            env.DB,
+            `UPDATE sites SET status = 'error', updated_at = datetime('now') WHERE id = ?`,
+            [site.id],
+          );
+          console.warn(JSON.stringify({
+            level: 'warn',
+            service: 'cron',
+            message: 'Unstuck build',
+            siteId: site.id,
+            slug: site.slug,
+            businessName: site.business_name,
+          }));
+        }
+        console.warn(JSON.stringify({
+          level: 'info',
+          service: 'cron',
+          message: `Unstuck ${stuckSites.data.length} builds`,
+        }));
+      }
+    } catch (err) {
+      console.warn(JSON.stringify({
+        level: 'error',
+        service: 'cron',
+        message: 'Stuck build scanner failed',
+        error: err instanceof Error ? err.message : String(err),
+      }));
     }
   },
 };

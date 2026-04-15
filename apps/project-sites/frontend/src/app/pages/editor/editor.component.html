@@ -1,0 +1,49 @@
+<div class="editor-page">
+  <div class="editor-header">
+    <div class="editor-title">
+      <button class="editor-back-btn" (click)="goBack()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="15 18 9 12 15 6" />
+        </svg>
+      </button>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+      </svg>
+      @if (site()) {
+        <span>AI Editor — {{ site()!.business_name }}</span>
+      } @else {
+        <span>AI Editor</span>
+      }
+    </div>
+    <div class="editor-actions">
+      @if (boltGenerating()) {
+        <span class="editor-status">Generating...</span>
+      }
+      @if (saving()) {
+        <span class="editor-status">Saving...</span>
+      }
+      <button class="btn btn-sm btn-accent" (click)="saveAndDeploy()" [disabled]="!boltReady() || boltGenerating() || saving()">
+        Save &amp; Deploy
+      </button>
+      <button class="btn btn-sm btn-outline" (click)="openFullscreen()">
+        Open Full Editor
+      </button>
+    </div>
+  </div>
+
+  @if (!boltReady()) {
+    <div class="editor-loading">
+      <div class="spinner"></div>
+      <span>Loading AI Editor...</span>
+    </div>
+  }
+
+  @if (iframeUrl()) {
+    <iframe
+      [src]="iframeUrl()!"
+      class="editor-iframe"
+      allow="clipboard-write"
+      sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+    ></iframe>
+  }
+</div>

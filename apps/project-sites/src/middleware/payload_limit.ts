@@ -23,8 +23,18 @@ export const payloadLimitMiddleware: MiddlewareHandler<{
   if (contentLength) {
     const size = Number(contentLength);
     const url = new URL(c.req.url);
-    const isUpload = UPLOAD_PATHS.some((p) => url.pathname.startsWith(p)) &&
-      (url.pathname.endsWith('/deploy') || url.pathname === '/api/publish/bolt');
+    const hostname = url.hostname;
+
+    // Skip payload limit for bolt editor (editor.projectsites.dev) — proxied to Pages
+    if (hostname === 'editor.projectsites.dev' || hostname.endsWith('.bolt-diy-8jf.pages.dev')) {
+      await next();
+      return;
+    }
+
+    const isUpload = (UPLOAD_PATHS.some((p) => url.pathname.startsWith(p)) &&
+      (url.pathname.endsWith('/deploy') || url.pathname === '/api/publish/bolt')) ||
+      url.pathname === '/api/assets/upload' ||
+      url.pathname.endsWith('/publish-bolt');
     const maxBytes = isUpload
       ? UPLOAD_MAX_BYTES
       : DEFAULT_CAPS.MAX_REQUEST_BODY_BYTES;

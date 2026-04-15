@@ -27,7 +27,7 @@ interface SearchItem {
 @Component({
   selector: 'app-search',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule ],
   templateUrl: './search.component.html',
   styleUrl: './search.component.scss',
 })
@@ -45,6 +45,20 @@ export class SearchComponent implements OnInit, OnDestroy {
   loading = signal(false);
   dropdownOpen = signal(false);
   showLocationPrompt = signal(false);
+
+  // FAQ
+  openFaqIndex = signal<number | null>(null);
+
+  // Pricing
+  annualPricing = signal(false);
+
+  // Contact form
+  contactName = '';
+  contactEmail = '';
+  contactPhone = '';
+  contactMessage = '';
+  contactSubmitting = signal(false);
+  contactSuccess = signal(false);
 
   private searchSubject = new Subject<string>();
   private destroy$ = new Subject<void>();
@@ -77,12 +91,22 @@ export class SearchComponent implements OnInit, OnDestroy {
         const items: SearchItem[] = [];
         const seen = new Set<string>();
 
+        // Build a map of Google Places data by place_id for cross-referencing
+        const placeMap = new Map<string, BusinessResult>();
+        for (const b of res.businesses.data || []) {
+          if (b.place_id) {
+            placeMap.set(b.place_id, b);
+          }
+        }
+
         // Pre-built sites first
         for (const s of res.sites.data || []) {
           const key = s.place_id || s.business_name;
           if (!seen.has(key)) {
             seen.add(key);
-            items.push({
+            // Cross-reference with Google Places data for lat/lng and distance
+            const placeData = s.place_id ? placeMap.get(s.place_id) : undefined;
+            const item: SearchItem = {
               type: 'prebuilt',
               name: s.business_name,
               address: s.business_address,
@@ -90,7 +114,18 @@ export class SearchComponent implements OnInit, OnDestroy {
               siteId: s.id,
               slug: s.slug,
               status: s.status,
-            });
+              lat: placeData?.lat,
+              lng: placeData?.lng,
+              phone: placeData?.phone,
+              website: placeData?.website,
+              types: placeData?.types,
+            };
+            if (this.geo.hasLocation() && placeData?.lat && placeData?.lng) {
+              const miles = this.geo.distanceMiles(this.geo.lat()!, this.geo.lng()!, placeData.lat, placeData.lng);
+              item.distanceMiles = miles;
+              item.distance = this.geo.formatDistance(miles);
+            }
+            items.push(item);
           }
         }
 
@@ -162,20 +197,9 @@ export class SearchComponent implements OnInit, OnDestroy {
       return;
     }
 
-    if (item.type === 'prebuilt') {
-      if (item.status === 'published' && item.slug) {
-        window.location.href = `https://${item.slug}.projectsites.dev`;
-        return;
-      }
-      // If building, navigate to waiting
-      if (item.siteId && ['building', 'queued', 'generating'].includes(item.status || '')) {
-        this.router.navigate(['/waiting'], { queryParams: { id: item.siteId, slug: item.slug } });
-        return;
-      }
-    }
-
-    // Business or pre-built not yet published
+    // All results (business or prebuilt) navigate to /create with business data pre-loaded
     this.auth.setMode('business');
+    localStorage.removeItem('ps_create_draft');
     this.auth.setSelectedBusiness({
       name: item.name,
       address: item.address,
@@ -187,26 +211,12 @@ export class SearchComponent implements OnInit, OnDestroy {
       lng: item.lng,
     });
 
-    // Check if site already exists
-    if (item.place_id) {
-      this.api.lookupSite(item.place_id).subscribe({
-        next: (res) => {
-          if (res.data) {
-            this.router.navigate(['/waiting'], { queryParams: { id: res.data.id, slug: res.data.slug } });
-          } else {
-            this.navigateToDetailsOrSignin();
-          }
-        },
-        error: () => this.navigateToDetailsOrSignin(),
-      });
-    } else {
-      this.navigateToDetailsOrSignin();
-    }
+    this.navigateToDetailsOrSignin();
   }
 
   private navigateToDetailsOrSignin(): void {
     if (this.auth.isLoggedIn()) {
-      this.router.navigate(['/details']);
+      this.router.navigate(['/create']);
     } else {
       this.router.navigate(['/signin']);
     }
@@ -239,5 +249,52 @@ export class SearchComponent implements OnInit, OnDestroy {
 
   closeDropdown(): void {
     setTimeout(() => this.dropdownOpen.set(false), 200);
+  }
+
+  toggleFaq(index: number): void {
+    this.openFaqIndex.set(this.openFaqIndex() === index ? null : index);
+  }
+
+  togglePricing(): void {
+    this.annualPricing.set(!this.annualPricing());
+  }
+
+  startBuildFlow(): void {
+    if (this.searchInput?.nativeElement) {
+      this.searchInput.nativeElement.focus();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+
+  scrollToHow(): void {
+    document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  submitContact(): void {
+    if (!this.contactName || !this.contactEmail || !this.contactMessage) {
+      this.toast.show('Please fill in all required fields.', 'error');
+      return;
+    }
+    this.contactSubmitting.set(true);
+    this.api.submitContact({
+      name: this.contactName,
+      email: this.contactEmail,
+      phone: this.contactPhone || undefined,
+      message: this.contactMessage,
+    }).subscribe({
+      next: () => {
+        this.contactSubmitting.set(false);
+        this.contactSuccess.set(true);
+        this.contactName = '';
+        this.contactEmail = '';
+        this.contactPhone = '';
+        this.contactMessage = '';
+        this.toast.show('Message sent! We\'ll get back to you soon.', 'success');
+      },
+      error: () => {
+        this.contactSubmitting.set(false);
+        this.toast.show('Failed to send message. Please try again.', 'error');
+      },
+    });
   }
 }

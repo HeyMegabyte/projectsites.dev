@@ -34,7 +34,7 @@ import { ToastService } from '../../services/toast.service';
   `,
   styles: [`
     .toast-container {
-      position: fixed; top: 72px; right: 24px; z-index: 10001;
+      position: fixed; top: 72px; right: 24px; z-index: var(--z-toast);
       display: flex; flex-direction: column; gap: 8px;
     }
     .toast {

@@ -107,6 +107,23 @@ export class WorkbenchStore {
     return this.#filesStore.filesCount;
   }
 
+  /**
+   * Extract all non-binary file contents as a plain object.
+   * Used by the embedded-mode postMessage bridge to send files to the parent frame.
+   */
+  getTextFiles(): Record<string, string> {
+    const result: Record<string, string> = {};
+    const fileMap = this.files.get();
+
+    for (const [filePath, dirent] of Object.entries(fileMap)) {
+      if (dirent?.type === 'file' && !dirent.isBinary && dirent.content) {
+        result[filePath] = dirent.content;
+      }
+    }
+
+    return result;
+  }
+
   get showTerminal() {
     return this.#terminalStore.showTerminal;
   }

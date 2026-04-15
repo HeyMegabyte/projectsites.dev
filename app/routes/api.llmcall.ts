@@ -65,13 +65,27 @@ function validateTokenLimits(modelDetails: ModelInfo, requestedTokens: number): 
 }
 
 async function llmCallAction({ context, request }: ActionFunctionArgs) {
-  const { system, message, model, provider, streamOutput } = await request.json<{
-    system: string;
-    message: string;
-    model: string;
-    provider: ProviderInfo;
-    streamOutput?: boolean;
-  }>();
+  let system: string, message: string, model: string, provider: ProviderInfo, streamOutput: boolean | undefined;
+
+  try {
+    const body = await request.json<{
+      system: string;
+      message: string;
+      model: string;
+      provider: ProviderInfo;
+      streamOutput?: boolean;
+    }>();
+    system = body.system;
+    message = body.message;
+    model = body.model;
+    provider = body.provider;
+    streamOutput = body.streamOutput;
+  } catch (e) {
+    return new Response(JSON.stringify({ error: true, message: 'Invalid request body' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 
   const { name: providerName } = provider;
 
@@ -144,9 +158,11 @@ async function llmCallAction({ context, request }: ActionFunctionArgs) {
         );
       }
 
-      throw new Response(null, {
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      throw new Response(JSON.stringify({ error: true, message: msg }), {
         status: 500,
         statusText: 'Internal Server Error',
+        headers: { 'Content-Type': 'application/json' },
       });
     }
   } else {

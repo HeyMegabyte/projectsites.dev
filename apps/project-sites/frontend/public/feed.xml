@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Project Sites</title>
+  <subtitle>AI-powered websites for small businesses</subtitle>
+  <link href="https://projectsites.dev/feed.xml" rel="self" type="application/atom+xml"/>
+  <link href="https://projectsites.dev/" rel="alternate" type="text/html"/>
+  <id>https://projectsites.dev/</id>
+  <updated>2026-04-03T00:00:00Z</updated>
+  <author>
+    <name>Project Sites</name>
+    <uri>https://projectsites.dev</uri>
+  </author>
+  <icon>https://projectsites.dev/icon-32.png</icon>
+  <logo>https://projectsites.dev/icon-512.png</logo>
+  <rights>Copyright 2024-2026 Megabyte Labs</rights>
+  <entry>
+    <title>Project Sites Launch</title>
+    <link href="https://projectsites.dev/" rel="alternate" type="text/html"/>
+    <id>https://projectsites.dev/launch-2026</id>
+    <updated>2026-04-03T00:00:00Z</updated>
+    <summary>AI builds your business website in minutes. We handle hosting, updates, and everything else — for $50/mo.</summary>
+    <content type="html">&lt;p&gt;Project Sites uses AI to build professional websites for small businesses. Search for your business, and our AI researches your brand to generate a complete multi-page website in under 5 minutes.&lt;/p&gt;</content>
+  </entry>
+</feed>

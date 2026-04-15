@@ -92,12 +92,24 @@ export const selectStarterTemplate = async (options: { message: string; model: s
   };
   const response = await fetch('/api/llmcall', {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(requestBody),
   });
-  const respJson: { text: string } = await response.json();
-  console.log(respJson);
 
-  const { text } = respJson;
+  if (!response.ok) {
+    console.warn('Template selection LLM call failed:', response.status);
+    return { template: 'blank', title: '' };
+  }
+
+  const respJson = await response.json() as { text?: string };
+
+  const text = respJson?.text;
+
+  if (!text) {
+    console.warn('Template selection LLM returned no text');
+    return { template: 'blank', title: '' };
+  }
+
   const selectedTemplate = parseSelectedTemplate(text);
 
   if (selectedTemplate) {

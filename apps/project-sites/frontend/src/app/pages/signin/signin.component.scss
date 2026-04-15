@@ -2,7 +2,7 @@
   padding: 0 24px 60px;
   text-align: center;
   position: relative;
-  z-index: 1;
+  z-index: var(--z-content);
   min-height: calc(100vh - 60px);
   display: flex;
   flex-direction: column;
@@ -21,7 +21,7 @@
   animation: fadeInScale 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 212, 255, 0.04), 0 0 60px rgba(0, 212, 255, 0.03);
   position: relative;
-  z-index: 1;
+  z-index: var(--z-content);
   backdrop-filter: blur(20px);
 
   h2 {
@@ -154,7 +154,7 @@
   transition: opacity 0.3s;
   background: linear-gradient(180deg, transparent 0%, rgba(5, 5, 16, 0.95) 30%);
   border-top: 1px solid rgba(0, 212, 255, 0.04);
-  z-index: 10;
+  z-index: var(--z-dropdown);
   backdrop-filter: blur(12px);
 
   &:hover { opacity: 1; }
@@ -162,17 +162,25 @@
 
 .signin-footer-social {
   display: flex;
-  gap: 14px;
+  gap: 18px;
 
   a {
-    color: var(--text-muted);
-    transition: color 0.2s, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    color: #fff;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
 
+    svg { width: 16px; height: 16px; }
+
     &:hover {
-      color: var(--accent);
-      transform: scale(1.2) translateY(-2px);
+      transform: scale(1.15) translateY(-2px);
     }
+
+    &[aria-label="GitHub"]:hover { color: #fff; filter: drop-shadow(0 0 6px rgba(255,255,255,0.3)); }
+    &[aria-label="X"]:hover { color: #fff; filter: drop-shadow(0 0 6px rgba(255,255,255,0.3)); }
+    &[aria-label="LinkedIn"]:hover { color: #0A66C2; }
+    &[aria-label="YouTube"]:hover { color: #FF0000; }
+    &[aria-label="Instagram"]:hover { color: #E4405F; }
+    &[aria-label="Facebook"]:hover { color: #1877F2; }
   }
 }
 

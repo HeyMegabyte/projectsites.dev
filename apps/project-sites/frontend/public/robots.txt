@@ -1,0 +1,108 @@
+# Project Sites — robots.txt
+# https://projectsites.dev/robots.txt
+
+# Standard search engines — full access
+User-agent: Googlebot
+Allow: /
+Disallow: /admin
+Disallow: /waiting
+Disallow: /editor
+
+User-agent: Bingbot
+Allow: /
+Disallow: /admin
+Disallow: /waiting
+Disallow: /editor
+
+User-agent: Slurp
+Allow: /
+Disallow: /admin
+
+User-agent: DuckDuckBot
+Allow: /
+
+User-agent: Baiduspider
+Allow: /
+Disallow: /admin
+
+User-agent: YandexBot
+Allow: /
+Disallow: /admin
+
+# Social media crawlers — allow for link previews
+User-agent: facebookexternalhit
+Allow: /
+
+User-agent: Twitterbot
+Allow: /
+
+User-agent: LinkedInBot
+Allow: /
+
+User-agent: Slackbot
+Allow: /
+
+User-agent: Discordbot
+Allow: /
+
+User-agent: TelegramBot
+Allow: /
+
+User-agent: WhatsApp
+Allow: /
+
+# AI assistants — live browsing (allow for citation/referral)
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+# AI training crawlers — block training data collection
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+User-agent: cohere-ai
+Disallow: /
+
+User-agent: Diffbot
+Disallow: /
+
+User-agent: Applebot-Extended
+Disallow: /
+
+# Generic scrapers
+User-agent: AhrefsBot
+Crawl-delay: 10
+
+User-agent: SemrushBot
+Crawl-delay: 10
+
+User-agent: MJ12bot
+Disallow: /
+
+# Default
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /waiting
+Disallow: /editor
+Disallow: /api/
+
+# Sitemaps
+Sitemap: https://projectsites.dev/sitemap.xml
+
+# Humans
+# https://projectsites.dev/humans.txt

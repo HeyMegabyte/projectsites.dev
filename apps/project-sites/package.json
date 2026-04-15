@@ -21,6 +21,7 @@
     "check": "npm run typecheck && npm run lint && npm run format:check && npm run test:unit"
   },
   "dependencies": {
+    "@cloudflare/containers": "^0.2.2",
     "@project-sites/shared": "file:../../packages/shared",
     "hono": "^4.4.0",
     "jszip": "^3.10.1",

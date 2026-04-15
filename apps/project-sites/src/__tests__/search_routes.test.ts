@@ -133,6 +133,8 @@ describe('GET /api/search/businesses', () => {
       types: ['establishment'],
       lat: null,
       lng: null,
+      phone: null,
+      website: null,
     });
     expect(body.data[1]).toEqual({
       place_id: 'place_2',
@@ -141,6 +143,8 @@ describe('GET /api/search/businesses', () => {
       types: ['cafe', 'food'],
       lat: null,
       lng: null,
+      phone: null,
+      website: null,
     });
 
     expect(mockFetch).toHaveBeenCalledTimes(1);

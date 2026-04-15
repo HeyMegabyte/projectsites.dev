@@ -18,29 +18,31 @@ function isCloudflareEnvironment(context: any): boolean {
 async function fetchRepoContentsCloudflare(repo: string, githubToken?: string) {
   const baseUrl = 'https://api.github.com';
 
-  // Get repository info to find default branch
-  const repoResponse = await fetch(`${baseUrl}/repos/${repo}`, {
-    headers: {
-      Accept: 'application/vnd.github.v3+json',
-      'User-Agent': 'bolt.diy-app',
-      ...(githubToken ? { Authorization: `Bearer ${githubToken}` } : {}),
-    },
+  const makeHeaders = (token?: string) => ({
+    Accept: 'application/vnd.github.v3+json',
+    'User-Agent': 'bolt.diy-app',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   });
 
+  // Get repository info — retry without token if credentials are bad
+  let repoResponse = await fetch(`${baseUrl}/repos/${repo}`, { headers: makeHeaders(githubToken) });
+
+  if ((repoResponse.status === 401 || repoResponse.status === 403) && githubToken) {
+    // Token is invalid/expired/rate-limited — retry without it (works for public repos)
+    githubToken = undefined;
+    repoResponse = await fetch(`${baseUrl}/repos/${repo}`, { headers: makeHeaders() });
+  }
+
   if (!repoResponse.ok) {
-    throw new Error(`Repository not found: ${repo}`);
+    throw new Error(`Repository not found: ${repo} (${repoResponse.status})`);
   }
 
   const repoData = (await repoResponse.json()) as any;
   const defaultBranch = repoData.default_branch;
 
-  // Get the tree recursively
+  // Get the tree recursively (use potentially-cleared token)
   const treeResponse = await fetch(`${baseUrl}/repos/${repo}/git/trees/${defaultBranch}?recursive=1`, {
-    headers: {
-      Accept: 'application/vnd.github.v3+json',
-      'User-Agent': 'bolt.diy-app',
-      ...(githubToken ? { Authorization: `Bearer ${githubToken}` } : {}),
-    },
+    headers: makeHeaders(githubToken),
   });
 
   if (!treeResponse.ok) {
@@ -82,11 +84,7 @@ async function fetchRepoContentsCloudflare(repo: string, githubToken?: string) {
     const batchPromises = batch.map(async (file: any) => {
       try {
         const contentResponse = await fetch(`${baseUrl}/repos/${repo}/contents/${file.path}`, {
-          headers: {
-            Accept: 'application/vnd.github.v3+json',
-            'User-Agent': 'bolt.diy-app',
-            ...(githubToken ? { Authorization: `Bearer ${githubToken}` } : {}),
-          },
+          headers: makeHeaders(githubToken),
         });
 
         if (!contentResponse.ok) {
@@ -210,16 +208,18 @@ export async function loader({ request, context }: { request: Request; context: 
   }
 
   try {
-    // Access environment variables from Cloudflare context or process.env
+    // Try with token first, then without (public repos work without auth)
     const githubToken =
       context?.cloudflare?.env?.GITHUB_TOKEN || process.env.GITHUB_TOKEN || process.env.VITE_GITHUB_ACCESS_TOKEN;
 
     let fileList;
 
-    if (isCloudflareEnvironment(context)) {
+    try {
       fileList = await fetchRepoContentsCloudflare(repo, githubToken);
-    } else {
-      fileList = await fetchRepoContentsZip(repo, githubToken);
+    } catch (tokenErr) {
+      // Token may be invalid — retry without authentication
+      console.warn('GitHub template fetch failed with token, retrying without auth:', tokenErr);
+      fileList = await fetchRepoContentsCloudflare(repo, undefined);
     }
 
     // Filter out .git files for both methods

@@ -56,8 +56,8 @@ The monorepo also includes:
 
 This is a monorepo containing:
 
-1. **Root app** (`/app`): A Remix + Vite web app for bolt.diy (AI code editor), deployed to Cloudflare Pages at `bolt.megabyte.space`
-2. **Project Sites Worker** (`/apps/project-sites`): A Cloudflare Worker (Hono) that powers the SaaS website delivery engine at `sites.megabyte.space`
+1. **Root app** (`/app`): A Remix + Vite web app for bolt.diy (AI code editor), deployed to Cloudflare Pages at `editor.projectsites.dev`
+2. **Project Sites Worker** (`/apps/project-sites`): A Cloudflare Worker (Hono) that powers the SaaS website delivery engine at `projectsites.dev`
 3. **Shared Package** (`/packages/shared`): Zod schemas, constants, RBAC middleware, utilities shared between packages
 4. **Database Schema** (`/supabase/migrations/`): Reference Postgres schema (D1 SQLite equivalent used in production)
 
@@ -69,7 +69,7 @@ The **primary development focus** in recent sessions has been on `apps/project-s
 bolt.diy/
 ├── app/                          # Remix frontend (bolt.diy AI code editor)
 ├── apps/
-│   └── project-sites/            # Cloudflare Worker → sites.megabyte.space
+│   └── project-sites/            # Cloudflare Worker → projectsites.dev
 │       ├── src/
 │       │   ├── index.ts          # Hono app entry point
 │       │   ├── types/env.ts      # Env bindings + Variables
@@ -157,7 +157,7 @@ When using Neon with Workers, prefer **Cloudflare Hyperdrive** to stabilize conn
 
 ### Key Design Decisions
 - **No Supabase JS client** — D1 via parameterized SQL for Workers compat
-- **Dash-based subdomains**: `{slug}-sites.megabyte.space` (not nested wildcards)
+- **Dot-based subdomains**: `{slug}.projectsites.dev`
 - **R2 paths**: `sites/{slug}/{version}/{file}`, marketing at `marketing/index.html`
 - **Queues NOT yet enabled** — `QUEUE` binding is optional in Env type
 - **CSP must include `'unsafe-inline'`** — homepage uses inline `<script>` tags
@@ -489,7 +489,7 @@ Every exported symbol must include:
 
 # PART 14 — MANDATORY: Auto-Deploy After Each Session
 
-> **After completing all changes**, you MUST deploy to staging (and production if on main).
+> **After completing all changes**, you MUST deploy to production.
 > If `CLOUDFLARE_API_KEY` and `CLOUDFLARE_EMAIL` are not set as environment variables,
 > **ask the user to provide them** before deploying.
 
@@ -498,9 +498,8 @@ Every exported symbol must include:
 2. Run E2E tests (`npx playwright test`) — all must pass
 3. Run typecheck (`npm run typecheck`) — no errors
 4. Run lint (`npm run lint`) — no errors
-5. Deploy to staging: `cd apps/project-sites && npx wrangler deploy --env staging`
-6. Upload marketing homepage: `npx wrangler r2 object put project-sites-staging/marketing/index.html --file public/index.html --content-type text/html --remote`
-7. If on main branch, also deploy to production after verifying staging
+5. Deploy to production: `cd apps/project-sites && npx wrangler deploy --env production`
+6. Upload marketing homepage: `npx wrangler r2 object put project-sites-production/marketing/index.html --file public/index.html --content-type text/html --remote`
 
 ## Deployment Credentials
 - **CLOUDFLARE_API_KEY** and **CLOUDFLARE_EMAIL** must be set as env vars for `wrangler deploy`
@@ -546,27 +545,22 @@ npm run check         # All of the above
 | Resource | ID |
 |----------|-----|
 | Account | `84fa0d1b16ff8086dd958c468ce7fd59` |
-| Zone (megabyte.space) | `75a6f8d5e441cd7124552976ba894f83` |
+| Zone (projectsites.dev) | `75a6f8d5e441cd7124552976ba894f83` |
 | Pages (bolt-diy) | `76c34b4f-1bd1-410c-af32-74fd8ee3b23f` |
-| D1 dev | `f5b59818-c785-4807-8aca-282c9037c58c` |
-| D1 staging | `7bdf6256-7b5d-417f-9b29-c7466ec78508` |
 | D1 production | `ea3e839a-c641-4861-ae30-dfc63bff8032` |
 
 ## Deployment Environments
 | Environment | Worker | URL |
 |------------|--------|-----|
-| Production | `project-sites` | `sites.megabyte.space` |
-| Staging | `project-sites-staging` | `sites-staging.megabyte.space` |
-| Pages (prod) | bolt-diy | `bolt.megabyte.space` |
-| Pages (staging) | bolt-diy | `bolt-staging.megabyte.space` |
+| Production | `project-sites` | `projectsites.dev` |
+| Pages (prod) | bolt-diy | `editor.projectsites.dev` |
 
 ```bash
 # Deploy worker (uses CLOUDFLARE_API_KEY + CLOUDFLARE_EMAIL env vars)
-cd apps/project-sites && npx wrangler deploy --env staging
 cd apps/project-sites && npx wrangler deploy --env production
 
 # Upload marketing homepage to R2
-npx wrangler r2 object put project-sites-staging/marketing/index.html --file public/index.html --content-type text/html --remote
+npx wrangler r2 object put project-sites-production/marketing/index.html --file public/index.html --content-type text/html --remote
 ```
 
 ---
@@ -599,17 +593,16 @@ npx wrangler r2 object put project-sites-staging/marketing/index.html --file pub
 - **Fallback**: SendGrid (`SENDGRID_API_KEY` secret)
 - Both are optional in `Env` interface and config schema
 - If neither is configured, magic link emails will fail with "Email delivery is not configured"
-- From address: `noreply@megabyte.space` — domain must be verified in provider
+- From address: `noreply@projectsites.dev` — domain must be verified in provider
 
 ## After Deploying, Verify Secrets Are Set
 ```bash
 # List secrets (requires CLOUDFLARE_API_KEY + CLOUDFLARE_EMAIL)
-npx wrangler secret list --env staging
 npx wrangler secret list --env production
 
 # Set a secret if missing
-npx wrangler secret put SENDGRID_API_KEY --env staging
-npx wrangler secret put RESEND_API_KEY --env staging
+npx wrangler secret put SENDGRID_API_KEY --env production
+npx wrangler secret put RESEND_API_KEY --env production
 ```
 
 ## Phone Feature Was Removed

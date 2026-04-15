@@ -1,0 +1,16 @@
+/* TEAM */
+Creator: Brian Zalewski
+Contact: hello@megabyte.space
+Twitter: @HeyMegabyte
+GitHub: HeyMegabyte
+From: United States
+
+/* AI */
+Built with: Claude, GPT-4o, Llama 3.1
+Platform: Cloudflare Workers, D1, R2, KV
+
+/* SITE */
+Last update: 2026-04-03
+Standards: HTML5, CSS3, ES2022
+Components: Angular 19, Hono, Tailwind CSS
+Software: Cloudflare Workers, Cloudflare Pages

@@ -54,6 +54,11 @@
               {
                 "glob": "**/*",
                 "input": "public"
+              },
+              {
+                "glob": "**/*",
+                "input": "public/.well-known",
+                "output": ".well-known"
               }
             ],
             "styles": [
@@ -71,8 +76,8 @@
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "10kB",
-                  "maximumError": "16kB"
+                  "maximumWarning": "28kB",
+                  "maximumError": "40kB"
                 }
               ],
               "outputHashing": "all",
@@ -121,6 +126,11 @@
               {
                 "glob": "**/*",
                 "input": "public"
+              },
+              {
+                "glob": "**/*",
+                "input": "public/.well-known",
+                "output": ".well-known"
               }
             ],
             "styles": [

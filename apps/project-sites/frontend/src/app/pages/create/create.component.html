@@ -1,0 +1,353 @@
+<section class="create-page">
+  <div class="create-inner">
+    <!-- Header -->
+    <div class="create-header">
+      <div class="create-icon">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" />
+        </svg>
+      </div>
+      <h1>{{ resetSiteId ? 'Reset & Rebuild' : 'Create Your Website' }}</h1>
+      <p class="create-subtitle">{{ resetSiteId ? 'Update the details below and our AI will rebuild your site from scratch.' : 'Tell us about your business and our AI will build a professional website in minutes. No coding required.' }}</p>
+    </div>
+
+    <!-- Selected business badge -->
+    @if (selectedBusiness(); as biz) {
+      <div class="selected-business-badge">
+        <div class="badge-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
+          </svg>
+        </div>
+        <div class="badge-text">
+          <div class="badge-name">{{ biz.name }}</div>
+          <div class="badge-addr">{{ biz.address }}</div>
+        </div>
+        <button class="badge-dismiss" (click)="dismissBusiness()" aria-label="Remove" data-tooltip="Remove selection">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+    }
+
+    <!-- Form -->
+    <div class="create-form">
+      <div class="form-section">
+        <div class="form-section-label">Business Information</div>
+
+        <div class="input-group business-group">
+          <label for="create-name">
+            Business Name
+            <span class="required">*</span>
+          </label>
+          <input
+            id="create-name"
+            type="text"
+            class="input-field"
+            placeholder="e.g., Vito's Mens Salon or 택배 HEYO / EXPRESS HEYO"
+            [(ngModel)]="businessName"
+            (input)="onBusinessInput()"
+            (blur)="closeBusinessDropdown()"
+            (keydown.enter)="closeBusinessDropdown(); $event.preventDefault()"
+            autocomplete="off"
+            maxlength="200"
+          />
+          @if (businessDropdownOpen() && businessSuggestions().length > 0) {
+            <div class="address-dropdown business-dropdown">
+              @for (b of businessSuggestions(); track b.place_id) {
+                <div class="address-option" (mousedown)="selectBusiness(b)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                  <div class="biz-suggestion">
+                    <span class="biz-name">{{ b.name }}</span>
+                    <span class="biz-address">{{ b.address }}</span>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </div>
+
+        <div class="input-group address-group">
+          <label for="create-address">
+            Business Address
+            <span class="required">*</span>
+          </label>
+          <input
+            id="create-address"
+            type="text"
+            class="input-field"
+            placeholder="e.g., 74 N Beverwyck Rd, Lake Hiawatha, NJ 07034"
+            [(ngModel)]="businessAddress"
+            (input)="onAddressInput()"
+            (blur)="closeAddressDropdown()"
+            (keydown.enter)="closeAddressDropdown(); $event.preventDefault()"
+            autocomplete="off"
+          />
+          @if (addressDropdownOpen() && addressSuggestions().length > 0) {
+            <div class="address-dropdown">
+              @for (s of addressSuggestions(); track s.description) {
+                <div class="address-option" (mousedown)="selectAddress(s)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
+                  {{ s.description }}
+                </div>
+              }
+            </div>
+          }
+        </div>
+
+        <div class="input-row">
+          <div class="input-group">
+            <label for="create-phone">
+              Phone
+              <span class="optional">(optional)</span>
+              @if (loadingPhone()) { <span class="field-loading"></span> }
+            </label>
+            <input
+              id="create-phone"
+              type="tel"
+              class="input-field"
+              placeholder="+1 (555) 123-4567"
+              [(ngModel)]="businessPhone"
+              (blur)="saveFormDraft()"
+              maxlength="20"
+            />
+          </div>
+          <div class="input-group">
+            <label for="create-website">
+              Existing Website
+              <span class="optional">(optional)</span>
+              @if (loadingWebsite()) { <span class="field-loading"></span> }
+            </label>
+            <input
+              id="create-website"
+              type="url"
+              class="input-field"
+              placeholder="https://example.com"
+              [(ngModel)]="businessWebsite"
+              (blur)="saveFormDraft()"
+              maxlength="500"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Auto-populate -->
+      <div class="auto-populate-section">
+        <button
+          class="btn btn-glass auto-populate-btn"
+          (click)="autoPopulate()"
+          [disabled]="autoPopulating() || !businessName.trim()"
+        >
+          @if (autoPopulating()) {
+            <span class="loading-dots"><span></span><span></span><span></span></span>
+            Searching...
+          } @else {
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+            Auto-Populate with AI
+          }
+        </button>
+        <span class="auto-populate-hint">Auto-fills phone, website, and generates design recommendations (colors, fonts, sections) based on your business type</span>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section-label">Customization</div>
+
+        <div class="input-group">
+          <label for="create-category">
+            Industry / Category
+            <span class="optional">(optional)</span>
+            @if (loadingCategory()) { <span class="field-loading"></span> }
+          </label>
+          <select
+            id="create-category"
+            class="input-field"
+            [(ngModel)]="businessCategory"
+            (ngModelChange)="saveFormDraft()"
+          >
+            <option value="">Select a category...</option>
+            @for (cat of categories; track cat) {
+              @if (cat) {
+                <option [value]="cat">{{ cat }}</option>
+              }
+            }
+          </select>
+        </div>
+
+        <div class="input-group">
+          <label for="create-context">
+            Additional details
+            <span class="optional">(optional but recommended)</span>
+            @if (loadingContext()) { <span class="field-loading"></span> }
+          </label>
+          <textarea
+            id="create-context"
+            class="input-field"
+            (blur)="saveFormDraft()"
+            placeholder="Add anything to improve your website. Examples:&#10;&#10;• Brand colors: #1a1a2e primary, #e94560 accent&#10;• Fonts: Montserrat headings, Inter body&#10;• Google Analytics: G-XXXXXXXXXX&#10;• Include a Calendly booking widget&#10;• Target audience: Men 25-45 who value premium grooming&#10;• Open Mon-Sat 9am-7pm, closed Sundays&#10;• Design style: modern minimalist with dark theme&#10;• Sections: Hero, Services with pricing, Team, Gallery, Reviews, Contact&#10;• Social links: Instagram, Facebook, TikTok&#10;• Any specific content, slogans, or taglines you want"
+            [(ngModel)]="additionalContext"
+            maxlength="5000"
+            rows="8"
+          ></textarea>
+          <span class="char-count">{{ additionalContext.length }} / 5000</span>
+        </div>
+      </div>
+
+      <!-- File Uploads -->
+      <div class="form-section">
+        <div class="form-section-label">Brand Assets <span class="optional">(optional)</span></div>
+
+        <div class="upload-row">
+          <div class="upload-group">
+            <label for="create-logo" class="upload-label">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+              <span>Logo</span>
+              <span class="upload-hint">PNG, JPG, SVG — max 5 MB</span>
+            </label>
+            <input
+              id="create-logo"
+              type="file"
+              accept="image/*"
+              class="upload-input"
+              (change)="onLogoSelected($event)"
+            />
+            @if (logoPreview || aiLogoUrl) {
+              <div class="upload-preview img-clickable" (click)="openImageModal(logoPreview || aiLogoUrl!, 'Logo')">
+                <img [src]="logoPreview || aiLogoUrl" alt="Logo preview" (error)="onAiLogoError()" />
+                <button class="upload-remove" (click)="removeLogo(); $event.stopPropagation()">✕</button>
+                @if (aiLogoUrl && !logoPreview) {
+                  <span class="ai-badge">AI</span>
+                }
+              </div>
+            }
+          </div>
+
+          <div class="upload-group">
+            <label for="create-favicon" class="upload-label">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/></svg>
+              <span>App Icon / Favicon</span>
+              <span class="upload-hint">512×512 PNG — max 2 MB</span>
+            </label>
+            <input
+              id="create-favicon"
+              type="file"
+              accept="image/png"
+              class="upload-input"
+              (change)="onFaviconSelected($event)"
+            />
+            @if (faviconPreview || aiFaviconUrl) {
+              <div class="upload-preview img-clickable" (click)="openImageModal(faviconPreview || aiFaviconUrl!, 'App Icon')">
+                <img [src]="faviconPreview || aiFaviconUrl" alt="Favicon preview" (error)="onAiFaviconError()" />
+                <button class="upload-remove" (click)="removeFavicon(); $event.stopPropagation()">✕</button>
+                @if (aiFaviconUrl && !faviconPreview) {
+                  <span class="ai-badge">AI</span>
+                }
+              </div>
+            }
+          </div>
+        </div>
+
+        <div class="upload-group upload-group-wide">
+          <label for="create-images" class="upload-label">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <span>Additional images &amp; files</span>
+            <span class="upload-hint">Team photos, product images, etc. — max 10 MB each, up to 20 files</span>
+          </label>
+          <input
+            id="create-images"
+            type="file"
+            accept="image/*"
+            multiple
+            class="upload-input"
+            (change)="onImagesSelected($event)"
+          />
+          @if (imagePreviews.length > 0 || aiImageUrls.length > 0) {
+            <div class="upload-preview-grid">
+              @for (preview of imagePreviews; track preview.name) {
+                <div class="upload-preview-item img-clickable" (click)="openImageModal(preview.url, preview.name)">
+                  <img [src]="preview.url" [alt]="preview.name" />
+                  <span class="upload-preview-name">{{ preview.name }}</span>
+                  <button class="upload-remove" (click)="removeImage(preview.name); $event.stopPropagation()">✕</button>
+                </div>
+              }
+              @for (aiImg of aiImageUrls; track aiImg.url) {
+                <div class="upload-preview-item ai-preview-item img-clickable" [title]="aiImg.name" (click)="openImageModal(aiImg.url, aiImg.name)">
+                  <img [src]="aiImg.url" [alt]="aiImg.name" (error)="removeAiImage(aiImg.url)" (load)="onAiImageLoad($event, aiImg.url)" />
+                  <span class="ai-badge">AI</span>
+                  <button class="upload-remove" (click)="removeAiImage(aiImg.url); $event.stopPropagation()">✕</button>
+                </div>
+              }
+            </div>
+          }
+        </div>
+
+        @if (discoveringImages()) {
+          <p class="upload-note discovering"><span class="loading-dots"><span></span><span></span><span></span></span> Discovering images from the web...</p>
+        } @else {
+          <p class="upload-note">If you don't upload a logo or icon, our AI will generate them based on your brand details.</p>
+        }
+      </div>
+
+      <!-- Submit -->
+      <button
+        class="btn btn-accent btn-large btn-full create-submit"
+        [disabled]="submitting()"
+        (click)="submitBuild()"
+      >
+        @if (submitting()) {
+          <span class="loading-dots"><span></span><span></span><span></span></span>
+          {{ resetSiteId ? 'Rebuilding...' : 'Building your site...' }}
+        } @else {
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          {{ resetSiteId ? 'Reset & Rebuild' : 'Build My Website' }}
+        }
+      </button>
+
+      <p class="create-hint">
+        @if (auth.isLoggedIn()) {
+          Your site will be ready in about 5 minutes. You can watch the progress in real time.
+        } @else {
+          You'll be asked to sign in before we start building. It only takes a few seconds.
+        }
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- Image Preview + AI Edit Modal -->
+@if (modalImage()) {
+  <div class="img-modal-overlay" (click)="closeImageModal()">
+    <div class="img-modal" (click)="$event.stopPropagation()">
+      <button class="img-modal-close" (click)="closeImageModal()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+      <div class="img-modal-title">{{ modalImageName() }}</div>
+      <div class="img-modal-preview">
+        <img [src]="modalImage()" [alt]="modalImageName()" />
+      </div>
+      <div class="img-modal-ai">
+        @if (modalAiProcessing()) {
+          <div class="img-modal-processing">
+            <span class="loading-dots"><span></span><span></span><span></span></span>
+            Processing with AI...
+          </div>
+        } @else {
+          <div class="img-modal-prompt-row">
+            <input
+              type="text"
+              class="input-field img-modal-input"
+              placeholder="Describe how to change this image with AI..."
+              [(ngModel)]="modalAiPrompt"
+              (keydown.enter)="submitImageAiEdit()"
+            />
+            <button class="btn btn-accent img-modal-submit" (click)="submitImageAiEdit()" [disabled]="!modalAiPrompt.trim()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26z"/></svg>
+              Edit
+            </button>
+          </div>
+          <span class="img-modal-hint">AI will modify this image based on your prompt</span>
+        }
+      </div>
+    </div>
+  </div>
+}

@@ -1,0 +1,62 @@
+{
+  "masterPicture": "public/hash-logo.png",
+  "iconsPath": "/",
+  "design": {
+    "ios": {
+      "pictureAspect": "backgroundAndMargin",
+      "backgroundColor": "#050510",
+      "margin": "14%",
+      "assets": {
+        "ios6AndPriorIcons": false,
+        "ios7AndLaterIcons": true,
+        "precomposedIcons": false,
+        "declareOnlyDefaultIcon": true
+      }
+    },
+    "desktopBrowser": {
+      "design": "raw"
+    },
+    "windows": {
+      "pictureAspect": "noChange",
+      "backgroundColor": "#050510",
+      "onConflict": "override",
+      "assets": {
+        "windows80Ie10Tile": false,
+        "windows10Ie11EdgeTiles": {
+          "small": false,
+          "medium": true,
+          "big": false,
+          "rectangle": false
+        }
+      }
+    },
+    "androidChrome": {
+      "pictureAspect": "noChange",
+      "themeColor": "#050510",
+      "manifest": {
+        "name": "Project Sites",
+        "shortName": "ProjectSites",
+        "display": "standalone",
+        "orientation": "notSet",
+        "onConflict": "override",
+        "declared": true
+      },
+      "assets": {
+        "legacyIcon": false,
+        "lowResolutionIcons": false
+      }
+    },
+    "safariPinnedTab": {
+      "pictureAspect": "silhouette",
+      "themeColor": "#00d4ff"
+    }
+  },
+  "settings": {
+    "scalingAlgorithm": "Mitchell",
+    "errorOnImageTooSmall": false,
+    "readmeFile": false,
+    "htmlCodeFile": false,
+    "usePathAsIs": false
+  },
+  "markupFile": "faviconData.json"
+}

@@ -235,7 +235,7 @@ export const ResearchSocialOutput = z.object({
   review_platforms: z.array(z.object({
     platform: z.string(),
     url: z.string().nullable(),
-    rating: z.string().nullable(),
+    rating: z.union([z.string(), z.number().transform(String)]).nullable(),
     review_count: z.number().nullable().optional().default(null),
   }).passthrough()).optional().default([]),
   google_business_photos: z.array(z.object({
@@ -260,7 +260,7 @@ export type ResearchBrandInput = z.infer<typeof ResearchBrandInput>;
 export const ResearchBrandOutput = z.object({
   logo: z.object({
     found_online: z.boolean().optional().default(false),
-    search_query: z.string().optional().default(''),
+    search_query: z.string().nullable().optional().default(''),
     fallback_design: z.object({
       text: z.string().optional().default(''),
       font: z.string().optional().default('Inter'),
@@ -454,6 +454,66 @@ export const ScoreWebsiteOutput = z.object({
 });
 export type ScoreWebsiteOutput = z.infer<typeof ScoreWebsiteOutput>;
 
+// ── Site Structure Plan (Pass 1 — headless pipeline) ─────────
+
+export const SiteStructurePlanInput = z.object({
+  research_json: z.string().min(1, 'research_json is required'),
+  template_json: z.string().min(1, 'template_json is required'),
+  business_name: z.string().min(1, 'business_name is required'),
+  additional_context: z.string().optional().default(''),
+});
+export type SiteStructurePlanInput = z.infer<typeof SiteStructurePlanInput>;
+
+export const SiteStructurePlanOutput = z.object({
+  pages: z.array(z.object({
+    path: z.string(),
+    title: z.string(),
+    purpose: z.string(),
+    sections: z.array(z.string()),
+  })).min(1),
+  design: z.object({
+    primary_color: z.string().optional().default('#2563eb'),
+    secondary_color: z.string().optional().default('#7c3aed'),
+    accent_color: z.string().optional().default('#64ffda'),
+    font_heading: z.string().optional().default('Inter'),
+    font_body: z.string().optional().default('Inter'),
+    style_notes: z.string().optional().default(''),
+  }).optional().default({}),
+  nav_links: z.array(z.object({
+    label: z.string(),
+    href: z.string(),
+  })).optional().default([]),
+  seo: z.object({
+    site_title: z.string().optional().default(''),
+    default_description: z.string().optional().default(''),
+  }).optional().default({}),
+});
+export type SiteStructurePlanOutput = z.infer<typeof SiteStructurePlanOutput>;
+
+// ── Multi-Page Site Output (Pass 2 — headless pipeline) ──────
+
+export const MultiPageSiteInput = z.object({
+  structure_plan_json: z.string().min(1, 'structure_plan_json is required'),
+  research_json: z.string().min(1, 'research_json is required'),
+  business_name: z.string().min(1, 'business_name is required'),
+  asset_urls_json: z.string().optional().default(''),
+  additional_context: z.string().optional().default(''),
+});
+export type MultiPageSiteInput = z.infer<typeof MultiPageSiteInput>;
+
+export const MultiPageSiteOutput = z.object({
+  files: z.array(z.object({
+    path: z.string(),
+    content: z.string(),
+    content_type: z.string().optional().default('text/html'),
+  })).min(1),
+  metadata: z.object({
+    model_used: z.string().optional().default('unknown'),
+    quality_self_score: z.number().min(0).max(100).optional().default(75),
+  }).optional().default({}),
+});
+export type MultiPageSiteOutput = z.infer<typeof MultiPageSiteOutput>;
+
 // ── Schema Registry ───────────────────────────────────────────
 
 /** Map of schema name → { input, output } Zod schemas */
@@ -472,6 +532,9 @@ export const PROMPT_SCHEMAS: Record<string, { input: z.ZodType; output?: z.ZodTy
   generate_website: { input: GenerateWebsiteInput, output: GenerateWebsiteOutput },
   generate_legal_pages: { input: GenerateLegalPageInput, output: GenerateLegalPageOutput },
   score_website: { input: ScoreWebsiteInput, output: ScoreWebsiteOutput },
+  // Headless pipeline prompts
+  plan_site_structure: { input: SiteStructurePlanInput, output: SiteStructurePlanOutput },
+  generate_multipage_site: { input: MultiPageSiteInput, output: MultiPageSiteOutput },
 };
 
 /**

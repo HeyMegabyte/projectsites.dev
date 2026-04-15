@@ -200,22 +200,56 @@ async function sendViaSendGrid(
  * @returns Complete HTML document string.
  */
 function buildMagicLinkEmail(verifyUrl: string): string {
-  return `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:transparent;color:#e2e8f0;padding:40px 20px;">
-  <div style="max-width:480px;margin:0 auto;background:#161635;border-radius:12px;padding:40px;border:1px solid rgba(80,165,219,0.1);">
-    <div style="text-align:center;margin-bottom:24px;">
-      <img src="https://projectsites.dev/logo-header.png" alt="Project Sites" style="max-height:44px;max-width:260px;height:auto;" />
-    </div>
-    <h1 style="color:#50a5db;font-size:24px;margin:0 0 16px;">Sign in to Project Sites</h1>
-    <p style="color:#94a3b8;line-height:1.6;margin:0 0 24px;">Click the button below to sign in. This link expires in ${AUTH.MAGIC_LINK_EXPIRY_HOURS} hour(s).</p>
-    <a href="${verifyUrl}" style="display:inline-block;background:linear-gradient(135deg,#50a5db,#7c3aed);color:#ffffff;font-weight:700;padding:14px 32px;border-radius:8px;text-decoration:none;font-size:16px;">Sign In</a>
-    <p style="color:#64748b;font-size:13px;margin:24px 0 0;">If you did not request this link, you can safely ignore this email.</p>
+  const logoImg = 'https://public.megabyte.space/project-sites-logo.png';
+  const year = new Date().getFullYear();
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><meta name="supported-color-schemes" content="dark"><meta name="x-apple-disable-message-reformatting"><title>Sign In</title></head>
+<body style="margin:0;padding:0;background:transparent;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#f0f4f8;-webkit-text-size-adjust:100%;line-height:1.6;">
+<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">Sign in to Project Sites — your link expires in ${AUTH.MAGIC_LINK_EXPIRY_HOURS} hour(s).${'&nbsp;'.repeat(60)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:transparent;">
+<tr><td align="center" style="padding:32px 16px;">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="background:linear-gradient(160deg,#080820 0%,#0d0d2a 50%,#0a0a22 100%);border:1px solid rgba(0,212,255,0.08);border-radius:20px;max-width:600px;width:100%;box-shadow:0 16px 48px rgba(0,0,0,0.5);">
+<!-- Logo -->
+<tr><td style="padding:32px 32px 0;text-align:center;">
+  <a href="https://${DOMAINS.SITES_BASE}" style="text-decoration:none;">
+    <img src="${logoImg}" alt="Project Sites" width="220" height="54" style="border:0;display:inline-block;max-width:220px;height:auto;" />
+  </a>
+</td></tr>
+<!-- Divider -->
+<tr><td style="padding:20px 32px 0;"><div style="height:1px;background:linear-gradient(90deg,transparent,rgba(0,212,255,0.2),rgba(124,58,237,0.15),transparent);"></div></td></tr>
+<!-- Icon -->
+<tr><td style="padding:28px 32px 0;text-align:center;">
+  <div style="display:inline-block;width:56px;height:56px;background:linear-gradient(135deg,#00d4ff,#7c3aed);border-radius:16px;line-height:56px;text-align:center;">
+    <span style="font-size:28px;color:#fff;">&#9889;</span>
   </div>
-</body>
-</html>`.trim();
+</td></tr>
+<!-- Content -->
+<tr><td style="padding:20px 32px;">
+  <h1 style="color:#f0f4f8;font-size:22px;font-weight:800;text-align:center;margin:0 0 12px;letter-spacing:-0.3px;">Sign in to Project Sites</h1>
+  <p style="color:#94a3b8;font-size:15px;text-align:center;line-height:1.7;margin:0 0 28px;">Click the button below to securely sign in. This link expires in <strong style="color:#e2e8f0;">${AUTH.MAGIC_LINK_EXPIRY_HOURS} hour(s)</strong>.</p>
+  <div style="text-align:center;margin-bottom:28px;">
+    <a href="${verifyUrl}" style="display:inline-block;padding:14px 40px;background:linear-gradient(135deg,#00d4ff 0%,#0ea5e9 50%,#7c3aed 100%);color:#fff;font-size:16px;font-weight:700;text-decoration:none;border-radius:12px;box-shadow:0 4px 16px rgba(0,212,255,0.3);letter-spacing:0.3px;">Sign In Securely</a>
+  </div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:rgba(0,0,0,0.15);border-radius:12px;border:1px solid rgba(0,212,255,0.05);">
+    <tr><td style="padding:14px 18px;">
+      <p style="color:#64748b;font-size:12px;line-height:1.6;margin:0;">
+        <strong style="color:#94a3b8;">Can't click the button?</strong> Copy and paste this URL into your browser:<br/>
+        <a href="${verifyUrl}" style="color:#00d4ff;font-size:11px;word-break:break-all;text-decoration:none;">${verifyUrl}</a>
+      </p>
+    </td></tr>
+  </table>
+  <p style="color:#475569;font-size:12px;text-align:center;margin:20px 0 0;line-height:1.5;">If you didn't request this link, you can safely ignore this email. Your account is secure.</p>
+</td></tr>
+<!-- Footer -->
+<tr><td style="padding:0 32px 28px;">
+  <div style="padding-top:20px;border-top:1px solid rgba(0,212,255,0.06);text-align:center;">
+    <span style="font-size:11px;color:rgba(148,163,184,0.3);">&copy; ${year} </span>
+    <a href="https://megabyte.space" style="font-size:11px;color:rgba(148,163,184,0.4);text-decoration:none;">Megabyte Labs</a>
+    <span style="font-size:11px;color:rgba(148,163,184,0.3);"> &middot; </span>
+    <a href="https://${DOMAINS.SITES_BASE}" style="font-size:11px;color:#00d4ff;text-decoration:none;font-weight:600;">projectsites.dev</a>
+  </div>
+</td></tr>
+</table>
+</td></tr></table></body></html>`;
 }
 
 /**
@@ -262,9 +296,7 @@ export async function createMagicLink(
 
   // Build verify URL and send email
   const baseUrl =
-    env.ENVIRONMENT === 'production'
-      ? `https://${DOMAINS.SITES_BASE}`
-      : `https://${DOMAINS.SITES_STAGING}`;
+    `https://${DOMAINS.SITES_BASE}`;
   const verifyUrl = `${baseUrl}/api/auth/magic-link/verify?token=${encodeURIComponent(token)}`;
 
   await sendEmail(env, {
@@ -363,9 +395,7 @@ export async function createGoogleOAuthState(
   });
 
   const callbackBase =
-    env.ENVIRONMENT === 'production'
-      ? `https://${DOMAINS.SITES_BASE}`
-      : `https://${DOMAINS.SITES_STAGING}`;
+    `https://${DOMAINS.SITES_BASE}`;
 
   const params = new URLSearchParams({
     client_id: env.GOOGLE_CLIENT_ID,
@@ -431,9 +461,7 @@ export async function handleGoogleOAuthCallback(
 
   // Exchange code for tokens
   const callbackBase =
-    env.ENVIRONMENT === 'production'
-      ? `https://${DOMAINS.SITES_BASE}`
-      : `https://${DOMAINS.SITES_STAGING}`;
+    `https://${DOMAINS.SITES_BASE}`;
 
   const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',

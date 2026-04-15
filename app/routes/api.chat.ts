@@ -12,7 +12,8 @@ import { WORK_DIR } from '~/utils/constants';
 import { createSummary } from '~/lib/.server/llm/create-summary';
 import { extractPropertiesFromMessage } from '~/lib/.server/llm/utils';
 import type { DesignScheme } from '~/types/design-scheme';
-import { MCPService } from '~/lib/services/mcpService';
+// MCPService uses Node.js stdio transport — dynamic import to avoid crash on Cloudflare Pages
+type MCPServiceType = import('~/lib/services/mcpService').MCPService;
 import { StreamRecoveryManager } from '~/lib/.server/llm/stream-recovery';
 
 export async function action(args: ActionFunctionArgs) {
@@ -84,7 +85,14 @@ async function chatAction({ context, request }: ActionFunctionArgs) {
   let progressCounter: number = 1;
 
   try {
-    const mcpService = MCPService.getInstance();
+    let mcpService: MCPServiceType | null = null;
+
+    try {
+      const { MCPService } = await import('~/lib/services/mcpService');
+      mcpService = MCPService.getInstance();
+    } catch {
+      // MCP not available on Cloudflare Pages — continue without it
+    }
     const totalMessageContent = messages.reduce((acc, message) => acc + message.content, '');
     logger.debug(`Total message length: ${totalMessageContent.split(' ').length}, words`);
 
@@ -99,7 +107,7 @@ async function chatAction({ context, request }: ActionFunctionArgs) {
         let summary: string | undefined = undefined;
         let messageSliceId = 0;
 
-        const processedMessages = await mcpService.processToolInvocations(messages, dataStream);
+        const processedMessages = mcpService ? await mcpService.processToolInvocations(messages, dataStream) : messages;
 
         if (processedMessages.length > 3) {
           messageSliceId = processedMessages.length - 3;
@@ -210,14 +218,13 @@ async function chatAction({ context, request }: ActionFunctionArgs) {
         const options: StreamingOptions = {
           supabaseConnection: supabase,
           toolChoice: 'auto',
-          tools: mcpService.toolsWithoutExecute,
-          maxSteps: maxLLMSteps,
-          onStepFinish: ({ toolCalls }) => {
-            // add tool call annotations for frontend processing
+          tools: mcpService?.toolsWithoutExecute,
+          maxSteps: mcpService ? maxLLMSteps : undefined,
+          onStepFinish: mcpService ? ({ toolCalls }) => {
             toolCalls.forEach((toolCall) => {
-              mcpService.processToolCall(toolCall, dataStream);
+              mcpService!.processToolCall(toolCall, dataStream);
             });
-          },
+          } : undefined,
           onFinish: async ({ text: content, finishReason, usage }) => {
             logger.debug('usage', JSON.stringify(usage));
 

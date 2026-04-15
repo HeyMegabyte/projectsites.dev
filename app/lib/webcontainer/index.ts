@@ -1,6 +1,7 @@
 import { WebContainer } from '@webcontainer/api';
 import { WORK_DIR_NAME } from '~/utils/constants';
 import { cleanStackTrace } from '~/utils/stacktrace';
+import { isEmbedded } from '~/lib/embed/embedded-mode';
 
 interface WebContainerContext {
   loaded: boolean;
@@ -19,6 +20,12 @@ export let webcontainer: Promise<WebContainer> = new Promise(() => {
 });
 
 if (!import.meta.env.SSR) {
+  if (isEmbedded) {
+    // In embedded mode (iframe), WebContainers cannot boot because
+    // crossOriginIsolated is false. The code editor still works —
+    // only live preview and terminal are unavailable.
+    console.warn('[webcontainer] Skipping boot — embedded mode (no SharedArrayBuffer in cross-origin iframe)');
+  } else {
   webcontainer =
     import.meta.hot?.data.webcontainer ??
     Promise.resolve()
@@ -59,7 +66,8 @@ if (!import.meta.env.SSR) {
         return webcontainer;
       });
 
-  if (import.meta.hot) {
-    import.meta.hot.data.webcontainer = webcontainer;
+    if (import.meta.hot) {
+      import.meta.hot.data.webcontainer = webcontainer;
+    }
   }
 }

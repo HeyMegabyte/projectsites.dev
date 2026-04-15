@@ -28,6 +28,7 @@ import type { ElementInfo } from '~/components/workbench/Inspector';
 import type { TextUIPart, FileUIPart, Attachment } from '@ai-sdk/ui-utils';
 import { useMCPStore } from '~/lib/stores/mcp';
 import type { LlmErrorAlertType } from '~/types/actions';
+import { isEmbedded, onParentMessage, postToParent, type ParentToChildMessage } from '~/lib/embed/embedded-mode';
 
 const logger = createScopedLogger('Chat');
 
@@ -173,10 +174,210 @@ export const ChatImpl = memo(
         }
 
         logger.debug('Finished streaming');
+
+        // Notify parent frame when generation completes (embedded mode)
+        if (isEmbedded) {
+          postToParent({
+            type: 'PS_GENERATION_STATUS',
+            status: 'complete',
+            correlationId: '',
+          });
+        }
+
+        // Auto-deploy to Project Sites if autoSubmit was used (from waiting page redirect)
+        const urlParams = new URLSearchParams(window.location.search);
+
+        if (urlParams.get('autoSubmit') === 'true' && urlParams.get('slug')) {
+          const slug = urlParams.get('slug')!;
+          const siteId = urlParams.get('siteId') || '';
+          console.warn('[auto-deploy] Generation complete — deploying to Project Sites:', slug);
+
+          // Give a moment for files to finalize, then deploy
+          setTimeout(async () => {
+            try {
+              toast.info('Deploying to Project Sites...');
+              const files = workbenchStore.getTextFiles();
+              const fileList = Object.entries(files).map(([path, content]) => ({
+                path: path.replace(/^\/home\/project\//, ''),
+                content,
+              }));
+
+              if (fileList.length === 0) {
+                toast.error('No files to deploy');
+                return;
+              }
+
+              const chatExport = {
+                messages: messages.map((m) => ({ id: m.id, role: m.role, content: m.content })),
+                description: description.get() || slug,
+                exportDate: new Date().toISOString(),
+              };
+
+              // Use publish-bolt API if we have a siteId
+              const publishUrl = siteId
+                ? `https://projectsites.dev/api/sites/${siteId}/publish-bolt`
+                : 'https://projectsites.dev/api/publish/bolt';
+
+              const res = await fetch(publishUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ files: fileList, chat: chatExport, slug }),
+              });
+
+              if (res.ok) {
+                toast.success(`Deployed ${fileList.length} files to ${slug}.projectsites.dev!`);
+
+                // Redirect to the live site after a moment
+                setTimeout(() => {
+                  window.location.href = `https://${slug}.projectsites.dev`;
+                }, 3000);
+              } else {
+                const err = await res.text();
+                toast.error('Deploy failed: ' + err.substring(0, 100));
+              }
+            } catch (err) {
+              console.warn('[auto-deploy] Failed:', err);
+              toast.error('Auto-deploy failed');
+            }
+          }, 2000);
+        }
       },
       initialMessages,
       initialInput: Cookies.get(PROMPT_COOKIE_KEY) || '',
     });
+
+    // ── Embedded mode: postMessage bridge ──
+    useEffect(() => {
+      if (!isEmbedded) {
+        return;
+      }
+
+      const unsub = onParentMessage((msg: ParentToChildMessage) => {
+        if (msg.type === 'PS_SUBMIT_PROMPT') {
+          // Auto-submit prompt from parent frame
+          postToParent({
+            type: 'PS_GENERATION_STATUS',
+            status: 'generating',
+            correlationId: msg.correlationId,
+          });
+          runAnimation();
+          append({
+            role: 'user',
+            content: `[Model: ${model}]\n\n[Provider: ${provider.name}]\n\n${msg.prompt}`,
+          });
+        } else if (msg.type === 'PS_IMPORT_FILES') {
+          // Import files from parent into the workbench editor
+          const fileEntries = Object.entries(msg.files);
+
+          if (fileEntries.length > 0) {
+            // Create a synthetic assistant message with boltArtifact to load files
+            const fileActions = fileEntries
+              .map(
+                ([filePath, content]) =>
+                  `<boltAction type="file" filePath="${filePath}">${content}</boltAction>`,
+              )
+              .join('\n');
+
+            const artifactMsg = `<boltArtifact id="imported-site" title="Imported Site Files">\n${fileActions}\n</boltArtifact>`;
+
+            setMessages([
+              ...messages,
+              {
+                id: `import-${Date.now()}`,
+                role: 'assistant' as const,
+                content: artifactMsg,
+              },
+            ]);
+            toast.success(`Imported ${fileEntries.length} files from Project Sites`);
+          }
+        } else if (msg.type === 'PS_REQUEST_FILES') {
+          // Send current files back to parent, optionally including chat export
+          const textFiles = workbenchStore.getTextFiles();
+          const response: {
+            type: 'PS_FILES_READY';
+            files: Record<string, string>;
+            chat?: { messages: unknown[]; description?: string; exportDate: string };
+            correlationId: string;
+          } = {
+            type: 'PS_FILES_READY',
+            files: textFiles,
+            correlationId: msg.correlationId,
+          };
+
+          if (msg.includeChat) {
+            response.chat = {
+              messages: messages.map((m) => ({
+                id: m.id,
+                role: m.role,
+                content: m.content,
+                createdAt: m.createdAt,
+              })),
+              description: description.get() || 'bolt.diy session',
+              exportDate: new Date().toISOString(),
+            };
+          }
+
+          postToParent(response);
+        } else if (msg.type === 'PS_LOAD_BUILD_CONTEXT') {
+          // Fetch build context JSON and auto-generate website
+          fetch(msg.contextUrl)
+            .then((res) => res.json())
+            .then((ctx: any) => {
+              // Display the context as a "Project Brief" user message
+              const briefLines = [
+                `# Project Brief: ${ctx.business?.name || 'Website'}`,
+                '',
+                ctx.business?.address ? `**Address:** ${ctx.business.address}` : '',
+                ctx.business?.phone ? `**Phone:** ${ctx.business.phone}` : '',
+                ctx.business?.category ? `**Industry:** ${ctx.business.category}` : '',
+                '',
+                '## Available Assets',
+                ...(ctx.assets || []).map((a: any) => `- ${a.name} (${a.confidence || '?'}% confidence) — ${a.url}`),
+                '',
+                '## Design Instructions',
+                ctx.instructions || 'Build a modern, gorgeous website using the provided assets.',
+              ].filter(Boolean).join('\n');
+
+              // Set the brief as a user message, then auto-submit generation prompt
+              setMessages([
+                ...messages,
+                { id: `brief-${Date.now()}`, role: 'user' as const, content: briefLines },
+              ]);
+
+              // After a small delay, submit the generation prompt
+              setTimeout(() => {
+                postToParent({ type: 'PS_GENERATION_STATUS', status: 'generating', correlationId: msg.correlationId });
+                runAnimation();
+                const assetList = (ctx.assets || [])
+                  .filter((a: any) => a.url)
+                  .map((a: any) => `${a.name}: ${a.url}`)
+                  .join('\n');
+                append({
+                  role: 'user',
+                  content: [
+                    `[Model: ${model}]\n\n[Provider: ${provider.name}]\n\n`,
+                    `Build a complete, gorgeous, animated portfolio website for "${ctx.business?.name || 'the business'}" using the assets and details in the project brief above.`,
+                    '',
+                    'Use these asset URLs directly in <img> tags:',
+                    assetList,
+                    '',
+                    ctx.instructions || '',
+                    '',
+                    'Create index.html, privacy.html, and terms.html. Use modern CSS animations, responsive design, and the exact brand colors from the research.',
+                  ].join('\n'),
+                });
+              }, 500);
+            })
+            .catch((err) => {
+              console.warn('[embed] Failed to load build context:', err);
+              toast.error('Failed to load project context');
+            });
+        }
+      });
+
+      return unsub;
+    }, [model, provider, append, messages, setMessages]);
+
     useEffect(() => {
       const prompt = searchParams.get('prompt');
 
@@ -224,6 +425,66 @@ export const ChatImpl = memo(
           });
       }
     }, [searchParams]);
+
+    // Handle buildContext URL parameter (used by waiting page to auto-generate from research)
+    const buildContextTriggeredRef = useRef(false);
+    useEffect(() => {
+      const contextUrl = searchParams.get('buildContext');
+
+      if (contextUrl && !buildContextTriggeredRef.current) {
+        buildContextTriggeredRef.current = true;
+        setSearchParams({});
+
+        toast.info('Loading project context...');
+
+        fetch(contextUrl)
+          .then((res) => {
+            if (!res.ok) throw new Error(`Failed to fetch build context: ${res.status}`);
+            return res.json();
+          })
+          .then((ctx: any) => {
+            const briefLines = [
+              `# Project Brief: ${ctx.business?.name || 'Website'}`,
+              '',
+              ctx.business?.address ? `**Address:** ${ctx.business.address}` : '',
+              ctx.business?.phone ? `**Phone:** ${ctx.business.phone}` : '',
+              ctx.business?.category ? `**Industry:** ${ctx.business.category}` : '',
+              '',
+              '## Design Instructions',
+              ctx.instructions || 'Build a modern, gorgeous website.',
+              '',
+              '## Available Assets',
+              ...(ctx.assets || []).map((a: any) => `- ${a.name} — ${a.url}`),
+            ].filter(Boolean).join('\n');
+
+            // Show brief as context, then auto-submit generation prompt
+            const assetList = (ctx.assets || [])
+              .filter((a: any) => a.url)
+              .map((a: any) => `${a.name}: ${a.url}`)
+              .join('\n');
+
+            runAnimation();
+            if (isEmbedded) {
+              postToParent({ type: 'PS_GENERATION_STATUS', status: 'generating', correlationId: 'auto' });
+            }
+            append({
+              role: 'user',
+              content: [
+                `[Model: ${model}]\n\n[Provider: ${provider.name}]\n\n`,
+                `Build a beautiful, gorgeous, easy-to-use concise website using the project details below.\n`,
+                briefLines,
+                assetList ? `\nAsset URLs to use in <img> tags:\n${assetList}` : '',
+              ].join('\n'),
+            });
+
+            toast.success('Building website from project brief...');
+          })
+          .catch((err: Error) => {
+            console.warn('[buildContext] Failed to load:', err);
+            toast.error('Failed to load project context');
+          });
+      }
+    }, [searchParams, model, provider]);
 
     const { enhancingPrompt, promptEnhanced, enhancePrompt, resetEnhancer } = usePromptEnhancer();
     const { parsedMessages, parseMessages } = useMessageParser();

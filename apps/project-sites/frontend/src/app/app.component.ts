@@ -5,6 +5,7 @@ import { ToastComponent } from './components/toast/toast.component';
 import { BgOrbsComponent } from './components/bg-orbs/bg-orbs.component';
 import { AuthService } from './services/auth.service';
 import { ApiService } from './services/api.service';
+import { MetaService } from './services/meta.service';
 
 @Component({
   selector: 'app-root',
@@ -21,7 +22,7 @@ import { ApiService } from './services/api.service';
   styles: [`
     .app {
       min-height: 100vh;
-      padding-top: 60px;
+      padding-top: 64px;
       position: relative;
     }
   `],
@@ -29,12 +30,76 @@ import { ApiService } from './services/api.service';
 export class AppComponent implements OnInit {
   private auth = inject(AuthService);
   private api = inject(ApiService);
+  private meta = inject(MetaService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
 
   ngOnInit(): void {
+    this.meta.init();
     this.handleAuthCallback();
     this.restoreSession();
+    this.initCursorFollower();
+  }
+
+  private initCursorFollower(): void {
+    if (typeof window === 'undefined' || !window.matchMedia('(hover: hover)').matches) return;
+
+    const follower = document.createElement('div');
+    follower.className = 'cursor-follower';
+    document.body.appendChild(follower);
+
+    let mouseX = 0;
+    let mouseY = 0;
+    let followerX = 0;
+    let followerY = 0;
+
+    document.addEventListener('mousemove', (e) => {
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+      if (!follower.classList.contains('visible')) {
+        follower.classList.add('visible');
+      }
+    });
+
+    document.addEventListener('mouseleave', () => {
+      follower.classList.remove('visible');
+    });
+
+    // Hover detection for interactive elements
+    document.addEventListener('mouseover', (e) => {
+      const target = e.target as HTMLElement;
+      if (target.closest('a, button, input, textarea, select, [data-tooltip], .search-result, .address-option')) {
+        follower.classList.add('hover');
+      }
+    });
+    document.addEventListener('mouseout', (e) => {
+      const target = e.target as HTMLElement;
+      if (target.closest('a, button, input, textarea, select, [data-tooltip], .search-result, .address-option')) {
+        follower.classList.remove('hover');
+      }
+    });
+
+    // Click ripple
+    document.addEventListener('click', (e) => {
+      const ripple = document.createElement('div');
+      ripple.className = 'click-ripple';
+      ripple.style.left = e.clientX + 'px';
+      ripple.style.top = e.clientY + 'px';
+      ripple.style.width = '80px';
+      ripple.style.height = '80px';
+      document.body.appendChild(ripple);
+      ripple.addEventListener('animationend', () => ripple.remove());
+    });
+
+    // Smooth follow with lerp
+    const animate = () => {
+      followerX += (mouseX - followerX) * 0.15;
+      followerY += (mouseY - followerY) * 0.15;
+      follower.style.left = followerX + 'px';
+      follower.style.top = followerY + 'px';
+      requestAnimationFrame(animate);
+    };
+    requestAnimationFrame(animate);
   }
 
   private handleAuthCallback(): void {
@@ -55,7 +120,7 @@ export class AppComponent implements OnInit {
       // Restore business and navigate
       const business = this.auth.getSelectedBusiness();
       if (business) {
-        this.router.navigate(['/details']);
+        this.router.navigate(['/create']);
       } else {
         this.router.navigate(['/admin']);
       }

@@ -1,60 +1,53 @@
 <section class="screen-waiting">
   <div class="waiting-card">
-    <div class="waiting-header">
-      <div class="terminal-dots">
-        <span class="dot red"></span>
-        <span class="dot yellow"></span>
-        <span class="dot green"></span>
+    @if (status() === 'published') {
+      <!-- Success state -->
+      <div class="waiting-success-icon">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+          <polyline points="22 4 12 14.01 9 11.01"/>
+        </svg>
       </div>
-      <span class="terminal-title">Building your website...</span>
-    </div>
+      <h2 class="waiting-title waiting-title-success">Your site is live!</h2>
+      <p class="waiting-subtitle">{{ slug }}.projectsites.dev</p>
 
-    <div class="terminal-body">
-      @for (step of steps(); track step.label; let i = $index) {
-        <div class="terminal-line" [class]="'step-' + step.status">
-          <span class="step-indicator">
-            @switch (step.status) {
-              @case ('done') {
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2">
-                  <path d="M20 6 9 17l-5-5" />
-                </svg>
-              }
-              @case ('active') {
-                <span class="spinner-small"></span>
-              }
-              @case ('error') {
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2">
-                  <path d="M18 6 6 18M6 6l12 12" />
-                </svg>
-              }
-              @default {
-                <span class="step-dot"></span>
-              }
-            }
-          </span>
-          <span class="step-label">{{ step.label }}</span>
+      <div class="waiting-success-actions">
+        <button class="btn btn-accent btn-large" (click)="viewSite()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          View Your Site
+        </button>
+        <button class="btn btn-glass" (click)="editWithAI()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"/></svg>
+          Edit with AI
+        </button>
+      </div>
+
+      <div class="waiting-actions">
+        <button class="btn btn-secondary-outline" (click)="goAdmin()">Go to Dashboard</button>
+      </div>
+    } @else {
+      <!-- Building state -->
+      <div class="waiting-spinner">
+        <div class="spinner"></div>
+      </div>
+      <h2 class="waiting-title">Preparing your project...</h2>
+      <p class="waiting-subtitle">{{ statusMessage() }}</p>
+      <p class="waiting-step">{{ stepProgress() }}</p>
+
+      <div class="waiting-progress-bar">
+        <div class="waiting-progress-fill" [style.width.%]="(currentStep() / totalSteps) * 100"></div>
+      </div>
+
+      @if (status() === 'error') {
+        <div class="waiting-error">
+          <p>Something went wrong. Please try again.</p>
+          <button class="btn btn-secondary-outline" (click)="goHome()">Try Again</button>
         </div>
       }
-    </div>
 
-    @if (status() === 'published') {
-      <div class="waiting-success">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2">
-          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><path d="M22 4 12 14.01l-3-3" />
-        </svg>
-        <p>Your site is live! Redirecting...</p>
+      <div class="waiting-actions">
+        <button class="btn btn-secondary-outline" (click)="goAdmin()">Go to Dashboard</button>
       </div>
     }
-
-    @if (status() === 'error') {
-      <div class="waiting-error">
-        <p>Something went wrong during the build.</p>
-        <button class="btn btn-secondary-outline" (click)="goHome()">Try Again</button>
-      </div>
-    }
-
-    <div class="waiting-actions">
-      <button class="btn btn-secondary-outline" (click)="goAdmin()">Go to Dashboard</button>
-    </div>
   </div>
 </section>

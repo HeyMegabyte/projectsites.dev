@@ -60,6 +60,9 @@ export interface Env {
   /** Cloudflare Workflow binding for AI site generation. */
   SITE_WORKFLOW: Workflow;
 
+  /** Claude Code build container (Durable Object) */
+  SITE_BUILDER?: DurableObjectNamespace;
+
   // ── Workers AI ────────────────────────────────────────────
   /** Cloudflare Workers AI binding for LLM inference. */
   AI: Ai;
@@ -82,13 +85,39 @@ export interface Env {
   /** Stripe webhook endpoint signing secret for signature verification. */
   STRIPE_WEBHOOK_SECRET: string;
 
+  // ── Domain & Conversion ────────────────────────────────────
+  /** WhoisXML API key for domain availability checking. */
+  WHOISXML_API_KEY?: string;
+  /** GoDaddy API key for domain registration. */
+  GODADDY_API_KEY?: string;
+  /** GoDaddy API secret for domain registration. */
+  GODADDY_API_SECRET?: string;
+
   // ── LLM Fallbacks (optional) ──────────────────────────────
-  /** OpenAI API key for fallback LLM calls. */
+  /** OpenAI API key for research pipeline and fallback LLM calls. */
   OPENAI_API_KEY?: string;
+  /** Anthropic API key for Claude models in headless generation pipeline. */
+  ANTHROPIC_API_KEY?: string;
+  /** Model ID for the research/prompt-formulation pipeline (default: o3-mini). */
+  RESEARCH_MODEL?: string;
   /** OpenRouter API key for model routing. */
   OPEN_ROUTER_API_KEY?: string;
   /** Groq API key for fast inference fallback. */
   GROQ_API_KEY?: string;
+
+  // ── Headless Pipeline Config ────────────────────────────────
+  /** A/B model split ratio (0-1). 0.5 = 50% OpenAI, 50% Anthropic. Default: 0.5. */
+  AB_MODEL_SPLIT?: string;
+  /** Template cache TTL in seconds. Default: 604800 (7 days). */
+  TEMPLATE_CACHE_TTL?: string;
+
+  // ── Image Generation & Discovery ──────────────────────────
+  /** Google Custom Search API key for image discovery. */
+  GOOGLE_CSE_KEY?: string;
+  /** Google Custom Search Engine ID for image discovery. */
+  GOOGLE_CSE_CX?: string;
+  /** Maximum number of AI-generated images per site (default: 5). */
+  MAX_GENERATED_IMAGES?: string;
 
   // ── Cloudflare API ────────────────────────────────────────
   /** Cloudflare API token for Custom Hostnames (Cloudflare for SaaS). */

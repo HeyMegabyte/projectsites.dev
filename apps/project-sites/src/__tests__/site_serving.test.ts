@@ -5,7 +5,7 @@ describe('generateTopBar', () => {
   it('generates valid HTML with CTA', () => {
     const html = generateTopBar('my-biz');
     expect(html).toContain('ps-topbar');
-    expect(html).toContain('Get Started');
+    expect(html).toContain('Upgrade');
     expect(html).toContain('$50/month');
   });
 
@@ -14,15 +14,15 @@ describe('generateTopBar', () => {
     expect(html).toContain('upgrade=joe-pizza');
   });
 
-  it('includes close button', () => {
+  it('does not include a close button (bar is non-dismissible)', () => {
     const html = generateTopBar('test');
-    expect(html).toContain('&times;');
-    expect(html).toContain("display='none'");
+    expect(html).not.toContain('&times;');
+    expect(html).toContain('Change URL to');
   });
 
   it('sets body padding', () => {
     const html = generateTopBar('test');
-    expect(html).toContain('padding-top:52px');
+    expect(html).toContain('padding-top:44px');
   });
 
   it('links to the main domain', () => {

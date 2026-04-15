@@ -175,6 +175,101 @@ export class ApiService {
   submitContact(body: { name: string; email: string; phone?: string; message: string }): Observable<void> {
     return this.post('/contact', body);
   }
+
+  /** List files for a site. API returns { data: { files, prefix, version } } */
+  listFiles(siteId: string): Observable<{ data: { files: SiteFile[]; prefix: string; version: string | null } }> {
+    return this.get(`/sites/${siteId}/files`);
+  }
+
+  /** Get file content */
+  getFileContent(siteId: string, key: string): Observable<{ data: { content: string } }> {
+    return this.get(`/sites/${siteId}/files/${encodeURIComponent(key)}`);
+  }
+
+  /** Save file content */
+  saveFile(siteId: string, key: string, content: string): Observable<void> {
+    return this.put(`/sites/${siteId}/files/${encodeURIComponent(key)}`, { content });
+  }
+
+  /** Delete a file */
+  deleteFile(siteId: string, key: string): Observable<void> {
+    return this.delete(`/sites/${siteId}/files/${encodeURIComponent(key)}`);
+  }
+
+  /** Export all text files as a flat map (for bolt.diy import) */
+  exportFiles(siteId: string): Observable<{ data: { files: Record<string, string>; prefix: string; version: string | null } }> {
+    return this.get(`/sites/${siteId}/files-export`);
+  }
+
+  /** Generate an expert prompt using OpenAI research pipeline */
+  generatePrompt(body: { site_id?: string; business_name: string; business_address?: string; google_place_id?: string; additional_context?: string }): Observable<{ data: { prompt: string; research: Record<string, unknown> } }> {
+    return this.post('/sites/generate-prompt', body);
+  }
+
+  /** Deploy ZIP to site */
+  deploySite(siteId: string, formData: FormData): Observable<{ data: { message: string } }> {
+    return this.postFormData(`/sites/${siteId}/deploy`, formData);
+  }
+
+  /** Get workflow status */
+  getWorkflow(siteId: string): Observable<{ data: WorkflowStatus }> {
+    return this.get(`/sites/${siteId}/workflow`);
+  }
+
+  /** Delete site with options */
+  deleteSiteWithOptions(id: string, cancelSubscription: boolean): Observable<void> {
+    return this.http.request<void>('DELETE', `/api/sites/${id}`, {
+      headers: this.headers(),
+      body: { cancel_subscription: cancelSubscription },
+    });
+  }
+
+  /** Get entitlements */
+  getEntitlements(): Observable<{ data: Entitlements }> {
+    return this.get('/billing/entitlements');
+  }
+
+  /** AI-powered business categorization */
+  categorize(name: string, address?: string, types?: string[]): Observable<{ data: { category: string } }> {
+    return this.post('/ai/categorize', { name, address, types });
+  }
+
+  /** AI image discovery — finds logo, favicon, and images via web search */
+  discoverImages(name: string, address?: string, website?: string): Observable<{ data: DiscoveredImages }> {
+    return this.post('/ai/discover-images', { name, address, website });
+  }
+
+  /** AI image edit — generates new image from a text prompt */
+  editImage(prompt: string, originalUrl?: string): Observable<{ data: { url: string; prompt: string } }> {
+    return this.post('/ai/edit-image', { prompt, originalUrl });
+  }
+
+  /** Upload assets (logo, favicon, images) before site creation */
+  uploadAssets(formData: FormData): Observable<{ data: { upload_id: string; assets: { key: string; name: string; size: number; type: string; url: string }[] } }> {
+    return this.postFormData('/assets/upload', formData);
+  }
+
+  /** Get build assets for a site (generated during workflow) */
+  getBuildAssets(siteId: string): Observable<{ data: { key: string; name: string; type: string; size: number; url: string }[] }> {
+    return this.get(`/sites/${siteId}/build-assets`);
+  }
+
+  /** Publish files + chat from bolt.diy to a site */
+  publishFromBolt(
+    siteId: string,
+    slug: string,
+    files: { path: string; content: string }[],
+    chat: { messages: unknown[]; description?: string; exportDate?: string },
+  ): Observable<{ data: { slug: string; version: string; url: string } }> {
+    return this.post(`/sites/${siteId}/publish-bolt`, { files, chat, slug });
+  }
+
+  /** Get chat export for a site by slug */
+  getChatExport(slug: string): Observable<{ messages: unknown[]; description?: string; exportDate?: string }> {
+    return this.http.get<{ messages: unknown[]; description?: string; exportDate?: string }>(
+      `/api/sites/by-slug/${slug}/chat`,
+    );
+  }
 }
 
 export interface BusinessResult {
@@ -232,6 +327,7 @@ export interface CreateSitePayload {
     phone?: string;
     website?: string;
     types?: string[];
+    category?: string;
   };
 }
 
@@ -269,4 +365,37 @@ export interface DomainSummary {
 export interface AddressResult {
   description: string;
   place_id?: string;
+}
+
+export interface SiteFile {
+  key: string;
+  size: number;
+  uploaded: string;
+}
+
+export interface WorkflowStatus {
+  status: string;
+  current_step?: string;
+  steps_completed?: number;
+  total_steps?: number;
+}
+
+export interface Entitlements {
+  topBarHidden: boolean;
+  maxCustomDomains: number;
+  chatEnabled: boolean;
+  analyticsEnabled: boolean;
+}
+
+export interface DiscoveredImage {
+  url: string;
+  name: string;
+  type: 'logo' | 'favicon' | 'image';
+  source: string;
+}
+
+export interface DiscoveredImages {
+  logo?: DiscoveredImage;
+  favicon?: DiscoveredImage;
+  images: DiscoveredImage[];
 }
