@@ -360,7 +360,7 @@ The generated website should have **minimum 10 unique images** from these source
 ```bash
 cd apps/project-sites
 npm install --legacy-peer-deps   # NOT pnpm (electron-builder breaks it)
-npm test                         # 527 unit tests across 25 suites
+npm test                         # 896 unit tests across 48 suites
 npm run typecheck                # tsc --noEmit
 npm run lint                     # eslint
 npx wrangler dev                 # local dev server (port 8787)
@@ -396,15 +396,27 @@ src/
 │   ├── api.ts                  # Auth, sites CRUD, billing, hostnames, audit logs
 │   └── webhooks.ts             # POST /webhooks/stripe (signature verification + idempotency)
 ├── services/
-│   ├── ai_workflows.ts         # V2 multi-phase AI pipeline + prompt registration
+│   ├── ai_workflows.ts         # Multi-phase AI pipeline + prompt registration
 │   ├── analytics.ts            # PostHog server-side event capture
 │   ├── audit.ts                # Append-only audit log writes
-│   ├── auth.ts                 # Magic link, phone OTP, Google OAuth, sessions
+│   ├── auth.ts                 # Magic link, Google OAuth, sessions
 │   ├── billing.ts              # Stripe checkout, subscriptions, entitlements
+│   ├── build_context.ts        # Build context assembly for container builds
+│   ├── build_limits.ts         # Build rate limiting + concurrency
+│   ├── chat_synthesis.ts       # Chat context synthesis for AI
+│   ├── confidence.ts           # Confidence scoring for research data
+│   ├── contact.ts              # Contact form handling
 │   ├── db.ts                   # D1 query helpers (dbQuery, dbInsert, dbUpdate, dbExecute)
 │   ├── domains.ts              # CF for SaaS custom hostname provisioning
+│   ├── external_llm.ts         # External LLM provider routing (OpenAI, Anthropic, etc.)
+│   ├── google_places.ts        # Google Places API integration
+│   ├── image_discovery.ts      # Multi-API image discovery (Unsplash, Pexels, etc.)
+│   ├── image_generation.ts     # AI image generation (DALL-E, Stability, etc.)
+│   ├── notifications.ts        # Email notifications (Resend/SendGrid)
+│   ├── openai_research.ts      # OpenAI-powered research pipeline
 │   ├── sentry.ts               # Error tracking (Toucan SDK)
 │   ├── site_serving.ts         # R2 static file serving + top bar injection for unpaid
+│   ├── template_cache.ts       # R2 template caching for container builds
 │   └── webhook.ts              # Stripe signature verification, idempotency
 ├── prompts/
 │   ├── index.ts                # Registry initialization (registerAllPrompts)
@@ -428,6 +440,7 @@ src/
 |--------|------|---------|
 | GET | `/health` | Health check (KV + R2 probe) |
 | GET | `/api/search/businesses?q=...` | Google Places proxy (max 10) |
+| GET | `/api/search/address?q=...` | Address search proxy |
 | GET | `/api/sites/search?q=...` | Pre-built site search (LIKE) |
 | GET | `/api/sites/lookup?place_id=...&slug=...` | Check if site exists |
 | GET | `/api/auth/google` | Start Google OAuth flow |
@@ -441,18 +454,39 @@ src/
 | POST | `/api/sites/create-from-search` | Create site + start AI workflow |
 | POST | `/api/auth/magic-link` | Request magic link email |
 | POST | `/api/auth/magic-link/verify` | Verify magic link (programmatic) |
-| POST | `/api/auth/phone/otp` | Request phone OTP |
-| POST | `/api/auth/phone/verify` | Verify phone OTP |
+| GET | `/api/auth/me` | Get current user session |
 | POST | `/api/sites` | Create site (manual) |
+| GET | `/api/slug/check` | Check slug availability |
 | GET | `/api/sites` | List user's sites |
 | GET | `/api/sites/:id` | Get single site |
 | GET | `/api/sites/:id/workflow` | Get workflow status |
+| GET | `/api/sites/:id/logs` | Get site audit logs |
+| POST | `/api/sites/:id/reset` | Reset site (rebuild) |
+| POST | `/api/sites/:id/deploy` | Deploy zip to site |
+| POST | `/api/sites/:id/publish-bolt` | Publish from bolt editor |
+| DELETE | `/api/sites/:id` | Delete site |
 | POST | `/api/billing/checkout` | Create Stripe checkout session |
+| POST | `/api/billing/embedded-checkout` | Create embedded checkout |
 | GET | `/api/billing/subscription` | Get subscription status |
 | GET | `/api/billing/entitlements` | Get plan entitlements |
+| POST | `/api/billing/portal` | Create Stripe billing portal |
 | GET | `/api/sites/:siteId/hostnames` | List hostnames |
 | POST | `/api/sites/:siteId/hostnames` | Provision hostname |
-| GET | `/api/audit-logs` | List audit logs |
+| PUT | `/api/sites/:siteId/hostnames/:hostnameId/primary` | Set primary hostname |
+| POST | `/api/sites/:siteId/hostnames/reset-primary` | Reset to default hostname |
+| DELETE | `/api/sites/:siteId/hostnames/:hostnameId` | Delete hostname |
+| POST | `/api/sites/:siteId/hostnames/:hostnameId/unsubscribe` | Unsubscribe hostname |
+| POST | `/api/sites/improve-prompt` | AI prompt improvement |
+| POST | `/api/sites/generate-prompt` | AI prompt generation |
+| POST | `/api/ai/categorize` | AI business categorization |
+| POST | `/api/contact-form/:slug` | Submit contact form |
+| GET | `/api/sites/by-slug/:slug/build-context` | Get build context |
+| GET | `/api/sites/by-slug/:slug/chat` | Get chat context |
+| GET | `/api/sites/by-slug/:slug/research.json` | Get research data |
+| GET | `/api/domains/search` | Search available domains |
+| POST | `/api/domains/purchase` | Purchase domain |
+| GET | `/api/admin/domains` | Admin: list all domains |
+| POST | `/api/publish/bolt` | Publish from bolt |
 
 ### Error Response Format
 ```json
@@ -481,24 +515,38 @@ Error codes: `BAD_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`
 ## AI Workflow Pipeline (site-generation.ts)
 
 ```
-Step 1 (sequential):  research-profile        → business_type needed for others
-Step 2 (parallel):    research-social          → social links
-                      research-brand           → logo, colors, fonts
-                      research-selling-points  → USPs, hero content
-                      research-images          → image strategies
-Step 3 (sequential):  generate-website         → full HTML from all research
-Step 4 (parallel):    generate-privacy-page    → privacy policy HTML
-                      generate-terms-page      → terms of service HTML
-                      score-website            → 8-dimension quality scoring
-Step 5:               upload-to-r2             → sites/{slug}/{version}/*
-Step 6:               update-site-status       → D1: status='published'
+Step 1 (sequential):  research-profile          → business_type needed for others
+Step 1b (optional):   google-places-lookup      → enrich with Places API data
+Step 2 (parallel):    research-social            → social links
+                      research-brand             → logo, colors, fonts
+                      research-selling-points    → USPs, hero content
+                      research-images            → image strategies
+Step 2.5 (sequential): move-uploaded-assets      → move user uploads to R2
+                       generate-logo             → AI logo generation
+                       generate-favicon-set      → favicon from logo
+                       generate-section-images   → AI section images
+                       discover-brand-images     → brand image discovery
+                       discover-videos           → YouTube video discovery
+                       store-build-context       → persist research to R2
+Step 2.5b (optional): scrape-website             → deep-crawl existing site
+Step 2.6 (optional):  seed-site-data             → seed per-site D1 tables
+Step 3 (sequential):  structure-plan             → site structure plan (fast LLM)
+Steps 4-6 (container build — multi-stage):
+  stage-a-foundation   → Claude Code generates full Vite+React+Tailwind+shadcn/ui project
+  upload-interim-v1    → upload to R2
+  stage-b-enhancement  → 3 sequential enhancement prompts
+  stage-c-quality      → quality/polish prompts
+  stage-d-final        → final safety + SEO prompts
+  upload-final         → upload to R2, update D1 status to 'published'
 ```
 
-Each step has automatic retry (3x) with exponential backoff.
+Each step has automatic retry (3x) with exponential backoff. Container builds use
+Cloudflare Containers (Durable Object `SITE_BUILDER`) running `node:22-slim` with
+Claude Code (`@anthropic-ai/claude-code`) installed at runtime.
 
 ## Prompt Files (prompts/*.prompt.md)
 
-13 prompt files in YAML frontmatter + Markdown format:
+15 prompt files in YAML frontmatter + Markdown format:
 
 | File | Purpose |
 |------|---------|
@@ -508,7 +556,9 @@ Each step has automatic retry (3x) with exponential backoff.
 | `research_selling_points.prompt.md` | 3 USPs + hero slogans |
 | `research_images.prompt.md` | Image needs + search strategies |
 | `generate_website.prompt.md` | Full website HTML from research data |
+| `generate_multipage_site.prompt.md` | Multi-page site generation |
 | `generate_legal_pages.prompt.md` | Privacy/terms pages |
+| `plan_site_structure.prompt.md` | Site structure planning |
 | `score_website.prompt.md` | 8-dimension quality scoring |
 | `site_copy.prompt.md` | Marketing copy (variant A) |
 | `site_copy_v3b.prompt.md` | Marketing copy (variant B) |
@@ -522,13 +572,13 @@ All tables have: `id` (UUID), `created_at`, `updated_at`, `deleted_at` (soft del
 Org-scoped tables include `org_id`.
 
 **Core**: `orgs`, `users`, `memberships`, `sites`, `hostnames`
-**Auth**: `sessions`, `magic_links`, `phone_otps`, `oauth_states`
+**Auth**: `sessions`, `magic_links`, `oauth_states` (`phone_otps` table exists but is orphaned — phone feature removed)
 **Billing**: `subscriptions`
 **Infra**: `webhook_events`, `audit_logs`, `workflow_jobs`
 **AI**: `research_data`, `confidence_attributes`
 **Analytics**: `analytics_daily`, `funnel_events`, `usage_events`
 
-Site status machine: `draft → building → published | archived`
+Site status machine: `draft → collecting → imaging → generating → published | error | archived`
 
 ## D1 Query Helpers (services/db.ts)
 ```typescript
@@ -552,20 +602,28 @@ dbExecute(db, sql, params)       // Raw execute
 - `SITES_BUCKET`: R2 bucket for static sites
 - `QUEUE`: Queue (optional, commented out — not yet enabled on account)
 - `SITE_WORKFLOW`: Cloudflare Workflow binding
+- `SITE_BUILDER`: Durable Object (Cloudflare Container) for Claude Code builds (production only)
 - `AI`: Workers AI binding
 
 ## Testing
 ```bash
-npm test                    # 527 unit tests
+npm test                    # 896 unit tests across 48 suites
 npm run test:coverage       # with coverage
 npx playwright test         # E2E tests (needs Chromium)
 ```
 
-### E2E Test Files
-- `e2e/golden-path.spec.ts` — Full user journey (10 tests)
-- `e2e/homepage.spec.ts` — Homepage sections + auth screens (28 tests)
-- `e2e/health.spec.ts` — Health, CORS, auth gates (15 tests)
-- `e2e/site-serving.spec.ts` — Serving, security, webhooks (13 tests)
+### E2E Test Files (38 spec files)
+Key specs include:
+- `e2e/golden-path.spec.ts` — Full user journey
+- `e2e/homepage.spec.ts` — Homepage sections + auth screens
+- `e2e/health.spec.ts` — Health, CORS, auth gates
+- `e2e/site-serving.spec.ts` — Serving, security, webhooks
+- `e2e/inline-editing.spec.ts` — Inline site editing
+- `e2e/ai-workflow.spec.ts` — AI generation workflow
+- `e2e/domain-management.spec.ts` — Domain provisioning
+- `e2e/admin-and-billing.spec.ts` — Admin + billing flows
+- `e2e/auth-and-signin.spec.ts` — Authentication flows
+- Plus 29 additional spec files covering UI polish, modals, search, etc.
 
 ### Test Business for E2E
 **Vito's Mens Salon** — 74 N Beverwyck Rd, Lake Hiawatha, NJ 07034

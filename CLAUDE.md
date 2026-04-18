@@ -75,11 +75,11 @@ bolt.diy/
 │       │   ├── types/env.ts      # Env bindings + Variables
 │       │   ├── middleware/       # auth, error_handler, payload_limit, request_id, security_headers
 │       │   ├── routes/           # api.ts, health.ts, search.ts, webhooks.ts
-│       │   ├── services/         # ai_workflows, analytics, audit, auth, billing, db, domains, sentry, site_serving, webhook
+│       │   ├── services/         # ai_workflows, analytics, audit, auth, billing, build_context, build_limits, chat_synthesis, confidence, contact, db, domains, external_llm, google_places, image_discovery, image_generation, notifications, openai_research, sentry, site_serving, template_cache, webhook
 │       │   ├── prompts/          # TS infra: parser, renderer, registry, schemas, observability, types
 │       │   ├── workflows/        # site-generation.ts (Cloudflare Workflow)
 │       │   ├── lib/              # posthog.ts, sentry.ts
-│       │   └── __tests__/        # 25 test suites
+│       │   └── __tests__/        # 48 test suites
 │       ├── prompts/              # .prompt.md files (YAML frontmatter + # System/# User)
 │       ├── public/               # index.html (marketing SPA), static assets
 │       ├── e2e/                  # Playwright E2E specs
@@ -340,7 +340,7 @@ For operational alerts:
 - **Absolute rule: every E2E starts from the homepage** — `goto("/")`, assert shell readiness, navigate by UI actions only
 - All E2E tests must be: deterministic (no sleeps; only locator waits), parallel-safe, using stable selectors (`data-testid` or role-based)
 - E2E tests for bolt.diy main app: `e2e/specs/` (96+ tests across 14 spec files)
-- E2E tests for project-sites: `apps/project-sites/e2e/` (27+ spec files)
+- E2E tests for project-sites: `apps/project-sites/e2e/` (38 spec files)
 - Feature inventory: `e2e/FEATURES.md` — authoritative feature list
 - Coverage mapping: `e2e/COVERAGE.yml` — every feature maps to spec files
 
@@ -366,7 +366,7 @@ cd packages/shared && npm run check
 - **Jest config MUST be `.cjs`** (not `.js` or `.ts`) because `"type": "module"`
 - Jest needs `moduleNameMapper: { '^(\\.{1,2}/.*)\\.js$': '$1' }` for TS imports
 - E2E: Use the custom fixture from `e2e/fixtures.ts` (blocks external CDN requests)
-- Test counts: worker tests (25 suites) + shared tests (6 suites) + root E2E (14 files, 96+ tests)
+- Test counts: worker tests (48 suites, 896 tests) + shared tests (6 suites) + root E2E (14 files, 96+ tests)
 
 ---
 

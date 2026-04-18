@@ -200,7 +200,7 @@ export interface Env {
   // ── Cloudflare API ────────────────────────────────────────
   /** Cloudflare API token for Custom Hostnames (Cloudflare for SaaS). */
   CF_API_TOKEN: string;
-  /** Cloudflare zone ID for `megabyte.space`. */
+  /** Cloudflare zone ID for `projectsites.dev`. */
   CF_ZONE_ID: string;
   /** Cloudflare Access Service Token client ID (bypasses bot protection for container builds). */
   CF_ACCESS_CLIENT_ID?: string;
