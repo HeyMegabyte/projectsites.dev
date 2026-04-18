@@ -225,10 +225,21 @@ Two dedicated SEO prompts run during the build:
 - Every sub-page (About, Services, Get Involved, etc.) must be its own stunning experience
 - Proper navigation between all pages
 
-**Original brand assets (ALWAYS use real assets):**
-- **Logo:** ALWAYS use the real logo from the source site. Priority: Logo.dev -> Brandfetch -> scrape from site -> extract from favicon -> AI-generate as last resort
-- **App icon:** Find real app icon, or extract icon from logo, or upscale favicon, or generate
-- **Brand colors:** Extract and use the actual brand colors from the source website
+**Brand Recreation Philosophy (CRITICAL — suped-up clone):**
+- The goal is a SUPED-UP CLONE — same brand, same content, dramatically more beautiful
+- **Logo:** IF THE BUSINESS HAS A LOGO, IT MUST BE USED. Priority: scrape from site header/footer → Logo.dev → Brandfetch → scan merchandise photos → extract from favicon → AI-generate as LAST resort
+- **Logo font:** Extract the font from the logo image using AI vision and reuse it in the design
+- **Logo graphics:** The graphic elements and colors in the logo should influence the ENTIRE site design
+- **App icon:** Find real app icon → extract from logo → upscale favicon with AI → generate
+- **Brand colors:** Extract from LOGO first, then website design, then merchandise/signage in photos
+- **Content:** Use ALL original website content. Crawl and scrape EVERY page. If pages are too small, combine with 301 redirects
+- **Images:** Use ALL original images. IF ANY PICTURE IS TOO SMALL, UPSIZE IT WITH AI
+- **Page recreation:** Recreate every URL from the original sitemap. Make each page more beautiful, compelling, multimedia-packed
+- **Every pass makes it better:** Structure prompts so each Claude Code pass escalates beauty, adding: gorgeous, accessible, concise, integrated, informative, intuitive, stunning, creative qualities
+
+**Criticism integration (MANDATORY):**
+- Any criticism for a *.projectsites.dev site must be adhered to, patched in prompts, and re-deployed
+- The prompt system evolves with every user feedback cycle — never ignore a criticism
 
 **Deep content integration:**
 - Scrape ALL pages from the source site, not just the homepage
