@@ -538,6 +538,72 @@ select.input-field {
   position: relative;
 }
 
+.quality-badge {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  padding: 2px 5px;
+  font-size: 0.55rem;
+  font-weight: 700;
+  background: rgba(100, 100, 100, 0.85);
+  color: #fff;
+  border-radius: 3px;
+  z-index: 1;
+  pointer-events: none;
+  line-height: 1;
+
+  &.quality-high {
+    background: rgba(16, 185, 129, 0.85);
+  }
+
+  &.quality-low {
+    background: rgba(239, 68, 68, 0.85);
+  }
+}
+
+.brand-assessment {
+  margin-top: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  font-size: 0.8rem;
+  background: rgba(255, 255, 255, 0.03);
+
+  &.brand-established {
+    border-color: rgba(16, 185, 129, 0.3);
+  }
+
+  &.brand-developing {
+    border-color: rgba(234, 179, 8, 0.3);
+  }
+
+  &.brand-minimal {
+    border-color: rgba(239, 68, 68, 0.2);
+  }
+
+  .brand-assessment-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    text-transform: capitalize;
+    color: var(--text-primary);
+
+    .brand-score {
+      margin-left: auto;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+  }
+
+  .brand-assessment-text {
+    margin-top: 4px;
+    color: var(--text-muted);
+    line-height: 1.4;
+  }
+}
+
 // Clickable image hover animation
 .img-clickable {
   cursor: pointer;

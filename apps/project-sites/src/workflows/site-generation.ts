@@ -195,7 +195,45 @@ async function safeValidateAndLog(
       output_preview: rawOutput.substring(0, 500),
       message: 'Failed to extract JSON from LLM output for ' + stepName + ' — raw: ' + rawOutput.substring(0, 200),
     });
-    throw new Error('JSON extraction failed for ' + stepName + ': ' + (jsonErr instanceof Error ? jsonErr.message : String(jsonErr)));
+    // Fallback: provide sensible defaults when JSON extraction fails
+    // This prevents entire workflow from crashing due to LLM returning prose
+    const defaults: Record<string, unknown> = {
+      'research-brand': {
+        logo: { found_online: false, search_query: '', fallback_design: { text: '', font: 'Inter', accent_shape: 'circle', accent_color: '#64ffda' } },
+        colors: { primary: '#2563eb', secondary: '#7c3aed', accent: '#64ffda', background: '#ffffff', surface: '#f8fafc', text_primary: '#1e293b', text_secondary: '#64748b' },
+        fonts: { heading: 'Inter', body: 'Source Sans Pro' },
+        brand_personality: 'professional, warm, approachable',
+        style_notes: 'Clean modern design with warm accents',
+      },
+      'research-selling-points': {
+        selling_points: [
+          { headline: 'Quality Service', description: 'We deliver exceptional quality in everything we do.', icon: 'star' },
+          { headline: 'Community Focused', description: 'Deeply rooted in our local community.', icon: 'heart' },
+          { headline: 'Trusted Choice', description: 'Trusted by our customers for years.', icon: 'shield-check' },
+        ],
+        hero_slogans: [{ headline: 'Welcome', subheadline: 'Serving our community with pride', cta_primary: { text: 'Contact Us', action: 'scroll_to_contact' }, cta_secondary: { text: 'Learn More', action: 'scroll_to_about' } }],
+        benefit_bullets: ['Quality service', 'Community focused', 'Trusted by locals'],
+      },
+      'structure-plan': {
+        pages: [
+          { path: '/', title: 'Home', purpose: 'Main landing page', sections: ['hero', 'features', 'about', 'services', 'testimonials', 'contact', 'faq', 'footer'] },
+          { path: '/about', title: 'About', purpose: 'About the business', sections: ['hero', 'story', 'team', 'values', 'cta'] },
+          { path: '/services', title: 'Services', purpose: 'Detailed services', sections: ['hero', 'services-grid', 'pricing', 'cta'] },
+          { path: '/contact', title: 'Contact', purpose: 'Contact information', sections: ['hero', 'form', 'map', 'hours'] },
+        ],
+        design: { primary_color: '#2563eb', secondary_color: '#7c3aed', accent_color: '#64ffda', font_heading: 'Inter', font_body: 'Source Sans Pro', style_notes: 'Clean modern design' },
+        nav_links: [{ label: 'Home', href: '/' }, { label: 'About', href: '/about' }, { label: 'Services', href: '/services' }, { label: 'Contact', href: '/contact' }],
+        seo: { site_title: 'Business Name', default_description: 'Professional services for the community' },
+      },
+    };
+    if (defaults[stepName]) {
+      await workflowLog(db, orgId, siteId, 'workflow.debug.using_defaults', {
+        step: stepName, message: 'JSON extraction failed — using sensible defaults for ' + stepName,
+      });
+      extracted = defaults[stepName];
+    } else {
+      throw new Error('JSON extraction failed for ' + stepName + ': ' + (jsonErr instanceof Error ? jsonErr.message : String(jsonErr)));
+    }
   }
 
   try {
@@ -410,28 +448,47 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
       return safeValidateAndLog(env.DB, params.orgId, params.siteId, 'research-images', 'research_images', result.output, result.model);
     });
 
-    let socialJson: string, brandJson: string, sellingPointsJson: string, imagesJson: string;
-    try {
-      [socialJson, brandJson, sellingPointsJson, imagesJson] = await Promise.all([
-        socialJsonPromise,
-        brandJsonPromise,
-        sellingPointsJsonPromise,
-        imagesJsonPromise,
-      ]);
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.failed', {
+    // Use Promise.allSettled so individual failures don't crash the entire research phase
+    const defaultBrand = JSON.stringify({
+      logo: { found_online: false, search_query: '', fallback_design: { text: '', font: 'Inter', accent_shape: 'circle', accent_color: '#64ffda' } },
+      colors: { primary: '#2563eb', secondary: '#7c3aed', accent: '#64ffda', background: '#ffffff', surface: '#f8fafc', text_primary: '#1e293b', text_secondary: '#64748b' },
+      fonts: { heading: 'Inter', body: 'Source Sans Pro' },
+      brand_personality: 'professional, warm, approachable',
+      style_notes: 'Clean modern design',
+    });
+    const defaultSelling = JSON.stringify({
+      selling_points: [
+        { headline: 'Quality Service', description: 'Exceptional quality in everything we do.', icon: 'star' },
+        { headline: 'Community Focus', description: 'Deeply rooted in our local community.', icon: 'heart' },
+        { headline: 'Trusted Choice', description: 'Trusted by customers for years.', icon: 'shield-check' },
+      ],
+      hero_slogans: [{ headline: 'Welcome', subheadline: 'Serving our community', cta_primary: { text: 'Contact Us', action: 'scroll_to_contact' }, cta_secondary: { text: 'Learn More', action: 'scroll_to_about' } }],
+      benefit_bullets: ['Quality service', 'Community focused', 'Trusted locally'],
+    });
+    const defaultSocial = JSON.stringify({ social_links: [], website_url: params.businessWebsite || '', review_platforms: [] });
+    const defaultImages = JSON.stringify({ hero_images: [], service_images: [], placeholder_strategy: 'gradient' });
+
+    const results = await Promise.allSettled([
+      socialJsonPromise,
+      brandJsonPromise,
+      sellingPointsJsonPromise,
+      imagesJsonPromise,
+    ]);
+
+    const socialJson = results[0].status === 'fulfilled' ? results[0].value : defaultSocial;
+    const brandJson = results[1].status === 'fulfilled' ? results[1].value : defaultBrand;
+    const sellingPointsJson = results[2].status === 'fulfilled' ? results[2].value : defaultSelling;
+    const imagesJson = results[3].status === 'fulfilled' ? results[3].value : defaultImages;
+
+    const failedSteps = results.filter(r => r.status === 'rejected').map((r, i) => ['social', 'brand', 'selling-points', 'images'][i]);
+    if (failedSteps.length > 0) {
+      await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.partial_failure', {
         step: 'parallel-research',
-        error: errorMsg,
-        elapsed_ms: elapsed('parallel-research'),
-        message: 'Parallel research failed: ' + errorMsg,
+        failed_streams: failedSteps,
+        errors: results.filter(r => r.status === 'rejected').map(r => (r as PromiseRejectedResult).reason?.message || String((r as PromiseRejectedResult).reason)),
+        message: 'Research partially failed (' + failedSteps.join(', ') + ') — using defaults. Build continues.',
         phase: 'data_collection',
-        business_name: params.businessName,
-        slug: params.slug,
-        recoverable: false,
       });
-      await updateSiteStatus(env.DB, params.siteId, 'error');
-      throw err;
     }
 
     const social = JSON.parse(socialJson) as SocialData;
@@ -616,6 +673,44 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
       }
     }
 
+    // Discover videos for the business (optional, non-blocking)
+    let discoveredVideos: any[] = [];
+    let videoAttribution: any[] = [];
+    if (env.YOUTUBE_API_KEY || env.PEXELS_API_KEY || env.PIXABAY_API_KEY) {
+      try {
+        const videoResult = await step.do('discover-videos', {
+          retries: { limit: 1, delay: '5 seconds', backoff: 'exponential' },
+          timeout: '1 minute',
+        }, async () => {
+          const videoSearchUrl = `https://${DOMAINS.SITES_BASE}/api/ai/discover-videos`;
+          const res = await fetch(videoSearchUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: params.businessName,
+              address: params.businessAddress,
+              business_type: profile.business_type,
+            }),
+          });
+          if (res.ok) {
+            const data = await res.json() as { data: { videos: any[]; attribution: any[] } };
+            return JSON.stringify(data.data);
+          }
+          return JSON.stringify({ videos: [], attribution: [] });
+        });
+        const parsed = JSON.parse(videoResult);
+        discoveredVideos = parsed.videos || [];
+        videoAttribution = parsed.attribution || [];
+        await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.complete', {
+          step: 'discover-videos', message: `Discovered ${discoveredVideos.length} videos`,
+        });
+      } catch (err) {
+        await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.failed', {
+          step: 'discover-videos', error: String(err), message: 'Video discovery failed (non-blocking)',
+        });
+      }
+    }
+
     // Store build context JSON for bolt.diy integration
     try {
       await step.do('store-build-context', RETRY_3, async () => {
@@ -642,49 +737,200 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
       message: `Data collection + imaging complete (${assetManifest.length} assets) — starting headless generation pipeline`,
     });
 
-    // ── Step 2.5b: Scrape existing website (if available) ─────
+    // ── Step 2.5b: Deep-crawl existing website (Firecrawl-style) ─────
+    // Crawls ALL pages (up to 20), extracts all text + images + videos,
+    // and uses AI vision to extract brand colors from the homepage screenshot.
     let scrapedContent = '';
     if (social.website_url || params.businessWebsite) {
       try {
-        const websiteUrl = social.website_url || params.businessWebsite || '';
+        const websiteUrl = params.businessWebsite || social.website_url || '';
         const siteUrl = websiteUrl.startsWith('http') ? websiteUrl : `https://${websiteUrl}`;
-        scrapedContent = await step.do('scrape-website', RETRY_3, async () => {
+        scrapedContent = await step.do('scrape-website', {
+          retries: { limit: 2, delay: '10 seconds', backoff: 'exponential' },
+          timeout: '3 minutes',
+        }, async () => {
           await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.scrape_started', {
-            url: siteUrl, message: `Scraping ${siteUrl} for content`, phase: 'research',
+            url: siteUrl, message: `Deep-crawling ${siteUrl} (all pages)`, phase: 'research',
           });
-          const res = await fetch(siteUrl, {
-            headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ProjectSites/1.0; +https://projectsites.dev)' },
-            redirect: 'follow',
-          });
-          if (!res.ok) return '';
-          const html = await res.text();
 
-          // Extract key content from HTML
-          const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-          const metaDesc = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i);
-          const h1s = [...html.matchAll(/<h1[^>]*>([\s\S]*?)<\/h1>/gi)].map(m => m[1].replace(/<[^>]+>/g, '').trim()).filter(Boolean);
-          const h2s = [...html.matchAll(/<h2[^>]*>([\s\S]*?)<\/h2>/gi)].map(m => m[1].replace(/<[^>]+>/g, '').trim()).filter(Boolean);
-          const paragraphs = [...html.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)].map(m => m[1].replace(/<[^>]+>/g, '').trim()).filter(t => t.length > 30).slice(0, 15);
-          const images = [...html.matchAll(/<img[^>]+src=["']([^"']+)["'][^>]*>/gi)].map(m => m[1]).filter(u => !u.includes('data:') && !u.includes('pixel')).slice(0, 10);
-          const navLinks = [...html.matchAll(/<nav[\s\S]*?<\/nav>/gi)].map(n => {
-            const links = [...n[0].matchAll(/<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)];
-            return links.map(l => ({ href: l[1], text: l[2].replace(/<[^>]+>/g, '').trim() }));
-          }).flat().filter(l => l.text);
-          const ogImage = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i);
+          const UA = 'Mozilla/5.0 (compatible; ProjectSites/1.0; +https://projectsites.dev)';
+          let domain = '';
+          try { domain = new URL(siteUrl).hostname; } catch { /* ignore */ }
 
+          // Helper: fetch a page and extract content
+          async function scrapePage(url: string): Promise<{
+            url: string; title: string; headings: string[]; paragraphs: string[];
+            images: string[]; links: string[];
+          } | null> {
+            try {
+              const res = await fetch(url, { headers: { 'User-Agent': UA }, redirect: 'follow' });
+              if (!res.ok) return null;
+              const ct = res.headers.get('content-type') || '';
+              if (!ct.includes('text/html')) return null;
+              const html = await res.text();
+
+              const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+              const h1s = [...html.matchAll(/<h1[^>]*>([\s\S]*?)<\/h1>/gi)].map(m => m[1].replace(/<[^>]+>/g, '').trim()).filter(Boolean);
+              const h2s = [...html.matchAll(/<h2[^>]*>([\s\S]*?)<\/h2>/gi)].map(m => m[1].replace(/<[^>]+>/g, '').trim()).filter(Boolean);
+              const h3s = [...html.matchAll(/<h3[^>]*>([\s\S]*?)<\/h3>/gi)].map(m => m[1].replace(/<[^>]+>/g, '').trim()).filter(Boolean);
+              const paragraphs = [...html.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/gi)]
+                .map(m => m[1].replace(/<[^>]+>/g, '').trim())
+                .filter(t => t.length > 20);
+              // Also grab list items for more content
+              const listItems = [...html.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)]
+                .map(m => m[1].replace(/<[^>]+>/g, '').trim())
+                .filter(t => t.length > 10 && t.length < 500);
+              const images = [...html.matchAll(/<img[^>]+src=["']([^"']+)["'][^>]*>/gi)]
+                .map(m => m[1])
+                .filter(u => !u.includes('data:') && !u.includes('pixel') && !u.includes('spacer') && !u.includes('tracking'))
+                .map(u => u.startsWith('/') ? `https://${domain}${u}` : u.startsWith('http') ? u : `https://${domain}/${u}`);
+              // Find internal links to crawl next
+              const internalLinks = [...html.matchAll(/<a[^>]+href=["']([^"'#]+)["']/gi)]
+                .map(m => m[1])
+                .filter(href => {
+                  if (href.startsWith('mailto:') || href.startsWith('tel:') || href.startsWith('javascript:')) return false;
+                  if (href.startsWith('/')) return true;
+                  try { return new URL(href).hostname === domain; } catch { return false; }
+                })
+                .map(href => href.startsWith('/') ? `https://${domain}${href}` : href);
+
+              return {
+                url,
+                title: titleMatch?.[1]?.trim() || '',
+                headings: [...h1s, ...h2s, ...h3s],
+                paragraphs: [...paragraphs, ...listItems],
+                images: [...new Set(images)],
+                links: [...new Set(internalLinks)],
+              };
+            } catch { return null; }
+          }
+
+          // Crawl homepage first
+          const homepage = await scrapePage(siteUrl);
+          if (!homepage) return '';
+
+          // Crawl internal pages (up to 20 total)
+          const visited = new Set<string>([siteUrl, siteUrl + '/']);
+          const pages = [homepage];
+          const queue = homepage.links.filter(l => !visited.has(l)).slice(0, 25);
+
+          for (const link of queue) {
+            if (visited.size >= 20) break;
+            const normalized = link.replace(/\/$/, '');
+            if (visited.has(normalized) || visited.has(normalized + '/')) continue;
+            visited.add(normalized);
+            visited.add(normalized + '/');
+            const page = await scrapePage(link);
+            if (page) pages.push(page);
+          }
+
+          // Collect all unique images across the site
+          const allImages = [...new Set(pages.flatMap(p => p.images))];
+
+          // Build comprehensive scraped content
           const scraped = {
-            title: titleMatch?.[1] || '',
-            description: metaDesc?.[1] || '',
-            headings: [...h1s.slice(0, 3), ...h2s.slice(0, 8)],
-            paragraphs,
-            images,
-            navLinks: navLinks.slice(0, 10),
-            ogImage: ogImage?.[1] || '',
+            site_url: siteUrl,
+            pages_crawled: pages.length,
+            homepage: {
+              title: homepage.title,
+              headings: homepage.headings,
+              paragraphs: homepage.paragraphs,
+            },
+            all_pages: pages.map(p => ({
+              url: p.url,
+              title: p.title,
+              headings: p.headings,
+              content: p.paragraphs.join('\n'),
+            })),
+            all_images: allImages.slice(0, 50), // Up to 50 images across the site
+            all_text: pages.flatMap(p => p.paragraphs).join('\n\n'),
+            ogImage: homepage.paragraphs.length > 0 ? '' : '', // Will be set from meta
           };
 
+          // Extract og:image from homepage
+          try {
+            const homepageRes = await fetch(siteUrl, { headers: { 'User-Agent': UA }, redirect: 'follow' });
+            if (homepageRes.ok) {
+              const html = await homepageRes.text();
+              const ogMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i);
+              if (ogMatch) scraped.ogImage = ogMatch[1];
+            }
+          } catch { /* ignore */ }
+
+          // ── Extract brand colors via AI vision ──
+          // Strategy: Use a screenshot API to capture the homepage as an image,
+          // then send that image to GPT-4o vision for color extraction.
+          // Fallback: Use Cloudflare Browser Rendering or a free screenshot service.
+          if (env.OPENAI_API_KEY && domain) {
+            try {
+              // Use a free screenshot service to capture the homepage
+              // microlink.io provides free screenshot API (no key needed)
+              const screenshotUrl = `https://api.microlink.io/?url=${encodeURIComponent(siteUrl)}&screenshot=true&meta=false&embed=screenshot.url`;
+              const ssRes = await fetch(screenshotUrl, { headers: { 'User-Agent': 'ProjectSites/1.0' } });
+              let imageUrl = '';
+              if (ssRes.ok) {
+                const ssData = await ssRes.json() as { data?: { screenshot?: { url?: string } } };
+                imageUrl = ssData.data?.screenshot?.url || '';
+              }
+
+              // Fallback: use Google's PageSpeed API thumbnail (if PAGESPEED_API_KEY available)
+              if (!imageUrl && env.PAGESPEED_API_KEY) {
+                const psUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(siteUrl)}&key=${env.PAGESPEED_API_KEY}&category=PERFORMANCE&strategy=DESKTOP`;
+                const psRes = await fetch(psUrl);
+                if (psRes.ok) {
+                  const psData = await psRes.json() as { lighthouseResult?: { audits?: { 'final-screenshot'?: { details?: { data?: string } } } } };
+                  const b64 = psData.lighthouseResult?.audits?.['final-screenshot']?.details?.data;
+                  if (b64) imageUrl = b64; // base64 data URI
+                }
+              }
+
+              if (imageUrl) {
+                const colorRes = await fetch('https://api.openai.com/v1/chat/completions', {
+                  method: 'POST',
+                  headers: { 'Authorization': `Bearer ${env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    model: 'gpt-4o',
+                    messages: [{
+                      role: 'user',
+                      content: [
+                        { type: 'text', text: 'Extract the brand colors from this website screenshot. Identify the dominant colors used in the logo, headers, buttons, accents, and background. Return ONLY valid JSON: {"primary":"#hex","secondary":"#hex","accent":"#hex","background":"#hex","text":"#hex"}' },
+                        { type: 'image_url', image_url: { url: imageUrl, detail: 'low' } },
+                      ],
+                    }],
+                    max_tokens: 200,
+                    temperature: 0.1,
+                  }),
+                });
+                if (colorRes.ok) {
+                  const colorData = await colorRes.json() as { choices: { message: { content: string } }[] };
+                  const colorJson = colorData.choices?.[0]?.message?.content?.replace(/```json\n?/g, '').replace(/```/g, '').trim();
+                  if (colorJson) {
+                    try {
+                      const extractedColors = JSON.parse(colorJson);
+                      (scraped as any).extracted_brand_colors = extractedColors;
+                      // Override research brand colors with visually extracted ones
+                      if (extractedColors.primary) {
+                        (brand as any).colors = { ...(brand as any).colors, ...extractedColors };
+                      }
+                      await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.brand_colors_extracted', {
+                        colors: extractedColors,
+                        source: 'ai_vision_screenshot',
+                        message: `Brand colors extracted: primary=${extractedColors.primary}, accent=${extractedColors.accent}`,
+                        phase: 'research',
+                      });
+                    } catch { /* ignore parse errors */ }
+                  }
+                }
+              }
+            } catch { /* non-critical — brand research colors will be used as fallback */ }
+          }
+
           await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.scrape_complete', {
-            title: scraped.title, headings: scraped.headings.length, paragraphs: scraped.paragraphs.length,
-            images: scraped.images.length, message: `Scraped: ${scraped.title} — ${scraped.headings.length} headings, ${scraped.paragraphs.length} paragraphs`,
+            pages_crawled: pages.length,
+            total_paragraphs: pages.flatMap(p => p.paragraphs).length,
+            total_images: allImages.length,
+            extracted_colors: (scraped as any).extracted_brand_colors || null,
+            message: `Deep-crawled ${pages.length} pages — ${pages.flatMap(p => p.paragraphs).length} paragraphs, ${allImages.length} images`,
             phase: 'research',
           });
 
@@ -693,6 +939,144 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
       } catch {
         // Scraping failed — continue without it
       }
+    }
+
+    // ── Step 2.6: Seed per-site D1 data tables from research ──
+    let siteDataJson = '{}';
+    try {
+      await step.do('seed-site-data', RETRY_3, async () => {
+        const siteId = params.siteId;
+        const rows: { id: string; table_name: string; data_json: string; sort_order: number }[] = [];
+
+        // Services from profile
+        if (profile.services && Array.isArray(profile.services)) {
+          profile.services.forEach((svc: any, i: number) => {
+            rows.push({
+              id: `svc-${siteId.slice(0, 8)}-${i}`,
+              table_name: 'services',
+              data_json: JSON.stringify({ name: svc.name || svc, description: svc.description || '', price: svc.price || '', duration: svc.duration || '' }),
+              sort_order: i,
+            });
+          });
+        }
+
+        // Team from profile
+        if (profile.team && Array.isArray(profile.team)) {
+          profile.team.forEach((member: any, i: number) => {
+            rows.push({
+              id: `team-${siteId.slice(0, 8)}-${i}`,
+              table_name: 'team_members',
+              data_json: JSON.stringify({ name: member.name || '', role: member.role || member.title || '', bio: member.bio || '', photo_url: member.photo || '' }),
+              sort_order: i,
+            });
+          });
+        }
+
+        // Business hours from profile
+        if (profile.hours || profile.opening_hours) {
+          const hours = profile.hours || profile.opening_hours;
+          if (typeof hours === 'object') {
+            const days = Array.isArray(hours) ? hours : Object.entries(hours as Record<string, any>).map(([day, h]: [string, any]) => ({ day, open: h.open || h, close: h.close || '' }));
+            days.forEach((h: any, i: number) => {
+              rows.push({
+                id: `hours-${siteId.slice(0, 8)}-${i}`,
+                table_name: 'business_hours',
+                data_json: JSON.stringify({ day: h.day || '', open: h.open || '', close: h.close || '', closed: h.closed || false }),
+                sort_order: i,
+              });
+            });
+          }
+        }
+
+        // FAQ from selling points
+        if (sellingPoints.faq_questions && Array.isArray(sellingPoints.faq_questions)) {
+          sellingPoints.faq_questions.forEach((faq: any, i: number) => {
+            rows.push({
+              id: `faq-${siteId.slice(0, 8)}-${i}`,
+              table_name: 'faq',
+              data_json: JSON.stringify({ question: faq.question || '', answer: faq.answer || '' }),
+              sort_order: i,
+            });
+          });
+        }
+
+        // Social links from social research
+        if (social.social_links && Array.isArray(social.social_links)) {
+          social.social_links.filter((s: any) => s.url).forEach((s: any, i: number) => {
+            rows.push({
+              id: `social-${siteId.slice(0, 8)}-${i}`,
+              table_name: 'social_links',
+              data_json: JSON.stringify({ platform: s.platform || '', url: s.url || '', handle: s.handle || '' }),
+              sort_order: i,
+            });
+          });
+        }
+
+        // Brand config from brand research
+        if (brand) {
+          const brandEntries = [
+            { key: 'primary_color', value: (brand as any).colors?.primary || '' },
+            { key: 'secondary_color', value: (brand as any).colors?.secondary || '' },
+            { key: 'accent_color', value: (brand as any).colors?.accent || '' },
+            { key: 'font_heading', value: (brand as any).fonts?.heading || '' },
+            { key: 'font_body', value: (brand as any).fonts?.body || '' },
+            { key: 'brand_personality', value: (brand as any).brand_personality || '' },
+          ].filter(e => e.value);
+          brandEntries.forEach((entry, i) => {
+            rows.push({
+              id: `brand-${siteId.slice(0, 8)}-${i}`,
+              table_name: 'brand_config',
+              data_json: JSON.stringify(entry),
+              sort_order: i,
+            });
+          });
+        }
+
+        // Insert all rows in batches
+        if (rows.length > 0) {
+          const batchSize = 20;
+          for (let i = 0; i < rows.length; i += batchSize) {
+            const batch = rows.slice(i, i + batchSize);
+            const stmts = batch.map(row =>
+              env.DB.prepare(
+                `INSERT OR REPLACE INTO site_data (id, site_id, table_name, data_json, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
+              ).bind(row.id, siteId, row.table_name, row.data_json, row.sort_order),
+            );
+            await env.DB.batch(stmts);
+          }
+        }
+
+        // Build site data JSON for the generation prompt
+        const grouped: Record<string, any[]> = {};
+        for (const row of rows) {
+          if (!grouped[row.table_name]) grouped[row.table_name] = [];
+          grouped[row.table_name].push({ id: row.id, ...JSON.parse(row.data_json) });
+        }
+
+        return JSON.stringify(grouped);
+      });
+
+      // Store the result for use in the build payload
+      siteDataJson = await step.do('read-site-data-json', RETRY_3, async () => {
+        const result = await env.DB.prepare(
+          `SELECT table_name, id, data_json FROM site_data WHERE site_id = ? AND deleted_at IS NULL ORDER BY sort_order ASC`,
+        ).bind(params.siteId).all();
+        const grouped: Record<string, any[]> = {};
+        for (const row of (result.results || []) as any[]) {
+          if (!grouped[row.table_name]) grouped[row.table_name] = [];
+          grouped[row.table_name].push({ id: row.id, ...JSON.parse(row.data_json || '{}') });
+        }
+        return JSON.stringify(grouped);
+      });
+
+      await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.complete', {
+        step: 'seed-site-data', message: `Seeded D1 data tables from research`,
+        phase: 'data_collection',
+      });
+    } catch (err) {
+      await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.failed', {
+        step: 'seed-site-data', error: String(err), message: 'D1 data seeding failed (non-blocking)',
+      });
     }
 
     // ── Step 3: Site Structure Plan (Pass 1 — fast/cheap) ─────
@@ -706,25 +1090,43 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
     let structurePlanJson: string;
     try {
       structurePlanJson = await step.do('structure-plan', RETRY_3, async () => {
-        const { callExternalLLM } = await import('../services/external_llm.js');
-        const { getOrCreateTemplate, matchCategory } = await import('../services/template_cache.js');
+        try {
+          const { callExternalLLM } = await import('../services/external_llm.js');
+          const { getOrCreateTemplate, matchCategory } = await import('../services/template_cache.js');
 
-        const category = matchCategory(profile.business_type);
-        const template = await getOrCreateTemplate(env, category);
+          const category = matchCategory(profile.business_type);
+          const template = await getOrCreateTemplate(env, category);
 
-        const researchData = JSON.stringify({ profile, social, brand, sellingPoints, images });
+          const researchData = JSON.stringify({ profile, social, brand, sellingPoints, images });
 
-        const result = await callExternalLLM(env, {
-          system: `You are an expert website information architect. Given research data about a business and an industry template, plan the structure of a multi-page website. Return valid JSON matching: { pages: [{ path, title, purpose, sections[] }], design: { primary_color, secondary_color, accent_color, font_heading, font_body, style_notes }, nav_links: [{ label, href }], seo: { site_title, default_description } }`,
-          user: `Business: ${params.businessName}\n\nResearch:\n${researchData}\n\nTemplate:\n${JSON.stringify(template)}\n\nPlan the site structure as JSON.`,
-          temperature: 0.3,
-          maxTokens: 4000,
-          jsonMode: true,
-          provider: 'anthropic',
-          model: 'claude-haiku-4-5-20251001',
-        });
+          const result = await callExternalLLM(env, {
+            system: `You are an expert website information architect. Given research data about a business and an industry template, plan the structure of a multi-page website. Return valid JSON matching: { pages: [{ path, title, purpose, sections[] }], design: { primary_color, secondary_color, accent_color, font_heading, font_body, style_notes }, nav_links: [{ label, href }], seo: { site_title, default_description } }`,
+            user: `Business: ${params.businessName}\n\nResearch:\n${researchData}\n\nTemplate:\n${JSON.stringify(template)}\n\nPlan the site structure as JSON.`,
+            temperature: 0.3,
+            maxTokens: 4000,
+            jsonMode: true,
+          });
 
-        return safeValidateAndLog(env.DB, params.orgId, params.siteId, 'structure-plan', 'plan_site_structure', result.output, result.model_used);
+          return safeValidateAndLog(env.DB, params.orgId, params.siteId, 'structure-plan', 'plan_site_structure', result.output, result.model_used);
+        } catch (llmErr) {
+          // If LLM call fails (quota, network, etc), use the default structure plan
+          await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.debug.structure_plan_fallback', {
+            error: llmErr instanceof Error ? llmErr.message : String(llmErr),
+            message: 'Structure plan LLM call failed, using default structure',
+          });
+          const defaultPlan = {
+            pages: [
+              { path: '/', title: `${params.businessName} - Home`, purpose: 'Main landing page', sections: ['hero', 'features', 'about', 'services', 'testimonials', 'contact', 'faq', 'footer'] },
+              { path: '/about', title: 'About', purpose: 'About the business', sections: ['hero', 'story', 'team', 'values'] },
+              { path: '/services', title: 'Services', purpose: 'Services offered', sections: ['hero', 'services-grid', 'pricing'] },
+              { path: '/contact', title: 'Contact', purpose: 'Contact information', sections: ['hero', 'form', 'map', 'hours'] },
+            ],
+            design: { primary_color: '#2563eb', secondary_color: '#7c3aed', accent_color: '#64ffda', font_heading: 'Inter', font_body: 'Source Sans Pro', style_notes: 'Clean modern design' },
+            nav_links: [{ label: 'Home', href: '/' }, { label: 'About', href: '#about' }, { label: 'Services', href: '#services' }, { label: 'Contact', href: '#contact' }],
+            seo: { site_title: params.businessName, default_description: `${params.businessName} - ${params.businessCategory || 'Professional services'}` },
+          };
+          return JSON.stringify(defaultPlan);
+        }
       });
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
@@ -749,85 +1151,280 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
       phase: 'generation',
     });
 
-    // ── Step 4: Claude Code Container Build ──────────────────
-    // The container handles EVERYTHING: generation, R2 upload, D1 status update, email notification.
-    // No API fallback — Claude Code container is the ONLY acceptable build method.
-    startTimer('container-build');
-    await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.container_build_started', {
-      step: 'container-build',
-      message: 'Dispatching build to Claude Code container (Vite + React + Tailwind + shadcn/ui)',
-      phase: 'generation',
-    });
+    // ── Steps 4-6: Multi-Stage Container Build ──────────────
+    // Container is a stateless Claude Code executor. Each step sends prompts +
+    // existing files, receives back updated files. Workflow handles R2/D1.
+    // Each step is under 20 min to stay within the 25-min workflow step timeout.
+
+    if (!env.SITE_BUILDER) {
+      await updateSiteStatus(env.DB, params.siteId, 'error');
+      throw new Error('SITE_BUILDER container not configured');
+    }
+
+    const containerId = env.SITE_BUILDER.idFromName(params.slug);
+    const container = env.SITE_BUILDER.get(containerId);
+    const safeName = (params.businessName || 'Business').replace(/[^\w\s\-'.]/g, '').slice(0, 100);
+    const category = profile.business_type || params.businessCategory || '';
+    const colors = (brand.colors || {}) as Record<string, string>;
+    const primary = colors.primary || '#1a1a2e';
+    const secondary = colors.secondary || '#16213e';
+    const accent = colors.accent || '#e94560';
+
+    // Prepare context files that Claude will read
+    const contextFiles: Record<string, unknown> = {
+      'research.json': { profile, brand, sellingPoints, social, images },
+      'params.json': {
+        businessName: safeName, slug: params.slug, category,
+        colors, assets: assetManifest, structure: structurePlan,
+        siteData: siteDataJson ? JSON.parse(siteDataJson) : {},
+      },
+    };
+    if (typeof scrapedContent === 'string' && scrapedContent.length > 0) {
+      contextFiles['scraped.txt'] = scrapedContent;
+    }
+
+    /** Helper: call container with prompts, return files */
+    async function callContainer(
+      prompts: { text: string; label: string; timeoutMin: number }[],
+      existingFiles: { name: string; content: string }[],
+      stepLabel: string,
+    ): Promise<{ name: string; content: string }[]> {
+      const payload = {
+        slug: params.slug,
+        _anthropicKey: env.ANTHROPIC_API_KEY || '',
+        contextFiles,
+        existingFiles,
+        prompts,
+      };
+
+      const res = await container.fetch('http://container/build', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text().catch(() => 'Unknown');
+        throw new Error(`Container ${stepLabel} failed: ${res.status} ${errText}`);
+      }
+
+      const result = await res.json() as {
+        status: string;
+        files?: { name: string; content: string }[];
+        error?: string;
+        results?: { label: string; success: boolean }[];
+      };
+
+      if (result.error) throw new Error(`Container ${stepLabel}: ${result.error}`);
+
+      // Log diagnostics from container
+      const diag = (result as any).diag;
+      await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.complete', {
+        step: stepLabel,
+        files: (result.files || []).length,
+        results: result.results,
+        diag: diag ? {
+          apiKeySet: diag.apiKeySet,
+          apiKeyLen: diag.apiKeyLen,
+          claudeInstalled: diag.claudeInstalled,
+          filesOnDisk: diag.filesOnDisk,
+        } : null,
+        message: `${stepLabel}: ${(result.files || []).length} files | API key: ${diag?.apiKeySet ? 'YES(' + diag.apiKeyLen + ')' : 'NO'} | Claude: ${diag?.claudeInstalled ? 'YES' : 'NO'} | Disk: ${(diag?.filesOnDisk || []).length} files`,
+        phase: 'generation',
+      });
+
+      return result.files || [];
+    }
+
+    /** Helper: upload files to R2 */
+    async function uploadToR2(files: { name: string; content: string }[], isInterim: boolean): Promise<string> {
+      const version = new Date().toISOString().replace(/[:.]/g, '-') + (isInterim ? '-interim' : '');
+      for (const f of files) {
+        const ext = f.name.split('.').pop()?.toLowerCase() || '';
+        const ct = { html: 'text/html', xml: 'application/xml', json: 'application/json',
+          svg: 'image/svg+xml', css: 'text/css', js: 'application/javascript',
+          ts: 'text/plain', tsx: 'text/plain', jsx: 'text/plain',
+          png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif',
+          webp: 'image/webp', ico: 'image/x-icon', txt: 'text/plain',
+        }[ext] || 'text/plain';
+        await env.SITES_BUCKET.put(`sites/${params.slug}/${version}/${f.name}`, f.content, {
+          httpMetadata: { contentType: ct },
+        });
+      }
+      await env.SITES_BUCKET.put(`sites/${params.slug}/_manifest.json`,
+        JSON.stringify({ current_version: version, files: files.map(f => f.name), building: isInterim }),
+        { httpMetadata: { contentType: 'application/json' } });
+      await env.DB.prepare(
+        isInterim
+          ? "UPDATE sites SET current_build_version = ?, updated_at = datetime('now') WHERE id = ?"
+          : "UPDATE sites SET status = 'published', current_build_version = ?, updated_at = datetime('now') WHERE id = ?",
+      ).bind(version, params.siteId).run();
+      return version;
+    }
+
+    // Scraped content note for prompts
+    let scrapedNote = '';
+    if (typeof scrapedContent === 'string' && scrapedContent.length > 0) {
+      scrapedNote = '\n\nREAL CONTENT FROM ORIGINAL WEBSITE (use this, not placeholder text):\n' + scrapedContent.slice(0, 8000);
+    }
+
+    let currentFiles: { name: string; content: string }[] = [];
 
     try {
-      await step.do('container-build', {
-        retries: { limit: 1, delay: '30 seconds', backoff: 'exponential' },
-        timeout: '15 minutes',
+      // ── STAGE A: Foundation (1 big prompt, ~15 min) ──
+      startTimer('container-build');
+      const stageAResult = await step.do('stage-a-foundation', {
+        retries: { limit: 1, delay: '10 seconds', backoff: 'exponential' },
+        timeout: '20 minutes',
       }, async () => {
-        if (!env.SITE_BUILDER) {
-          throw new Error('SITE_BUILDER container not configured — cannot build without Claude Code');
-        }
-
-        const siteBaseUrl = `https://${params.slug}.${DOMAINS.SITES_SUFFIX}`;
-        const containerId = env.SITE_BUILDER.idFromName(params.slug);
-        const container = env.SITE_BUILDER.get(containerId);
-
-        // Pass ALL data including images from /create page
-        const buildPayload = {
-          slug: params.slug,
-          siteId: params.siteId,
-          orgId: params.orgId,
-          businessName: params.businessName,
-          businessAddress: params.businessAddress || '',
-          businessPhone: params.businessPhone || '',
-          businessWebsite: social.website_url || (params as any).businessWebsite || '',
-          additionalContext: params.additionalContext || '',
-          researchData: { profile, brand, sellingPoints, social, images },
-          assetUrls: assetManifest.map((key: string) => ({
-            url: `${siteBaseUrl}/assets/${key.split('/').pop()}`,
-            name: key.split('/').pop() || key,
-          })),
-          structurePlan,
-          scrapedContent: typeof scrapedContent === 'string' ? scrapedContent : '',
-        };
-
-        const containerRes = await container.fetch('http://container/build', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(buildPayload),
-        });
-
-        if (!containerRes.ok) {
-          const errText = await containerRes.text().catch(() => 'Unknown error');
-          throw new Error(`Container build failed: ${containerRes.status} ${errText}`);
-        }
-
-        return 'container-build-dispatched';
+        return callContainer([{
+          label: 'A-foundation',
+          timeoutMin: 15,
+          text: [
+            `You are building a production-ready website for "${safeName}" that matches Stripe.com / Linear.app / Vercel.com quality.`,
+            'IMPORTANT: You MUST use the Write tool to create files in the current directory. Do NOT just output HTML as text — actually write the files to disk.',
+            'Read ALL files prefixed with _ in this directory for context.',
+            '',
+            '=== BUSINESS ===',
+            `Name: ${safeName}`,
+            `Category: ${category || 'general business'}`,
+            `Colors: --primary:${primary}; --secondary:${secondary}; --accent:${accent};`,
+            '',
+            '=== DESIGN SYSTEM ===',
+            '- Font: Inter or Satoshi (Google Fonts, display=swap)',
+            '- Typography: 48px hero, 24px sections, 16px body',
+            '- Layout: Material Design spacing. Max-width 1200px.',
+            '- WCAG AA contrast minimum on ALL text.',
+            '',
+            '=== REQUIRED SECTIONS ===',
+            '1. Sticky header with inline SVG logo + nav',
+            '2. Full-viewport hero: gradient overlay, 48px headline, CTA',
+            '3. Features/selling points (3-4 cards with icons)',
+            '4. About section (split layout)',
+            '5. Services grid (every card unique Unsplash image)',
+            '6. Testimonials or impact counters',
+            '7. Google Maps embed',
+            '8. Contact form (name, email, message)',
+            '9. FAQ (5+ items, last: "Built by ProjectSites.dev")',
+            '10. Footer (business info, social links)',
+            '',
+            '=== ANIMATIONS ===',
+            '6+ @keyframes. IntersectionObserver scroll reveals. Glassmorphism.',
+            'prefers-reduced-motion support.',
+            '',
+            '=== SEO ===',
+            `<title> with name+location. canonical: https://${params.slug}.projectsites.dev/`,
+            'JSON-LD LocalBusiness. og tags. Semantic HTML.',
+            '',
+            '=== IMAGES ===',
+            '15+ unique Unsplash images. Never duplicate URLs. Alt text.',
+            '',
+            'OUTPUT: Write index.html, robots.txt, sitemap.xml. Production-ready.',
+            scrapedNote,
+          ].filter(Boolean).join('\n'),
+        }], [], 'stage-a');
       });
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
+      currentFiles = (stageAResult as { name: string; content: string }[]) || [];
+
+      // Upload interim v1
+      if (currentFiles.length > 0) {
+        await step.do('upload-interim-v1', RETRY_3, async () => {
+          await uploadToR2(currentFiles, true);
+          return 'uploaded';
+        });
+      }
+
+      // ── STAGE B: Enhancement (3 prompts, ~10 min) ──
+      if (currentFiles.some(f => f.name === 'index.html')) {
+        const enhancedFiles = await step.do('stage-b-enhancement', {
+          retries: { limit: 1, delay: '10 seconds', backoff: 'exponential' },
+          timeout: '20 minutes',
+        }, async () => {
+          return callContainer([
+            { label: 'B1-animations', timeoutMin: 5, text: 'Add animations to index.html. Do NOT rewrite from scratch.\n\nAdd @keyframes: fadeInUp, slideInLeft/Right, scaleIn, subtleFloat.\nIntersectionObserver: sections start opacity:0 translateY:20px, get .visible class.\nGlassmorphism on 2+ elements. Subtle hovers. @media prefers-reduced-motion.' },
+            { label: 'B2-seo', timeoutMin: 5, text: 'SEO audit on index.html. Do NOT rewrite.\n\nVerify: meta description, og tags, canonical, JSON-LD LocalBusiness, FAQPage schema, heading hierarchy, keyword placement, internal links, robots.txt, sitemap.xml.' },
+            { label: 'B3-images', timeoutMin: 5, text: 'Image audit on index.html. Do NOT rewrite.\n\nCount images. If <15, add more Unsplash. Every card needs unique image. No empty bg-image. Grid rows consistent. loading=lazy. Alt text.' },
+          ], currentFiles, 'stage-b');
+        });
+        const enhancedArr = enhancedFiles as { name: string; content: string }[];
+        if (enhancedArr?.length > 0) currentFiles = enhancedArr;
+
+        // Upload interim v2
+        await step.do('upload-interim-v2', RETRY_3, async () => {
+          await uploadToR2(currentFiles, true);
+          return 'uploaded';
+        });
+      }
+
+      // ── STAGE C+D: Quality + Final (5 prompts, ~10 min) ──
+      if (currentFiles.some(f => f.name === 'index.html')) {
+        // Domain-specific prompt
+        let domainPrompt = 'Add domain-specific features to index.html. ';
+        const catLower = category.toLowerCase();
+        if (catLower.includes('non-profit') || catLower.includes('community') || catLower.includes('church') || catLower.includes('soup')) {
+          domainPrompt += 'NON-PROFIT: Add prominent donation CTA, impact counters, volunteer signup.';
+        } else if (catLower.includes('restaurant') || catLower.includes('food')) {
+          domainPrompt += 'RESTAURANT: Add menu section, hours widget, reservation CTA.';
+        } else if (catLower.includes('salon') || catLower.includes('spa')) {
+          domainPrompt += 'SALON: Add services+prices, staff, booking CTA.';
+        } else {
+          domainPrompt += 'Add appropriate features for this business type.';
+        }
+
+        const finalFiles = await step.do('stage-cd-quality-final', {
+          retries: { limit: 1, delay: '10 seconds', backoff: 'exponential' },
+          timeout: '20 minutes',
+        }, async () => {
+          return callContainer([
+            { label: 'C1-visual', timeoutMin: 3, text: 'Visual quality fix on index.html.\n\n1. Text over images: dark overlay min rgba(0,0,0,0.5)\n2. Color contrast 4.5:1\n3. Vibrant palette\n4. Grid partial rows centered' },
+            { label: 'C2-a11y', timeoutMin: 3, text: 'Accessibility fix. Heading hierarchy (1 h1). Alt text. Labels on inputs. Skip-to-content. html lang=en. Focus-visible. ARIA labels.' },
+            { label: 'C3-domain', timeoutMin: 3, text: domainPrompt },
+            { label: 'D1-production', timeoutMin: 3, text: 'Production readiness. No console.log. Valid HTML. HTTPS URLs. Google Fonts preconnect. Back-to-top button. Smooth scroll. Copyright ' + new Date().getFullYear() + '.' },
+            { label: 'D2-safety', timeoutMin: 2, text: 'Safety check. Privacy notice on form. Footer: Privacy+Terms links. External links: rel=noopener. FAQ last: Built by ProjectSites.dev.' },
+          ], currentFiles, 'stage-cd');
+        });
+        const finalArr = finalFiles as { name: string; content: string }[];
+        if (finalArr?.length > 0) currentFiles = finalArr;
+      }
+
+      // ── FINAL DEPLOY ──
+      if (currentFiles.length > 0) {
+        await step.do('upload-final', RETRY_3, async () => {
+          const version = await uploadToR2(currentFiles, false);
+          await env.DB.prepare(
+            "INSERT OR IGNORE INTO site_snapshots (id, site_id, snapshot_name, build_version, description) VALUES (?, ?, 'initial', ?, 'First published version')",
+          ).bind(crypto.randomUUID(), params.siteId, version).run();
+          return version;
+        });
+      } else {
+        await updateSiteStatus(env.DB, params.siteId, 'error');
+      }
+
+    } catch (containerErr) {
+      const containerErrMsg = containerErr instanceof Error ? containerErr.message : String(containerErr);
       await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.failed', {
         step: 'container-build',
-        error: errorMsg,
+        error: containerErrMsg,
         elapsed_ms: elapsed('container-build'),
-        message: 'Container build dispatch failed: ' + errorMsg,
+        message: 'Container build failed: ' + containerErrMsg,
         phase: 'generation',
         recoverable: false,
       });
       await updateSiteStatus(env.DB, params.siteId, 'error');
-      throw err;
+
+      // Non-critical notification — we don't have user email in workflow params
+      throw containerErr;
     }
 
-    // Container handles R2 upload, D1 status update, and email notification.
-    // The workflow's job is done after dispatching the build.
     const totalElapsed = elapsed('workflow');
     const totalSeconds = Math.round(totalElapsed / 1000);
-    await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.container_dispatched', {
+    await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.complete', {
       slug: params.slug,
-      url: `https://${params.slug}${DOMAINS.SITES_SUFFIX}`,
+      url: `https://${params.slug}.${DOMAINS.SITES_SUFFIX}`,
       total_elapsed_ms: totalElapsed,
       total_seconds: totalSeconds,
-      message: `Container build dispatched for ${params.businessName} · Research took ${totalSeconds}s · Container will handle generation + upload + publish`,
+      files: currentFiles.length,
+      message: `Published ${params.businessName} with ${currentFiles.length} files in ${totalSeconds}s`,
       phase: 'complete',
     });
 
@@ -835,7 +1432,9 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
       siteId: params.siteId,
       slug: params.slug,
       model_used: 'claude-code-container',
-      status: 'container-building',
+      status: 'published',
+      files: currentFiles.length,
+      elapsed_seconds: totalSeconds,
     };
   }
 }

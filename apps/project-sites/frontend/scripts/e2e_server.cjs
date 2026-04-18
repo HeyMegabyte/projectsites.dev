@@ -163,6 +163,13 @@ async function handleAPI(req, res, urlPath) {
       ] });
     }
 
+    // When Doody Calls results
+    if (qLower.includes('doody') || qLower.includes('pooper')) {
+      return json(res, { data: [
+        { name: 'When Doody Calls - Pooper Scoopers', address: '123 Clean St, Dallas, TX 75201', place_id: 'place-whendoodycalls', phone: '(214) 555-POOP', website: 'https://whendoodycalls.com', types: ['point_of_interest', 'establishment', 'home_goods_store'] },
+      ] });
+    }
+
     // "Hey" results — long list to test dropdown z-index/overlay
     // Simulates Google Places: returns all matching businesses, filtered by query
     const heyBusinesses = [
@@ -211,7 +218,22 @@ async function handleAPI(req, res, urlPath) {
   if (urlPath === '/api/sites/create-from-search' && method === 'POST') {
     const body = await readBody(req);
     const newId = `site-new-${++siteIdCounter}`;
-    const slug = (body.business?.name || 'new-site').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    // AI-smart slug generation (mock): use shortest meaningful representation
+    const rawName = (body.business?.name || 'new-site');
+    const address = (body.business?.address || '');
+    const city = address.split(',').slice(1, 2).join('').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    let slug = rawName.toLowerCase().replace(/'/g, '').replace(/\s*-\s*.+$/, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    // For chain brands, append city/neighborhood for disambiguation
+    const chains = ['trader-joes', 'mcdonalds', 'starbucks', 'dunkin', 'subway', 'target', 'walmart', 'costco'];
+    if (chains.some(c => slug.startsWith(c)) && city) {
+      slug = slug + '-' + city;
+    }
+    // Check if name already has a location qualifier (e.g., "Trader Joe's - Hell's Kitchen")
+    const qualifier = rawName.match(/\s*-\s*(.+)$/);
+    if (qualifier && chains.some(c => slug.startsWith(c))) {
+      slug = rawName.toLowerCase().replace(/'/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    }
+    slug = slug.substring(0, 63);
     const newSite = {
       id: newId,
       slug,
@@ -470,14 +492,23 @@ async function handleAPI(req, res, urlPath) {
     // All URLs proxied through /api/image-proxy for CORS safety
     const knownBrands = {
       'the-white-house': {
-        logo: { url: proxy('https://www.whitehouse.gov/wp-content/uploads/2021/01/wh_social-share.png'), name: 'white-house-logo.png', type: 'logo', source: 'website-scrape' },
-        favicon: { url: proxy('https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://www.whitehouse.gov&size=256'), name: 'white-house-favicon.png', type: 'favicon', source: 'google-favicon' },
+        logo: { url: proxy('https://www.whitehouse.gov/wp-content/uploads/2021/01/wh_social-share.png'), name: 'white-house-logo.png', type: 'logo', source: 'website-scrape', quality: { quality_score: 90, is_professional: true, is_safe: true, description: 'Official White House social share image', recommendation: 'use_as_is', issues: [] } },
+        favicon: { url: proxy('https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://www.whitehouse.gov&size=256'), name: 'white-house-favicon.png', type: 'favicon', source: 'google-favicon', quality: { quality_score: 85, is_professional: true, is_safe: true, description: 'White House favicon', recommendation: 'use_as_is', issues: [] }, dimensions: { width: 256, height: 256 } },
         images: [
-          { url: proxy('https://upload.wikimedia.org/wikipedia/commons/thumb/1/1d/White_House_north_and_south_sides.jpg/800px-White_House_north_and_south_sides.jpg'), name: 'white-house-front.jpg', type: 'image', source: 'wikimedia' },
-          { url: proxy('https://upload.wikimedia.org/wikipedia/commons/thumb/c/c2/WhiteHouseSouthFacade.JPG/800px-WhiteHouseSouthFacade.JPG'), name: 'white-house-south.jpg', type: 'image', source: 'wikimedia' },
-          { url: proxy('https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/White_House_aerial_photo.jpg/800px-White_House_aerial_photo.jpg'), name: 'white-house-aerial.jpg', type: 'image', source: 'wikimedia' },
-          { url: proxy('https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/Seal_of_the_President_of_the_United_States.svg/480px-Seal_of_the_President_of_the_United_States.svg.png'), name: 'presidential-seal.png', type: 'image', source: 'wikimedia' },
+          { url: proxy('https://upload.wikimedia.org/wikipedia/commons/thumb/1/1d/White_House_north_and_south_sides.jpg/800px-White_House_north_and_south_sides.jpg'), name: 'white-house-front.jpg', type: 'image', source: 'wikimedia', quality: { quality_score: 95, is_professional: true, is_safe: true, description: 'White House north facade', recommendation: 'use_as_is', issues: [] } },
+          { url: proxy('https://upload.wikimedia.org/wikipedia/commons/thumb/c/c2/WhiteHouseSouthFacade.JPG/800px-WhiteHouseSouthFacade.JPG'), name: 'white-house-south.jpg', type: 'image', source: 'wikimedia', quality: { quality_score: 92, is_professional: true, is_safe: true, description: 'White House south facade', recommendation: 'use_as_is', issues: [] } },
+          { url: proxy('https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/White_House_aerial_photo.jpg/800px-White_House_aerial_photo.jpg'), name: 'white-house-aerial.jpg', type: 'image', source: 'wikimedia', quality: { quality_score: 88, is_professional: true, is_safe: true, description: 'Aerial view of White House', recommendation: 'use_as_is', issues: [] } },
+          { url: proxy('https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/Seal_of_the_President_of_the_United_States.svg/480px-Seal_of_the_President_of_the_United_States.svg.png'), name: 'presidential-seal.png', type: 'image', source: 'wikimedia', quality: { quality_score: 85, is_professional: true, is_safe: true, description: 'Presidential seal', recommendation: 'use_as_is', issues: [] } },
         ],
+        brand_assessment: { brand_maturity: 'established', website_quality_score: 95, asset_strategy: 'Use original brand assets as-is.', has_professional_logo: true, has_quality_favicon: true, recommendation: 'Recreate site faithful to existing brand with modern enhancements.' },
+      },
+      'when-doody-calls': {
+        logo: { url: proxy('https://whendoodycalls.com/wp-content/uploads/2017/02/Web_Banner3.jpg'), name: 'whendoodycalls-logo.jpg', type: 'logo', source: 'website-scrape', quality: { quality_score: 45, is_professional: false, is_safe: true, description: 'Banner image with logo text and phone number overlay. Low resolution, dated design.', recommendation: 'use_as_inspiration', issues: ['Low resolution', 'Phone number on image', 'Dated design'] } },
+        favicon: null,
+        images: [
+          { url: proxy('https://whendoodycalls.com/wp-content/uploads/2017/02/Web_Banner3.jpg'), name: 'when-doody-calls-banner.jpg', type: 'image', source: 'website-img', quality: { quality_score: 45, is_professional: false, is_safe: true, description: 'Company banner with logo, dog illustration, and phone number. Dated aesthetic but recognizable brand identity.', recommendation: 'use_as_inspiration', issues: ['Low resolution', 'Phone number overlay', 'Dated design'] } },
+        ],
+        brand_assessment: { brand_maturity: 'minimal', website_quality_score: 25, asset_strategy: 'Original assets are low quality. Use as inspiration only. Generate professional AI alternatives.', has_professional_logo: false, has_quality_favicon: false, recommendation: 'Create a gorgeous, modern site that reimagines the brand professionally.' },
       },
     };
 
@@ -495,17 +526,57 @@ async function handleAPI(req, res, urlPath) {
           name: `${name}-logo.png`,
           type: 'logo',
           source: 'web-search',
+          quality: { quality_score: 70, is_professional: true, is_safe: true, description: 'Generic logo', recommendation: 'use_as_is', issues: [] },
         },
         favicon: {
           url: `${baseUrl}/${encodeURIComponent(name + '-icon')}`,
           name: `${name}-icon.png`,
           type: 'favicon',
           source: 'web-search',
+          quality: { quality_score: 65, is_professional: true, is_safe: true, description: 'Generic favicon', recommendation: 'use_as_is', issues: [] },
+          dimensions: { width: 256, height: 256 },
         },
         images: [
-          { url: `${baseUrl}/${encodeURIComponent(name + '-hero')}`, name: `${name}-hero.jpg`, type: 'image', source: 'web-search' },
-          { url: `${baseUrl}/${encodeURIComponent(name + '-storefront')}`, name: `${name}-storefront.jpg`, type: 'image', source: 'web-search' },
-          { url: `${baseUrl}/${encodeURIComponent(name + '-team')}`, name: `${name}-team.jpg`, type: 'image', source: 'web-search' },
+          { url: `${baseUrl}/${encodeURIComponent(name + '-hero')}`, name: `${name}-hero.jpg`, type: 'image', source: 'web-search', quality: { quality_score: 75, is_professional: true, is_safe: true, description: 'Hero image', recommendation: 'use_as_is', issues: [] } },
+          { url: `${baseUrl}/${encodeURIComponent(name + '-storefront')}`, name: `${name}-storefront.jpg`, type: 'image', source: 'web-search', quality: { quality_score: 72, is_professional: true, is_safe: true, description: 'Storefront image', recommendation: 'use_as_is', issues: [] } },
+          { url: `${baseUrl}/${encodeURIComponent(name + '-team')}`, name: `${name}-team.jpg`, type: 'image', source: 'web-search', quality: { quality_score: 68, is_professional: true, is_safe: true, description: 'Team photo', recommendation: 'use_as_is', issues: [] } },
+        ],
+        brand_assessment: null,
+      },
+    });
+  }
+
+  // Video discovery
+  if (urlPath === '/api/ai/discover-videos' && method === 'POST') {
+    const body = await readBody(req);
+    const name = (body.name || '').toLowerCase();
+    return json(res, {
+      data: {
+        videos: [
+          {
+            url: 'https://www.youtube.com/watch?v=mock-video-1',
+            embed_url: 'https://www.youtube.com/embed/mock-video-1?autoplay=1&mute=1&loop=1',
+            thumbnail: `http://localhost:${PORT}/mock-img/video-thumb-1`,
+            title: `${body.name || 'Business'} Tour`,
+            source: 'youtube',
+            duration_seconds: 120,
+            attribution: { author: 'Mock Channel', license: 'YouTube Standard License', source_url: 'https://www.youtube.com/watch?v=mock-video-1' },
+            relevance: name.includes('trader') ? 'business_specific' : 'category_generic',
+          },
+          {
+            url: 'https://www.pexels.com/video/mock-1/',
+            embed_url: `http://localhost:${PORT}/mock-img/video-pexels-1`,
+            thumbnail: `http://localhost:${PORT}/mock-img/video-pexels-thumb-1`,
+            title: 'Stock footage',
+            source: 'pexels',
+            duration_seconds: 30,
+            attribution: { author: 'Mock Photographer', license: 'Pexels License', source_url: 'https://www.pexels.com/video/mock-1/' },
+            relevance: 'category_generic',
+          },
+        ],
+        attribution: [
+          { author: 'Mock Channel', license: 'YouTube Standard License', source_url: 'https://www.youtube.com/watch?v=mock-video-1' },
+          { author: 'Mock Photographer', license: 'Pexels License', source_url: 'https://www.pexels.com/video/mock-1/' },
         ],
       },
     });

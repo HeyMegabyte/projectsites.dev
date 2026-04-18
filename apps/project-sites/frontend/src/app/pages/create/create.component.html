@@ -218,6 +218,11 @@
                 @if (aiLogoUrl && !logoPreview) {
                   <span class="ai-badge">AI</span>
                 }
+                @if (aiLogoQuality && !logoPreview) {
+                  <span class="quality-badge" [class.quality-high]="aiLogoQuality.quality_score >= 70" [class.quality-low]="aiLogoQuality.quality_score < 50" [title]="aiLogoQuality.description">
+                    {{ aiLogoQuality.quality_score }}
+                  </span>
+                }
               </div>
             }
           </div>
@@ -241,6 +246,11 @@
                 <button class="upload-remove" (click)="removeFavicon(); $event.stopPropagation()">✕</button>
                 @if (aiFaviconUrl && !faviconPreview) {
                   <span class="ai-badge">AI</span>
+                }
+                @if (aiFaviconQuality && !faviconPreview) {
+                  <span class="quality-badge" [class.quality-high]="aiFaviconQuality.quality_score >= 70" [class.quality-low]="aiFaviconQuality.quality_score < 50" [title]="aiFaviconQuality.description">
+                    {{ aiFaviconQuality.quality_score }}
+                  </span>
                 }
               </div>
             }
@@ -271,9 +281,14 @@
                 </div>
               }
               @for (aiImg of aiImageUrls; track aiImg.url) {
-                <div class="upload-preview-item ai-preview-item img-clickable" [title]="aiImg.name" (click)="openImageModal(aiImg.url, aiImg.name)">
+                <div class="upload-preview-item ai-preview-item img-clickable" [title]="aiImg.quality?.description || aiImg.name" (click)="openImageModal(aiImg.url, aiImg.name)">
                   <img [src]="aiImg.url" [alt]="aiImg.name" (error)="removeAiImage(aiImg.url)" (load)="onAiImageLoad($event, aiImg.url)" />
                   <span class="ai-badge">AI</span>
+                  @if (aiImg.quality) {
+                    <span class="quality-badge" [class.quality-high]="aiImg.quality.quality_score >= 70" [class.quality-low]="aiImg.quality.quality_score < 50">
+                      {{ aiImg.quality.quality_score }}
+                    </span>
+                  }
                   <button class="upload-remove" (click)="removeAiImage(aiImg.url); $event.stopPropagation()">✕</button>
                 </div>
               }
@@ -282,9 +297,20 @@
         </div>
 
         @if (discoveringImages()) {
-          <p class="upload-note discovering"><span class="loading-dots"><span></span><span></span><span></span></span> Discovering images from the web...</p>
+          <p class="upload-note discovering"><span class="loading-dots"><span></span><span></span><span></span></span> Discovering and inspecting images from the web...</p>
         } @else {
           <p class="upload-note">If you don't upload a logo or icon, our AI will generate them based on your brand details.</p>
+        }
+
+        @if (brandAssessment) {
+          <div class="brand-assessment" [class.brand-established]="brandAssessment.brand_maturity === 'established'" [class.brand-developing]="brandAssessment.brand_maturity === 'developing'" [class.brand-minimal]="brandAssessment.brand_maturity === 'minimal'">
+            <div class="brand-assessment-header">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.27 5.82 22 7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+              <span>Brand: {{ brandAssessment.brand_maturity }}</span>
+              <span class="brand-score">{{ brandAssessment.website_quality_score }}/100</span>
+            </div>
+            <p class="brand-assessment-text">{{ brandAssessment.recommendation }}</p>
+          </div>
         }
       </div>
 

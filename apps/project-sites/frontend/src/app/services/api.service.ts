@@ -239,6 +239,11 @@ export class ApiService {
     return this.post('/ai/discover-images', { name, address, website });
   }
 
+  /** AI video discovery — finds relevant videos from YouTube, Pexels, Pixabay */
+  discoverVideos(name: string, address?: string, businessType?: string): Observable<{ data: DiscoveredVideos }> {
+    return this.post('/ai/discover-videos', { name, address, business_type: businessType });
+  }
+
   /** AI image edit — generates new image from a text prompt */
   editImage(prompt: string, originalUrl?: string): Observable<{ data: { url: string; prompt: string } }> {
     return this.post('/ai/edit-image', { prompt, originalUrl });
@@ -387,15 +392,52 @@ export interface Entitlements {
   analyticsEnabled: boolean;
 }
 
+export interface ImageQualityResult {
+  quality_score: number;
+  is_professional: boolean;
+  is_safe: boolean;
+  description: string;
+  recommendation: 'use_as_is' | 'use_as_inspiration' | 'enhance' | 'reject';
+  issues: string[];
+}
+
 export interface DiscoveredImage {
   url: string;
   name: string;
   type: 'logo' | 'favicon' | 'image';
   source: string;
+  quality?: ImageQualityResult | null;
+  dimensions?: { width: number; height: number } | null;
+}
+
+export interface BrandAssessment {
+  brand_maturity: 'established' | 'developing' | 'minimal';
+  website_quality_score: number;
+  asset_strategy: string;
+  has_professional_logo: boolean;
+  has_quality_favicon: boolean;
+  recommendation: string;
 }
 
 export interface DiscoveredImages {
   logo?: DiscoveredImage;
   favicon?: DiscoveredImage;
   images: DiscoveredImage[];
+  brand_assessment?: BrandAssessment | null;
+}
+
+export interface DiscoveredVideo {
+  url: string;
+  embed_url: string;
+  thumbnail: string;
+  title: string;
+  source: 'youtube' | 'pexels' | 'pixabay';
+  duration_seconds: number;
+  attribution: { author: string; license: string; source_url: string };
+  relevance: 'business_specific' | 'category_generic';
+}
+
+export interface DiscoveredVideos {
+  videos: DiscoveredVideo[];
+  attribution: { author: string; license: string; source_url: string }[];
 }

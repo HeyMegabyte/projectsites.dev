@@ -1,5 +1,5 @@
 import { Component, OnInit, OnDestroy, inject, signal, HostListener } from '@angular/core';
-import { NgTemplateOutlet } from '@angular/common';
+import { NgTemplateOutlet, DatePipe } from '@angular/common';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -21,7 +21,7 @@ interface FileTreeNode {
 @Component({
   selector: 'app-admin',
   standalone: true,
-  imports: [FormsModule, NgTemplateOutlet],
+  imports: [FormsModule, NgTemplateOutlet, DatePipe],
   templateUrl: './admin.component.html',
   styleUrl: './admin.component.scss',
 })
@@ -90,6 +90,16 @@ export class AdminComponent implements OnInit, OnDestroy {
   deployFile: File | null = null;
   deployFileName = signal('');
   deploying = signal(false);
+
+  // Snapshots modal
+  snapshotModalSiteId = signal<string | null>(null);
+  snapshotModalSiteName = signal('');
+  snapshotModalSlug = signal('');
+  snapshots = signal<{ id: string; snapshot_name: string; build_version: string; description: string | null; created_at: string }[]>([]);
+  loadingSnapshots = signal(false);
+  newSnapshotName = '';
+  newSnapshotDescription = '';
+  creatingSnapshot = signal(false);
 
   // Reset modal
   resetModalSite = signal<Site | null>(null);
@@ -392,6 +402,64 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.registerDomainQuery = '';
     this.domainCheckResult.set(null);
     this.editingSlugInModal.set(false);
+  }
+
+  // ── Snapshots ──────────────────────────────────────────────
+  openSnapshots(site: Site): void {
+    this.snapshotModalSiteId.set(site.id);
+    this.snapshotModalSiteName.set(site.business_name);
+    this.snapshotModalSlug.set(site.slug);
+    this.loadSnapshots(site.id);
+    this.closeDropdowns();
+  }
+
+  closeSnapshots(): void {
+    this.snapshotModalSiteId.set(null);
+    this.snapshots.set([]);
+    this.newSnapshotName = '';
+    this.newSnapshotDescription = '';
+  }
+
+  private loadSnapshots(siteId: string): void {
+    this.loadingSnapshots.set(true);
+    this.api.get<{ data: { id: string; snapshot_name: string; build_version: string; description: string | null; created_at: string }[] }>(`/sites/${siteId}/snapshots`).subscribe({
+      next: (res) => { this.snapshots.set(res.data || []); this.loadingSnapshots.set(false); },
+      error: () => { this.loadingSnapshots.set(false); },
+    });
+  }
+
+  createSnapshot(): void {
+    const siteId = this.snapshotModalSiteId();
+    if (!siteId || !this.newSnapshotName.trim()) return;
+    this.creatingSnapshot.set(true);
+    this.api.post<{ data: { id: string; snapshot_name: string; build_version: string; url: string } }>(`/sites/${siteId}/snapshots`, {
+      name: this.newSnapshotName.trim(),
+      description: this.newSnapshotDescription.trim() || undefined,
+    }).subscribe({
+      next: (res) => {
+        this.toast.success(`Snapshot created: ${res.data.snapshot_name}`);
+        this.newSnapshotName = '';
+        this.newSnapshotDescription = '';
+        this.creatingSnapshot.set(false);
+        this.loadSnapshots(siteId);
+      },
+      error: (err) => {
+        this.toast.error(err?.error?.error?.message || 'Failed to create snapshot');
+        this.creatingSnapshot.set(false);
+      },
+    });
+  }
+
+  deleteSnapshot(snapshotId: string): void {
+    const siteId = this.snapshotModalSiteId();
+    if (!siteId) return;
+    this.api.delete(`/sites/${siteId}/snapshots/${snapshotId}`).subscribe({
+      next: () => {
+        this.toast.success('Snapshot deleted');
+        this.loadSnapshots(siteId);
+      },
+      error: () => this.toast.error('Failed to delete snapshot'),
+    });
   }
 
   startSlugEdit(): void {

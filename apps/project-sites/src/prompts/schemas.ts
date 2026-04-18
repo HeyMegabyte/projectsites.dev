@@ -266,7 +266,7 @@ export const ResearchBrandOutput = z.object({
       font: z.string().optional().default('Inter'),
       accent_shape: z.string().optional().default('circle'),
       accent_color: z.string().optional().default('#64ffda'),
-    }).optional().default({}),
+    }).nullable().optional().transform(v => v ?? { text: '', font: 'Inter', accent_shape: 'circle', accent_color: '#64ffda' }),
   }).optional().default({}),
   colors: z.object({
     primary: z.string().optional().default('#2563eb'),

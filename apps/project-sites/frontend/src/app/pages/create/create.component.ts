@@ -188,8 +188,11 @@ export class CreateComponent implements OnInit, OnDestroy {
   modalAiPrompt = '';
   modalAiProcessing = signal(false);
   aiLogoUrl: string | null = null;
+  aiLogoQuality: { quality_score: number; recommendation: string; description: string } | null = null;
   aiFaviconUrl: string | null = null;
-  aiImageUrls: { url: string; name: string }[] = [];
+  aiFaviconQuality: { quality_score: number; recommendation: string; description: string } | null = null;
+  aiImageUrls: { url: string; name: string; quality?: { quality_score: number; recommendation: string; description: string } | null }[] = [];
+  brandAssessment: { brand_maturity: string; website_quality_score: number; asset_strategy: string; recommendation: string } | null = null;
 
   // File uploads
   logoFile: File | null = null;
@@ -479,8 +482,11 @@ export class CreateComponent implements OnInit, OnDestroy {
   private discoverBrandImages(website?: string): void {
     // Clear previous AI-discovered images before loading new ones
     this.aiLogoUrl = null;
+    this.aiLogoQuality = null;
     this.aiFaviconUrl = null;
+    this.aiFaviconQuality = null;
     this.aiImageUrls = [];
+    this.brandAssessment = null;
     this.discoveringImages.set(true);
     this.cdr.detectChanges();
 
@@ -493,11 +499,18 @@ export class CreateComponent implements OnInit, OnDestroy {
         const data = res.data;
         if (data.logo?.url && !this.logoFile) {
           this.aiLogoUrl = data.logo.url;
+          this.aiLogoQuality = data.logo.quality || null;
         }
         if (data.favicon?.url && !this.faviconFile) {
           this.aiFaviconUrl = data.favicon.url;
+          this.aiFaviconQuality = data.favicon.quality || null;
         }
-        this.aiImageUrls = (data.images || []).map(img => ({ url: img.url, name: img.name }));
+        this.aiImageUrls = (data.images || []).map((img: { url: string; name: string; quality?: { quality_score: number; recommendation: string; description: string } | null }) => ({
+          url: img.url,
+          name: img.name,
+          quality: img.quality || null,
+        }));
+        this.brandAssessment = data.brand_assessment || null;
         this.discoveringImages.set(false);
         this.cdr.detectChanges();
         this.saveFormDraft();
@@ -686,8 +699,11 @@ export class CreateComponent implements OnInit, OnDestroy {
       businessCategory: this.businessCategory,
       additionalContext: this.additionalContext,
       aiLogoUrl: this.aiLogoUrl,
+      aiLogoQuality: this.aiLogoQuality,
       aiFaviconUrl: this.aiFaviconUrl,
+      aiFaviconQuality: this.aiFaviconQuality,
       aiImageUrls: this.aiImageUrls,
+      brandAssessment: this.brandAssessment,
       selectedBusiness: this.selectedBusiness(),
       savedAt: Date.now(),
     };
@@ -713,7 +729,10 @@ export class CreateComponent implements OnInit, OnDestroy {
       if (draft.businessCategory) this.businessCategory = draft.businessCategory;
       if (draft.additionalContext) this.additionalContext = draft.additionalContext;
       if (draft.aiLogoUrl) this.aiLogoUrl = draft.aiLogoUrl;
+      if (draft.aiLogoQuality) this.aiLogoQuality = draft.aiLogoQuality;
       if (draft.aiFaviconUrl) this.aiFaviconUrl = draft.aiFaviconUrl;
+      if (draft.aiFaviconQuality) this.aiFaviconQuality = draft.aiFaviconQuality;
+      if (draft.brandAssessment) this.brandAssessment = draft.brandAssessment;
       if (draft.aiImageUrls?.length) this.aiImageUrls = draft.aiImageUrls;
       if (draft.selectedBusiness?.place_id) this.selectedBusiness.set(draft.selectedBusiness);
       // Force Angular to pick up the category select value

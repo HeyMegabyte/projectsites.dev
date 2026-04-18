@@ -163,6 +163,9 @@
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
                     Files
                   </button>
+                  <button class="site-action-btn" (click)="openSnapshots(site)" data-tooltip="Manage snapshots">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4m0 12v4M2 12h4m12 0h4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg>
+                  </button>
                   <button class="site-action-btn" (click)="openLogs(site)" data-tooltip="View build history">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                     Logs
@@ -383,6 +386,52 @@
 <!-- ═══════════════════════════════════════════════════════ -->
 <!-- Logs Modal (Enhanced) -->
 <!-- ═══════════════════════════════════════════════════════ -->
+@if (snapshotModalSiteId()) {
+  <div class="modal-overlay" (click)="closeSnapshots()">
+    <div class="modal-card snapshots-modal" (click)="$event.stopPropagation()">
+      <button class="modal-close" (click)="closeSnapshots()">&times;</button>
+      <h3>Snapshots — {{ snapshotModalSiteName() }}</h3>
+      <p class="modal-subtitle">Frozen versions accessible at <code>{{ snapshotModalSlug() }}-&#123;name&#125;.projectsites.dev</code></p>
+
+      <!-- Create snapshot -->
+      <div class="snapshot-create">
+        <input type="text" placeholder="Snapshot name (e.g., v2, redesign)" [(ngModel)]="newSnapshotName" class="input-field" maxlength="30" />
+        <input type="text" placeholder="Description (optional)" [(ngModel)]="newSnapshotDescription" class="input-field" />
+        <button class="btn btn-accent btn-sm" [disabled]="creatingSnapshot() || !newSnapshotName.trim()" (click)="createSnapshot()">
+          {{ creatingSnapshot() ? 'Creating...' : 'Create Snapshot' }}
+        </button>
+      </div>
+
+      <!-- Snapshot list -->
+      @if (loadingSnapshots()) {
+        <p class="loading-text">Loading snapshots...</p>
+      } @else if (snapshots().length === 0) {
+        <p class="empty-text">No snapshots yet. The first one is created automatically when your site is built.</p>
+      } @else {
+        <div class="snapshot-list">
+          @for (snap of snapshots(); track snap.id) {
+            <div class="snapshot-item">
+              <div class="snapshot-info">
+                <a class="snapshot-name" [href]="'https://' + snapshotModalSlug() + '-' + snap.snapshot_name + '.projectsites.dev'" target="_blank" rel="noopener">
+                  {{ snap.snapshot_name }}
+                </a>
+                <span class="snapshot-version">{{ snap.build_version }}</span>
+                @if (snap.description) {
+                  <span class="snapshot-desc">{{ snap.description }}</span>
+                }
+                <span class="snapshot-date">{{ snap.created_at | date:'short' }}</span>
+              </div>
+              <button class="btn-icon danger" (click)="deleteSnapshot(snap.id)" title="Delete snapshot">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              </button>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  </div>
+}
+
 @if (logsModalSiteId()) {
   <div class="modal-overlay" (click)="closeLogs()">
     <div class="modal-card logs-modal" (click)="$event.stopPropagation()">

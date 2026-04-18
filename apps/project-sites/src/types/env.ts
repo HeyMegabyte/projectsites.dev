@@ -119,11 +119,93 @@ export interface Env {
   /** Maximum number of AI-generated images per site (default: 5). */
   MAX_GENERATED_IMAGES?: string;
 
+  // ── Media Discovery & Generation APIs ───────────────────────
+  /** YouTube Data API v3 key for video search/discovery. */
+  YOUTUBE_API_KEY?: string;
+  /** Pexels API key for royalty-free stock photos + video. */
+  PEXELS_API_KEY?: string;
+  /** Pixabay API key for royalty-free images + video + illustrations. */
+  PIXABAY_API_KEY?: string;
+  /** Unsplash API access key for high-quality royalty-free photos. */
+  UNSPLASH_ACCESS_KEY?: string;
+  /** Ideogram API key for AI image/logo generation. */
+  IDEOGRAM_API_KEY?: string;
+  /** Replicate API token for Stable Diffusion, image upscaling, bg removal. */
+  REPLICATE_API_TOKEN?: string;
+  /** Runway API key for AI video generation (Gen-2/Gen-3). */
+  RUNWAY_API_KEY?: string;
+
+  // ── Business Data APIs ────────────────────────────────────
+  /** Foursquare API key for venue photos, tips, and categories. */
+  FOURSQUARE_API_KEY?: string;
+  /** Yelp Fusion API key for reviews, ratings, and photos. */
+  YELP_API_KEY?: string;
+  /** Google Maps embed API key. */
+  GOOGLE_MAPS_API_KEY?: string;
+
+  // ── Image Optimization & Maps ─────────────────────────────
+  /** Cloudinary cloud name for image transformation CDN. */
+  CLOUDINARY_CLOUD_NAME?: string;
+  /** Cloudinary API key for upload/transform. */
+  CLOUDINARY_API_KEY?: string;
+  /** Cloudinary API secret for signed requests. */
+  CLOUDINARY_API_SECRET?: string;
+  /** Mapbox access token for custom styled interactive maps. */
+  MAPBOX_ACCESS_TOKEN?: string;
+
+  // ── Brand Discovery APIs ──────────────────────────────────
+  /** Logo.dev API token for high-res company logos by domain. */
+  LOGODEV_TOKEN?: string;
+  /** Brandfetch API key for full brand kits (logo, colors, fonts) by domain. */
+  BRANDFETCH_API_KEY?: string;
+
+  // ── Reviews & Trust APIs ──────────────────────────────────
+  /** TripAdvisor Content API key for hospitality reviews/ratings. */
+  TRIPADVISOR_API_KEY?: string;
+  /** Trustpilot API key for business trust scores and reviews. */
+  TRUSTPILOT_API_KEY?: string;
+
+  // ── Generative AI APIs ────────────────────────────────────
+  /** ElevenLabs API key for AI voiceover generation. */
+  ELEVENLABS_API_KEY?: string;
+  /** Stability AI API key for Stable Diffusion image generation. */
+  STABILITY_API_KEY?: string;
+  /** Remove.bg API key for background removal from product/logo images. */
+  REMOVEBG_API_KEY?: string;
+
+  // ── Animation & UX ────────────────────────────────────────
+  /** LottieFiles API key for animated illustrations per business category. */
+  LOTTIEFILES_API_KEY?: string;
+
+  // ── SEO & Quality Gates ───────────────────────────────────
+  /** Google PageSpeed Insights API key (can reuse GOOGLE_MAPS_API_KEY). */
+  PAGESPEED_API_KEY?: string;
+  /** GTmetrix API key for real performance scoring. */
+  GTMETRIX_API_KEY?: string;
+
+  // ── Contact & Location ────────────────────────────────────
+  /** Hunter.io API key for discovering business email patterns. */
+  HUNTER_API_KEY?: string;
+  /** What3Words API key for precise location addressing. */
+  WHAT3WORDS_API_KEY?: string;
+  /** Abstract API key for geolocation (timezone, currency). */
+  ABSTRACT_GEO_API_KEY?: string;
+
+  // ── Analytics Embeds ──────────────────────────────────────
+  /** Microsoft Clarity project ID for free heatmaps/session recordings. */
+  CLARITY_PROJECT_ID?: string;
+  /** Plausible Analytics domain for privacy-friendly analytics. */
+  PLAUSIBLE_DOMAIN?: string;
+
   // ── Cloudflare API ────────────────────────────────────────
   /** Cloudflare API token for Custom Hostnames (Cloudflare for SaaS). */
   CF_API_TOKEN: string;
   /** Cloudflare zone ID for `megabyte.space`. */
   CF_ZONE_ID: string;
+  /** Cloudflare Access Service Token client ID (bypasses bot protection for container builds). */
+  CF_ACCESS_CLIENT_ID?: string;
+  /** Cloudflare Access Service Token client secret. */
+  CF_ACCESS_CLIENT_SECRET?: string;
 
   // ── Email (Resend / SendGrid) ────────────────────────────
   /** Resend API key for transactional email. Preferred provider. */

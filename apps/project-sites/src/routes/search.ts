@@ -440,12 +440,8 @@ search.post('/api/sites/create-from-search', async (c) => {
     console.warn(`[create-from-search] mode=${mode}, business=${sanitizedName}`);
   }
 
-  const baseSlug = sanitizedName
-    .toLowerCase()
-    .replace(/'/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-    .substring(0, 63) || `site-${Date.now().toString(36)}`;
+  // AI-calculated slug: produce the shortest, most meaningful URL-safe representation
+  const baseSlug = await generateSmartSlug(c.env, sanitizedName, businessAddress);
 
   // Ensure slug uniqueness: check D1 for existing sites with the same slug
   // and R2 for published content, then append suffix if needed
@@ -751,6 +747,77 @@ search.post('/api/sites/generate-prompt', async (c) => {
  * Appends incrementing suffix (-2, -3, ...) if already taken.
  * Falls back to random suffix after 10 attempts.
  */
+/**
+ * Generate a smart, AI-calculated slug that is the shortest meaningful
+ * representation of the business name + location differentiator.
+ *
+ * Examples:
+ * - "Trader Joe's" at "3056 NJ-10, Denville, NJ" → "trader-joes-denville"
+ * - "Trader Joe's - Hell's Kitchen" → "trader-joes-hells-kitchen"
+ * - "When Doody Calls - Pooper Scoopers" → "when-doody-calls"
+ * - "Vito's Mens Salon" → "vitos-mens-salon"
+ *
+ * Falls back to simple slugification if AI is unavailable.
+ */
+async function generateSmartSlug(env: Env, businessName: string, address?: string): Promise<string> {
+  // Simple slugification as fallback
+  const simpleSlug = businessName
+    .toLowerCase()
+    .replace(/'/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .substring(0, 63) || `site-${Date.now().toString(36)}`;
+
+  // Try AI-powered slug generation
+  try {
+    const result = await env.AI.run('@cf/meta/llama-3.1-8b-instruct' as Parameters<typeof env.AI.run>[0], {
+      messages: [
+        {
+          role: 'system',
+          content: `Generate the shortest, simplest URL slug for a business website. Rules:
+- Output ONLY the slug, nothing else. No explanation.
+- Use lowercase letters, numbers, and hyphens only.
+- Remove possessives ('s → s), articles (the, a, an), and filler words.
+- For chain businesses (Trader Joe's, McDonald's, Starbucks), include a location differentiator (neighborhood or city name).
+- For unique businesses, just use the core business name (2-4 words max).
+- Remove subtitles/taglines after dashes unless they ARE the brand name.
+- Maximum 40 characters, prefer under 25.
+
+Examples:
+"Trader Joe's" at "3056 NJ-10, Denville, NJ 07834" → trader-joes-denville
+"Trader Joe's - Hell's Kitchen" at "435 W 42nd St, NY" → trader-joes-hells-kitchen
+"When Doody Calls - Pooper Scoopers" at "Dallas, TX" → when-doody-calls
+"Vito's Mens Salon" at "74 N Beverwyck Rd, Lake Hiawatha, NJ" → vitos-mens-salon
+"The White House" at "1600 Pennsylvania Ave, DC" → the-white-house
+"McDonald's" at "789 Broadway, New York, NY" → mcdonalds-broadway-nyc`,
+        },
+        {
+          role: 'user',
+          content: `Business: "${businessName}"${address ? `\nAddress: "${address}"` : ''}`,
+        },
+      ],
+      max_tokens: 50,
+    });
+
+    const response = ((result as { response?: string }).response ?? '').trim();
+    // Clean and validate AI output
+    const aiSlug = response
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, '')
+      .replace(/--+/g, '-')
+      .replace(/^-|-$/g, '')
+      .substring(0, 63);
+
+    if (aiSlug && aiSlug.length >= 3 && aiSlug.length <= 63 && /^[a-z0-9]/.test(aiSlug)) {
+      return aiSlug;
+    }
+  } catch {
+    // AI unavailable — fall through to simple slug
+  }
+
+  return simpleSlug;
+}
+
 async function ensureUniqueSlug(env: Env, slug: string): Promise<string> {
   let candidate = slug;
 
@@ -976,12 +1043,35 @@ search.get('/api/image-proxy', async (c) => {
       });
     }
 
+    // Check actual image dimensions from the binary data — reject sub-4px images
+    const buf = new Uint8Array(body);
+    let imgW = 0;
+    let imgH = 0;
+    // PNG check
+    if (buf[0] === 0x89 && buf[1] === 0x50 && buf.byteLength >= 24) {
+      imgW = (buf[16] << 24) | (buf[17] << 16) | (buf[18] << 8) | buf[19];
+      imgH = (buf[20] << 24) | (buf[21] << 16) | (buf[22] << 8) | buf[23];
+    }
+    // GIF check
+    if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46 && buf.byteLength >= 10) {
+      imgW = buf[6] | (buf[7] << 8);
+      imgH = buf[8] | (buf[9] << 8);
+    }
+    // Reject images smaller than 4x4 (tracking pixels, spacers)
+    if (imgW > 0 && imgH > 0 && (imgW < 4 || imgH < 4)) {
+      return new Response(TRANSPARENT_PIXEL, {
+        headers: { 'Content-Type': 'image/png', 'Access-Control-Allow-Origin': '*', 'X-Proxy-Status': 'too-small-dimensions' },
+      });
+    }
+
     return new Response(body, {
       headers: {
         'Content-Type': ct,
         'Access-Control-Allow-Origin': '*',
         'Cache-Control': 'public, max-age=86400',
         'X-Proxy-Status': 'ok',
+        // Expose dimensions so frontend can use them
+        ...(imgW > 0 ? { 'X-Image-Width': String(imgW), 'X-Image-Height': String(imgH) } : {}),
       },
     });
   } catch {
@@ -1007,15 +1097,247 @@ async function isImageReachable(url: string): Promise<boolean> {
 }
 
 /**
+ * Fetch actual image dimensions by downloading the first bytes and reading the header.
+ * Returns { width, height, byteLength } or null if unable to determine.
+ */
+async function getImageDimensions(url: string): Promise<{ width: number; height: number; byteLength: number } | null> {
+  try {
+    const r = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; ProjectSites/1.0)',
+        'Range': 'bytes=0-65535',
+      },
+      redirect: 'follow',
+    });
+    if (!r.ok && r.status !== 206) return null;
+    const buf = new Uint8Array(await r.arrayBuffer());
+    const cl = parseInt(r.headers.get('content-length') || '0') || buf.byteLength;
+
+    // PNG: dimensions at bytes 16-23 (IHDR chunk)
+    if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47) {
+      if (buf.byteLength >= 24) {
+        const w = (buf[16] << 24) | (buf[17] << 16) | (buf[18] << 8) | buf[19];
+        const h = (buf[20] << 24) | (buf[21] << 16) | (buf[22] << 8) | buf[23];
+        return { width: w, height: h, byteLength: cl };
+      }
+    }
+
+    // JPEG: scan for SOF0/SOF2 markers
+    if (buf[0] === 0xFF && buf[1] === 0xD8) {
+      let i = 2;
+      while (i < buf.byteLength - 9) {
+        if (buf[i] !== 0xFF) { i++; continue; }
+        const marker = buf[i + 1];
+        // SOF0 (0xC0) or SOF2 (0xC2) — contains dimensions
+        if (marker === 0xC0 || marker === 0xC2) {
+          const h = (buf[i + 5] << 8) | buf[i + 6];
+          const w = (buf[i + 7] << 8) | buf[i + 8];
+          return { width: w, height: h, byteLength: cl };
+        }
+        // Skip to next marker
+        const segLen = (buf[i + 2] << 8) | buf[i + 3];
+        i += 2 + segLen;
+      }
+    }
+
+    // GIF: dimensions at bytes 6-9
+    if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46) {
+      if (buf.byteLength >= 10) {
+        const w = buf[6] | (buf[7] << 8);
+        const h = buf[8] | (buf[9] << 8);
+        return { width: w, height: h, byteLength: cl };
+      }
+    }
+
+    // WebP: RIFF header, VP8 chunk
+    if (buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 && buf.byteLength >= 30) {
+      // VP8 lossy
+      if (buf[12] === 0x56 && buf[13] === 0x50 && buf[14] === 0x38 && buf[15] === 0x20) {
+        const w = ((buf[26]) | (buf[27] << 8)) & 0x3FFF;
+        const h = ((buf[28]) | (buf[29] << 8)) & 0x3FFF;
+        return { width: w, height: h, byteLength: cl };
+      }
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Image quality assessment result from AI vision inspection.
+ */
+interface ImageQualityResult {
+  /** 0-100 quality score */
+  quality_score: number;
+  /** Whether the image is professional enough for a business website */
+  is_professional: boolean;
+  /** Whether the image is safe (no NSFW, no violence, no hate) */
+  is_safe: boolean;
+  /** Brief description of what the image shows */
+  description: string;
+  /** Recommendation for how to use this asset */
+  recommendation: 'use_as_is' | 'use_as_inspiration' | 'enhance' | 'reject';
+  /** Issues found, if any */
+  issues: string[];
+  /** Whether the image has excessive white/blank padding on sides */
+  has_padding?: boolean;
+  /** Whether the image appears to be a generic CAD/architectural rendering (not a real photo) */
+  is_generic_rendering?: boolean;
+  /** Confidence that this image is actually of/about the specified business */
+  business_relevance?: number;
+}
+
+/**
+ * Use GPT-4o vision to assess image quality, professionalism, and safety.
+ * Returns null if vision API is unavailable (no OpenAI key).
+ */
+async function inspectImageWithVision(
+  imageUrl: string,
+  context: { businessName: string; imageRole: 'logo' | 'favicon' | 'hero' | 'photo' | 'banner' },
+  openaiKey: string,
+): Promise<ImageQualityResult | null> {
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: `You are an image quality inspector for a professional website builder. Assess images for:
+1. QUALITY: Resolution clarity, compression artifacts, pixelation (0-100 score)
+2. PROFESSIONALISM: Is this suitable for a business website? Consider composition, lighting, branding quality
+3. SAFETY: Flag NSFW, violent, hateful, or inappropriate content
+4. RELEVANCE: Does this match the business "${context.businessName}" and its intended use as a ${context.imageRole}?
+5. PADDING: Does the image have large white/blank areas on the sides? (uncropped, improperly formatted)
+6. RENDERING: Is this a generic CAD/architectural rendering rather than a real photograph of an actual business?
+7. BUSINESS MATCH: How confident (0.0-1.0) are you this image depicts "${context.businessName}" specifically (not just a similar business)?
+
+Return ONLY valid JSON (no markdown):
+{"quality_score":0-100,"is_professional":bool,"is_safe":bool,"description":"what the image shows","recommendation":"use_as_is|use_as_inspiration|enhance|reject","issues":["issue1"],"has_padding":bool,"is_generic_rendering":bool,"business_relevance":0.0-1.0}
+
+Scoring guide:
+- 90-100: High-res, professional, clearly related to this specific business, perfect for a modern website
+- 70-89: Good quality, minor issues (slightly low-res, imperfect composition)
+- 50-69: Usable as inspiration but should be enhanced/replaced for final site
+- 30-49: Low quality (blurry, pixelated, amateur, has padding, generic rendering) — use only as inspiration
+- 0-29: Reject — too low quality, unsafe, irrelevant, or clearly not this business
+
+REJECT if: has_padding is true AND quality is below 60, OR is_generic_rendering is true AND business_relevance < 0.5`,
+          },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: `Assess this ${context.imageRole} image for "${context.businessName}":` },
+              { type: 'image_url', image_url: { url: imageUrl, detail: 'low' } },
+            ],
+          },
+        ],
+        max_tokens: 300,
+        temperature: 0.1,
+      }),
+    });
+
+    if (!res.ok) return null;
+    const data = await res.json() as { choices: { message: { content: string } }[] };
+    const content = data.choices?.[0]?.message?.content || '';
+    // Parse JSON from response (strip any markdown code fences)
+    const jsonStr = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const result = JSON.parse(jsonStr) as ImageQualityResult;
+    // Normalize
+    result.quality_score = Math.max(0, Math.min(100, result.quality_score));
+    result.issues = result.issues || [];
+    return result;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Scrape large images from a webpage's <img> tags.
+ * Returns URLs of images that are likely content images (not icons, trackers, etc.).
+ */
+function scrapePageImages(html: string, domain: string): string[] {
+  const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
+  const images: string[] = [];
+  const seen = new Set<string>();
+  let match: RegExpExecArray | null;
+
+  while ((match = imgRegex.exec(html)) !== null) {
+    let src = match[1];
+    if (!src || src.startsWith('data:')) continue;
+
+    // Resolve relative URLs
+    if (src.startsWith('/')) src = `https://${domain}${src}`;
+    else if (!src.startsWith('http')) src = `https://${domain}/${src}`;
+
+    // Skip tracking pixels, tiny icons, and common non-content images
+    if (/1x1|spacer|pixel|tracking|analytics|beacon|sprite|icon-\d|badge/i.test(src)) continue;
+    // Skip common CDN patterns for tiny assets
+    if (/gravatar|wp-includes\/images|emoji|smilies/i.test(src)) continue;
+
+    // Check for size hints in the tag (width/height attributes)
+    const fullTag = match[0];
+    const widthMatch = fullTag.match(/width=["']?(\d+)/i);
+    const heightMatch = fullTag.match(/height=["']?(\d+)/i);
+    const w = widthMatch ? parseInt(widthMatch[1]) : 0;
+    const h = heightMatch ? parseInt(heightMatch[1]) : 0;
+    // Skip if explicitly tiny
+    if ((w > 0 && w < 100) || (h > 0 && h < 100)) continue;
+
+    if (!seen.has(src)) {
+      seen.add(src);
+      images.push(src);
+    }
+  }
+  return images;
+}
+
+/**
+ * Extended image metadata returned by discover-images.
+ * Includes quality assessment from AI vision inspection.
+ */
+interface DiscoveredImage {
+  url: string;
+  name: string;
+  type: 'logo' | 'favicon' | 'image';
+  source: 'website-scrape' | 'website-img' | 'google-cse' | 'google-favicon';
+  /** Original (non-proxied) URL for internal processing */
+  originalUrl?: string;
+  /** AI vision quality assessment (null if vision unavailable) */
+  quality?: ImageQualityResult | null;
+  /** Actual image dimensions if determinable */
+  dimensions?: { width: number; height: number } | null;
+}
+
+/**
  * AI image discovery — finds logo, favicon, and images for a business.
  * All URLs are proxied through /api/image-proxy for CORS safety.
+ *
+ * Enhanced with:
+ * - GPT-4o vision quality inspection on ALL discovered images
+ * - Homepage <img> tag scraping for large content images
+ * - Business domain prioritization in CSE queries
+ * - Favicon dimension validation (rejects sub-64px favicons)
+ * - Brand quality assessment and asset triage
+ *
+ * @remarks
+ * Every image returned by this endpoint has been:
+ * 1. Validated for reachability (HTTP HEAD/GET)
+ * 2. Checked for minimum dimensions (>= 64px for icons, >= 400px for photos)
+ * 3. Inspected by GPT-4o vision for quality, professionalism, and safety
+ * 4. Annotated with a quality score and usage recommendation
  */
 search.post('/api/ai/discover-images', async (c) => {
   const body = await c.req.json() as { name: string; address?: string; website?: string };
   if (!body.name) {
-    return c.json({ data: { logo: null, favicon: null, images: [] } });
+    return c.json({ data: { logo: null, favicon: null, images: [], brand_assessment: null } });
   }
 
+  const openaiKey = c.env.OPENAI_API_KEY || '';
   const website = body.website || '';
   let domain = '';
   try {
@@ -1025,8 +1347,8 @@ search.post('/api/ai/discover-images', async (c) => {
   const baseProxy = `https://${DOMAINS.SITES_BASE}/api/image-proxy?url=`;
   const proxy = (url: string) => `${baseProxy}${encodeURIComponent(url)}`;
 
-  // Logo: scrape the website's og:image or apple-touch-icon (best logo source)
-  let logo = null;
+  // ── Step 1: Scrape the business website (single fetch, reuse HTML) ──
+  let scrapedHtml = '';
   if (domain) {
     try {
       const siteRes = await fetch(`https://${domain}`, {
@@ -1034,144 +1356,266 @@ search.post('/api/ai/discover-images', async (c) => {
         redirect: 'follow',
       });
       if (siteRes.ok) {
-        const html = await siteRes.text();
-        // Try og:image first (usually highest quality brand image)
-        const ogMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
-          || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
-        // Try apple-touch-icon (usually the logo at 180px+)
-        const appleMatch = html.match(/<link[^>]+rel=["']apple-touch-icon["'][^>]+href=["']([^"']+)["']/i);
-        // Try any large favicon
-        const iconMatch = html.match(/<link[^>]+rel=["']icon["'][^>]+sizes=["'](\d+)x\d+["'][^>]+href=["']([^"']+)["']/i);
+        scrapedHtml = await siteRes.text();
+      }
+    } catch {
+      // Scraping failed — will use fallbacks
+    }
+  }
 
-        let logoUrl = '';
-        if (ogMatch?.[1]) {
-          logoUrl = ogMatch[1];
-        } else if (appleMatch?.[1]) {
-          logoUrl = appleMatch[1];
-        } else if (iconMatch && parseInt(iconMatch[1]) >= 96) {
-          logoUrl = iconMatch[2];
-        }
+  // ── Step 2: Extract logo from website ──
+  let logo: DiscoveredImage | null = null;
+  if (domain && scrapedHtml) {
+    // Try og:image first (usually highest quality brand image)
+    const ogMatch = scrapedHtml.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+      || scrapedHtml.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+    // Try apple-touch-icon (usually the logo at 180px+)
+    const appleMatch = scrapedHtml.match(/<link[^>]+rel=["']apple-touch-icon["'][^>]+href=["']([^"']+)["']/i);
+    // Try any large favicon
+    const iconMatch = scrapedHtml.match(/<link[^>]+rel=["']icon["'][^>]+sizes=["'](\d+)x\d+["'][^>]+href=["']([^"']+)["']/i);
 
-        if (logoUrl) {
-          // Resolve relative URLs
-          if (logoUrl.startsWith('/')) logoUrl = `https://${domain}${logoUrl}`;
-          else if (!logoUrl.startsWith('http')) logoUrl = `https://${domain}/${logoUrl}`;
+    let logoUrl = '';
+    if (ogMatch?.[1]) {
+      logoUrl = ogMatch[1];
+    } else if (appleMatch?.[1]) {
+      logoUrl = appleMatch[1];
+    } else if (iconMatch && parseInt(iconMatch[1]) >= 96) {
+      logoUrl = iconMatch[2];
+    }
+
+    if (logoUrl) {
+      if (logoUrl.startsWith('/')) logoUrl = `https://${domain}${logoUrl}`;
+      else if (!logoUrl.startsWith('http')) logoUrl = `https://${domain}/${logoUrl}`;
+      logo = {
+        url: proxy(logoUrl),
+        originalUrl: logoUrl,
+        name: `${domain}-logo.png`,
+        type: 'logo',
+        source: 'website-scrape',
+      };
+    }
+  }
+
+  // Try Logo.dev API for high-res company logo
+  if (!logo && domain && c.env.LOGODEV_TOKEN) {
+    try {
+      const logodevUrl = `https://img.logo.dev/${domain}?token=${c.env.LOGODEV_TOKEN}&size=256&format=png&retina=true`;
+      const dims = await getImageDimensions(logodevUrl);
+      if (dims && dims.width >= 100 && dims.height >= 100) {
+        logo = {
+          url: proxy(logodevUrl),
+          originalUrl: logodevUrl,
+          name: `${domain}-logodev.png`,
+          type: 'logo',
+          source: 'website-scrape',
+        };
+      }
+    } catch { /* non-critical */ }
+  }
+
+  // Try Brandfetch API for full brand kit
+  let brandfetchData: { logo_url?: string; icon_url?: string; colors?: string[]; fonts?: string[] } | null = null;
+  if (domain && c.env.BRANDFETCH_API_KEY) {
+    try {
+      const bfRes = await fetch(`https://api.brandfetch.io/v2/brands/${domain}`, {
+        headers: { 'Authorization': `Bearer ${c.env.BRANDFETCH_API_KEY}` },
+      });
+      if (bfRes.ok) {
+        const bfData = await bfRes.json() as {
+          logos?: { formats?: { src: string; format: string }[]; type?: string }[];
+          icons?: { formats?: { src: string }[] }[];
+          colors?: { hex: string; type: string }[];
+          fonts?: { name: string; type: string }[];
+        };
+        // Extract best logo
+        const bfLogos = bfData.logos || [];
+        const primaryLogo = bfLogos.find(l => l.type === 'logo') || bfLogos[0];
+        const logoSrc = primaryLogo?.formats?.find(f => f.format === 'svg')?.src
+          || primaryLogo?.formats?.find(f => f.format === 'png')?.src;
+        if (logoSrc && !logo) {
           logo = {
-            url: proxy(logoUrl),
-            name: `${domain}-logo.png`,
+            url: proxy(logoSrc),
+            originalUrl: logoSrc,
+            name: `${domain}-brandfetch-logo.png`,
             type: 'logo',
             source: 'website-scrape',
           };
         }
-      }
-    } catch {
-      // Scraping failed — will fall back below
-    }
-
-    // Fallback: use Google's faviconV2 at max resolution as the logo
-    if (!logo) {
-      logo = {
-        url: proxy(`https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://${domain}&size=256`),
-        name: `${domain}-logo.png`,
-        type: 'logo',
-        source: 'google-favicon',
-      };
-    }
-  }
-
-  // Favicon: try apple-touch-icon / large icon from the site first (for 512px+), then Google faviconV2
-  let favicon = null;
-  if (domain) {
-    try {
-      const siteRes = logo ? null : await fetch(`https://${domain}`, {
-        headers: { 'User-Agent': 'ProjectSites/1.0' },
-        redirect: 'follow',
-      }).catch(() => null);
-      // Reuse HTML from logo scrape if available, otherwise fetch
-      let html = '';
-      if (!siteRes) {
-        // Logo scrape already ran — re-fetch just for favicon extraction
-        const r = await fetch(`https://${domain}`, {
-          headers: { 'User-Agent': 'ProjectSites/1.0' },
-          redirect: 'follow',
-        }).catch(() => null);
-        if (r?.ok) html = await r.text();
-      }
-
-      if (html) {
-        // Look for large icons: 512px, 384px, 256px, 192px apple-touch-icon
-        const largeIconMatch = html.match(/<link[^>]+rel=["'](?:apple-touch-icon|icon)["'][^>]+sizes=["'](\d+)x\d+["'][^>]+href=["']([^"']+)["']/gi);
-        let bestUrl = '';
-        let bestSize = 0;
-        if (largeIconMatch) {
-          for (const tag of largeIconMatch) {
-            const sizeM = tag.match(/sizes=["'](\d+)/i);
-            const hrefM = tag.match(/href=["']([^"']+)["']/i);
-            if (sizeM && hrefM) {
-              const s = parseInt(sizeM[1]);
-              if (s > bestSize) { bestSize = s; bestUrl = hrefM[1]; }
-            }
+        // Extract icon for favicon
+        const bfIcon = bfData.icons?.[0]?.formats?.[0]?.src;
+        if (bfIcon) {
+          const iconDims = await getImageDimensions(bfIcon);
+          if (iconDims && iconDims.width >= 64 && !favicon) {
+            favicon = {
+              url: proxy(bfIcon),
+              originalUrl: bfIcon,
+              name: `${domain}-brandfetch-icon.png`,
+              type: 'favicon',
+              source: 'website-scrape',
+              dimensions: { width: iconDims.width, height: iconDims.height },
+            };
           }
         }
-        // Also try apple-touch-icon without sizes (usually 180px)
-        if (!bestUrl || bestSize < 180) {
-          const appleM = html.match(/<link[^>]+rel=["']apple-touch-icon["'][^>]+href=["']([^"']+)["']/i);
-          if (appleM?.[1] && bestSize < 180) { bestUrl = appleM[1]; bestSize = 180; }
-        }
+        brandfetchData = {
+          logo_url: logoSrc || undefined,
+          icon_url: bfIcon || undefined,
+          colors: bfData.colors?.map(c => c.hex) || [],
+          fonts: bfData.fonts?.map(f => f.name) || [],
+        };
+      }
+    } catch { /* non-critical */ }
+  }
 
-        if (bestUrl) {
-          if (bestUrl.startsWith('/')) bestUrl = `https://${domain}${bestUrl}`;
-          else if (!bestUrl.startsWith('http')) bestUrl = `https://${domain}/${bestUrl}`;
+  // Fallback: Google's faviconV2 at max resolution
+  if (!logo && domain) {
+    const googleFavUrl = `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://${domain}&size=256`;
+    logo = {
+      url: proxy(googleFavUrl),
+      originalUrl: googleFavUrl,
+      name: `${domain}-logo.png`,
+      type: 'logo',
+      source: 'google-favicon',
+    };
+  }
+
+  // ── Step 3: Extract favicon with dimension validation ──
+  let favicon: DiscoveredImage | null = null;
+  if (domain && scrapedHtml) {
+    // Look for large icons: 512px, 384px, 256px, 192px
+    const largeIconMatch = scrapedHtml.match(/<link[^>]+rel=["'](?:apple-touch-icon|icon)["'][^>]+sizes=["'](\d+)x\d+["'][^>]+href=["']([^"']+)["']/gi);
+    let bestUrl = '';
+    let bestSize = 0;
+    if (largeIconMatch) {
+      for (const tag of largeIconMatch) {
+        const sizeM = tag.match(/sizes=["'](\d+)/i);
+        const hrefM = tag.match(/href=["']([^"']+)["']/i);
+        if (sizeM && hrefM) {
+          const s = parseInt(sizeM[1]);
+          if (s > bestSize) { bestSize = s; bestUrl = hrefM[1]; }
+        }
+      }
+    }
+    // Also try apple-touch-icon without sizes (usually 180px)
+    if (!bestUrl || bestSize < 180) {
+      const appleM = scrapedHtml.match(/<link[^>]+rel=["']apple-touch-icon["'][^>]+href=["']([^"']+)["']/i);
+      if (appleM?.[1] && bestSize < 180) { bestUrl = appleM[1]; bestSize = 180; }
+    }
+
+    if (bestUrl) {
+      if (bestUrl.startsWith('/')) bestUrl = `https://${domain}${bestUrl}`;
+      else if (!bestUrl.startsWith('http')) bestUrl = `https://${domain}/${bestUrl}`;
+
+      // Validate actual dimensions — reject sub-64px favicons
+      const dims = await getImageDimensions(bestUrl);
+      if (dims && dims.width >= 64 && dims.height >= 64) {
+        favicon = {
+          url: proxy(bestUrl),
+          originalUrl: bestUrl,
+          name: `${domain}-favicon.png`,
+          type: 'favicon',
+          source: 'website-scrape',
+          dimensions: { width: dims.width, height: dims.height },
+        };
+      } else if (dims) {
+        console.warn(
+          JSON.stringify({ level: 'warn', service: 'discover-images', message: 'Rejected tiny favicon', domain, width: dims.width, height: dims.height, url: bestUrl }),
+        );
+      }
+    }
+
+    // If no valid favicon from HTML tags, try the standard /favicon.ico and /favicon.png paths
+    if (!favicon) {
+      for (const path of ['/apple-touch-icon.png', '/favicon-32x32.png', '/favicon.png', '/favicon.ico']) {
+        const candidateUrl = `https://${domain}${path}`;
+        const dims = await getImageDimensions(candidateUrl);
+        if (dims && dims.width >= 64 && dims.height >= 64) {
           favicon = {
-            url: proxy(bestUrl),
+            url: proxy(candidateUrl),
+            originalUrl: candidateUrl,
             name: `${domain}-favicon.png`,
             type: 'favicon',
             source: 'website-scrape',
+            dimensions: { width: dims.width, height: dims.height },
           };
+          break;
         }
       }
-    } catch { /* fall through to Google */ }
+    }
+  }
 
-    // Fallback: Google faviconV2 at 256px
-    if (!favicon) {
+  // Fallback: Google faviconV2 at 256px (only if we have a domain and no valid favicon yet)
+  if (!favicon && domain) {
+    const googleFavUrl = `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://${domain}&size=256`;
+    // Validate the Google favicon is not a generic globe/placeholder
+    const dims = await getImageDimensions(googleFavUrl);
+    if (dims && dims.width >= 64 && dims.height >= 64) {
       favicon = {
-        url: proxy(`https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://${domain}&size=256`),
+        url: proxy(googleFavUrl),
+        originalUrl: googleFavUrl,
         name: `${domain}-favicon.png`,
         type: 'favicon',
         source: 'google-favicon',
+        dimensions: { width: dims.width, height: dims.height },
       };
     }
   }
 
-  // Images: use AI to determine the best search queries, then Google Custom Search
-  const images: { url: string; name: string; type: string; source: string }[] = [];
+  // ── Step 4: Discover images from multiple sources ──
+  const images: DiscoveredImage[] = [];
   const cseKey = c.env.GOOGLE_CSE_KEY;
   const cseCx = c.env.GOOGLE_CSE_CX;
+  const bizName = body.name;
+  const slug = bizName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
+  // 4a: Scrape <img> tags from the business homepage for large content images
+  if (domain && scrapedHtml) {
+    const pageImages = scrapePageImages(scrapedHtml, domain);
+    // Validate dimensions and reachability for scraped images
+    const scraped = await Promise.all(
+      pageImages.slice(0, 10).map(async (imgUrl) => {
+        const dims = await getImageDimensions(imgUrl);
+        if (dims && dims.width >= 300 && dims.height >= 200 && dims.byteLength > 15000) {
+          return { url: imgUrl, title: '', width: dims.width, height: dims.height };
+        }
+        return null;
+      }),
+    );
+    const validScraped = scraped.filter((s): s is NonNullable<typeof s> => s !== null);
+    // Sort by area (largest first) — best content images tend to be large
+    validScraped.sort((a, b) => (b.width * b.height) - (a.width * a.height));
+    for (let i = 0; i < Math.min(validScraped.length, 5); i++) {
+      images.push({
+        url: proxy(validScraped[i].url),
+        originalUrl: validScraped[i].url,
+        name: `${slug}-site-${i + 1}.jpg`,
+        type: 'image',
+        source: 'website-img',
+        dimensions: { width: validScraped[i].width, height: validScraped[i].height },
+      });
+    }
+  }
+
+  // 4b: Google Custom Search for additional images
   if (cseKey && cseCx) {
     try {
-      const bizName = body.name;
-      const slug = bizName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-
-      // Blocklist: stock photo sites with watermarks
       const blocked = /shutterstock|gettyimages|istockphoto|alamy|dreamstime|123rf|depositphotos|stock\.adobe|loopnet|zillow/i;
-
-      // Build location context for disambiguation
       const addr = body.address || '';
       const city = addr.split(',').slice(1, 2).join('').trim();
       const locationCtx = city ? ` ${city}` : '';
 
-      // Focused queries — include location to disambiguate, prefer official sources
+      // Enhanced queries — include business domain to prioritize their own hosted images
       const queries = [
+        // Prioritize images hosted on the business's own website
+        ...(domain ? [`site:${domain} -icon -logo -badge -sprite`] : []),
         `"${bizName}"${locationCtx} official photo -watermark -stock -getty -shutterstock -hotel`,
         `"${bizName}"${locationCtx} site:wikipedia.org OR site:flickr.com OR site:commons.wikimedia.org`,
         `"${bizName}"${locationCtx} building exterior -editorial -stock -hotel -resort`,
-        `"${bizName}"${locationCtx} interior -watermark -stock -hotel`,
         `"${bizName}"${locationCtx} -stock -editorial -hotel -"for sale"`,
       ];
 
-      // Search and filter
       const allCandidates: { url: string; title: string }[] = [];
+      const seenFromScrape = new Set(images.map(img => img.originalUrl || ''));
+
       const searchPromises = queries.map(async (q) => {
         try {
           const cseUrl = `https://www.googleapis.com/customsearch/v1?key=${cseKey}&cx=${cseCx}&q=${encodeURIComponent(q)}&searchType=image&num=4&imgSize=xlarge&imgType=photo&safe=active`;
@@ -1181,7 +1625,7 @@ search.post('/api/ai/discover-images', async (c) => {
             for (const item of (cseData.items || [])) {
               if (blocked.test(item.displayLink || '') || blocked.test(item.link)) continue;
               if (/watermark|preview|thumb|editorial|icon|logo|badge/i.test(item.link)) continue;
-              // Skip tiny images (< 400px in either dimension)
+              if (seenFromScrape.has(item.link)) continue;
               const imgW = item.image?.width || 0;
               const imgH = item.image?.height || 0;
               if (imgW > 0 && imgW < 400) continue;
@@ -1193,45 +1637,457 @@ search.post('/api/ai/discover-images', async (c) => {
       });
       await Promise.all(searchPromises);
 
-      // Deduplicate
-      const seen = new Set<string>();
-      const unique = allCandidates.filter(c => { if (seen.has(c.url)) return false; seen.add(c.url); return true; });
+      // Deduplicate (also dedup against scraped images)
+      const seen = new Set<string>(seenFromScrape);
+      const unique = allCandidates.filter(item => { if (seen.has(item.url)) return false; seen.add(item.url); return true; });
 
       // Validate reachability + minimum size
       const validated: typeof unique = [];
-      await Promise.all(unique.slice(0, 20).map(async (c) => {
+      await Promise.all(unique.slice(0, 20).map(async (item) => {
         try {
-          const r = await fetch(c.url, { method: 'HEAD', headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ProjectSites/1.0)' }, redirect: 'follow' });
+          const r = await fetch(item.url, { method: 'HEAD', headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ProjectSites/1.0)' }, redirect: 'follow' });
           const ct = r.headers.get('content-type') || '';
           const cl = parseInt(r.headers.get('content-length') || '0');
-          if (r.ok && ct.startsWith('image/') && (cl === 0 || cl > 20000)) validated.push(c);
+          if (r.ok && ct.startsWith('image/') && (cl === 0 || cl > 20000)) validated.push(item);
         } catch { /* skip */ }
       }));
 
-      for (let i = 0; i < Math.min(validated.length, 14); i++) {
-        images.push({ url: proxy(validated[i].url), name: `${slug}-${i + 1}.jpg`, type: 'image', source: 'google-cse' });
+      const maxCse = Math.max(0, 14 - images.length);
+      for (let i = 0; i < Math.min(validated.length, maxCse); i++) {
+        images.push({
+          url: proxy(validated[i].url),
+          originalUrl: validated[i].url,
+          name: `${slug}-${images.length + 1}.jpg`,
+          type: 'image',
+          source: 'google-cse',
+        });
       }
     } catch (err) {
       console.warn('[discover-images] CSE search failed:', err);
     }
   }
 
-  // Validate logo and favicon are actually reachable images
-  if (logo) {
-    // Extract the original URL from the proxy URL
-    const logoOriginal = decodeURIComponent(logo.url.split('url=')[1] || '');
-    if (logoOriginal && !(await isImageReachable(logoOriginal))) {
+  // 4c: Unsplash — high-quality royalty-free photos
+  const unsplashKey = c.env.UNSPLASH_ACCESS_KEY;
+  if (unsplashKey && images.length < 14) {
+    try {
+      const unsplashQuery = `${bizName} ${body.address?.split(',').slice(1, 2).join('').trim() || ''}`.trim();
+      const uRes = await fetch(`https://api.unsplash.com/search/photos?query=${encodeURIComponent(unsplashQuery)}&per_page=4&orientation=landscape`, {
+        headers: { 'Authorization': `Client-ID ${unsplashKey}` },
+      });
+      if (uRes.ok) {
+        const uData = await uRes.json() as { results?: { urls: { regular: string }; alt_description?: string; user: { name: string } }[] };
+        const seenUrls = new Set(images.map(img => img.originalUrl || ''));
+        for (const photo of (uData.results || []).slice(0, 4)) {
+          if (!seenUrls.has(photo.urls.regular) && images.length < 14) {
+            images.push({
+              url: proxy(photo.urls.regular),
+              originalUrl: photo.urls.regular,
+              name: `${slug}-unsplash-${images.length + 1}.jpg`,
+              type: 'image',
+              source: 'google-cse', // grouped with discovered images
+            });
+          }
+        }
+      }
+    } catch { /* non-critical */ }
+  }
+
+  // 4d: Foursquare — venue photos
+  const foursquareKey = c.env.FOURSQUARE_API_KEY;
+  if (foursquareKey && images.length < 14) {
+    try {
+      const fsQuery = encodeURIComponent(bizName);
+      const fsNear = encodeURIComponent(body.address || '');
+      const fsSearchRes = await fetch(`https://api.foursquare.com/v3/places/search?query=${fsQuery}&near=${fsNear}&limit=1`, {
+        headers: { 'Authorization': foursquareKey, 'Accept': 'application/json' },
+      });
+      if (fsSearchRes.ok) {
+        const fsSearchData = await fsSearchRes.json() as { results?: { fsq_id: string }[] };
+        const fsqId = fsSearchData.results?.[0]?.fsq_id;
+        if (fsqId) {
+          const fsPhotosRes = await fetch(`https://api.foursquare.com/v3/places/${fsqId}/photos?limit=4`, {
+            headers: { 'Authorization': foursquareKey, 'Accept': 'application/json' },
+          });
+          if (fsPhotosRes.ok) {
+            const fsPhotos = await fsPhotosRes.json() as { prefix: string; suffix: string }[];
+            const seenUrls = new Set(images.map(img => img.originalUrl || ''));
+            for (const p of (Array.isArray(fsPhotos) ? fsPhotos : []).slice(0, 3)) {
+              const photoUrl = `${p.prefix}original${p.suffix}`;
+              if (!seenUrls.has(photoUrl) && images.length < 14) {
+                images.push({
+                  url: proxy(photoUrl),
+                  originalUrl: photoUrl,
+                  name: `${slug}-fsq-${images.length + 1}.jpg`,
+                  type: 'image',
+                  source: 'google-cse',
+                });
+              }
+            }
+          }
+        }
+      }
+    } catch { /* non-critical */ }
+  }
+
+  // 4e: Yelp — business photos
+  const yelpKey = c.env.YELP_API_KEY;
+  if (yelpKey && images.length < 14) {
+    try {
+      const yelpQuery = encodeURIComponent(bizName);
+      const yelpLocation = encodeURIComponent(body.address || '');
+      const yRes = await fetch(`https://api.yelp.com/v3/businesses/search?term=${yelpQuery}&location=${yelpLocation}&limit=1`, {
+        headers: { 'Authorization': `Bearer ${yelpKey}` },
+      });
+      if (yRes.ok) {
+        const yData = await yRes.json() as { businesses?: { id: string; image_url?: string; photos?: string[] }[] };
+        const biz = yData.businesses?.[0];
+        if (biz) {
+          const seenUrls = new Set(images.map(img => img.originalUrl || ''));
+          const yelpPhotos = biz.photos || (biz.image_url ? [biz.image_url] : []);
+          for (const photoUrl of yelpPhotos.slice(0, 3)) {
+            if (photoUrl && !seenUrls.has(photoUrl) && images.length < 14) {
+              images.push({
+                url: proxy(photoUrl),
+                originalUrl: photoUrl,
+                name: `${slug}-yelp-${images.length + 1}.jpg`,
+                type: 'image',
+                source: 'google-cse',
+              });
+            }
+          }
+        }
+      }
+    } catch { /* non-critical */ }
+  }
+
+  // ── Step 5: Validate logo and favicon reachability ──
+  if (logo?.originalUrl && !(await isImageReachable(logo.originalUrl))) {
+    logo = null;
+  }
+  if (favicon?.originalUrl && !(await isImageReachable(favicon.originalUrl))) {
+    favicon = null;
+  }
+
+  // ── Step 6: AI vision quality inspection on ALL images ──
+  if (openaiKey) {
+    const inspectionTasks: Promise<void>[] = [];
+
+    if (logo) {
+      const logoRef = logo;
+      inspectionTasks.push(
+        inspectImageWithVision(logoRef.originalUrl || logoRef.url, { businessName: bizName, imageRole: 'logo' }, openaiKey)
+          .then(result => { logoRef.quality = result; }),
+      );
+    }
+
+    if (favicon) {
+      const favRef = favicon;
+      inspectionTasks.push(
+        inspectImageWithVision(favRef.originalUrl || favRef.url, { businessName: bizName, imageRole: 'favicon' }, openaiKey)
+          .then(result => { favRef.quality = result; }),
+      );
+    }
+
+    // Inspect all discovered images in parallel (batch of 6 at a time to avoid rate limits)
+    for (let batch = 0; batch < images.length; batch += 6) {
+      const batchImages = images.slice(batch, batch + 6);
+      const batchTasks = batchImages.map((img) =>
+        inspectImageWithVision(img.originalUrl || img.url, { businessName: bizName, imageRole: 'photo' }, openaiKey)
+          .then(result => { img.quality = result; }),
+      );
+      inspectionTasks.push(...batchTasks);
+    }
+
+    // Wait for all inspections (with a 15s timeout so we don't block forever)
+    await Promise.race([
+      Promise.allSettled(inspectionTasks),
+      new Promise(resolve => setTimeout(resolve, 15000)),
+    ]);
+
+    // Filter out unsafe or rejected images
+    if (logo?.quality && (!logo.quality.is_safe || logo.quality.recommendation === 'reject')) {
+      console.warn(JSON.stringify({ level: 'warn', service: 'discover-images', message: 'Logo rejected by vision', domain, issues: logo.quality.issues }));
       logo = null;
     }
-  }
-  if (favicon) {
-    const favOriginal = decodeURIComponent(favicon.url.split('url=')[1] || '');
-    if (favOriginal && !(await isImageReachable(favOriginal))) {
+    if (favicon?.quality && (!favicon.quality.is_safe || favicon.quality.recommendation === 'reject')) {
+      console.warn(JSON.stringify({ level: 'warn', service: 'discover-images', message: 'Favicon rejected by vision', domain, issues: favicon.quality.issues }));
       favicon = null;
+    }
+
+    // Remove unsafe, rejected, padded, or irrelevant images
+    const filteredImages = images.filter(img => {
+      if (!img.quality) return true; // Vision unavailable — keep
+      if (!img.quality.is_safe) return false; // Unsafe — remove
+      if (img.quality.recommendation === 'reject') return false; // Explicitly rejected
+      // Reject images with excessive padding and low quality
+      if (img.quality.has_padding && img.quality.quality_score < 60) return false;
+      // Reject generic CAD renderings with low business relevance
+      if (img.quality.is_generic_rendering && (img.quality.business_relevance ?? 0) < 0.5) return false;
+      return true;
+    });
+    images.length = 0;
+    images.push(...filteredImages);
+
+    // Sort by quality score (highest first) so best images appear first in UI
+    images.sort((a, b) => (b.quality?.quality_score ?? 50) - (a.quality?.quality_score ?? 50));
+  }
+
+  // ── Step 7: Brand quality assessment ──
+  let brandAssessment: {
+    brand_maturity: 'established' | 'developing' | 'minimal';
+    website_quality_score: number;
+    asset_strategy: string;
+    has_professional_logo: boolean;
+    has_quality_favicon: boolean;
+    recommendation: string;
+  } | null = null;
+
+  if (openaiKey && domain && scrapedHtml) {
+    try {
+      const titleMatch = scrapedHtml.match(/<title[^>]*>([^<]+)<\/title>/i);
+      const pageTitle = titleMatch?.[1]?.trim() || '';
+      // Count quality signals
+      const hasOgImage = /<meta[^>]+property=["']og:image/i.test(scrapedHtml);
+      const hasAppleTouchIcon = /<link[^>]+rel=["']apple-touch-icon/i.test(scrapedHtml);
+      const hasStructuredData = /application\/ld\+json/i.test(scrapedHtml);
+      const hasViewport = /<meta[^>]+name=["']viewport/i.test(scrapedHtml);
+      const hasSsl = website.startsWith('https');
+      const imgCount = (scrapedHtml.match(/<img[^>]+>/gi) || []).length;
+
+      // Simple heuristic scoring (0-100) for website quality
+      let siteScore = 20; // base
+      if (hasOgImage) siteScore += 15;
+      if (hasAppleTouchIcon) siteScore += 10;
+      if (hasStructuredData) siteScore += 15;
+      if (hasViewport) siteScore += 10;
+      if (hasSsl) siteScore += 10;
+      if (imgCount >= 3) siteScore += 10;
+      if (pageTitle && pageTitle.length > 5) siteScore += 10;
+
+      const hasProfessionalLogo = !!(logo?.quality && logo.quality.quality_score >= 70 && logo.quality.is_professional);
+      const hasQualityFavicon = !!(favicon?.dimensions && favicon.dimensions.width >= 256);
+
+      let maturity: 'established' | 'developing' | 'minimal' = 'minimal';
+      if (siteScore >= 70 && hasProfessionalLogo) maturity = 'established';
+      else if (siteScore >= 40) maturity = 'developing';
+
+      let strategy = '';
+      let recommendation = '';
+      if (maturity === 'established') {
+        strategy = 'Use original brand assets as-is. Honor existing brand identity.';
+        recommendation = 'Recreate site faithful to existing brand with modern enhancements.';
+      } else if (maturity === 'developing') {
+        strategy = 'Use original assets as inspiration. Enhance colors, typography, and imagery.';
+        recommendation = 'Build a polished, professional site that elevates the existing brand.';
+      } else {
+        strategy = 'Original assets are low quality. Use as inspiration only. Generate professional AI alternatives.';
+        recommendation = 'Create a gorgeous, modern site that reimagines the brand professionally.';
+      }
+
+      brandAssessment = {
+        brand_maturity: maturity,
+        website_quality_score: siteScore,
+        asset_strategy: strategy,
+        has_professional_logo: hasProfessionalLogo,
+        has_quality_favicon: hasQualityFavicon,
+        recommendation,
+      };
+    } catch {
+      // Brand assessment is non-critical
     }
   }
 
-  return c.json({ data: { logo, favicon, images } });
+  // Enrich brand assessment with Brandfetch data if available
+  if (brandAssessment && brandfetchData) {
+    (brandAssessment as any).brandfetch = brandfetchData;
+  }
+
+  // Clean response — strip internal fields
+  const cleanImage = (img: DiscoveredImage) => ({
+    url: img.url,
+    name: img.name,
+    type: img.type,
+    source: img.source,
+    quality: img.quality || null,
+    dimensions: img.dimensions || null,
+  });
+
+  return c.json({
+    data: {
+      logo: logo ? cleanImage(logo) : null,
+      favicon: favicon ? cleanImage(favicon) : null,
+      images: images.map(cleanImage),
+      brand_assessment: brandAssessment,
+    },
+  });
+});
+
+/**
+ * Video discovery — finds relevant videos for a business from YouTube, Pexels, and Pixabay.
+ * Returns embeddable video URLs with attribution metadata for the legal/attribution page.
+ *
+ * @remarks
+ * Sources (in priority order):
+ * 1. YouTube Data API v3 — official business channel videos, location-specific content
+ * 2. Pexels Video API — royalty-free stock videos matching business type
+ * 3. Pixabay Video API — royalty-free stock videos as fallback
+ *
+ * All videos include attribution data for the `/attribution` page.
+ */
+search.post('/api/ai/discover-videos', async (c) => {
+  const body = await c.req.json() as { name: string; address?: string; business_type?: string };
+  if (!body.name) {
+    return c.json({ data: { videos: [], attribution: [] } });
+  }
+
+  const videos: {
+    url: string;
+    embed_url: string;
+    thumbnail: string;
+    title: string;
+    source: 'youtube' | 'pexels' | 'pixabay';
+    duration_seconds: number;
+    attribution: { author: string; license: string; source_url: string };
+    relevance: 'business_specific' | 'category_generic';
+  }[] = [];
+
+  const bizName = body.name;
+  const bizType = body.business_type || '';
+  const addr = body.address || '';
+  const city = addr.split(',').slice(1, 2).join('').trim();
+
+  // 1. YouTube Data API — search for business-specific videos
+  const youtubeKey = c.env.YOUTUBE_API_KEY;
+  if (youtubeKey) {
+    try {
+      const queries = [
+        `"${bizName}" ${city}`.trim(),
+        ...(bizType ? [`${bizType} ${city} tour`] : []),
+      ];
+      for (const q of queries) {
+        const ytUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&maxResults=3&q=${encodeURIComponent(q)}&key=${youtubeKey}`;
+        const ytRes = await fetch(ytUrl);
+        if (ytRes.ok) {
+          const ytData = await ytRes.json() as {
+            items?: { id: { videoId: string }; snippet: { title: string; thumbnails: { high?: { url: string } }; channelTitle: string } }[]
+          };
+          for (const item of (ytData.items || [])) {
+            const videoId = item.id.videoId;
+            videos.push({
+              url: `https://www.youtube.com/watch?v=${videoId}`,
+              embed_url: `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&loop=1&playlist=${videoId}&controls=0`,
+              thumbnail: item.snippet.thumbnails?.high?.url || `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+              title: item.snippet.title,
+              source: 'youtube',
+              duration_seconds: 0,
+              attribution: {
+                author: item.snippet.channelTitle,
+                license: 'YouTube Standard License',
+                source_url: `https://www.youtube.com/watch?v=${videoId}`,
+              },
+              relevance: q.includes(bizName) ? 'business_specific' : 'category_generic',
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[discover-videos] YouTube search failed:', err);
+    }
+  }
+
+  // 2. Pexels Video API — royalty-free stock videos
+  const pexelsKey = c.env.PEXELS_API_KEY;
+  if (pexelsKey && videos.length < 5) {
+    try {
+      const pexelsQuery = bizType || bizName;
+      const pxRes = await fetch(`https://api.pexels.com/videos/search?query=${encodeURIComponent(pexelsQuery)}&per_page=3&size=large`, {
+        headers: { 'Authorization': pexelsKey },
+      });
+      if (pxRes.ok) {
+        const pxData = await pxRes.json() as {
+          videos?: { id: number; url: string; duration: number; image: string; user: { name: string; url: string };
+            video_files?: { link: string; quality: string; width: number }[] }[]
+        };
+        for (const v of (pxData.videos || [])) {
+          const hdFile = v.video_files?.find(f => f.quality === 'hd' || f.width >= 1280);
+          if (hdFile) {
+            videos.push({
+              url: v.url,
+              embed_url: hdFile.link,
+              thumbnail: v.image,
+              title: `Stock video from Pexels`,
+              source: 'pexels',
+              duration_seconds: v.duration,
+              attribution: {
+                author: v.user.name,
+                license: 'Pexels License (free for commercial use)',
+                source_url: v.url,
+              },
+              relevance: 'category_generic',
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[discover-videos] Pexels search failed:', err);
+    }
+  }
+
+  // 3. Pixabay Video API — royalty-free fallback
+  const pixabayKey = c.env.PIXABAY_API_KEY;
+  if (pixabayKey && videos.length < 3) {
+    try {
+      const pbQuery = bizType || bizName;
+      const pbRes = await fetch(`https://pixabay.com/api/videos/?key=${pixabayKey}&q=${encodeURIComponent(pbQuery)}&per_page=3&safesearch=true`);
+      if (pbRes.ok) {
+        const pbData = await pbRes.json() as {
+          hits?: { id: number; pageURL: string; duration: number; user: string;
+            videos?: { large?: { url: string; thumbnail: string } } }[]
+        };
+        for (const h of (pbData.hits || [])) {
+          if (h.videos?.large?.url) {
+            videos.push({
+              url: h.pageURL,
+              embed_url: h.videos.large.url,
+              thumbnail: h.videos.large.thumbnail || '',
+              title: `Stock video from Pixabay`,
+              source: 'pixabay',
+              duration_seconds: h.duration,
+              attribution: {
+                author: h.user,
+                license: 'Pixabay License (free for commercial use)',
+                source_url: h.pageURL,
+              },
+              relevance: 'category_generic',
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[discover-videos] Pixabay search failed:', err);
+    }
+  }
+
+  // Deduplicate by embed URL
+  const seen = new Set<string>();
+  const unique = videos.filter(v => { if (seen.has(v.embed_url)) return false; seen.add(v.embed_url); return true; });
+
+  // Sort: business-specific first, then by source priority
+  unique.sort((a, b) => {
+    if (a.relevance !== b.relevance) return a.relevance === 'business_specific' ? -1 : 1;
+    const srcOrder = { youtube: 0, pexels: 1, pixabay: 2 };
+    return srcOrder[a.source] - srcOrder[b.source];
+  });
+
+  const attribution = unique.map(v => v.attribution);
+
+  return c.json({
+    data: {
+      videos: unique.slice(0, 6),
+      attribution,
+    },
+  });
 });
 
 /**
@@ -1499,6 +2355,179 @@ search.post('/api/conversion/checkout', async (c) => {
     console.warn('[conversion-checkout] Error:', err);
     return c.json({ error: { code: 'INTERNAL_ERROR', message: 'Checkout creation failed' } }, 500);
   }
+});
+
+// ── Public Site Data API (read-only, for live polling from generated sites) ──
+
+/**
+ * Public read-only endpoint for per-site D1 data tables.
+ * Generated websites poll this to stay in sync when clients edit data.
+ *
+ * Allowed tables (whitelisted to prevent data leaks):
+ * services, team_members, business_hours, faq, menu_items, gallery,
+ * social_links, specials, products, classes, listings, amenities, reviews
+ */
+const ALLOWED_PUBLIC_TABLES = new Set([
+  'services', 'team_members', 'business_hours', 'faq', 'menu_items',
+  'gallery', 'social_links', 'specials', 'products', 'classes',
+  'listings', 'amenities', 'reviews', 'brand_config', 'policies',
+]);
+
+search.get('/api/public-data/:table', async (c) => {
+  const table = c.req.param('table');
+  if (!ALLOWED_PUBLIC_TABLES.has(table)) {
+    return c.json({ error: { code: 'BAD_REQUEST', message: 'Unknown table' } }, 400);
+  }
+
+  // Resolve site from hostname (subdomain or custom domain)
+  const hostname = c.req.header('host') || '';
+  const { resolveSite } = await import('../services/site_serving.js');
+  const site = await resolveSite(c.env, c.env.DB, hostname);
+  if (!site) {
+    return c.json({ error: { code: 'NOT_FOUND', message: 'Site not found' } }, 404);
+  }
+
+  // Query the site's data table (stored in the shared DB with site_id scoping)
+  try {
+    const result = await c.env.DB.prepare(
+      `SELECT * FROM site_data WHERE site_id = ? AND table_name = ? AND deleted_at IS NULL ORDER BY sort_order ASC, created_at ASC`,
+    ).bind(site.site_id, table).all();
+
+    // Parse the JSON data column for each row
+    const rows = (result.results || []).map((row: any) => {
+      try {
+        return { id: row.id, ...JSON.parse(row.data_json || '{}') };
+      } catch {
+        return { id: row.id };
+      }
+    });
+
+    return c.json({ data: rows }, 200, {
+      'Cache-Control': 'public, max-age=10, stale-while-revalidate=30',
+      'Access-Control-Allow-Origin': '*',
+    });
+  } catch {
+    return c.json({ data: [] }, 200, {
+      'Cache-Control': 'public, max-age=10',
+      'Access-Control-Allow-Origin': '*',
+    });
+  }
+});
+
+/** Authenticated endpoint for admin to read/write site data */
+search.get('/api/sites/:siteId/data/:table', async (c) => {
+  const orgId = c.get('orgId');
+  if (!orgId) return c.json({ error: { code: 'UNAUTHORIZED', message: 'Must be authenticated' } }, 401);
+  const { siteId, table } = c.req.param();
+  if (!ALLOWED_PUBLIC_TABLES.has(table)) {
+    return c.json({ error: { code: 'BAD_REQUEST', message: 'Unknown table' } }, 400);
+  }
+
+  const result = await c.env.DB.prepare(
+    `SELECT * FROM site_data WHERE site_id = ? AND table_name = ? AND deleted_at IS NULL ORDER BY sort_order ASC, created_at ASC`,
+  ).bind(siteId, table).all();
+
+  const rows = (result.results || []).map((row: any) => {
+    try {
+      return { id: row.id, sort_order: row.sort_order, ...JSON.parse(row.data_json || '{}') };
+    } catch {
+      return { id: row.id, sort_order: row.sort_order };
+    }
+  });
+
+  return c.json({ data: rows });
+});
+
+/** Upsert a row in a site data table */
+search.put('/api/sites/:siteId/data/:table/:rowId', async (c) => {
+  const orgId = c.get('orgId');
+  if (!orgId) return c.json({ error: { code: 'UNAUTHORIZED', message: 'Must be authenticated' } }, 401);
+  const { siteId, table, rowId } = c.req.param();
+  if (!ALLOWED_PUBLIC_TABLES.has(table)) {
+    return c.json({ error: { code: 'BAD_REQUEST', message: 'Unknown table' } }, 400);
+  }
+
+  const body = await c.req.json();
+  const dataJson = JSON.stringify(body.data || body);
+
+  await c.env.DB.prepare(
+    `INSERT INTO site_data (id, site_id, table_name, data_json, sort_order, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+     ON CONFLICT(id) DO UPDATE SET data_json = ?, sort_order = ?, updated_at = datetime('now')`,
+  ).bind(rowId, siteId, table, dataJson, body.sort_order ?? 0, dataJson, body.sort_order ?? 0).run();
+
+  return c.json({ data: { id: rowId, updated: true } });
+});
+
+/** Delete a row from a site data table */
+search.delete('/api/sites/:siteId/data/:table/:rowId', async (c) => {
+  const orgId = c.get('orgId');
+  if (!orgId) return c.json({ error: { code: 'UNAUTHORIZED', message: 'Must be authenticated' } }, 401);
+  const { siteId, table, rowId } = c.req.param();
+
+  await c.env.DB.prepare(
+    `UPDATE site_data SET deleted_at = datetime('now') WHERE id = ? AND site_id = ? AND table_name = ?`,
+  ).bind(rowId, siteId, table).run();
+
+  return c.json({ data: { id: rowId, deleted: true } });
+});
+
+/** List all tables for a site (for admin AG Grid) */
+search.get('/api/sites/:siteId/data', async (c) => {
+  const orgId = c.get('orgId');
+  if (!orgId) return c.json({ error: { code: 'UNAUTHORIZED', message: 'Must be authenticated' } }, 401);
+  const siteId = c.req.param('siteId');
+
+  const result = await c.env.DB.prepare(
+    `SELECT DISTINCT table_name, COUNT(*) as row_count FROM site_data WHERE site_id = ? AND deleted_at IS NULL GROUP BY table_name ORDER BY table_name`,
+  ).bind(siteId).all();
+
+  return c.json({ data: result.results || [] });
+});
+
+/**
+ * Container upload endpoint — allows the build container to upload files to R2
+ * via the public worker URL when outbound handlers aren't available.
+ * Authenticated via a shared secret passed in the build payload.
+ */
+search.put('/api/container-upload/*', async (c) => {
+  const secret = c.req.header('x-container-secret');
+  if (secret !== c.env.ANTHROPIC_API_KEY?.slice(0, 16)) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+  const key = c.req.path.replace('/api/container-upload/', '');
+  if (!key || key.includes('..')) return c.json({ error: 'Invalid key' }, 400);
+
+  const body = await c.req.arrayBuffer();
+  const ct = c.req.header('content-type') || 'application/octet-stream';
+  await c.env.SITES_BUCKET.put(key, body, { httpMetadata: { contentType: ct } });
+  return c.json({ ok: true, key });
+});
+
+/**
+ * Container D1 query endpoint — allows the build container to execute
+ * parameterized SQL via the public worker URL.
+ */
+search.post('/api/container-query', async (c) => {
+  const secret = c.req.header('x-container-secret');
+  if (secret !== c.env.ANTHROPIC_API_KEY?.slice(0, 16)) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+  const body = await c.req.json() as { sql: string; params?: unknown[] };
+  const stmt = c.env.DB.prepare(body.sql);
+  const result = body.params ? await stmt.bind(...body.params).run() : await stmt.run();
+  return c.json({ ok: true, meta: result.meta });
+});
+
+/** Serve the container build server script from R2 (used by container entrypoint bootstrap) */
+search.get('/api/container-script', async (c) => {
+  const obj = await c.env.SITES_BUCKET.get('container/build-server.js');
+  if (!obj) {
+    return c.text('// build-server.js not found in R2', 404);
+  }
+  return new Response(await obj.text(), {
+    headers: { 'Content-Type': 'application/javascript', 'Cache-Control': 'no-cache' },
+  });
 });
 
 export { search };

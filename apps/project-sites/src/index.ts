@@ -91,6 +91,14 @@ app.use(
   }),
 );
 
+// Rate limiting on sensitive endpoints
+import { rateLimitMiddleware } from './middleware/rate_limit.js';
+app.use('/api/auth/magic-link', rateLimitMiddleware({ maxRequests: 5, windowSeconds: 300, prefix: 'rl:magic' }));
+app.use('/api/auth/phone/*', rateLimitMiddleware({ maxRequests: 5, windowSeconds: 300, prefix: 'rl:phone' }));
+app.use('/api/search/businesses', rateLimitMiddleware({ maxRequests: 30, windowSeconds: 60, prefix: 'rl:search' }));
+app.use('/api/sites/create-from-search', rateLimitMiddleware({ maxRequests: 10, windowSeconds: 3600, prefix: 'rl:create' }));
+app.use('/api/ai/*', rateLimitMiddleware({ maxRequests: 20, windowSeconds: 60, prefix: 'rl:ai' }));
+
 // Auth middleware for API routes (sets userId/orgId if valid session)
 app.use('/api/*', authMiddleware);
 
@@ -214,16 +222,12 @@ app.all('*', async (c) => {
   const site = await resolveSite(c.env, c.env.DB, hostname);
 
   if (!site) {
-    return c.json(
-      {
-        error: {
-          code: 'NOT_FOUND',
-          message: 'Site not found',
-          request_id: c.get('requestId'),
-        },
-      },
-      404,
-    );
+    const reqId = c.get('requestId') || 'unknown';
+    const errorHtml = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Not Found | ProjectSites</title><link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet"><style>*{margin:0;padding:0;box-sizing:border-box}body{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0a0a0f;color:#e0e0e0;font-family:'Space Grotesk',sans-serif;overflow:hidden}@keyframes glitch{0%,100%{transform:translate(0)}20%{transform:translate(-2px,2px)}40%{transform:translate(2px,-2px)}60%{transform:translate(-1px,-1px)}80%{transform:translate(1px,1px)}}@keyframes scanline{0%{top:-100%}100%{top:100%}}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}@keyframes gradient{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}.container{text-align:center;max-width:600px;padding:2rem;position:relative;z-index:1}.bg{position:fixed;inset:0;background:linear-gradient(-45deg,#0a0a0f,#0d1117,#0a1628,#0f0a1e);background-size:400% 400%;animation:gradient 8s ease infinite}.grid{position:fixed;inset:0;background-image:linear-gradient(rgba(0,255,200,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,200,.03) 1px,transparent 1px);background-size:60px 60px}.scanline{position:fixed;width:100%;height:4px;background:linear-gradient(90deg,transparent,rgba(0,255,200,.08),transparent);animation:scanline 4s linear infinite;z-index:0}.code{font-size:8rem;font-weight:700;background:linear-gradient(135deg,#00ffc8,#00d4ff,#7c3aed);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:float 3s ease-in-out infinite;line-height:1}.msg{font-size:1.5rem;color:#8892a4;margin:1rem 0 2rem;animation:pulse 3s ease-in-out infinite}.btn{display:inline-block;padding:12px 32px;background:linear-gradient(135deg,#00ffc8,#00d4ff);color:#0a0a0f;font-weight:600;border-radius:50px;text-decoration:none;transition:all .3s;font-family:inherit}.btn:hover{transform:translateY(-3px);box-shadow:0 8px 30px rgba(0,255,200,.3)}.debug{margin-top:3rem;text-align:left;background:rgba(0,255,200,.04);border:1px solid rgba(0,255,200,.1);border-radius:12px;padding:1.5rem;font-family:'Fira Code',monospace;font-size:.75rem;color:#4a9;line-height:1.8}.debug-title{color:#00ffc8;font-size:.85rem;margin-bottom:.5rem;font-weight:500}.debug span{color:#667}</style></head><body><div class="bg"></div><div class="grid"></div><div class="scanline"></div><div class="container"><div class="code">404</div><p class="msg">This site doesn't exist yet</p><a class="btn" href="https://projectsites.dev/create">Build it with AI</a><div class="debug"><div class="debug-title">// debug info</div><span>hostname:</span> ${hostname}<br><span>request_id:</span> ${reqId}<br><span>timestamp:</span> ${new Date().toISOString()}<br><span>resolved:</span> null<br><span>edge:</span> ${c.req.header('cf-ray') || 'unknown'}<br><span>colo:</span> ${(c.req.raw as any).cf?.colo || 'unknown'}</div></div></body></html>`;
+    return new Response(errorHtml, {
+      status: 404,
+      headers: { 'Content-Type': 'text/html;charset=utf-8', 'Cache-Control': 'no-cache' },
+    });
   }
 
   // Check for ?chat query param (requires auth gate)

@@ -105,13 +105,13 @@ api.get('/api/auth/magic-link/verify', async (c) => {
 
     if (result.redirect_url) {
       const redirectTarget = new URL(result.redirect_url);
-      // Only allow redirects to *.projectsites.dev or *.megabyte.space to prevent open redirect attacks
-      if (
-        !redirectTarget.hostname.endsWith('.projectsites.dev') &&
-        redirectTarget.hostname !== 'projectsites.dev' &&
-        !redirectTarget.hostname.endsWith('.megabyte.space') &&
-        redirectTarget.hostname !== 'megabyte.space'
-      ) {
+      // Strict redirect validation — only allow exact known domains and single-level subdomains
+      const allowedDomains = ['projectsites.dev', 'megabyte.space'];
+      const hostname = redirectTarget.hostname;
+      const isAllowed = allowedDomains.some(domain =>
+        hostname === domain || (hostname.endsWith('.' + domain) && hostname.split('.').length <= domain.split('.').length + 1),
+      );
+      if (!isAllowed || redirectTarget.protocol !== 'https:') {
         return c.redirect('/?error=invalid_redirect');
       }
       redirectTarget.searchParams.set('token', session.token);
@@ -222,11 +222,13 @@ api.get('/api/auth/google/callback', async (c) => {
 
   const rawRedirect = result.redirect_url ?? baseUrl;
   const redirectTarget = new URL(rawRedirect);
-  // Only allow redirects to *.projectsites.dev to prevent open redirect attacks
-  if (
-    !redirectTarget.hostname.endsWith('.projectsites.dev') &&
-    redirectTarget.hostname !== 'projectsites.dev'
-  ) {
+  // Strict redirect validation — only allow exact known domains and single-level subdomains
+  const oauthAllowedDomains = ['projectsites.dev', 'megabyte.space'];
+  const oauthHostname = redirectTarget.hostname;
+  const oauthAllowed = oauthAllowedDomains.some(domain =>
+    oauthHostname === domain || (oauthHostname.endsWith('.' + domain) && oauthHostname.split('.').length <= domain.split('.').length + 1),
+  );
+  if (!oauthAllowed || redirectTarget.protocol !== 'https:') {
     return c.redirect(`${baseUrl}/?error=invalid_redirect`);
   }
   redirectTarget.searchParams.set('token', session.token);
@@ -263,13 +265,25 @@ api.post('/api/sites', async (c) => {
   const orgId = c.get('orgId');
   if (!orgId) throw unauthorized('Must be authenticated');
 
-  const slug =
-    validated.slug ??
-    validated.business_name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
-      .substring(0, 63);
+  // AI-powered smart slug or user-provided slug
+  let slug: string;
+  if (validated.slug) {
+    slug = validated.slug;
+  } else {
+    try {
+      const result = await c.env.AI.run('@cf/meta/llama-3.1-8b-instruct' as Parameters<typeof c.env.AI.run>[0], {
+        messages: [
+          { role: 'system', content: 'Generate the shortest URL slug for this business. Output ONLY the slug (lowercase, hyphens, no explanation). Max 40 chars. Remove possessives, articles, taglines.' },
+          { role: 'user', content: `Business: "${validated.business_name}"${validated.business_address ? ` at "${validated.business_address}"` : ''}` },
+        ],
+        max_tokens: 50,
+      });
+      const aiSlug = ((result as { response?: string }).response ?? '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/--+/g, '-').replace(/^-|-$/g, '').substring(0, 63);
+      slug = (aiSlug && aiSlug.length >= 3) ? aiSlug : validated.business_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').substring(0, 63);
+    } catch {
+      slug = validated.business_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').substring(0, 63);
+    }
+  }
 
   const site = {
     id: crypto.randomUUID(),
@@ -1899,6 +1913,44 @@ api.post('/api/sites/:id/deploy', async (c) => {
     .bind(version, siteId)
     .run();
 
+  // Auto-create snapshot on each AI Edit publish with AI-generated name
+  try {
+    // Count existing snapshots to determine naming
+    const { dbQuery: snpQuery } = await import('../services/db.js');
+    const existingSnaps = await snpQuery<{ snapshot_name: string }>(c.env.DB, 'SELECT snapshot_name FROM site_snapshots WHERE site_id = ? AND deleted_at IS NULL', [siteId]);
+    const snapCount = existingSnaps.data.length;
+
+    let snapshotName = `edit-${snapCount + 1}`;
+    // Try AI-generated snapshot name
+    try {
+      const aiResult = await c.env.AI.run('@cf/meta/llama-3.1-8b-instruct' as Parameters<typeof c.env.AI.run>[0], {
+        messages: [
+          { role: 'system', content: 'Generate a 1-3 word URL-safe snapshot name for a website version. Output ONLY the name. Use lowercase, hyphens. Examples: hero-redesign, color-update, new-menu, layout-v2, spring-refresh' },
+          { role: 'user', content: `This is edit #${snapCount + 1} of "${slug}". ${uploadedFiles.length} files changed.` },
+        ],
+        max_tokens: 20,
+      });
+      const aiName = ((aiResult as { response?: string }).response ?? '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/--+/g, '-').replace(/^-|-$/g, '').substring(0, 25);
+      if (aiName && aiName.length >= 2) snapshotName = aiName;
+    } catch { /* fall back to edit-N */ }
+
+    // Ensure uniqueness
+    const existing = existingSnaps.data.find(s => s.snapshot_name === snapshotName);
+    if (existing) snapshotName = `${snapshotName}-${Date.now().toString(36).slice(-4)}`;
+
+    const { dbInsert: snpInsert } = await import('../services/db.js');
+    await snpInsert(c.env.DB, 'site_snapshots', {
+      id: crypto.randomUUID(),
+      site_id: siteId,
+      snapshot_name: snapshotName,
+      build_version: version,
+      description: `AI Edit — ${uploadedFiles.length} files updated`,
+      created_by: c.get('userId') || null,
+    });
+  } catch (snapErr) {
+    console.warn('[publish] Snapshot creation failed (non-blocking):', snapErr);
+  }
+
   // Invalidate KV cache
   await c.env.CACHE_KV.delete(`host:${slug}${DOMAINS.SITES_SUFFIX}`).catch(() => {});
 
@@ -2921,6 +2973,97 @@ api.delete('/api/sites/:id/files/:path{.+}', async (c) => {
   });
 
   return c.json({ data: { key: fullKey, deleted: true } });
+});
+
+// ── Site Snapshots ─────────────────────────────────────────────────
+
+/** List snapshots for a site */
+api.get('/api/sites/:siteId/snapshots', async (c) => {
+  const orgId = c.get('orgId');
+  if (!orgId) throw unauthorized('Must be authenticated');
+  const siteId = c.req.param('siteId');
+
+  const { dbQuery: dbq } = await import('../services/db.js');
+  const result = await dbq<{ id: string; snapshot_name: string; build_version: string; description: string | null; created_at: string }>(
+    c.env.DB,
+    'SELECT id, snapshot_name, build_version, description, created_at FROM site_snapshots WHERE site_id = ? AND deleted_at IS NULL ORDER BY created_at DESC',
+    [siteId],
+  );
+
+  return c.json({ data: result.data });
+});
+
+/** Create a snapshot (freeze current version or a specific version) */
+api.post('/api/sites/:siteId/snapshots', async (c) => {
+  const orgId = c.get('orgId');
+  const userId = c.get('userId');
+  if (!orgId) throw unauthorized('Must be authenticated');
+  const siteId = c.req.param('siteId');
+  const body = await c.req.json() as { name: string; description?: string; build_version?: string };
+
+  if (!body.name?.trim()) {
+    throw badRequest('Snapshot name is required');
+  }
+
+  // Normalize snapshot name to URL-safe slug
+  const snapshotName = body.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').substring(0, 30);
+  if (!snapshotName || snapshotName.length < 1) {
+    throw badRequest('Invalid snapshot name');
+  }
+
+  // Get the site's current build version if none specified
+  const { dbQueryOne: dbq1 } = await import('../services/db.js');
+  const site = await dbq1<{ current_build_version: string | null; slug: string }>(
+    c.env.DB,
+    'SELECT current_build_version, slug FROM sites WHERE id = ? AND org_id = ? AND deleted_at IS NULL',
+    [siteId, orgId],
+  );
+  if (!site) throw badRequest('Site not found');
+
+  const buildVersion = body.build_version || site.current_build_version;
+  if (!buildVersion) {
+    throw badRequest('Site has no published version to snapshot');
+  }
+
+  // Verify the version exists in R2
+  const r2Check = await c.env.SITES_BUCKET.head(`sites/${site.slug}/${buildVersion}/index.html`);
+  if (!r2Check) {
+    throw badRequest('Build version not found in storage');
+  }
+
+  const { dbInsert: dbIns } = await import('../services/db.js');
+  const id = crypto.randomUUID();
+  await dbIns(c.env.DB, 'site_snapshots', {
+    id,
+    site_id: siteId,
+    snapshot_name: snapshotName,
+    build_version: buildVersion,
+    description: body.description || null,
+    created_by: userId || null,
+  });
+
+  const snapshotUrl = `https://${site.slug}-${snapshotName}.${DOMAINS.SITES_SUFFIX}`;
+
+  return c.json({
+    data: {
+      id,
+      snapshot_name: snapshotName,
+      build_version: buildVersion,
+      url: snapshotUrl,
+    },
+  }, 201);
+});
+
+/** Delete a snapshot */
+api.delete('/api/sites/:siteId/snapshots/:snapshotId', async (c) => {
+  const orgId = c.get('orgId');
+  if (!orgId) throw unauthorized('Must be authenticated');
+  const snapshotId = c.req.param('snapshotId');
+
+  const { dbUpdate: dbUpd } = await import('../services/db.js');
+  await dbUpd(c.env.DB, 'site_snapshots', { deleted_at: new Date().toISOString() }, 'id = ?', [snapshotId]);
+
+  return c.json({ data: { deleted: true } });
 });
 
 export { api };

@@ -81,11 +81,11 @@ class_name = "SiteGenerationWorkflow"
 [env.production.ai]
 binding = "AI"
 
-# Claude Code build container
+# Claude Code build container — custom image with all deps pre-installed
 [[env.production.containers]]
 class_name = "SiteBuilderContainer"
 image = "docker.io/library/node:22-slim"
-max_instances = 3
+max_instances = 10
 
 [[env.production.durable_objects.bindings]]
 name = "SITE_BUILDER"

@@ -395,9 +395,12 @@ export async function resolveSite(
     }
   }
 
-  // Look up by slug
+  // Look up by slug — with snapshot resolution
+  // Pattern: {slug}-{snapshot}.projectsites.dev → serve frozen version
+  // The snapshot name is separated by the LAST occurrence of a known snapshot pattern
   if (slug) {
-    const siteRow = await dbQueryOne<{
+    // First try exact slug match
+    let siteRow = await dbQueryOne<{
       id: string;
       slug: string;
       org_id: string;
@@ -407,6 +410,45 @@ export async function resolveSite(
       'SELECT id, slug, org_id, current_build_version FROM sites WHERE slug = ? AND deleted_at IS NULL',
       [slug],
     );
+
+    // If no exact match, try snapshot resolution: {slug}-{snapshot}
+    let snapshotVersion: string | null = null;
+    if (!siteRow && slug.includes('-')) {
+      // Try progressively shorter prefixes to find the base slug
+      const parts = slug.split('-');
+      for (let i = parts.length - 1; i >= 1; i--) {
+        const candidateSlug = parts.slice(0, i).join('-');
+        const candidateSnapshot = parts.slice(i).join('-');
+        const candidateRow = await dbQueryOne<{
+          id: string;
+          slug: string;
+          org_id: string;
+          current_build_version: string | null;
+        }>(
+          db,
+          'SELECT id, slug, org_id, current_build_version FROM sites WHERE slug = ? AND deleted_at IS NULL',
+          [candidateSlug],
+        );
+        if (candidateRow) {
+          // Found a base site — now look up the snapshot
+          const snapshot = await dbQueryOne<{ build_version: string }>(
+            db,
+            'SELECT build_version FROM site_snapshots WHERE site_id = ? AND snapshot_name = ? AND deleted_at IS NULL',
+            [candidateRow.id, candidateSnapshot],
+          );
+          if (snapshot) {
+            siteRow = candidateRow;
+            snapshotVersion = snapshot.build_version;
+            console.warn(JSON.stringify({
+              level: 'debug', service: 'site_serving',
+              message: 'Snapshot resolved', slug: candidateSlug, snapshot: candidateSnapshot,
+              version: snapshot.build_version,
+            }));
+          }
+          break;
+        }
+      }
+    }
 
     if (siteRow) {
       const subRow = await dbQueryOne<{ plan: string; status: string }>(
@@ -422,7 +464,8 @@ export async function resolveSite(
         site_id: siteRow.id,
         slug: siteRow.slug,
         org_id: siteRow.org_id,
-        current_build_version: siteRow.current_build_version,
+        // Use snapshot version if resolved, otherwise latest
+        current_build_version: snapshotVersion || siteRow.current_build_version,
         plan,
       };
 
@@ -490,7 +533,16 @@ export async function serveSiteFromR2(
     return new Response('Not Found', { status: 404 });
   }
 
-  const version = site.current_build_version ?? 'latest';
+  // If the site has no published version yet (still building), show a branded "building" page
+  if (!site.current_build_version) {
+    const buildingHtml = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Building... | ${site.slug}</title><link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet"><style>*{margin:0;padding:0;box-sizing:border-box}body{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0a0a0f;color:#e0e0e0;font-family:'Space Grotesk',sans-serif;overflow:hidden}@keyframes gradient{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}@keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.05);opacity:.8}}@keyframes spin{to{transform:rotate(360deg)}}.bg{position:fixed;inset:0;background:linear-gradient(-45deg,#0a0a0f,#0d1117,#0a1628,#0f0a1e);background-size:400% 400%;animation:gradient 8s ease infinite}.container{text-align:center;max-width:500px;padding:2rem;position:relative;z-index:1}.spinner{width:60px;height:60px;border:3px solid rgba(0,255,200,.1);border-top-color:#00ffc8;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 2rem}.title{font-size:2rem;font-weight:700;background:linear-gradient(135deg,#00ffc8,#00d4ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:pulse 2s ease-in-out infinite}.subtitle{color:#8892a4;margin-top:1rem;font-size:1.1rem;line-height:1.6}.slug{color:#4a9;font-family:monospace;font-size:.9rem;margin-top:1.5rem}p.note{color:#556;font-size:.8rem;margin-top:2rem}</style><meta http-equiv="refresh" content="15"></head><body><div class="bg"></div><div class="container"><div class="spinner"></div><div class="title">Building your website</div><p class="subtitle">Our AI is crafting a gorgeous, custom website. This usually takes a few minutes.</p><p class="slug">${site.slug}.projectsites.dev</p><p class="note">This page auto-refreshes every 15 seconds.</p></div></body></html>`;
+    return new Response(buildingHtml, {
+      status: 200,
+      headers: { 'Content-Type': 'text/html;charset=utf-8', 'Cache-Control': 'no-cache, no-store' },
+    });
+  }
+
+  const version = site.current_build_version;
 
   // Normalize path: strip leading slash for file lookup
   let filePath = requestPath;
