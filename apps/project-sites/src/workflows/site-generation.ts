@@ -1447,20 +1447,29 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
         });
       }
 
-      // ── STAGE B: Enhancement (3 prompts, ~10 min) ──
+      // ── STAGE B: Enhancement (3 individual steps to avoid timeout) ──
       if (currentFiles.some(f => f.name === 'index.html')) {
-        const enhancedFiles = await step.do('stage-b-enhancement', {
+        const b1 = await step.do('stage-b1-beauty', {
           retries: { limit: 1, delay: '10 seconds', backoff: 'exponential' },
-          timeout: '20 minutes',
+          timeout: '15 minutes',
         }, async () => {
           return callContainer([
-            { label: 'B1-beauty', timeoutMin: 5, text: 'Make ALL pages MORE BEAUTIFUL. Do NOT rewrite from scratch — enhance what exists.\n\nAdd to ALL HTML files:\n- 10+ @keyframes animations (fadeInUp, slideInLeft, scaleIn, subtleFloat, gradientShift, glowPulse)\n- IntersectionObserver: sections start opacity:0 translateY:30px, animate to visible on scroll\n- Glassmorphism on nav and cards (backdrop-filter:blur(20px))\n- Dark theme refinement: ensure dark backgrounds with vibrant accent colors\n- Gradient text on hero headings\n- Smooth hover transforms on cards (translateY -4px + shadow)\n- @media prefers-reduced-motion\n- Make it BREATHTAKINGLY GORGEOUS — every pixel should feel intentional' },
-            { label: 'B2-seo', timeoutMin: 5, text: 'SEO audit on ALL HTML files. Do NOT rewrite.\n\nVerify on every page: meta description, og tags, canonical URL, heading hierarchy.\nOn index.html: JSON-LD LocalBusiness with geo+hours, FAQPage schema.\nAll pages: keyword placement in h1/h2, internal links between pages, image alt text.\nCreate/update robots.txt and sitemap.xml listing ALL pages.' },
-            { label: 'B3-content', timeoutMin: 5, text: 'Content completeness audit on ALL pages.\n\nRead _scraped.txt and _research.json. Ensure ALL original website content is present.\nIf any services, programs, team members, or details are missing — add them.\nEvery page should have 15+ images. Use Unsplash for gaps.\nNo empty background-image. No duplicate image URLs.\nGrid rows consistent (center partial final rows).\nAll images: loading=lazy, descriptive alt text.' },
-          ], currentFiles, 'stage-b');
+            { label: 'B1-beauty', timeoutMin: 10, text: 'Make ALL pages MORE BEAUTIFUL. Do NOT rewrite from scratch — enhance what exists.\n\nAdd to ALL HTML files:\n- 10+ @keyframes animations (fadeInUp, slideInLeft, scaleIn, subtleFloat, gradientShift, glowPulse)\n- IntersectionObserver: sections start opacity:0 translateY:30px, animate to visible on scroll\n- Glassmorphism on nav and cards (backdrop-filter:blur(20px))\n- Dark theme refinement: ensure dark backgrounds with vibrant accent colors\n- Gradient text on hero headings\n- Smooth hover transforms on cards (translateY -4px + shadow)\n- @media prefers-reduced-motion\n- Make it BREATHTAKINGLY GORGEOUS — every pixel should feel intentional' },
+          ], currentFiles, 'stage-b1');
         });
-        const enhancedArr = enhancedFiles as { name: string; content: string }[];
-        if (enhancedArr?.length > 0) currentFiles = enhancedArr;
+        const b1Arr = b1 as { name: string; content: string }[];
+        if (b1Arr?.length > 0) currentFiles = b1Arr;
+
+        const b2 = await step.do('stage-b2-seo-content', {
+          retries: { limit: 1, delay: '10 seconds', backoff: 'exponential' },
+          timeout: '15 minutes',
+        }, async () => {
+          return callContainer([
+            { label: 'B2-seo-content', timeoutMin: 10, text: 'SEO + content audit on ALL HTML files. Do NOT rewrite from scratch.\n\n1. SEO: Verify meta description, og tags, canonical URL, heading hierarchy on every page. JSON-LD LocalBusiness on index.html. FAQPage schema. Internal links between ALL pages. robots.txt + sitemap.xml listing ALL pages.\n2. CONTENT: Read _scraped.txt and _research.json. Ensure ALL original website content is present. If any services, programs, team members, or details are missing — add them. Every page should have images. No empty background-image. loading=lazy. Alt text with keywords.' },
+          ], currentFiles, 'stage-b2');
+        });
+        const b2Arr = b2 as { name: string; content: string }[];
+        if (b2Arr?.length > 0) currentFiles = b2Arr;
 
         // Upload interim v2
         await step.do('upload-interim-v2', RETRY_3, async () => {
