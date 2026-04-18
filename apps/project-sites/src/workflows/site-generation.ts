@@ -809,13 +809,13 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           const homepage = await scrapePage(siteUrl);
           if (!homepage) return '';
 
-          // Crawl internal pages (up to 20 total)
+          // Crawl internal pages (up to 50 total for thorough content extraction)
           const visited = new Set<string>([siteUrl, siteUrl + '/']);
           const pages = [homepage];
-          const queue = homepage.links.filter(l => !visited.has(l)).slice(0, 25);
+          const queue = homepage.links.filter(l => !visited.has(l)).slice(0, 60);
 
           for (const link of queue) {
-            if (visited.size >= 20) break;
+            if (visited.size >= 50) break;
             const normalized = link.replace(/\/$/, '');
             if (visited.has(normalized) || visited.has(normalized + '/')) continue;
             visited.add(normalized);
@@ -842,20 +842,70 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
               headings: p.headings,
               content: p.paragraphs.join('\n'),
             })),
-            all_images: allImages.slice(0, 50), // Up to 50 images across the site
+            all_images: allImages.slice(0, 100), // Up to 100 images across the site
             all_text: pages.flatMap(p => p.paragraphs).join('\n\n'),
             ogImage: homepage.paragraphs.length > 0 ? '' : '', // Will be set from meta
           };
 
-          // Extract og:image from homepage
+          // Extract og:image and logo from homepage HTML
+          let logoUrl = '';
           try {
             const homepageRes = await fetch(siteUrl, { headers: { 'User-Agent': UA }, redirect: 'follow' });
             if (homepageRes.ok) {
               const html = await homepageRes.text();
               const ogMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i);
               if (ogMatch) scraped.ogImage = ogMatch[1];
+
+              // Extract logo: look in header, nav, .logo class, img with logo in src/alt/class
+              const logoPatterns = [
+                // Common logo patterns in HTML
+                /<(?:a|div|span)[^>]*(?:class|id)=["'][^"']*logo[^"']*["'][^>]*>[\s\S]*?<img[^>]+src=["']([^"']+)["']/gi,
+                /<img[^>]+(?:class|id)=["'][^"']*logo[^"']*["'][^>]+src=["']([^"']+)["']/gi,
+                /<img[^>]+src=["']([^"']*logo[^"']*)["']/gi,
+                /<img[^>]+alt=["'][^"']*logo[^"']*["'][^>]+src=["']([^"']+)["']/gi,
+                // Header images (often logos)
+                /<header[\s\S]*?<img[^>]+src=["']([^"']+)["']/gi,
+                /<nav[\s\S]*?<img[^>]+src=["']([^"']+)["']/gi,
+              ];
+              for (const pattern of logoPatterns) {
+                const match = pattern.exec(html);
+                if (match?.[1] && !match[1].includes('data:') && !match[1].includes('pixel')) {
+                  let url = match[1];
+                  if (url.startsWith('/')) url = `https://${domain}${url}`;
+                  else if (!url.startsWith('http')) url = `https://${domain}/${url}`;
+                  logoUrl = url;
+                  break;
+                }
+              }
+
+              // Also extract favicon as fallback logo/icon source
+              const faviconMatch = html.match(/<link[^>]+rel=["'](?:icon|shortcut icon|apple-touch-icon)["'][^>]+href=["']([^"']+)["']/i);
+              if (faviconMatch?.[1]) {
+                let favUrl = faviconMatch[1];
+                if (favUrl.startsWith('/')) favUrl = `https://${domain}${favUrl}`;
+                else if (!favUrl.startsWith('http')) favUrl = `https://${domain}/${favUrl}`;
+                (scraped as any).favicon_url = favUrl;
+              }
             }
           } catch { /* ignore */ }
+
+          // Store extracted logo
+          if (logoUrl) {
+            (scraped as any).logo_url = logoUrl;
+            // Upload logo to R2 for use in generated site
+            try {
+              const logoRes = await fetch(logoUrl, { headers: { 'User-Agent': UA } });
+              if (logoRes.ok) {
+                const logoData = await logoRes.arrayBuffer();
+                const ext = logoUrl.split('.').pop()?.split('?')[0] || 'png';
+                const logoKey = `sites/${params.slug}/assets/logo.${ext}`;
+                await env.SITES_BUCKET.put(logoKey, logoData, {
+                  httpMetadata: { contentType: logoRes.headers.get('content-type') || `image/${ext}` },
+                });
+                (scraped as any).logo_r2_url = `https://${params.slug}.${DOMAINS.SITES_SUFFIX}/assets/logo.${ext}`;
+              }
+            } catch { /* non-critical */ }
+          }
 
           // ── Extract brand colors via AI vision ──
           // Strategy: Use a screenshot API to capture the homepage as an image,
@@ -1270,9 +1320,26 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
     }
 
     // Scraped content note for prompts
+    // Parse scraped content to extract page URLs, logo, and content
     let scrapedNote = '';
+    let scrapedPages: { url: string; title: string; content: string }[] = [];
+    let scrapedLogoUrl = '';
+    let scrapedAllImages: string[] = [];
     if (typeof scrapedContent === 'string' && scrapedContent.length > 0) {
-      scrapedNote = '\n\nREAL CONTENT FROM ORIGINAL WEBSITE (use this, not placeholder text):\n' + scrapedContent.slice(0, 8000);
+      try {
+        const parsed = JSON.parse(scrapedContent);
+        scrapedPages = parsed.all_pages || [];
+        scrapedLogoUrl = parsed.logo_r2_url || parsed.logo_url || '';
+        scrapedAllImages = parsed.all_images || [];
+
+        // Build a comprehensive content note — don't truncate, pass everything
+        const contentSections = scrapedPages.map((p: any) =>
+          `--- PAGE: ${p.url} ---\nTitle: ${p.title}\n${(p.headings || []).map((h: string) => `## ${h}`).join('\n')}\n${p.content || ''}`
+        ).join('\n\n');
+        scrapedNote = '\n\n=== ORIGINAL WEBSITE CONTENT (use ALL of this — do NOT skip any content) ===\n' + contentSections;
+      } catch {
+        scrapedNote = '\n\nORIGINAL WEBSITE CONTENT:\n' + scrapedContent.slice(0, 20000);
+      }
     }
 
     let currentFiles: { name: string; content: string }[] = [];
@@ -1300,11 +1367,20 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           `Brand Colors (extracted from original site): primary:${primary}; secondary:${secondary}; accent:${accent}`,
           logoUrl ? `Logo URL: ${logoUrl} — USE THIS LOGO. Do not create a generic SVG.` : 'No logo found — create a professional inline SVG using the brand colors and Inter 700 font.',
           `Brand personality: ${brand.brand_personality || 'professional, warm, approachable'}`,
+          scrapedLogoUrl ? `LOGO (MUST USE): ${scrapedLogoUrl}` : logoUrl ? `Logo URL: ${logoUrl}` : '',
           '',
-          '=== MULTI-PAGE ARCHITECTURE ===',
-          'Create MULTIPLE HTML files — one per major section of the business:',
-          structurePlan.pages ? structurePlan.pages.map((p: any, i: number) => `${i + 1}. ${p.path} — ${p.title}: ${p.purpose}`).join('\n') : 'index.html (homepage), about.html, services.html, contact.html',
-          'Each page must be its own COMPELLING MULTIMEDIA EXPERIENCE.',
+          '=== MULTI-PAGE ARCHITECTURE (recreate ALL original pages) ===',
+          'Create MULTIPLE HTML files. Recreate every page from the original site, making each one DRAMATICALLY more beautiful:',
+          scrapedPages.length > 0
+            ? scrapedPages.map((p: any, i: number) => {
+                const pageName = p.url.replace(/^https?:\/\/[^/]+/, '').replace(/\/$/, '') || '/';
+                const fileName = pageName === '/' ? 'index.html' : pageName.replace(/^\//, '').replace(/\//g, '-').replace(/[^a-z0-9-]/gi, '') + '.html';
+                return `${i + 1}. ${fileName} — "${p.title || pageName}" (original: ${p.url})`;
+              }).join('\n')
+            : structurePlan.pages ? structurePlan.pages.map((p: any, i: number) => `${i + 1}. ${p.path} — ${p.title}: ${p.purpose}`).join('\n') : 'index.html, about.html, services.html, contact.html',
+          '',
+          'If any original pages are too small to stand alone, COMBINE them into a single page.',
+          'Each page must be its own COMPELLING MULTIMEDIA EXPERIENCE — breathtakingly gorgeous.',
           'Navigation: consistent header/footer across all pages with links to every page.',
           '',
           '=== DESIGN (Stripe / Linear / Vercel quality) ===',
@@ -1331,11 +1407,12 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           'Include ALL programs, services, team members, history, and details from the original.',
           'Augment with researched facts about affiliated organizations.',
           '',
-          '=== IMAGES ===',
-          allAssets.length > 0 ? `Discovered images from original site:\n${allAssets.slice(0, 20).join('\n')}` : '',
-          '- Use ALL images from the original site (listed in _research.json)',
-          '- Add Unsplash images to fill gaps: https://images.unsplash.com/photo-{ID}?w={W}&h={H}&fit=crop',
-          '- 15+ unique images per page minimum. Every section needs images.',
+          '=== IMAGES (use ALL original images + supplement with Unsplash) ===',
+          scrapedAllImages.length > 0 ? `Images from original website (USE THESE):\n${scrapedAllImages.slice(0, 30).join('\n')}` : '',
+          allAssets.length > 0 ? `Additional discovered assets:\n${allAssets.slice(0, 20).join('\n')}` : '',
+          '- USE ALL images from the original site first — they are the real business photos',
+          '- Add Unsplash images ONLY to fill gaps: https://images.unsplash.com/photo-{ID}?w={W}&h={H}&fit=crop',
+          '- 10+ unique images per page minimum. Every section needs images.',
           '- Alt text with keywords on every image. loading="lazy" below fold.',
           '',
           '=== SEO ===',
