@@ -1161,8 +1161,14 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
       throw new Error('SITE_BUILDER container not configured');
     }
 
-    const containerId = env.SITE_BUILDER.idFromName(params.slug);
-    const container = env.SITE_BUILDER.get(containerId);
+    // Use a stage-specific container ID so each stage gets a fresh container.
+    // This avoids "container not running" errors when the container idles between stages.
+    let stageCounter = 0;
+    function getContainer() {
+      stageCounter++;
+      const id = env.SITE_BUILDER.idFromName(`${params.slug}-stage-${stageCounter}`);
+      return env.SITE_BUILDER.get(id);
+    }
     const safeName = (params.businessName || 'Business').replace(/[^\w\s\-'.]/g, '').slice(0, 100);
     const category = profile.business_type || params.businessCategory || '';
     const colors = (brand.colors || {}) as Record<string, string>;
@@ -1197,6 +1203,7 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
         prompts,
       };
 
+      const container = getContainer();
       const res = await container.fetch('http://container/build', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1356,35 +1363,46 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
         });
       }
 
-      // ── STAGE C+D: Quality + Final (5 prompts, ~10 min) ──
+      // ── STAGE C: Quality (3 prompts, ~10 min) ──
       if (currentFiles.some(f => f.name === 'index.html')) {
-        // Domain-specific prompt
         let domainPrompt = 'Add domain-specific features to index.html. ';
         const catLower = category.toLowerCase();
         if (catLower.includes('non-profit') || catLower.includes('community') || catLower.includes('church') || catLower.includes('soup')) {
-          domainPrompt += 'NON-PROFIT: Add prominent donation CTA, impact counters, volunteer signup.';
+          domainPrompt += 'NON-PROFIT: Add prominent donation CTA (gradient button), impact counters (meals served, volunteers, years active), volunteer signup section. Warm, dignified tone.';
         } else if (catLower.includes('restaurant') || catLower.includes('food')) {
-          domainPrompt += 'RESTAURANT: Add menu section, hours widget, reservation CTA.';
+          domainPrompt += 'RESTAURANT: Add menu section, hours widget, reservation/order CTA.';
         } else if (catLower.includes('salon') || catLower.includes('spa')) {
-          domainPrompt += 'SALON: Add services+prices, staff, booking CTA.';
+          domainPrompt += 'SALON: Add services+prices, staff profiles, booking CTA.';
         } else {
           domainPrompt += 'Add appropriate features for this business type.';
         }
 
-        const finalFiles = await step.do('stage-cd-quality-final', {
+        const stageC = await step.do('stage-c-quality', {
           retries: { limit: 1, delay: '10 seconds', backoff: 'exponential' },
           timeout: '20 minutes',
         }, async () => {
           return callContainer([
-            { label: 'C1-visual', timeoutMin: 3, text: 'Visual quality fix on index.html.\n\n1. Text over images: dark overlay min rgba(0,0,0,0.5)\n2. Color contrast 4.5:1\n3. Vibrant palette\n4. Grid partial rows centered' },
-            { label: 'C2-a11y', timeoutMin: 3, text: 'Accessibility fix. Heading hierarchy (1 h1). Alt text. Labels on inputs. Skip-to-content. html lang=en. Focus-visible. ARIA labels.' },
-            { label: 'C3-domain', timeoutMin: 3, text: domainPrompt },
-            { label: 'D1-production', timeoutMin: 3, text: 'Production readiness. No console.log. Valid HTML. HTTPS URLs. Google Fonts preconnect. Back-to-top button. Smooth scroll. Copyright ' + new Date().getFullYear() + '.' },
-            { label: 'D2-safety', timeoutMin: 2, text: 'Safety check. Privacy notice on form. Footer: Privacy+Terms links. External links: rel=noopener. FAQ last: Built by ProjectSites.dev.' },
-          ], currentFiles, 'stage-cd');
+            { label: 'C1-visual', timeoutMin: 3, text: 'Visual quality fix on index.html.\n\n1. Text over images: dark overlay min rgba(0,0,0,0.5)\n2. Color contrast 4.5:1 for text\n3. Vibrant palette, no washed-out colors\n4. Grid partial rows centered\n5. Google Maps address should link to directions' },
+            { label: 'C2-domain', timeoutMin: 5, text: domainPrompt },
+          ], currentFiles, 'stage-c');
         });
-        const finalArr = finalFiles as { name: string; content: string }[];
-        if (finalArr?.length > 0) currentFiles = finalArr;
+        const stageCArr = stageC as { name: string; content: string }[];
+        if (stageCArr?.length > 0) currentFiles = stageCArr;
+      }
+
+      // ── STAGE D: Final (2 prompts, ~5 min) ──
+      if (currentFiles.some(f => f.name === 'index.html')) {
+        const stageD = await step.do('stage-d-final', {
+          retries: { limit: 1, delay: '10 seconds', backoff: 'exponential' },
+          timeout: '15 minutes',
+        }, async () => {
+          return callContainer([
+            { label: 'D1-production', timeoutMin: 3, text: 'Production readiness. No console.log. Valid HTML. HTTPS URLs. Google Fonts preconnect. Back-to-top button. Smooth scroll. Copyright ' + new Date().getFullYear() + '. Address links to Google Maps directions.' },
+            { label: 'D2-safety', timeoutMin: 2, text: 'Safety check. Privacy notice on form. Footer: Privacy+Terms links. External links: rel=noopener. FAQ last item: Built by ProjectSites.dev.' },
+          ], currentFiles, 'stage-d');
+        });
+        const stageDArr = stageD as { name: string; content: string }[];
+        if (stageDArr?.length > 0) currentFiles = stageDArr;
       }
 
       // ── FINAL DEPLOY ──

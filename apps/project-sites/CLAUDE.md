@@ -106,6 +106,14 @@ Workflow Step 4c: stage-cd-quality-final (20 min timeout)
 5. Runs each prompt via `su cuser -s /bin/sh -c "sh /tmp/run.sh"`
 6. Returns all non-underscore files from the build directory
 
+**API Credit Discipline (NON-NEGOTIABLE):**
+- **NEVER** waste API credits on speculative or debugging builds
+- If there's an error, reduce to the **simplest reproducible state** first (e.g., 2+2 math test)
+- Fix issues as **separate, temporary tests** — not by running full production builds
+- Only trigger full builds when the pipeline is proven working end-to-end
+- For infrastructure debugging, use mock responses or static data — never real API calls
+- Each Claude Code prompt costs ~$0.50-2.00. Each full build costs ~$5-15. Treat credits as scarce.
+
 **Key constraints:**
 - Entrypoint must be under 10KB (CF Containers limit)
 - Each workflow step must complete within 25 minutes
@@ -197,7 +205,49 @@ Two dedicated SEO prompts run during the build:
 1. **Keyword research + placement**: Analyze the business type + location, identify 5-8 target keywords, ensure they're placed in all required positions
 2. **Technical SEO audit**: Verify all meta tags, schema, sitemap, canonical, heading hierarchy, alt text, internal links. Fix any gaps.
 
-**Visual quality standards:** 8+ @keyframes animations, glassmorphism, gradient text, scroll reveals, 10+ unique images, actual brand colors (extracted via AI vision from original website), creative typography. Sites must look award-winning.
+### Visual Quality Standards (CRITICAL — Breathtakingly Gorgeous)
+
+**Every page must be a COMPELLING MULTIMEDIA EXPERIENCE. Everything should be BREATHTAKINGLY GORGEOUS and VIVIDLY + MASTERFULLY ANIMATED.**
+
+**Tech stack:** shadcn/ui + Tailwind CSS + React (Vite). Every generated site uses this stack.
+
+**Visual requirements:**
+- 8+ @keyframes animations, glassmorphism, gradient text, scroll reveals
+- 10+ unique images per site minimum
+- Actual brand colors extracted via AI vision from original website
+- Creative typography using premium fonts (Inter, Satoshi, DM Sans, Cabinet Grotesk)
+- **Dark theme preferred** — darker + colorful is trending. Use dark backgrounds with vibrant accent colors
+- Sites must look award-winning — Stripe / Linear / Vercel level polish
+
+**Multi-page architecture (5-8 pages minimum for content-rich businesses):**
+- Don't cram everything into one page
+- Homepage = compelling marketing summary of the entire business mission
+- Every sub-page (About, Services, Get Involved, etc.) must be its own stunning experience
+- Proper navigation between all pages
+
+**Original brand assets (ALWAYS use real assets):**
+- **Logo:** ALWAYS use the real logo from the source site. Priority: Logo.dev -> Brandfetch -> scrape from site -> extract from favicon -> AI-generate as last resort
+- **App icon:** Find real app icon, or extract icon from logo, or upscale favicon, or generate
+- **Brand colors:** Extract and use the actual brand colors from the source website
+
+**Deep content integration:**
+- Scrape ALL pages from the source site, not just the homepage
+- Combine with web search results
+- Augment with research, facts, references to affiliated organizations
+- Back up content with real facts, proven research, affiliated org references
+- If the source has a blog, recreate it with external CMS capability
+
+**Multimedia everywhere:**
+- Every page should have rich media (images, videos, animations)
+- Double the parallelized research and multimedia discovery
+- Optimize for visual impact — dark overlays on text are OK if they look stunning
+- Add interactive, gamification elements where appropriate
+
+**Google Maps embed:**
+- Must have proper CSP headers allowing Google Maps iframe sources
+- Register the domain with Google Maps Platform for API key restrictions
+- Address links should use Google Maps directions URL format: `https://www.google.com/maps/dir/?api=1&destination={encoded_address}`
+- Include `LocalBusiness` schema with geo coordinates matching the embedded map
 
 ## Design System & Style Guide (MANDATORY)
 
