@@ -2076,12 +2076,12 @@ api.post('/api/sites/:id/publish-bolt', async (c) => {
     action: 'site.published_from_bolt_embedded',
     target_type: 'site',
     target_id: siteId,
-    metadata_json: JSON.stringify({
+    metadata_json: {
       slug,
       version,
       file_count: files.length,
       has_chat: !!(chat && chat.messages?.length),
-    }),
+    },
   });
 
   return c.json({

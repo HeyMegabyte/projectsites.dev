@@ -483,10 +483,10 @@ search.post('/api/sites/create-from-search', async (c) => {
         businessName: sanitizedName,
         businessAddress: businessAddress ?? undefined,
         businessPhone: businessPhone ?? undefined,
-        businessCategory: body.business?.category ?? undefined,
+        businessCategory: body.business?.types?.[0] ?? undefined,
         googlePlaceId: googlePlaceId ?? undefined,
         additionalContext: additionalContext ?? undefined,
-        uploadId: body.upload_id ?? undefined,
+        uploadId: (body as Record<string, unknown>).upload_id as string | undefined,
         orgId: orgId,
       },
     });
@@ -720,11 +720,11 @@ search.post('/api/sites/generate-prompt', async (c) => {
   // Audit log
   await writeAuditLog(c.env.DB, {
     org_id: orgId,
-    user_id: userId,
+    actor_id: userId,
     action: 'research.generate_prompt',
-    resource_type: 'site',
-    resource_id: siteId || null,
-    metadata: { business_name: businessName, model: c.env.RESEARCH_MODEL || 'o3-mini' },
+    target_type: 'site',
+    target_id: siteId || null,
+    metadata_json: { business_name: businessName, model: c.env.RESEARCH_MODEL || 'o3-mini' },
   }).catch(() => { /* best-effort */ });
 
   return c.json({
@@ -871,7 +871,7 @@ Categories: ${categories.join(', ')}
 
 Category:`;
 
-    const result = await c.env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
+    const result = await c.env.AI.run('@cf/meta/llama-3.1-8b-instruct' as any, {
       messages: [{ role: 'user', content: prompt }],
       max_tokens: 30,
       temperature: 0,
@@ -1365,6 +1365,7 @@ search.post('/api/ai/discover-images', async (c) => {
 
   // ── Step 2: Extract logo from website ──
   let logo: DiscoveredImage | null = null;
+  let favicon: DiscoveredImage | null = null;
   if (domain && scrapedHtml) {
     // Try og:image first (usually highest quality brand image)
     const ogMatch = scrapedHtml.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
@@ -1479,7 +1480,6 @@ search.post('/api/ai/discover-images', async (c) => {
   }
 
   // ── Step 3: Extract favicon with dimension validation ──
-  let favicon: DiscoveredImage | null = null;
   if (domain && scrapedHtml) {
     // Look for large icons: 512px, 384px, 256px, 192px
     const largeIconMatch = scrapedHtml.match(/<link[^>]+rel=["'](?:apple-touch-icon|icon)["'][^>]+sizes=["'](\d+)x\d+["'][^>]+href=["']([^"']+)["']/gi);

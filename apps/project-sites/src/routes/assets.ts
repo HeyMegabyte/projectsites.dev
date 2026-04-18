@@ -64,21 +64,21 @@ assets.post('/api/assets/upload', async (c) => {
 
   // Process logo
   const logo = formData.get('logo');
-  if (logo instanceof File && logo.size > 0) {
-    await processFile(logo, 'logo');
+  if (typeof logo === 'object' && logo !== null && 'size' in logo && (logo as File).size > 0) {
+    await processFile(logo as File, 'logo');
   }
 
   // Process favicon
   const favicon = formData.get('favicon');
-  if (favicon instanceof File && favicon.size > 0) {
-    await processFile(favicon, 'favicon');
+  if (typeof favicon === 'object' && favicon !== null && 'size' in favicon && (favicon as File).size > 0) {
+    await processFile(favicon as File, 'favicon');
   }
 
   // Process additional images
   const images = formData.getAll('images');
   for (const img of images) {
-    if (img instanceof File && img.size > 0) {
-      await processFile(img, 'images');
+    if (typeof img === 'object' && img !== null && 'size' in img && (img as File).size > 0) {
+      await processFile(img as File, 'images');
     }
   }
 

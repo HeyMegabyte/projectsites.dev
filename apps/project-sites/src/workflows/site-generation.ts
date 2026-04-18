@@ -1166,8 +1166,8 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
     let stageCounter = 0;
     function getContainer() {
       stageCounter++;
-      const id = env.SITE_BUILDER.idFromName(`${params.slug}-stage-${stageCounter}`);
-      return env.SITE_BUILDER.get(id);
+      const id = env.SITE_BUILDER!.idFromName(`${params.slug}-stage-${stageCounter}`);
+      return env.SITE_BUILDER!.get(id);
     }
     const safeName = (params.businessName || 'Business').replace(/[^\w\s\-'.]/g, '').slice(0, 100);
     const category = profile.business_type || params.businessCategory || '';
@@ -1285,7 +1285,8 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
         timeout: '20 minutes',
       }, async () => {
         // Build a comprehensive prompt using ALL research data
-        const logoUrl = brand.logo?.found_online ? (brand.logo.url || '') : '';
+        const brandLogo = (brand.logo || {}) as Record<string, any>;
+        const logoUrl = brandLogo.found_online ? (brandLogo.url || '') : '';
         const allAssets = (assetManifest || []).map((key: string) => `https://${params.slug}.${DOMAINS.SITES_SUFFIX}/assets/${key.split('/').pop()}`);
 
         const foundationPrompt = [

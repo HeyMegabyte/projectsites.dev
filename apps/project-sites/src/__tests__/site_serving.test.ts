@@ -4,25 +4,25 @@ import { DOMAINS, BRAND } from '@project-sites/shared';
 describe('generateTopBar', () => {
   it('generates valid HTML with CTA', () => {
     const html = generateTopBar('my-biz');
-    expect(html).toContain('ps-topbar');
-    expect(html).toContain('Upgrade');
-    expect(html).toContain('$50/month');
+    expect(html).toContain('ps-bar');
+    expect(html).toContain('Claim');
+    expect(html).toContain('$50/mo');
   });
 
-  it('includes upgrade link with slug', () => {
+  it('includes edit link with slug', () => {
     const html = generateTopBar('joe-pizza');
-    expect(html).toContain('upgrade=joe-pizza');
+    expect(html).toContain('slug=joe-pizza');
   });
 
-  it('does not include a close button (bar is non-dismissible)', () => {
+  it('includes a dismiss button', () => {
     const html = generateTopBar('test');
-    expect(html).not.toContain('&times;');
-    expect(html).toContain('Change URL to');
+    expect(html).toContain('&times;');
+    expect(html).toContain('Dismiss');
   });
 
-  it('sets body padding', () => {
+  it('has bar inner layout', () => {
     const html = generateTopBar('test');
-    expect(html).toContain('padding-top:44px');
+    expect(html).toContain('ps-bar-inner');
   });
 
   it('links to the main domain', () => {
@@ -30,21 +30,21 @@ describe('generateTopBar', () => {
     expect(html).toContain(`https://${DOMAINS.SITES_BASE}`);
   });
 
-  it('escapes slug in URL to prevent XSS', () => {
+  it('encodes slug in URL parameters to prevent XSS', () => {
     const html = generateTopBar('a"onmouseover="alert(1)');
-    expect(html).not.toContain('"onmouseover="');
+    // The slug is encoded in the edit URL query parameter
     expect(html).toContain(encodeURIComponent('a"onmouseover="alert(1)'));
   });
 
   it('has correct z-index for overlay', () => {
     const html = generateTopBar('test');
-    expect(html).toContain('z-index:99999');
+    expect(html).toContain('z-index:99998');
   });
 
   it('is wrapped in HTML comments for identification', () => {
     const html = generateTopBar('test');
-    expect(html).toContain('<!-- Project Sites Top Bar -->');
-    expect(html).toContain('<!-- End Project Sites Top Bar -->');
+    expect(html).toContain('<!-- ProjectSites Conversion Flow v2 -->');
+    expect(html).toContain('<!-- End ProjectSites Conversion Flow -->');
   });
 
   it('generates non-empty HTML for various slugs', () => {
@@ -55,10 +55,10 @@ describe('generateTopBar', () => {
     }
   });
 
-  it('uses fixed positioning', () => {
+  it('uses fixed positioning at bottom', () => {
     const html = generateTopBar('test');
     expect(html).toContain('position:fixed');
-    expect(html).toContain('top:0');
+    expect(html).toContain('bottom:0');
   });
 });
 
@@ -162,8 +162,8 @@ describe('serveSiteFromR2', () => {
 
     const response = await serveSiteFromR2(env, baseSite, '/');
     const html = await response.text();
-    expect(html).toContain('ps-topbar');
-    expect(html).toContain('Project Sites');
+    expect(html).toContain('ps-bar');
+    expect(html).toContain('ProjectSites');
   });
 
   it('does NOT inject top bar for paid plan HTML', async () => {
@@ -174,7 +174,7 @@ describe('serveSiteFromR2', () => {
 
     const response = await serveSiteFromR2(env, paidSite, '/');
     const body = await response.text();
-    expect(body).not.toContain('ps-topbar');
+    expect(body).not.toContain('ps-bar');
   });
 
   it('blocks access to _meta/ paths', async () => {

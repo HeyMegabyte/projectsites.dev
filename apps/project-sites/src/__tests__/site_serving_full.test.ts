@@ -318,12 +318,12 @@ describe('serveSiteFromR2', () => {
 
     expect(response.status).toBe(200);
     const html = await response.text();
-    expect(html).toContain('ps-topbar');
-    expect(html).toContain('Project Sites');
+    expect(html).toContain('ps-bar');
+    expect(html).toContain('ProjectSites');
     expect(html).toContain('<h1>Hello</h1>');
     const bodyIndex = html.indexOf('<body>');
-    const topBarIndex = html.indexOf('ps-topbar');
-    expect(topBarIndex).toBeGreaterThan(bodyIndex);
+    const barIndex = html.indexOf('ps-bar');
+    expect(barIndex).toBeGreaterThan(bodyIndex);
   });
 
   it('does NOT inject top bar for paid site HTML responses', async () => {
@@ -335,8 +335,8 @@ describe('serveSiteFromR2', () => {
 
     expect(response.status).toBe(200);
     const body = await response.text();
-    expect(body).not.toContain('ps-topbar');
-    expect(body).not.toContain('Project Sites Top Bar');
+    expect(body).not.toContain('ps-bar');
+    expect(body).not.toContain('ProjectSites Conversion Flow');
   });
 
   it('does NOT inject top bar for non-HTML responses (CSS, JS)', async () => {
@@ -372,14 +372,16 @@ describe('serveSiteFromR2', () => {
     expect(env.SITES_BUCKET.get).toHaveBeenCalledWith('sites/acme-corp/v42/assets/logo.svg');
   });
 
-  it('uses "latest" as version when current_build_version is null', async () => {
-    const r2Obj = createMockR2Object('data');
-    (env.SITES_BUCKET.get as jest.Mock).mockResolvedValue(r2Obj);
-
+  it('returns building page when current_build_version is null', async () => {
     const site = makeSite({ current_build_version: null });
-    await serveSiteFromR2(env as any, site, '/file.txt');
+    const response = await serveSiteFromR2(env as any, site, '/file.txt');
 
-    expect(env.SITES_BUCKET.get).toHaveBeenCalledWith('sites/my-site/latest/file.txt');
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain('Building');
+    expect(html).toContain(site.slug);
+    // Should NOT have queried R2 — building page is self-contained
+    expect(env.SITES_BUCKET.get).not.toHaveBeenCalled();
   });
 
   it('sets cache-control and X-Site-Slug headers', async () => {
@@ -423,7 +425,7 @@ describe('serveSiteFromR2', () => {
     const response = await serveSiteFromR2(env as any, site, '/index.html');
 
     const html = await response.text();
-    expect(html).toContain('upgrade=joe-pizza');
+    expect(html).toContain('slug=joe-pizza');
     expect(html).toContain(`https://${DOMAINS.SITES_BASE}`);
   });
 
@@ -438,6 +440,6 @@ describe('serveSiteFromR2', () => {
 
     expect(response.status).toBe(200);
     const html = await response.text();
-    expect(html).toContain('ps-topbar');
+    expect(html).toContain('ps-bar');
   });
 });

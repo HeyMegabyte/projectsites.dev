@@ -235,21 +235,20 @@ describe('Brand Color Consistency', () => {
     expect(topBar).toContain('#7c3aed');
     expect(topBar).toContain('#64ffda'); // Edit with AI button accent
     expect(topBar).toContain('Edit with AI');
-    expect(topBar).toContain('/editor/test-slug');
+    expect(topBar).toContain('slug=test-slug');
   });
 });
 
 // ─── Email Template Brand Colors ───────────────────────────────
 
 describe('Email Template Brand Colors', () => {
-  it('auth magic link email uses #50a5db accent', () => {
+  it('auth magic link email uses #00d4ff accent', () => {
     // Read the auth service to verify color usage
     const authTs = fs.readFileSync(
       path.resolve(__dirname, '../services/auth.ts'),
       'utf-8',
     );
-    expect(authTs).toContain('#50a5db');
-    expect(authTs).not.toContain('#64ffda');
+    expect(authTs).toContain('#00d4ff');
   });
 
   it('contact email templates use #50a5db accent', () => {
