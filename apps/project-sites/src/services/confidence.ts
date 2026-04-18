@@ -498,8 +498,6 @@ export function transformToV3(
 
   const rawHeroImages = arr(img.hero_images) as Array<Record<string, unknown>>;
   const rawServiceImages = arr(img.service_images) as Array<Record<string, unknown>>;
-  const rawGallery = arr(img.gallery) as Array<Record<string, unknown>>;
-
   // Determine business type for image filtering
   const businessType = str(p.business_type) || 'general';
 

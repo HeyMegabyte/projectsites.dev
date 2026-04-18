@@ -28,7 +28,7 @@
  * @packageDocumentation
  */
 
-import { DOMAINS, BRAND } from '@project-sites/shared';
+import { DOMAINS } from '@project-sites/shared';
 import type { Env } from '../types/env.js';
 import { dbQueryOne } from './db.js';
 
@@ -61,7 +61,6 @@ export function generateTopBar(slug: string): string {
  * Zero external dependencies. Self-contained vanilla JS/CSS.
  */
 export function generateConversionFlow(slug: string): string {
-  const apiBase = `https://${DOMAINS.SITES_BASE}`;
   const editUrl = `https://${DOMAINS.BOLT_BASE}/?slug=${encodeURIComponent(slug)}`;
 
   return `<!-- ProjectSites Conversion Flow v2 -->

@@ -94,7 +94,6 @@ app.use(
 // Rate limiting on sensitive endpoints
 import { rateLimitMiddleware } from './middleware/rate_limit.js';
 app.use('/api/auth/magic-link', rateLimitMiddleware({ maxRequests: 5, windowSeconds: 300, prefix: 'rl:magic' }));
-app.use('/api/auth/phone/*', rateLimitMiddleware({ maxRequests: 5, windowSeconds: 300, prefix: 'rl:phone' }));
 app.use('/api/search/businesses', rateLimitMiddleware({ maxRequests: 30, windowSeconds: 60, prefix: 'rl:search' }));
 app.use('/api/sites/create-from-search', rateLimitMiddleware({ maxRequests: 10, windowSeconds: 3600, prefix: 'rl:create' }));
 app.use('/api/ai/*', rateLimitMiddleware({ maxRequests: 20, windowSeconds: 60, prefix: 'rl:ai' }));

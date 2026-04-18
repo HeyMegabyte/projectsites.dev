@@ -29,8 +29,6 @@ function brandedErrorPage(opts: {
     503: 'Service Unavailable',
   };
   const title = titles[opts.status] || `Error ${opts.status}`;
-  const emoji: Record<number, string> = { 400: 'form', 401: 'lock', 403: 'shield', 404: 'search', 429: 'clock', 500: 'alert', 502: 'cloud', 503: 'wrench' };
-  const icon = emoji[opts.status] || 'alert';
   const suggestions: Record<number, string> = {
     400: 'Check the request format and try again.',
     401: 'Please <a href="https://projectsites.dev/" class="link">sign in</a> to continue.',

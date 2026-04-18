@@ -25,21 +25,6 @@ import { extractJsonFromText } from '../services/ai_workflows.js';
 import { notifySiteBuilt } from '../services/notifications.js';
 import { DOMAINS } from '@project-sites/shared';
 
-/** Strip markdown code fences from LLM HTML output. */
-function cleanHtmlOutput(raw: string): string {
-  let cleaned = raw.trim();
-  // Strip leading text before <!DOCTYPE or <!doctype
-  const docIdx = cleaned.search(/<!doctype\s/i);
-  if (docIdx > 0) {
-    cleaned = cleaned.substring(docIdx);
-  }
-  // Strip trailing markdown fence
-  if (cleaned.endsWith('```')) {
-    cleaned = cleaned.replace(/\s*```\s*$/, '');
-  }
-  return cleaned.trim();
-}
-
 /** Update site status in D1 (best-effort, never throws). */
 async function updateSiteStatus(db: D1Database, siteId: string, status: string): Promise<void> {
   try {
@@ -145,20 +130,10 @@ interface SocialData {
   [key: string]: unknown;
 }
 
-/** Shape of the quality score data. */
-interface QualityData {
-  overall: number;
-  issues?: string[];
-  suggestions?: string[];
-  missing_sections?: string[];
-}
-
 // Step callbacks return JSON-stringified data (string is always Serializable).
 // We parse it back after the step completes.
 
 const RETRY_3 = { retries: { limit: 3, delay: '10 seconds' as const, backoff: 'exponential' as const }, timeout: '2 minutes' as const };
-const RETRY_HTML = { retries: { limit: 3, delay: '15 seconds' as const, backoff: 'exponential' as const }, timeout: '10 minutes' as const };
-const RETRY_LEGAL = { retries: { limit: 3, delay: '10 seconds' as const, backoff: 'exponential' as const }, timeout: '3 minutes' as const };
 
 /**
  * Safely validate LLM JSON output with enriched error messages.
@@ -509,12 +484,6 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
       },
     );
 
-    // Expose both legacy and v3 under research
-    const research = {
-      ...researchRaw,
-      _v3: researchV3,
-    };
-
     await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.parallel_research_complete', {
       has_social: !!social,
       has_website_url: !!social.website_url,
@@ -747,7 +716,7 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
         const siteUrl = websiteUrl.startsWith('http') ? websiteUrl : `https://${websiteUrl}`;
         scrapedContent = await step.do('scrape-website', {
           retries: { limit: 2, delay: '10 seconds', backoff: 'exponential' },
-          timeout: '3 minutes',
+          timeout: '8 minutes',
         }, async () => {
           await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.scrape_started', {
             url: siteUrl, message: `Deep-crawling ${siteUrl} (all pages)`, phase: 'research',
@@ -812,16 +781,39 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           // Crawl internal pages (up to 50 total for thorough content extraction)
           const visited = new Set<string>([siteUrl, siteUrl + '/']);
           const pages = [homepage];
-          const queue = homepage.links.filter(l => !visited.has(l)).slice(0, 60);
+          let queue = homepage.links.filter(l => !visited.has(l)).slice(0, 1000);
 
           for (const link of queue) {
-            if (visited.size >= 50) break;
+            if (visited.size >= 500) break;
             const normalized = link.replace(/\/$/, '');
             if (visited.has(normalized) || visited.has(normalized + '/')) continue;
             visited.add(normalized);
             visited.add(normalized + '/');
             const page = await scrapePage(link);
             if (page) pages.push(page);
+          }
+
+          // Second pass: scan all discovered pages for MORE internal links not yet visited
+          if (visited.size < 500) {
+            const secondPassLinks: string[] = [];
+            for (const page of pages) {
+              for (const link of page.links) {
+                const normalized = link.replace(/\/$/, '');
+                if (!visited.has(normalized) && !visited.has(normalized + '/')) {
+                  secondPassLinks.push(link);
+                }
+              }
+            }
+            const uniqueSecondPass = [...new Set(secondPassLinks)];
+            for (const link of uniqueSecondPass) {
+              if (visited.size >= 500) break;
+              const normalized = link.replace(/\/$/, '');
+              if (visited.has(normalized) || visited.has(normalized + '/')) continue;
+              visited.add(normalized);
+              visited.add(normalized + '/');
+              const page = await scrapePage(link);
+              if (page) pages.push(page);
+            }
           }
 
           // Collect all unique images across the site
@@ -842,7 +834,7 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
               headings: p.headings,
               content: p.paragraphs.join('\n'),
             })),
-            all_images: allImages.slice(0, 100), // Up to 100 images across the site
+            all_images: allImages.slice(0, 500), // Up to 500 images across the site
             all_text: pages.flatMap(p => p.paragraphs).join('\n\n'),
             ogImage: homepage.paragraphs.length > 0 ? '' : '', // Will be set from meta
           };
@@ -1401,6 +1393,18 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           '7. Call to action (donate/volunteer/contact based on category)',
           '8. Footer: full business info, nav links, social, "Built by ProjectSites.dev"',
           '',
+          '=== DONATION PAGE (for non-profits and causes) ===',
+          'If this is a non-profit or organization that accepts donations, create a donate.html page:',
+          '- Full-screen split layout at desktop (two panes side by side)',
+          '- LEFT PANE: Large compelling cause photo + description of why donations matter + vivid animations',
+          '- RIGHT PANE: Simple donation form like givedirectly.org — monthly by default, $50/month default',
+          '- Amount options: $25, $50, $100, $250, Custom',
+          '- Monthly/One-time toggle (monthly selected by default)',
+          '- Simple name + email fields, then "Donate Now" button',
+          '- Button links to Stripe checkout (use data attributes for JS integration)',
+          '- Below the form: "Recent donors" section (placeholder for last 50 anonymous donations)',
+          '- The whole page should be emotionally compelling with stunning imagery and animation',
+          '',
           '=== CONTENT (use ALL original website content) ===',
           'The _scraped.txt file contains the COMPLETE content from the original website.',
           'You MUST use this real content — do NOT make up placeholder text.',
@@ -1497,7 +1501,7 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           timeout: '20 minutes',
         }, async () => {
           return callContainer([
-            { label: 'C1-visual', timeoutMin: 3, text: 'Visual quality fix on index.html.\n\n1. Text over images: dark overlay min rgba(0,0,0,0.5)\n2. Color contrast 4.5:1 for text\n3. Vibrant palette, no washed-out colors\n4. Grid partial rows centered\n5. Google Maps address should link to directions' },
+            { label: 'C1-visual', timeoutMin: 3, text: 'Visual quality fix on index.html.\n\n1. Text over images: dark overlay min rgba(0,0,0,0.5)\n2. Color contrast 4.5:1 for text\n3. Vibrant palette, no washed-out colors\n4. Grid partial rows centered\n5. Google Maps address should link to directions\n\nEnsure pixel-perfect design. Every element should be precisely aligned. Check spacing, typography, colors at all breakpoints. The site should look like it was designed by a world-class design agency.' },
             { label: 'C2-domain', timeoutMin: 5, text: domainPrompt },
           ], currentFiles, 'stage-c');
         });
@@ -1512,7 +1516,7 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           timeout: '15 minutes',
         }, async () => {
           return callContainer([
-            { label: 'D1-production', timeoutMin: 3, text: 'Production readiness. No console.log. Valid HTML. HTTPS URLs. Google Fonts preconnect. Back-to-top button. Smooth scroll. Copyright ' + new Date().getFullYear() + '. Address links to Google Maps directions.' },
+            { label: 'D1-production', timeoutMin: 3, text: 'Production readiness. No console.log. Valid HTML. HTTPS URLs. Google Fonts preconnect. Back-to-top button. Smooth scroll. Copyright ' + new Date().getFullYear() + '. Address links to Google Maps directions.\n\nEnsure pixel-perfect design. Every element should be precisely aligned. Check spacing, typography, colors at all breakpoints. The site should look like it was designed by a world-class design agency.' },
             { label: 'D2-safety', timeoutMin: 2, text: 'Safety check. Privacy notice on form. Footer: Privacy+Terms links. External links: rel=noopener. FAQ last item: Built by ProjectSites.dev.' },
           ], currentFiles, 'stage-d');
         });
