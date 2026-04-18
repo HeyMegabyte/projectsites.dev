@@ -2530,4 +2530,84 @@ search.get('/api/container-script', async (c) => {
   });
 });
 
+/**
+ * Public donation checkout endpoint.
+ * Creates a Stripe Checkout session for one-time or recurring donations.
+ * The Stripe keys are server-side only — never exposed to client code.
+ *
+ * POST /api/donate
+ * Body: { slug, amount, interval, donorName?, donorEmail? }
+ * Returns: { url } — redirect the user to this Stripe Checkout URL
+ */
+search.post('/api/donate', async (c) => {
+  const body = await c.req.json() as {
+    slug: string;
+    amount: number;       // in cents (e.g., 5000 = $50)
+    interval?: 'month' | 'year' | 'one_time';
+    donorName?: string;
+    donorEmail?: string;
+    successUrl?: string;
+    cancelUrl?: string;
+  };
+
+  if (!body.slug || !body.amount || body.amount < 100) {
+    return c.json({ error: 'Invalid donation: slug and amount (min $1.00) required' }, 400);
+  }
+
+  const stripeKey = c.env.STRIPE_SECRET_KEY;
+  if (!stripeKey) {
+    return c.json({ error: 'Donations not configured' }, 503);
+  }
+
+  // Look up the site to get business name
+  const site = await c.env.DB.prepare('SELECT business_name FROM sites WHERE slug = ?').bind(body.slug).first() as { business_name: string } | null;
+  const businessName = site?.business_name || body.slug;
+
+  const isRecurring = body.interval && body.interval !== 'one_time';
+  const siteUrl = `https://${body.slug}.projectsites.dev`;
+
+  // Create Stripe Checkout Session via REST API (no SDK needed)
+  const params = new URLSearchParams();
+  params.append('mode', isRecurring ? 'subscription' : 'payment');
+  params.append('success_url', body.successUrl || `${siteUrl}/donate.html?success=true`);
+  params.append('cancel_url', body.cancelUrl || `${siteUrl}/donate.html`);
+  params.append('line_items[0][price_data][currency]', 'usd');
+  params.append('line_items[0][price_data][unit_amount]', String(body.amount));
+  params.append('line_items[0][price_data][product_data][name]', `Donation to ${businessName}`);
+  params.append('line_items[0][price_data][product_data][description]', `Thank you for supporting ${businessName}`);
+  params.append('line_items[0][quantity]', '1');
+  if (isRecurring) {
+    params.append('line_items[0][price_data][recurring][interval]', body.interval === 'year' ? 'year' : 'month');
+  }
+  if (body.donorEmail) {
+    params.append('customer_email', body.donorEmail);
+  }
+  params.append('metadata[slug]', body.slug);
+  params.append('metadata[donor_name]', body.donorName || 'Anonymous');
+  params.append('metadata[source]', 'projectsites_donation');
+
+  try {
+    const stripeRes = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${stripeKey}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params.toString(),
+    });
+
+    if (!stripeRes.ok) {
+      const err = await stripeRes.text().catch(() => 'Unknown');
+      console.warn('[donate] Stripe error:', stripeRes.status, err.slice(0, 200));
+      return c.json({ error: 'Payment setup failed' }, 502);
+    }
+
+    const session = await stripeRes.json() as { url: string; id: string };
+    return c.json({ url: session.url, sessionId: session.id });
+  } catch (e) {
+    console.warn('[donate] Error:', e instanceof Error ? e.message : String(e));
+    return c.json({ error: 'Payment service unavailable' }, 503);
+  }
+});
+
 export { search };
