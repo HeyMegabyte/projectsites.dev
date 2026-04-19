@@ -1349,31 +1349,44 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
         const allAssets = (assetManifest || []).map((key: string) => `https://${params.slug}.${DOMAINS.SITES_SUFFIX}/assets/${key.split('/').pop()}`);
 
         const foundationPrompt = [
-          `You are RECREATING the website for "${safeName}" as a SUPED-UP CLONE — same brand identity, same content, but DRAMATICALLY more beautiful, compelling, and multimedia-packed.`,
+          `You are RECREATING the website for "${safeName}" as a SUPED-UP CLONE — same brand identity, same content, but DRAMATICALLY more beautiful.`,
           'IMPORTANT: You MUST use the Write tool to create files in the current directory.',
           'Read ALL _ prefixed files for full research context.',
           '',
-          '=== BRAND IDENTITY (CRITICAL — use the REAL brand, not generic) ===',
+          '=== BRAND IDENTITY (CRITICAL — use REAL brand from the original site) ===',
           `Name: ${safeName}`,
           `Category: ${category || 'general business'}`,
-          `Brand Colors (extracted from original site): primary:${primary}; secondary:${secondary}; accent:${accent}`,
-          logoUrl ? `Logo URL: ${logoUrl} — USE THIS LOGO. Do not create a generic SVG.` : 'No logo found — create a professional inline SVG using the brand colors and Inter 700 font.',
-          `Brand personality: ${brand.brand_personality || 'professional, warm, approachable'}`,
-          scrapedLogoUrl ? `LOGO (MUST USE): ${scrapedLogoUrl}` : logoUrl ? `Logo URL: ${logoUrl}` : '',
+          `Brand Colors (extracted from original site via AI vision): primary:${primary}; secondary:${secondary}; accent:${accent}`,
+          'IMPORTANT: These colors were extracted from the original website. USE THEM as the primary palette.',
+          'Consider the original site\'s background: if it uses white/light backgrounds, the remake can too.',
+          'Let the logo\'s visual style (colors, shapes, mood) guide the ENTIRE design direction.',
           '',
-          '=== MULTI-PAGE ARCHITECTURE (recreate ALL original pages) ===',
-          'Create MULTIPLE HTML files. Recreate every page from the original site, making each one DRAMATICALLY more beautiful:',
+          scrapedLogoUrl ? `LOGO (MUST USE — downloaded from original site): ${scrapedLogoUrl}` : logoUrl ? `Logo URL: ${logoUrl} — Download and embed this logo.` : '',
+          scrapedLogoUrl || logoUrl ? 'Use <img> tag with the logo URL. Do NOT create a generic SVG when a real logo exists.' : 'No logo found — create a professional inline SVG using brand colors.',
+          'APP ICON: Create a favicon.svg that extracts the key graphic element from the logo (monogram or symbol). Also reference it as apple-touch-icon.',
+          `Brand personality: ${brand.brand_personality || 'professional, warm, approachable'}`,
+          '',
+          '=== MULTI-PAGE ARCHITECTURE ===',
+          'Create MULTIPLE HTML files with CLEAN URLs (use descriptive filenames):',
           scrapedPages.length > 0
-            ? scrapedPages.map((p: any, i: number) => {
-                const pageName = p.url.replace(/^https?:\/\/[^/]+/, '').replace(/\/$/, '') || '/';
-                const fileName = pageName === '/' ? 'index.html' : pageName.replace(/^\//, '').replace(/\//g, '-').replace(/[^a-z0-9-]/gi, '') + '.html';
-                return `${i + 1}. ${fileName} — "${p.title || pageName}" (original: ${p.url})`;
-              }).join('\n')
+            ? (() => {
+                // Intelligently group pages — combine thin pages, keep substantial ones
+                const pageList = scrapedPages.map((p: any, i: number) => {
+                  const pageName = p.url.replace(/^https?:\/\/[^/]+/, '').replace(/\/$/, '') || '/';
+                  const fileName = pageName === '/' ? 'index.html' : pageName.replace(/^\//, '').replace(/\//g, '-').replace(/[^a-z0-9-]/gi, '') + '.html';
+                  return `${i + 1}. ${fileName} — "${p.title || pageName}" (original: ${p.url})`;
+                });
+                return pageList.join('\n');
+              })()
             : structurePlan.pages ? structurePlan.pages.map((p: any, i: number) => `${i + 1}. ${p.path} — ${p.title}: ${p.purpose}`).join('\n') : 'index.html, about.html, services.html, contact.html',
           '',
-          'If any original pages are too small to stand alone, COMBINE them into a single page.',
-          'Each page must be its own COMPELLING MULTIMEDIA EXPERIENCE — breathtakingly gorgeous.',
-          'Navigation: consistent header/footer across all pages with links to every page.',
+          'RULES for page organization:',
+          '- Combine thin pages into richer, more comprehensive pages',
+          '- Keep nav CONCISE: max 5-7 top-level links. Use dropdowns for sub-sections.',
+          '- You have FULL CREATIVITY to reorganize URLs for better keywords',
+          '- Every page must have unique images — NEVER reuse the same image across pages',
+          '- Each page must be a COMPELLING MULTIMEDIA EXPERIENCE',
+          '- Consistent header (logo + nav) and footer across all pages',
           '',
           '=== DESIGN (Stripe / Linear / Vercel quality) ===',
           '- Dark theme preferred with vibrant brand accent colors',
@@ -1411,13 +1424,15 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           'Include ALL programs, services, team members, history, and details from the original.',
           'Augment with researched facts about affiliated organizations.',
           '',
-          '=== IMAGES (use ALL original images + supplement with Unsplash) ===',
-          scrapedAllImages.length > 0 ? `Images from original website (USE THESE):\n${scrapedAllImages.slice(0, 30).join('\n')}` : '',
-          allAssets.length > 0 ? `Additional discovered assets:\n${allAssets.slice(0, 20).join('\n')}` : '',
-          '- USE ALL images from the original site first — they are the real business photos',
-          '- Add Unsplash images ONLY to fill gaps: https://images.unsplash.com/photo-{ID}?w={W}&h={H}&fit=crop',
-          '- 10+ unique images per page minimum. Every section needs images.',
-          '- Alt text with keywords on every image. loading="lazy" below fold.',
+          '=== IMAGES (unique per page, AI-selected) ===',
+          scrapedAllImages.length > 0 ? `Images scraped from original website (USE THESE FIRST):\n${scrapedAllImages.slice(0, 40).join('\n')}` : '',
+          allAssets.length > 0 ? `Additional discovered/generated assets:\n${allAssets.slice(0, 20).join('\n')}` : '',
+          '- NEVER reuse the same image on multiple pages',
+          '- USE original business photos from the scraped site first',
+          '- Fill gaps with relevant Unsplash: https://images.unsplash.com/photo-{ID}?w={W}&h={H}&fit=crop',
+          '- Every image must be RELEVANT to its section (a food photo for meal service, volunteers for volunteer page)',
+          '- NO empty image holders — if no image available, use a relevant Unsplash photo',
+          '- 8+ unique images per page. Alt text with keywords. loading="lazy" below fold.',
           '',
           '=== SEO ===',
           `<title>: ${safeName} — primary keyword + location`,
@@ -1458,7 +1473,7 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           timeout: '15 minutes',
         }, async () => {
           return callContainer([
-            { label: 'B1-beauty', timeoutMin: 10, text: 'Make ALL pages MORE BEAUTIFUL. Do NOT rewrite from scratch — enhance what exists.\n\nAdd to ALL HTML files:\n- 10+ @keyframes animations (fadeInUp, slideInLeft, scaleIn, subtleFloat, gradientShift, glowPulse)\n- IntersectionObserver: sections start opacity:0 translateY:30px, animate to visible on scroll\n- Glassmorphism on nav and cards (backdrop-filter:blur(20px))\n- Dark theme refinement: ensure dark backgrounds with vibrant accent colors\n- Gradient text on hero headings\n- Smooth hover transforms on cards (translateY -4px + shadow)\n- @media prefers-reduced-motion\n- Make it BREATHTAKINGLY GORGEOUS — every pixel should feel intentional' },
+            { label: 'B1-beauty', timeoutMin: 10, text: 'Make ALL pages MORE BEAUTIFUL. Do NOT rewrite from scratch — enhance what exists.\n\nFor ALL HTML files:\n- 10+ @keyframes animations (fadeInUp, slideInLeft, scaleIn, subtleFloat, gradientShift, glowPulse)\n- IntersectionObserver: sections start opacity:0 translateY:30px, animate to visible on scroll\n- Glassmorphism on cards (backdrop-filter:blur(20px))\n- Use the BRAND COLORS from the original site (check _research.json for extracted colors)\n- Gradient text on hero headings using brand primary color\n- Smooth hover transforms on cards (translateY -4px + shadow)\n- @media prefers-reduced-motion\n- Check every image: is it RELEVANT to its section? Is it duplicated on another page? Fix any mismatches.\n- Fill any empty image placeholders with relevant Unsplash photos.\n- SELF-PROMPT: Look at each page critically. What would make it more stunning? Do it.' },
           ], currentFiles, 'stage-b1');
         });
         const b1Arr = b1 as { name: string; content: string }[];
@@ -1501,7 +1516,7 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           timeout: '20 minutes',
         }, async () => {
           return callContainer([
-            { label: 'C1-visual', timeoutMin: 3, text: 'Visual quality fix on index.html.\n\n1. Text over images: dark overlay min rgba(0,0,0,0.5)\n2. Color contrast 4.5:1 for text\n3. Vibrant palette, no washed-out colors\n4. Grid partial rows centered\n5. Google Maps address should link to directions\n\nEnsure pixel-perfect design. Every element should be precisely aligned. Check spacing, typography, colors at all breakpoints. The site should look like it was designed by a world-class design agency.' },
+            { label: 'C1-visual', timeoutMin: 5, text: 'Visual quality audit on ALL HTML files.\n\n1. Check EVERY image: is it relevant to the section content? Remove/replace irrelevant ones.\n2. Check for DUPLICATE images across pages — each page must have unique imagery.\n3. Fill any empty image placeholders with relevant Unsplash photos.\n4. Ensure the LOGO from the original site is visible in the header of every page.\n5. Verify brand colors match the original site (not generic blue/cyan).\n6. Text contrast: readable on all backgrounds.\n7. Grid partial rows centered.\n8. Nav should have max 5-7 top-level links, use dropdowns for sub-pages.\n9. Google Maps address should link to directions URL.\n10. SELF-PROMPT: What else would make each page more stunning? Do it.' },
             { label: 'C2-domain', timeoutMin: 5, text: domainPrompt },
           ], currentFiles, 'stage-c');
         });
@@ -1516,8 +1531,8 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           timeout: '15 minutes',
         }, async () => {
           return callContainer([
-            { label: 'D1-production', timeoutMin: 3, text: 'Production readiness. No console.log. Valid HTML. HTTPS URLs. Google Fonts preconnect. Back-to-top button. Smooth scroll. Copyright ' + new Date().getFullYear() + '. Address links to Google Maps directions.\n\nEnsure pixel-perfect design. Every element should be precisely aligned. Check spacing, typography, colors at all breakpoints. The site should look like it was designed by a world-class design agency.' },
-            { label: 'D2-safety', timeoutMin: 2, text: 'Safety check. Privacy notice on form. Footer: Privacy+Terms links. External links: rel=noopener. FAQ last item: Built by ProjectSites.dev.' },
+            { label: 'D1-production', timeoutMin: 5, text: 'Final production polish on ALL files.\n\n1. No console.log. Valid HTML. All URLs use HTTPS.\n2. Google Fonts preconnect + display=swap.\n3. Back-to-top button. Smooth scroll. Copyright ' + new Date().getFullYear() + '.\n4. Address text links to Google Maps directions URL.\n5. Verify logo appears in header of EVERY page.\n6. Verify app icon/favicon is set.\n7. Every page must look pixel-perfect at 1280px and 375px.\n8. SELF-PROMPT: Browse every page as a user would. What feels incomplete or ugly? Fix it now.' },
+            { label: 'D2-safety', timeoutMin: 2, text: 'Safety + SEO final check.\n1. Privacy notice on contact/donation forms.\n2. Footer: Privacy + Terms links on every page.\n3. External links: rel=noopener noreferrer.\n4. FAQ last item: Built by ProjectSites.dev.\n5. Verify sitemap.xml lists ALL pages.\n6. Verify robots.txt allows crawling.' },
           ], currentFiles, 'stage-d');
         });
         const stageDArr = stageD as { name: string; content: string }[];
