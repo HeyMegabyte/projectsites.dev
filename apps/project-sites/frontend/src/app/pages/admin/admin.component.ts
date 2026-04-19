@@ -25,6 +25,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   sidebarCollapsed = signal(false);
   isEditorRoute = signal(false);
   editorSaving = signal(false);
+  currentSection = signal('Dashboard');
 
   private routerSub?: Subscription;
 
@@ -47,11 +48,22 @@ export class AdminComponent implements OnInit, OnDestroy {
     if (this.deployModalSiteId()) { this.closeDeploy(); return; }
   }
 
+  private updateRouteState(url: string): void {
+    this.isEditorRoute.set(url.includes('/admin/editor'));
+    const segment = url.split('/').pop() || '';
+    const labels: Record<string, string> = {
+      '': 'Dashboard', 'admin': 'Dashboard', 'editor': 'Editor',
+      'domains': 'Domains', 'snapshots': 'Snapshots', 'analytics': 'Analytics',
+      'seo': 'SEO', 'billing': 'Billing', 'audit': 'Audit Log', 'settings': 'Settings',
+    };
+    this.currentSection.set(labels[segment] || 'Dashboard');
+  }
+
   ngOnInit(): void {
-    this.isEditorRoute.set(this.router.url.includes('/admin/editor'));
+    this.updateRouteState(this.router.url);
     this.routerSub = this.router.events
       .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
-      .subscribe(e => this.isEditorRoute.set(e.urlAfterRedirects.includes('/admin/editor')));
+      .subscribe(e => this.updateRouteState(e.urlAfterRedirects));
 
     if (!this.auth.isLoggedIn()) {
       this.state.loading.set(false);

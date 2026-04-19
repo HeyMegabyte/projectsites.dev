@@ -165,9 +165,14 @@
     <!-- Top bar -->
     <div class="flex items-center justify-between px-7 py-3 border-b border-white/[0.06] bg-dark/60 backdrop-blur-lg flex-shrink-0 gap-3 flex-wrap max-md:px-4 max-md:pl-[52px]">
       <div class="flex items-center gap-1.5 text-[0.82rem] text-text-secondary">
-        <span class="font-medium max-w-[180px] truncate">{{ state.selectedSite()?.business_name || 'My Sites' }}</span>
-        <svg class="opacity-50" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
-        <span class="text-white font-semibold">Admin</span>
+        <a class="font-medium text-text-secondary hover:text-primary transition-colors no-underline cursor-pointer" routerLink="/admin">ProjectSites</a>
+        @if (state.selectedSite(); as site) {
+          <svg class="opacity-40 flex-shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+          <a class="font-medium text-text-secondary hover:text-primary transition-colors no-underline cursor-pointer max-w-[180px] truncate"
+             [href]="state.getSiteUrl(site)" target="_blank" rel="noopener">{{ site.business_name || 'Unnamed' }}</a>
+        }
+        <svg class="opacity-40 flex-shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+        <span class="text-white font-semibold">{{ currentSection() }}</span>
       </div>
       <div class="flex items-center gap-2">
         <button class="top-btn" (click)="state.loadData()" title="Refresh">
