@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, signal, HostListener } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed, HostListener } from '@angular/core';
 import { NgTemplateOutlet, DatePipe } from '@angular/common';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { Router } from '@angular/router';
@@ -17,6 +17,18 @@ interface FileTreeNode {
   expanded: boolean;
   children: FileTreeNode[];
 }
+
+export type NavSection =
+  | 'dashboard'
+  | 'pages'
+  | 'design'
+  | 'domains'
+  | 'analytics'
+  | 'seo'
+  | 'billing'
+  | 'audit'
+  | 'settings'
+  | 'snapshots';
 
 @Component({
   selector: 'app-admin',
@@ -37,12 +49,21 @@ export class AdminComponent implements OnInit, OnDestroy {
   onEscape(): void {
     if (this.deletingSite()) { this.cancelDelete(); return; }
     if (this.editingFile()) { this.closeFileEditor(); return; }
-    if (this.filesModalSiteId()) { this.closeFiles(); return; }
-    if (this.logsModalSiteId()) { this.closeLogs(); return; }
-    if (this.domainModalSiteId()) { this.closeDomains(); return; }
     if (this.deployModalSiteId()) { this.closeDeploy(); return; }
     if (this.resetModalSite()) { this.closeReset(); return; }
   }
+
+  // ─── Sidebar state ───────────────────────────────────
+  activeNav = signal<NavSection>('dashboard');
+  siteDropdownOpen = signal(false);
+  sidebarCollapsed = signal(false);
+  selectedSiteId = signal<string | null>(null);
+
+  selectedSite = computed(() => {
+    const id = this.selectedSiteId();
+    if (!id) return this.sites()[0] || null;
+    return this.sites().find(s => s.id === id) || this.sites()[0] || null;
+  });
 
   sites = signal<Site[]>([]);
   domainSummary = signal<DomainSummary>({ total: 0, active: 0, pending: 0, failed: 0 });
@@ -58,25 +79,18 @@ export class AdminComponent implements OnInit, OnDestroy {
   // More dropdown
   openDropdownId = signal<string | null>(null);
 
-  // Domain modal
-  domainModalSiteId = signal<string | null>(null);
-  domainModalSiteName = signal('');
-  domainModalSlug = signal('');
+  // Domain state (inline in right panel now)
   domainTab = signal<'existing' | 'connect' | 'register'>('existing');
   hostnames = signal<Hostname[]>([]);
   newHostname = '';
   loadingHostnames = signal(false);
 
-  // Logs modal
-  logsModalSiteId = signal<string | null>(null);
-  logsModalSiteName = signal('');
+  // Logs state (inline in right panel)
   logs = signal<LogEntry[]>([]);
   loadingLogs = signal(false);
   private logsInterval: ReturnType<typeof setInterval> | null = null;
 
-  // Files modal
-  filesModalSiteId = signal<string | null>(null);
-  filesModalSiteName = signal('');
+  // Files state (inline in right panel)
   files = signal<SiteFile[]>([]);
   fileTree = signal<FileTreeNode[]>([]);
   loadingFiles = signal(false);
@@ -91,10 +105,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   deployFileName = signal('');
   deploying = signal(false);
 
-  // Snapshots modal
-  snapshotModalSiteId = signal<string | null>(null);
-  snapshotModalSiteName = signal('');
-  snapshotModalSlug = signal('');
+  // Snapshots state (inline in right panel)
   snapshots = signal<{ id: string; snapshot_name: string; build_version: string; description: string | null; created_at: string }[]>([]);
   loadingSnapshots = signal(false);
   newSnapshotName = '';
@@ -122,11 +133,9 @@ export class AdminComponent implements OnInit, OnDestroy {
   checkingDomain = signal(false);
   domainCheckResult = signal<{ domain: string; available: boolean } | null>(null);
 
-  // Slug editing in domains modal
+  // Slug editing in domains
   editingSlugInModal = signal(false);
   modalSlugValue = '';
-
-  // (Bolt editor moved to /editor/:slug route)
 
   // Delete confirm
   deletingSite = signal<Site | null>(null);
@@ -211,6 +220,51 @@ export class AdminComponent implements OnInit, OnDestroy {
       });
   }
 
+  // ─── Navigation ───────────────────────────────────────
+
+  selectNav(section: NavSection): void {
+    this.activeNav.set(section);
+    this.sidebarCollapsed.set(false);
+    const site = this.selectedSite();
+    if (!site) return;
+
+    // Load data for the section
+    switch (section) {
+      case 'pages':
+        this.loadFiles(site.id);
+        break;
+      case 'domains':
+        this.loadHostnames(site.id);
+        break;
+      case 'audit':
+        this.openLogs(site);
+        break;
+      case 'snapshots':
+        this.loadSnapshots(site.id);
+        break;
+    }
+  }
+
+  selectSite(site: Site): void {
+    this.selectedSiteId.set(site.id);
+    this.siteDropdownOpen.set(false);
+    // Reload section data for new site
+    this.selectNav(this.activeNav());
+  }
+
+  toggleSiteDropdown(event: MouseEvent): void {
+    event.stopPropagation();
+    this.siteDropdownOpen.update(v => !v);
+  }
+
+  closeSiteDropdown(): void {
+    this.siteDropdownOpen.set(false);
+  }
+
+  toggleSidebar(): void {
+    this.sidebarCollapsed.update(v => !v);
+  }
+
   // ─── Utilities ────────────────────────────────────────
 
   getStatusClass(status: string): string {
@@ -241,7 +295,6 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   getScreenshotUrl(site: Site): string {
-    // Use thum.io with wait parameter, proxied through our image proxy
     const siteUrl = this.getSiteUrl(site);
     return `/api/image-proxy?url=${encodeURIComponent(`https://image.thum.io/get/width/800/crop/500/wait/3/noanimate/${siteUrl}`)}`;
   }
@@ -252,7 +305,6 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   onScreenshotError(event: Event): void {
     const img = event.target as HTMLImageElement;
-    // Replace with a gradient placeholder
     img.style.display = 'none';
     const parent = img.parentElement;
     if (parent && !parent.querySelector('.screenshot-fallback')) {
@@ -323,6 +375,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   closeDropdowns(): void {
     this.openDropdownId.set(null);
+    this.siteDropdownOpen.set(false);
   }
 
   // ─── Inline editing ───────────────────────────────────
@@ -379,91 +432,21 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.sites.update((sites) => sites.filter((s) => s.id !== site.id));
         this.deletingSite.set(null);
         this.toast.success('Site deleted');
+        // If deleted site was selected, reset
+        if (this.selectedSiteId() === site.id) {
+          this.selectedSiteId.set(null);
+        }
       },
       error: () => this.toast.error('Failed to delete site'),
     });
   }
 
-  // ─── Domain modal ─────────────────────────────────────
-
-  openDomains(site: Site): void {
-    this.domainModalSiteId.set(site.id);
-    this.domainModalSiteName.set(site.business_name);
-    this.domainModalSlug.set(site.slug);
-    this.domainTab.set('existing');
-    this.loadHostnames(site.id);
-    this.closeDropdowns();
-  }
-
-  closeDomains(): void {
-    this.domainModalSiteId.set(null);
-    this.hostnames.set([]);
-    this.newHostname = '';
-    this.registerDomainQuery = '';
-    this.domainCheckResult.set(null);
-    this.editingSlugInModal.set(false);
-  }
-
-  // ── Snapshots ──────────────────────────────────────────────
-  openSnapshots(site: Site): void {
-    this.snapshotModalSiteId.set(site.id);
-    this.snapshotModalSiteName.set(site.business_name);
-    this.snapshotModalSlug.set(site.slug);
-    this.loadSnapshots(site.id);
-    this.closeDropdowns();
-  }
-
-  closeSnapshots(): void {
-    this.snapshotModalSiteId.set(null);
-    this.snapshots.set([]);
-    this.newSnapshotName = '';
-    this.newSnapshotDescription = '';
-  }
-
-  private loadSnapshots(siteId: string): void {
-    this.loadingSnapshots.set(true);
-    this.api.get<{ data: { id: string; snapshot_name: string; build_version: string; description: string | null; created_at: string }[] }>(`/sites/${siteId}/snapshots`).subscribe({
-      next: (res) => { this.snapshots.set(res.data || []); this.loadingSnapshots.set(false); },
-      error: () => { this.loadingSnapshots.set(false); },
-    });
-  }
-
-  createSnapshot(): void {
-    const siteId = this.snapshotModalSiteId();
-    if (!siteId || !this.newSnapshotName.trim()) return;
-    this.creatingSnapshot.set(true);
-    this.api.post<{ data: { id: string; snapshot_name: string; build_version: string; url: string } }>(`/sites/${siteId}/snapshots`, {
-      name: this.newSnapshotName.trim(),
-      description: this.newSnapshotDescription.trim() || undefined,
-    }).subscribe({
-      next: (res) => {
-        this.toast.success(`Snapshot created: ${res.data.snapshot_name}`);
-        this.newSnapshotName = '';
-        this.newSnapshotDescription = '';
-        this.creatingSnapshot.set(false);
-        this.loadSnapshots(siteId);
-      },
-      error: (err) => {
-        this.toast.error(err?.error?.error?.message || 'Failed to create snapshot');
-        this.creatingSnapshot.set(false);
-      },
-    });
-  }
-
-  deleteSnapshot(snapshotId: string): void {
-    const siteId = this.snapshotModalSiteId();
-    if (!siteId) return;
-    this.api.delete(`/sites/${siteId}/snapshots/${snapshotId}`).subscribe({
-      next: () => {
-        this.toast.success('Snapshot deleted');
-        this.loadSnapshots(siteId);
-      },
-      error: () => this.toast.error('Failed to delete snapshot'),
-    });
-  }
+  // ─── Domain management ────────────────────────────────
 
   startSlugEdit(): void {
-    this.modalSlugValue = this.domainModalSlug();
+    const site = this.selectedSite();
+    if (!site) return;
+    this.modalSlugValue = site.slug;
     this.editingSlugInModal.set(true);
   }
 
@@ -472,15 +455,14 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   saveSlugFromModal(): void {
-    const siteId = this.domainModalSiteId();
+    const site = this.selectedSite();
     const newSlug = this.modalSlugValue.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
-    if (!siteId || !newSlug) return;
+    if (!site || !newSlug) return;
 
-    this.api.updateSite(siteId, { slug: newSlug } as any).subscribe({
+    this.api.updateSite(site.id, { slug: newSlug } as any).subscribe({
       next: (res) => {
-        this.domainModalSlug.set(res.data?.slug || newSlug);
         this.sites.update((sites) =>
-          sites.map((s) => (s.id === siteId ? { ...s, slug: res.data?.slug || newSlug } : s))
+          sites.map((s) => (s.id === site.id ? { ...s, slug: res.data?.slug || newSlug } : s))
         );
         this.editingSlugInModal.set(false);
         this.toast.success('Subdomain updated');
@@ -522,10 +504,10 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   addHostname(): void {
-    const siteId = this.domainModalSiteId();
-    if (!siteId || !this.newHostname.trim()) return;
+    const site = this.selectedSite();
+    if (!site || !this.newHostname.trim()) return;
 
-    this.api.addHostname(siteId, this.newHostname.trim()).subscribe({
+    this.api.addHostname(site.id, this.newHostname.trim()).subscribe({
       next: (res) => {
         this.hostnames.update((h) => [...h, res.data]);
         this.newHostname = '';
@@ -537,10 +519,10 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   setPrimary(hostnameId: string): void {
-    const siteId = this.domainModalSiteId();
-    if (!siteId) return;
+    const site = this.selectedSite();
+    if (!site) return;
 
-    this.api.setPrimaryHostname(siteId, hostnameId).subscribe({
+    this.api.setPrimaryHostname(site.id, hostnameId).subscribe({
       next: () => {
         this.hostnames.update((h) =>
           h.map((hn) => ({ ...hn, is_primary: hn.id === hostnameId }))
@@ -552,10 +534,10 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   deleteHostname(hostnameId: string): void {
-    const siteId = this.domainModalSiteId();
-    if (!siteId) return;
+    const site = this.selectedSite();
+    if (!site) return;
 
-    this.api.deleteHostname(siteId, hostnameId).subscribe({
+    this.api.deleteHostname(site.id, hostnameId).subscribe({
       next: () => {
         this.hostnames.update((h) => h.filter((hn) => hn.id !== hostnameId));
         this.toast.success('Domain removed');
@@ -570,28 +552,60 @@ export class AdminComponent implements OnInit, OnDestroy {
     return 'hn-failed';
   }
 
-  // ─── Logs modal ───────────────────────────────────────
+  // ─── Snapshots ────────────────────────────────────────
 
-  openLogs(site: Site): void {
-    this.logsModalSiteId.set(site.id);
-    this.logsModalSiteName.set(site.business_name);
-    this.loadLogs(site.id);
-    this.closeDropdowns();
-
-    // Auto-refresh logs every 5s
-    this.logsInterval = setInterval(() => {
-      const id = this.logsModalSiteId();
-      if (id) this.loadLogs(id);
-    }, 5000);
+  private loadSnapshots(siteId: string): void {
+    this.loadingSnapshots.set(true);
+    this.api.get<{ data: { id: string; snapshot_name: string; build_version: string; description: string | null; created_at: string }[] }>(`/sites/${siteId}/snapshots`).subscribe({
+      next: (res) => { this.snapshots.set(res.data || []); this.loadingSnapshots.set(false); },
+      error: () => { this.loadingSnapshots.set(false); },
+    });
   }
 
-  closeLogs(): void {
-    this.logsModalSiteId.set(null);
-    this.logs.set([]);
-    if (this.logsInterval) {
-      clearInterval(this.logsInterval);
-      this.logsInterval = null;
-    }
+  createSnapshot(): void {
+    const site = this.selectedSite();
+    if (!site || !this.newSnapshotName.trim()) return;
+    this.creatingSnapshot.set(true);
+    this.api.post<{ data: { id: string; snapshot_name: string; build_version: string; url: string } }>(`/sites/${site.id}/snapshots`, {
+      name: this.newSnapshotName.trim(),
+      description: this.newSnapshotDescription.trim() || undefined,
+    }).subscribe({
+      next: (res) => {
+        this.toast.success(`Snapshot created: ${res.data.snapshot_name}`);
+        this.newSnapshotName = '';
+        this.newSnapshotDescription = '';
+        this.creatingSnapshot.set(false);
+        this.loadSnapshots(site.id);
+      },
+      error: (err) => {
+        this.toast.error(err?.error?.error?.message || 'Failed to create snapshot');
+        this.creatingSnapshot.set(false);
+      },
+    });
+  }
+
+  deleteSnapshot(snapshotId: string): void {
+    const site = this.selectedSite();
+    if (!site) return;
+    this.api.delete(`/sites/${site.id}/snapshots/${snapshotId}`).subscribe({
+      next: () => {
+        this.toast.success('Snapshot deleted');
+        this.loadSnapshots(site.id);
+      },
+      error: () => this.toast.error('Failed to delete snapshot'),
+    });
+  }
+
+  // ─── Logs ─────────────────────────────────────────────
+
+  openLogs(site: Site): void {
+    this.loadLogs(site.id);
+    // Auto-refresh logs every 5s
+    if (this.logsInterval) clearInterval(this.logsInterval);
+    this.logsInterval = setInterval(() => {
+      const s = this.selectedSite();
+      if (s && this.activeNav() === 'audit') this.loadLogs(s.id);
+    }, 5000);
   }
 
   loadLogs(siteId: string): void {
@@ -737,18 +751,15 @@ export class AdminComponent implements OnInit, OnDestroy {
     const dim = (s: string) => s;
     const a = action || '';
 
-    // ── Validation errors: show field issues concisely ──
     if (a.includes('validation_failed')) {
       const step = m['step'] ? String(m['step']) : '';
       const zod = m['zod_details'] ? String(m['zod_details']) : '';
       const fields = zod.split(';').map((f) => f.trim()).filter(Boolean);
       const parts = [step ? c(step) : ''];
       if (fields.length > 0) {
-        // Show max 3 field errors to keep it short
         const shown = fields.slice(0, 3).map((f) => {
           const [path, ...rest] = f.split(':');
-          const issue = rest.join(':').trim()
-            .replace(/^Expected\s+/, '').replace(/,\s*received\s+/, ' ≠ ');
+          const issue = rest.join(':').trim().replace(/^Expected\s+/, '').replace(/,\s*received\s+/, ' ≠ ');
           return `${c(path.trim())}: ${err(issue)}`;
         });
         if (fields.length > 3) shown.push(dim(`+${fields.length - 3} more`));
@@ -757,327 +768,18 @@ export class AdminComponent implements OnInit, OnDestroy {
       return parts.filter(Boolean).join(' &middot; ');
     }
 
-    // ── Workflow started: show business name, slug, flags ──
-    if (a === 'workflow.started') {
-      const parts: string[] = [];
-      if (m['business_name']) parts.push(e(String(m['business_name'])));
-      if (m['slug']) parts.push(c(String(m['slug'])));
-      const flags = [m['has_context'] ? 'has context' : '', m['has_assets'] ? 'has assets' : ''].filter(Boolean);
-      if (flags.length) parts.push(dim(flags.join(', ')));
-      if (m['message'] && !m['business_name'] && !m['slug']) parts.push(e(String(m['message']).slice(0, 100)));
-      return parts.join(' &middot; ');
-    }
-
-    // ── Research started: show business name + address ──
-    if (a === 'workflow.step.profile_research_started') {
-      const parts: string[] = [];
-      if (m['business_name']) parts.push(e(String(m['business_name'])));
-      if (m['business_address']) parts.push(dim(e(String(m['business_address']))));
-      if (m['message'] && !m['business_name']) parts.push(e(String(m['message']).slice(0, 100)));
-      return parts.join(' &middot; ');
-    }
-
-    // ── Parallel research started: show step names ──
-    if (a === 'workflow.step.parallel_research_started') {
-      const parts: string[] = [];
-      if (m['steps'] && Array.isArray(m['steps'])) {
-        parts.push(dim(m['steps'].join(', ')));
-      } else if (m['message']) {
-        parts.push(e(String(m['message']).slice(0, 100)));
-      } else {
-        parts.push(dim('social, brand, USPs, images'));
-      }
-      return parts.join(' &middot; ');
-    }
-
-    // ── Workflow queued/failed ──
-    if (a === 'workflow.queued' || a === 'workflow.failed' || a === 'workflow.creation_failed') {
-      const parts: string[] = [];
-      if (m['slug']) parts.push(c(String(m['slug'])));
-      if (m['error']) parts.push(err(String(m['error']).slice(0, 100)));
-      if (m['message'] && !m['slug'] && !m['error']) parts.push(e(String(m['message']).slice(0, 100)));
-      return parts.join(' &middot; ');
-    }
-
-    // ── Generic step started/complete (when not handled by specific actions above) ──
-    if (a === 'workflow.step.started' || a === 'workflow.step.complete') {
-      const parts: string[] = [];
-      if (m['step']) parts.push(c(String(m['step'])));
-      if (m['elapsed_ms']) parts.push(accent(t(m['elapsed_ms'])));
-      return parts.join(' &middot; ');
-    }
-
-    // ── Workflow phase transitions ──
-    if (a.startsWith('workflow.phase.')) {
-      const parts: string[] = [];
-      if (m['phase']) parts.push(e(String(m['phase'])));
-      if (m['message'] && !m['phase']) parts.push(e(String(m['message']).slice(0, 100)));
-      return parts.join(' &middot; ');
-    }
-
-    // ── LLM output: show step, size, model ──
-    if (a.includes('llm_output')) {
-      const parts: string[] = [];
-      if (m['step']) parts.push(c(String(m['step'])));
-      if (m['output_length']) parts.push(accent(`${Number(m['output_length']).toLocaleString()} chars`));
-      if (m['model']) parts.push(dim(String(m['model'])));
-      return parts.join(' &middot; ');
-    }
-
-    // ── JSON extraction failed: show step + truncated error ──
-    if (a.includes('json_extraction_failed')) {
-      const parts: string[] = [];
-      if (m['step']) parts.push(c(String(m['step'])));
-      if (m['error']) parts.push(err(String(m['error']).slice(0, 100)));
-      return parts.join(' &middot; ');
-    }
-
-    // ── Step failed: show step, phase, concise error ──
-    if (a === 'workflow.step.failed') {
-      const parts: string[] = [];
-      if (m['step']) parts.push(c(String(m['step'])));
-      if (m['phase']) parts.push(dim(String(m['phase'])));
-      if (m['error']) {
-        let errStr = String(m['error']);
-        // Strip verbose validation details — already shown in preceding validation_failed entry
-        const colonIdx = errStr.indexOf(':');
-        if (errStr.length > 80 && colonIdx > 0 && colonIdx < 60) {
-          errStr = errStr.slice(0, colonIdx);
-        } else if (errStr.length > 80) {
-          errStr = errStr.slice(0, 80) + '…';
-        }
-        parts.push(err(errStr));
-      }
-      if (m['elapsed_ms']) parts.push(accent(t(m['elapsed_ms'])));
-      return parts.join(' &middot; ');
-    }
-
-    // ── Profile research complete: type, services, location ──
-    if (a.includes('profile_research_complete')) {
-      const parts: string[] = [];
-      if (m['business_type']) parts.push(e(String(m['business_type'])));
-      if (m['services_count']) parts.push(`${m['services_count']} services`);
-      if (m['city'] || m['state']) parts.push(e([m['city'], m['state']].filter(Boolean).join(', ')));
-      if (m['elapsed_ms']) parts.push(accent(t(m['elapsed_ms'])));
-      return parts.join(' &middot; ');
-    }
-
-    // ── Google Places enrichment ──
-    if (a.includes('google_places_enriched')) {
-      const parts: string[] = [];
-      if (m['rating']) parts.push(`${m['rating']}★`);
-      if (m['review_count']) parts.push(`${m['review_count']} reviews`);
-      if (m['photo_count']) parts.push(`${m['photo_count']} photos`);
-      const flags = [m['has_phone'] ? 'phone' : '', m['has_website'] ? 'website' : '', m['has_hours'] ? 'hours' : ''].filter(Boolean);
-      if (flags.length) parts.push(dim(flags.join(', ')));
-      return parts.join(' &middot; ');
-    }
-
-    // ── Parallel research complete ──
-    if (a.includes('parallel_research_complete')) {
-      const parts: string[] = [];
-      const items = ['social', 'brand', 'USPs', 'images'].filter(Boolean);
-      parts.push(dim(items.join(' + ')));
-      if (m['website_url']) parts.push(c(String(m['website_url'])));
-      if (m['elapsed_ms']) parts.push(accent(t(m['elapsed_ms'])));
-      return parts.join(' &middot; ');
-    }
-
-    // ── HTML generation complete ──
-    if (a.includes('html_generation_complete')) {
-      const parts: string[] = [];
-      if (m['html_size_kb']) parts.push(accent(`${m['html_size_kb']} KB`));
-      if (m['elapsed_ms']) parts.push(accent(t(m['elapsed_ms'])));
-      return parts.join(' &middot; ');
-    }
-
-    // ── Legal + scoring complete ──
-    if (a.includes('legal_and_scoring_complete')) {
-      const parts: string[] = [];
-      if (m['quality_score'] !== undefined) parts.push(accent(`Score: ${m['quality_score']}/100`));
-      if (m['elapsed_ms']) parts.push(accent(t(m['elapsed_ms'])));
-      return parts.join(' &middot; ');
-    }
-
-    // ── Quality below threshold ──
-    if (a.includes('quality_below_threshold')) {
-      const parts: string[] = [];
-      if (m['quality_score'] !== undefined && m['threshold'] !== undefined) {
-        parts.push(err(`${m['quality_score']} < ${m['threshold']} threshold`));
-      }
-      if (m['issues'] && Array.isArray(m['issues']) && m['issues'].length) {
-        parts.push(dim(m['issues'].slice(0, 3).join(', ')));
-      }
-      return parts.join(' &middot; ');
-    }
-
-    // ── Quality regenerated ──
-    if (a.includes('quality_regenerated')) {
-      const parts: string[] = [];
-      if (m['new_quality_score'] !== undefined) parts.push(accent(`New score: ${m['new_quality_score']}/100`));
-      if (m['improved']) parts.push(dim('improved'));
-      return parts.join(' &middot; ');
-    }
-
-    // ── Upload complete ──
-    if (a.includes('upload_to_r2_complete')) {
-      const parts: string[] = [];
-      if (m['version']) parts.push(`v${e(String(m['version']))}`);
-      if (m['slug']) parts.push(c(`${m['slug']}.projectsites.dev`));
-      if (m['elapsed_ms']) parts.push(accent(t(m['elapsed_ms'])));
-      return parts.join(' &middot; ');
-    }
-
-    // ── Build completed ──
-    if (a === 'workflow.completed') {
-      const parts: string[] = [];
-      if (m['url']) parts.push(c(String(m['url'])));
-      if (m['quality_score'] !== undefined) parts.push(accent(`Score: ${m['quality_score']}/100`));
-      if (m['total_seconds']) parts.push(accent(`${m['total_seconds']}s total`));
-      return parts.join(' &middot; ');
-    }
-
-    // ── Status update ──
-    if (a === 'workflow.status_update') {
-      const parts: string[] = [];
-      if (m['old_status'] && m['new_status']) parts.push(`${e(String(m['old_status']))} → ${e(String(m['new_status']))}`);
-      else if (m['new_status']) parts.push(e(String(m['new_status'])));
-      else if (m['status']) parts.push(e(String(m['status'])));
-      if (m['phase']) parts.push(dim(e(String(m['phase']))));
-      if (!parts.length && m['message']) parts.push(e(String(m['message']).slice(0, 100)));
-      return parts.join(' &middot; ');
-    }
-
-    // ── Score fallback / text fallback ──
-    if (a.includes('score_text_fallback')) {
-      const parts: string[] = [];
-      if (m['parsed_overall'] !== undefined) parts.push(`Parsed score: ${m['parsed_overall']}`);
-      return parts.join(' &middot; ') || dim('Used regex fallback parser');
-    }
-    if (a.includes('score_fallback')) {
-      return dim('Using default scores (scoring failed)');
-    }
-
-    // ── Slug / name changes ──
-    if (a.includes('slug_changed') && m['old_slug'] && m['new_slug']) {
-      return `${c(String(m['old_slug']))} → ${c(String(m['new_slug']))}`;
-    }
-    if (a.includes('name_changed') && m['old_name'] && m['new_name']) {
-      return `${e(String(m['old_name']))} → ${e(String(m['new_name']))}`;
-    }
-
-    // ── Hostname operations ──
-    if (a.includes('hostname')) {
-      const parts: string[] = [];
-      if (m['hostname']) parts.push(c(String(m['hostname'])));
-      if (m['status']) parts.push(e(String(m['status'])));
-      if (m['message'] && !m['hostname']) parts.push(e(String(m['message'])));
-      return parts.join(' &middot; ');
-    }
-
-    // ── Site created / deployed ──
-    if (a === 'site.created' || a === 'site.created_from_search') {
-      const parts: string[] = [];
-      if (m['business_name']) parts.push(e(String(m['business_name'])));
-      if (m['slug']) parts.push(c(String(m['slug'])));
-      if (m['mode']) parts.push(dim(String(m['mode'])));
-      return parts.join(' &middot; ');
-    }
-    if (a === 'site.deployed' || a === 'site.deploy_started') {
-      const parts: string[] = [];
-      if (m['file_count']) parts.push(`${m['file_count']} files`);
-      if (m['slug']) parts.push(c(String(m['slug'])));
-      return parts.join(' &middot; ');
-    }
-
-    // ── File operations ──
-    if (a.startsWith('file.')) {
-      const parts: string[] = [];
-      if (m['file_key'] || m['key']) parts.push(c(String(m['file_key'] || m['key'])));
-      if (m['size']) parts.push(dim(`${(Number(m['size']) / 1024).toFixed(1)} KB`));
-      return parts.join(' &middot; ');
-    }
-
-    // ── Auth ──
-    if (a.includes('auth.')) {
-      if (m['email']) return c(String(m['email']));
-      if (m['identifier']) return c(String(m['identifier']));
-      if (m['message']) return e(String(m['message']));
-      return '';
-    }
-
-    // ── Billing ──
-    if (a.includes('billing.') || a.includes('checkout') || a.includes('subscription')) {
-      const parts: string[] = [];
-      if (m['plan']) parts.push(e(String(m['plan'])));
-      if (m['amount']) parts.push(accent(`$${m['amount']}`));
-      if (m['interval']) parts.push(dim(`/${m['interval']}`));
-      if (m['message'] && !m['plan']) parts.push(e(String(m['message'])));
-      return parts.join('');
-    }
-
-    // ── Webhook ──
-    if (a.includes('webhook')) {
-      const parts: string[] = [];
-      if (m['event_type']) parts.push(c(String(m['event_type'])));
-      if (m['error']) parts.push(err(String(m['error']).slice(0, 100)));
-      if (m['message'] && !m['event_type'] && !m['error']) parts.push(e(String(m['message'])));
-      return parts.join(' &middot; ');
-    }
-
-    // ── R2 migration ──
-    if (a.includes('r2_migration')) {
-      const parts: string[] = [];
-      if (m['file_count']) parts.push(`${m['file_count']} files`);
-      if (m['error']) parts.push(err(String(m['error']).slice(0, 100)));
-      if (m['message'] && !m['error']) parts.push(e(String(m['message'])));
-      return parts.join(' &middot; ');
-    }
-
-    // ── Notification ──
-    if (a.includes('notification')) {
-      const parts: string[] = [];
-      if (m['email'] || m['to']) parts.push(c(String(m['email'] || m['to'])));
-      if (m['error']) parts.push(err(String(m['error']).slice(0, 80)));
-      return parts.join(' &middot; ');
-    }
-
-    // ── Site cache / publish ──
-    if (a === 'site.cache_invalidated' || a === 'site.published_from_bolt') {
-      const parts: string[] = [];
-      if (m['slug']) parts.push(c(String(m['slug'])));
-      if (m['message'] && !m['slug']) parts.push(e(String(m['message']).slice(0, 100)));
-      return parts.join(' &middot; ');
-    }
-
-    // ── Contact form ──
-    if (a === 'contact.form_submitted') {
-      const parts: string[] = [];
-      if (m['name']) parts.push(e(String(m['name'])));
-      if (m['email']) parts.push(c(String(m['email'])));
-      return parts.join(' &middot; ');
-    }
-
-    // ── Generic started steps (generation, legal, upload, publishing) ──
-    if (a.includes('_started') && a.startsWith('workflow.step.')) {
-      const parts: string[] = [];
-      if (m['slug']) parts.push(c(String(m['slug'])));
-      if (m['message'] && !m['slug']) parts.push(e(String(m['message']).slice(0, 100)));
-      return parts.join(' &middot; ');
-    }
-
-    // ── Generic fallback: use message, then structured fields ──
+    // Generic fallback
     const parts: string[] = [];
     if (m['message']) {
       let msg = String(m['message']);
-      if (msg.length > 140) msg = msg.slice(0, 140) + '…';
+      if (msg.length > 140) msg = msg.slice(0, 140) + '...';
       parts.push(e(msg));
     }
     if (m['elapsed_ms'] && !m['message']) parts.push(accent(t(m['elapsed_ms'])));
     if (m['slug'] && !m['message']) parts.push(c(String(m['slug'])));
     if (m['error'] && !m['message']) {
       let errMsg = String(m['error']);
-      if (errMsg.length > 100) errMsg = errMsg.slice(0, 100) + '…';
+      if (errMsg.length > 100) errMsg = errMsg.slice(0, 100) + '...';
       parts.push(err(errMsg));
     }
     return parts.join(' &middot; ');
@@ -1121,7 +823,8 @@ export class AdminComponent implements OnInit, OnDestroy {
   copyLogsForAI(): void {
     const logs = this.logs();
     if (!logs.length) { this.toast.info('No logs to copy'); return; }
-    const siteName = this.logsModalSiteName() || 'unknown';
+    const site = this.selectedSite();
+    const siteName = site?.business_name || 'unknown';
     const lines: string[] = [];
     lines.push(`# Site Logs: ${siteName}`);
     lines.push(`Exported: ${new Date().toISOString()}`);
@@ -1153,27 +856,13 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
-  // ─── Files modal ──────────────────────────────────────
-
-  openFiles(site: Site): void {
-    this.filesModalSiteId.set(site.id);
-    this.filesModalSiteName.set(site.business_name);
-    this.editingFile.set(null);
-    this.loadFiles(site.id);
-    this.closeDropdowns();
-  }
-
-  closeFiles(): void {
-    this.filesModalSiteId.set(null);
-    this.files.set([]);
-    this.editingFile.set(null);
-  }
+  // ─── Files ────────────────────────────────────────────
 
   private loadFiles(siteId: string): void {
     this.loadingFiles.set(true);
+    this.editingFile.set(null);
     this.api.listFiles(siteId).subscribe({
       next: (res: any) => {
-        // API returns { data: { files: [...], prefix, version } }
         const raw = res.data;
         const files: SiteFile[] = Array.isArray(raw) ? raw : (raw?.files || []);
         this.files.set(files);
@@ -1190,7 +879,6 @@ export class AdminComponent implements OnInit, OnDestroy {
   private buildFileTree(files: SiteFile[]): FileTreeNode[] {
     const root: FileTreeNode[] = [];
     for (const file of files) {
-      // Strip "sites/{slug}/{version}/" prefix
       const parts = file.key.split('/');
       const relParts = parts.length > 3 ? parts.slice(3) : [parts[parts.length - 1]];
 
@@ -1211,7 +899,6 @@ export class AdminComponent implements OnInit, OnDestroy {
         }
       }
     }
-    // Sort: dirs first, then files alphabetically
     const sortTree = (nodes: FileTreeNode[]): void => {
       nodes.sort((a, b) => {
         if (a.isDir && !b.isDir) return -1;
@@ -1261,12 +948,12 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   openFileEditor(file: SiteFile): void {
     if (!this.isEditableFile(file.key)) return;
-    const siteId = this.filesModalSiteId();
-    if (!siteId) return;
+    const site = this.selectedSite();
+    if (!site) return;
 
     this.editingFile.set(file);
     this.fileContent = 'Loading...';
-    this.api.getFileContent(siteId, file.key).subscribe({
+    this.api.getFileContent(site.id, file.key).subscribe({
       next: (res) => { this.fileContent = res.data?.content || ''; },
       error: () => {
         this.fileContent = '';
@@ -1287,12 +974,12 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   saveFileContent(): void {
-    const siteId = this.filesModalSiteId();
+    const site = this.selectedSite();
     const file = this.editingFile();
-    if (!siteId || !file) return;
+    if (!site || !file) return;
 
     this.savingFile.set(true);
-    this.api.saveFile(siteId, file.key, this.fileContent).subscribe({
+    this.api.saveFile(site.id, file.key, this.fileContent).subscribe({
       next: () => {
         this.savingFile.set(false);
         this.toast.success('File saved');
@@ -1305,12 +992,13 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   deleteFileItem(file: SiteFile): void {
-    const siteId = this.filesModalSiteId();
-    if (!siteId) return;
+    const site = this.selectedSite();
+    if (!site) return;
 
-    this.api.deleteFile(siteId, file.key).subscribe({
+    this.api.deleteFile(site.id, file.key).subscribe({
       next: () => {
         this.files.update((f) => f.filter((item) => item.key !== file.key));
+        this.fileTree.set(this.buildFileTree(this.files()));
         if (this.editingFile()?.key === file.key) this.editingFile.set(null);
         this.toast.success('File deleted');
       },
@@ -1327,16 +1015,15 @@ export class AdminComponent implements OnInit, OnDestroy {
   promptNewFile(): void {
     const name = prompt('New file name (e.g., styles.css):');
     if (!name?.trim()) return;
-    const siteId = this.filesModalSiteId();
-    if (!siteId) return;
-    // Determine prefix from existing files
+    const site = this.selectedSite();
+    if (!site) return;
     const firstFile = this.files()[0];
     const prefix = firstFile ? firstFile.key.split('/').slice(0, 3).join('/') + '/' : '';
     const key = prefix + name.trim();
-    this.api.saveFile(siteId, key, '').subscribe({
+    this.api.saveFile(site.id, key, '').subscribe({
       next: () => {
         this.toast.success(`Created ${name}`);
-        this.loadFiles(siteId);
+        this.loadFiles(site.id);
       },
       error: () => this.toast.error('Failed to create file'),
     });
@@ -1345,15 +1032,15 @@ export class AdminComponent implements OnInit, OnDestroy {
   promptNewFolder(): void {
     const name = prompt('New folder name:');
     if (!name?.trim()) return;
-    const siteId = this.filesModalSiteId();
-    if (!siteId) return;
+    const site = this.selectedSite();
+    if (!site) return;
     const firstFile = this.files()[0];
     const prefix = firstFile ? firstFile.key.split('/').slice(0, 3).join('/') + '/' : '';
     const key = prefix + name.trim() + '/.gitkeep';
-    this.api.saveFile(siteId, key, '').subscribe({
+    this.api.saveFile(site.id, key, '').subscribe({
       next: () => {
         this.toast.success(`Created folder ${name}`);
-        this.loadFiles(siteId);
+        this.loadFiles(site.id);
       },
       error: () => this.toast.error('Failed to create folder'),
     });
@@ -1378,19 +1065,18 @@ export class AdminComponent implements OnInit, OnDestroy {
     event.stopPropagation();
     const newName = prompt('Rename to:', node.name);
     if (!newName?.trim() || newName === node.name) return;
-    // Rename = copy content to new key + delete old key
-    const siteId = this.filesModalSiteId();
-    if (!siteId || !node.key) return;
+    const site = this.selectedSite();
+    if (!site || !node.key) return;
     const oldKey = node.key;
     const newKey = oldKey.substring(0, oldKey.lastIndexOf('/') + 1) + newName.trim();
-    this.api.getFileContent(siteId, oldKey).subscribe({
+    this.api.getFileContent(site.id, oldKey).subscribe({
       next: (res) => {
-        this.api.saveFile(siteId, newKey, res.data?.content || '').subscribe({
+        this.api.saveFile(site.id, newKey, res.data?.content || '').subscribe({
           next: () => {
-            this.api.deleteFile(siteId, oldKey).subscribe({
+            this.api.deleteFile(site.id, oldKey).subscribe({
               next: () => {
                 this.toast.success(`Renamed to ${newName}`);
-                this.loadFiles(siteId);
+                this.loadFiles(site.id);
               },
             });
           },
@@ -1406,15 +1092,15 @@ export class AdminComponent implements OnInit, OnDestroy {
     const currentName = this.getFileName(file.key);
     const newName = prompt('Rename to:', currentName);
     if (!newName?.trim() || newName === currentName) return;
-    const siteId = this.filesModalSiteId();
-    if (!siteId) return;
+    const site = this.selectedSite();
+    if (!site) return;
     const newKey = file.key.substring(0, file.key.lastIndexOf('/') + 1) + newName.trim();
-    this.api.saveFile(siteId, newKey, this.fileContent).subscribe({
+    this.api.saveFile(site.id, newKey, this.fileContent).subscribe({
       next: () => {
-        this.api.deleteFile(siteId, file.key).subscribe({
+        this.api.deleteFile(site.id, file.key).subscribe({
           next: () => {
             this.toast.success(`Renamed to ${newName}`);
-            this.loadFiles(siteId);
+            this.loadFiles(site.id);
             this.editingFile.set(null);
           },
         });
@@ -1428,11 +1114,9 @@ export class AdminComponent implements OnInit, OnDestroy {
     const file = this.editingFile();
     if (!file) return;
     this.fileAiProcessing.set(true);
-    // Use Workers AI to modify the file content
-    const siteId = this.filesModalSiteId();
-    if (!siteId) { this.fileAiProcessing.set(false); return; }
+    const site = this.selectedSite();
+    if (!site) { this.fileAiProcessing.set(false); return; }
     this.toast.info('AI is modifying the file...');
-    // For now, use a simple toast — full AI integration would call a backend endpoint
     setTimeout(() => {
       this.fileAiProcessing.set(false);
       this.toast.info('AI file editing coming soon');
@@ -1463,7 +1147,6 @@ export class AdminComponent implements OnInit, OnDestroy {
     event.stopPropagation();
     const files = event.dataTransfer?.files;
     if (!files?.length) return;
-    // If dropping on a file, use its directory
     const dir = node.key ? node.key.substring(0, node.key.lastIndexOf('/') + 1) : '';
     this.handleDroppedFiles(files, dir);
   }
@@ -1490,8 +1173,8 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   private handleDroppedFiles(files: FileList, dirPrefix: string): void {
-    const siteId = this.filesModalSiteId();
-    if (!siteId) return;
+    const site = this.selectedSite();
+    if (!site) return;
     const firstFile = this.files()[0];
     const basePrefix = firstFile ? firstFile.key.split('/').slice(0, 3).join('/') + '/' : '';
     const fullPrefix = basePrefix + dirPrefix;
@@ -1499,17 +1182,16 @@ export class AdminComponent implements OnInit, OnDestroy {
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const key = fullPrefix + file.name;
-      // Check if file already exists
       const exists = this.files().some(f => f.key === key);
       if (exists && !confirm(`Overwrite ${file.name}?`)) continue;
 
       const reader = new FileReader();
       reader.onload = () => {
         const content = reader.result as string;
-        this.api.saveFile(siteId, key, content).subscribe({
+        this.api.saveFile(site.id, key, content).subscribe({
           next: () => {
             this.toast.success(`Uploaded ${file.name}`);
-            this.loadFiles(siteId);
+            this.loadFiles(site.id);
           },
           error: () => this.toast.error(`Failed to upload ${file.name}`),
         });
@@ -1568,11 +1250,10 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
-  // ─── Reset modal ──────────────────────────────────────
+  // ─── Reset ────────────────────────────────────────────
 
   openReset(site: Site): void {
     this.closeDropdowns();
-    // Store original business data so the create page can restore it
     this.auth.setSelectedBusiness({
       name: site.business_name || '',
       address: site.business_address || '',

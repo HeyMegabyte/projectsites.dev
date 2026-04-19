@@ -1,578 +1,723 @@
-<section class="admin-panel" (click)="closeDropdowns()">
-  <div class="admin-panel-inner">
-    <!-- Header -->
-    <div class="admin-panel-header">
-      <div class="admin-panel-title">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
-          <rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
-        </svg>
-        My Sites
-        @if (!loading() && sites().length > 0) {
-          <span class="site-count-badge">{{ sites().length }} site{{ sites().length !== 1 ? 's' : '' }}</span>
-        }
-      </div>
-      <div class="admin-panel-actions">
-        <button class="admin-btn admin-btn-icon" (click)="loadData()" data-tooltip="Refresh">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>
-            <path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
-          </svg>
-        </button>
-        @if (subscription()?.status === 'active') {
-          <button class="admin-btn" (click)="openBilling()" data-tooltip="Manage subscription">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>
-            </svg>
-            Billing
-          </button>
-        }
-        <button class="admin-btn admin-btn-accent" (click)="newSite()" data-tooltip="Create new AI site">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-          New Site
-        </button>
-      </div>
+<div class="admin-layout" (click)="closeDropdowns()">
+  <!-- Mobile hamburger -->
+  <button class="mobile-toggle" (click)="toggleSidebar(); $event.stopPropagation()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- LEFT SIDEBAR                                        -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <aside class="sidebar" [class.collapsed]="sidebarCollapsed()">
+    <!-- Logo -->
+    <div class="sidebar-logo">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00E5FF" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      <span class="sidebar-logo-text">ProjectSites</span>
+      <button class="sidebar-close-mobile" (click)="sidebarCollapsed.set(true)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
     </div>
 
-    <!-- Domain summary -->
-    @if (domainSummary().total > 0) {
-      <div class="domain-summary">
-        <span class="ds-item">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-          {{ domainSummary().total }} domain{{ domainSummary().total !== 1 ? 's' : '' }}
-        </span>
-        <span class="ds-active">{{ domainSummary().active }} active</span>
-        @if (domainSummary().pending > 0) {
-          <span class="ds-pending">{{ domainSummary().pending }} pending</span>
+    <!-- Site Selector -->
+    <div class="site-selector" (click)="$event.stopPropagation()">
+      <button class="site-selector-btn" (click)="toggleSiteDropdown($event)">
+        @if (selectedSite(); as site) {
+          <div class="site-selector-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          </div>
+          <div class="site-selector-info">
+            <span class="site-selector-name">{{ site.business_name || 'Unnamed' }}</span>
+            <span class="site-selector-status" [class]="getStatusClass(site.status)">{{ getStatusLabel(site.status) }}</span>
+          </div>
+        } @else {
+          <div class="site-selector-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          </div>
+          <div class="site-selector-info">
+            <span class="site-selector-name">No sites</span>
+          </div>
         }
-        @if (domainSummary().failed > 0) {
-          <span class="ds-failed">{{ domainSummary().failed }} failed</span>
+        <svg class="site-selector-chevron" [class.open]="siteDropdownOpen()" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+
+      @if (siteDropdownOpen()) {
+        <div class="site-dropdown">
+          @for (site of sites(); track site.id) {
+            <button class="site-dropdown-item" [class.active]="selectedSite()?.id === site.id" (click)="selectSite(site)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/></svg>
+              <span class="site-dropdown-name">{{ site.business_name || 'Unnamed' }}</span>
+              <span class="site-dropdown-status" [class]="getStatusClass(site.status)">{{ getStatusLabel(site.status) }}</span>
+            </button>
+          }
+          <div class="site-dropdown-divider"></div>
+          <button class="site-dropdown-item add-new" (click)="newSite()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            <span>Add New Site</span>
+          </button>
+        </div>
+      }
+    </div>
+
+    <!-- Navigation -->
+    <nav class="sidebar-nav">
+      <button class="nav-item" [class.active]="activeNav() === 'dashboard'" (click)="selectNav('dashboard')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        <span>Dashboard</span>
+      </button>
+      <button class="nav-item" [class.active]="activeNav() === 'pages'" (click)="selectNav('pages')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <span>Pages & Content</span>
+      </button>
+      <button class="nav-item" [class.active]="activeNav() === 'design'" (click)="selectNav('design')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        <span>Design & Theme</span>
+      </button>
+      <button class="nav-item" [class.active]="activeNav() === 'domains'" (click)="selectNav('domains')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        <span>Domains</span>
+        @if (domainSummary().total > 0) {
+          <span class="nav-badge">{{ domainSummary().total }}</span>
+        }
+      </button>
+      <button class="nav-item" [class.active]="activeNav() === 'snapshots'" (click)="selectNav('snapshots')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2v4m0 12v4M2 12h4m12 0h4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg>
+        <span>Snapshots</span>
+      </button>
+      <button class="nav-item" [class.active]="activeNav() === 'analytics'" (click)="selectNav('analytics')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+        <span>Analytics</span>
+      </button>
+      <button class="nav-item" [class.active]="activeNav() === 'seo'" (click)="selectNav('seo')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <span>SEO Settings</span>
+      </button>
+
+      <div class="nav-divider"></div>
+
+      <button class="nav-item" [class.active]="activeNav() === 'billing'" (click)="selectNav('billing')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+        <span>Billing & Plan</span>
+      </button>
+      <button class="nav-item" [class.active]="activeNav() === 'audit'" (click)="selectNav('audit')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        <span>Audit Log</span>
+      </button>
+      <button class="nav-item" [class.active]="activeNav() === 'settings'" (click)="selectNav('settings')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>Settings</span>
+      </button>
+    </nav>
+  </aside>
+
+  <!-- Sidebar overlay for mobile -->
+  @if (!sidebarCollapsed()) {
+    <div class="sidebar-overlay" (click)="sidebarCollapsed.set(true)"></div>
+  }
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- RIGHT PANEL (MAIN CONTENT)                          -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <main class="main-content">
+    <!-- Top bar -->
+    <div class="top-bar">
+      <div class="breadcrumb">
+        <span class="breadcrumb-root">{{ selectedSite()?.business_name || 'My Sites' }}</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+        <span class="breadcrumb-current">
+          @switch (activeNav()) {
+            @case ('dashboard') { Overview }
+            @case ('pages') { Pages & Content }
+            @case ('design') { Design & Theme }
+            @case ('domains') { Domains }
+            @case ('analytics') { Analytics }
+            @case ('seo') { SEO Settings }
+            @case ('billing') { Billing & Plan }
+            @case ('audit') { Audit Log }
+            @case ('settings') { Settings }
+            @case ('snapshots') { Snapshots }
+          }
+        </span>
+      </div>
+      <div class="top-bar-actions">
+        <button class="top-btn" (click)="loadData()" title="Refresh">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+        </button>
+        @if (selectedSite(); as site) {
+          @if (site.status === 'published') {
+            <button class="top-btn" (click)="visitSite(site)" title="Preview site">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              Preview
+            </button>
+            <button class="top-btn accent" (click)="editInBolt(site)" title="Edit in AI code editor">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+              AI Edit
+            </button>
+          }
         }
       </div>
-    }
+    </div>
 
     <!-- Loading -->
     @if (loading()) {
-      <div class="admin-loading">
-        Loading..
+      <div class="panel-loading">
+        <div class="loading-spinner"></div>
+        <span>Loading dashboard...</span>
       </div>
-    }
+    } @else if (!selectedSite()) {
+      <!-- No sites -->
+      <div class="empty-state">
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        <h2>No sites yet</h2>
+        <p>Create your first AI-powered website in minutes.</p>
+        <button class="action-btn accent" (click)="newSite()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          Create Site
+        </button>
+      </div>
+    } @else {
 
-    <!-- Sites grid -->
-    @if (!loading()) {
-      @if (sites().length === 0) {
-        <div class="admin-empty">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" />
-          </svg>
-          <h3>No sites yet</h3>
-          <p>Create your first AI-powered website in minutes.</p>
-          <button class="btn btn-accent" (click)="newSite()">Create Site</button>
-        </div>
-      } @else {
-        <div class="site-grid">
-          @for (site of sites(); track site.id; let i = $index) {
-            <div class="site-card" [class.building]="isBuilding(site)" [class.dropdown-open]="openDropdownId() === site.id" [style.z-index]="openDropdownId() === site.id ? 'var(--z-popover)' : (sites().length - i)">
-              <!-- Preview -->
-              <div class="site-card-preview" (click)="isBuilding(site) ? goToWaiting(site) : visitSite(site)">
-                @if (site.status === 'published' && site.current_build_version) {
-                  <img
-                    class="site-card-screenshot"
-                    [src]="getScreenshotUrl(site)"
-                    [alt]="site.business_name"
-                    loading="lazy"
-                    (error)="onScreenshotError($event)"
-                  />
-                } @else if (isBuilding(site)) {
-                  <div class="site-card-preview-placeholder building clickable">
-                    <span class="preview-spinner"></span>
-                    <span>{{ getStatusLabel(site.status) }}...</span>
-                    <span class="preview-hint">Click to view progress</span>
-                  </div>
-                } @else if (site.status === 'error' || site.status === 'failed') {
-                  <div class="site-card-preview-placeholder error">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-                    <span>Build failed</span>
+      <!-- ═══ DASHBOARD ═══ -->
+      @if (activeNav() === 'dashboard') {
+        <div class="panel-content">
+          <!-- Site preview card -->
+          <div class="dashboard-hero">
+            <div class="hero-preview" (click)="isBuilding(selectedSite()!) ? goToWaiting(selectedSite()!) : visitSite(selectedSite()!)">
+              @if (selectedSite()!.status === 'published' && selectedSite()!.current_build_version) {
+                <img class="hero-screenshot" [src]="getScreenshotUrl(selectedSite()!)" [alt]="selectedSite()!.business_name" loading="lazy" (error)="onScreenshotError($event)" />
+              } @else if (isBuilding(selectedSite()!)) {
+                <div class="hero-placeholder building">
+                  <div class="building-spinner"></div>
+                  <span>{{ getStatusLabel(selectedSite()!.status) }}...</span>
+                  <span class="hero-hint">Click to view progress</span>
+                </div>
+              } @else if (selectedSite()!.status === 'error' || selectedSite()!.status === 'failed') {
+                <div class="hero-placeholder error">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                  <span>Build failed</span>
+                </div>
+              } @else {
+                <div class="hero-placeholder">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                  <span>Draft</span>
+                </div>
+              }
+            </div>
+
+            <div class="hero-info">
+              <div class="hero-status-row">
+                <span class="status-chip" [class]="getStatusClass(selectedSite()!.status)">{{ getStatusLabel(selectedSite()!.status) }}</span>
+                @if (selectedSite()!.plan) {
+                  <span class="plan-chip" [class]="selectedSite()!.plan">{{ selectedSite()!.plan }}</span>
+                }
+              </div>
+              <h1 class="hero-title" (dblclick)="startEdit(selectedSite()!.id, 'name', selectedSite()!.business_name)">
+                @if (editingSiteId() === selectedSite()!.id && editingField() === 'name') {
+                  <div class="inline-edit">
+                    <input class="inline-input" [(ngModel)]="editValue" (keyup.enter)="saveEdit(selectedSite()!.id)" (keyup.escape)="cancelEdit()" />
+                    <button class="inline-btn save" (click)="saveEdit(selectedSite()!.id)">&#10003;</button>
+                    <button class="inline-btn cancel" (click)="cancelEdit()">&#10005;</button>
                   </div>
                 } @else {
-                  <div class="site-card-preview-placeholder">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                      <rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" />
-                    </svg>
-                    <span>Draft</span>
+                  {{ selectedSite()!.business_name || 'Unnamed' }}
+                }
+              </h1>
+              <div class="hero-url-row">
+                @if (editingSiteId() === selectedSite()!.id && editingField() === 'slug') {
+                  <div class="inline-edit">
+                    <input class="inline-input slug" [(ngModel)]="editValue" (keyup.enter)="saveEdit(selectedSite()!.id)" (keyup.escape)="cancelEdit()" />
+                    <span class="slug-suffix">.projectsites.dev</span>
+                    <button class="inline-btn save" (click)="saveEdit(selectedSite()!.id)">&#10003;</button>
+                    <button class="inline-btn cancel" (click)="cancelEdit()">&#10005;</button>
                   </div>
+                } @else {
+                  <a class="hero-url" [href]="getSiteUrl(selectedSite()!)" target="_blank" rel="noopener" (dblclick)="startEdit(selectedSite()!.id, 'slug', selectedSite()!.slug); $event.preventDefault()">
+                    {{ selectedSite()!.primary_hostname || selectedSite()!.slug + '.projectsites.dev' }}
+                  </a>
+                  <button class="icon-btn" (click)="copyUrl(selectedSite()!)" title="Copy URL">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  </button>
                 }
               </div>
 
-              <!-- Status + Title -->
-              <div class="site-card-body">
-                <div class="site-card-title-row">
-                  <span class="site-card-status" [class]="getStatusClass(site.status)">{{ getStatusLabel(site.status) }}</span>
-                  @if (site.plan) {
-                    <span class="plan-badge" [class]="site.plan">{{ site.plan }}</span>
-                  }
-                </div>
+              <!-- Quick actions -->
+              <div class="hero-actions">
+                @if (selectedSite()!.status === 'published') {
+                  <button class="action-btn" (click)="editInBolt(selectedSite()!)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                    AI Edit
+                  </button>
+                }
+                <button class="action-btn" (click)="openDeploy(selectedSite()!)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  Deploy ZIP
+                </button>
+                <button class="action-btn" (click)="openReset(selectedSite()!)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/></svg>
+                  Rebuild
+                </button>
+                <button class="action-btn danger" (click)="confirmDelete(selectedSite()!)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
 
-                <!-- Name (editable) -->
-                @if (editingSiteId() === site.id && editingField() === 'name') {
-                  <div class="inline-edit-wrap">
-                    <input class="inline-edit-input" [(ngModel)]="editValue" (keyup.enter)="saveEdit(site.id)" (keyup.escape)="cancelEdit()" />
-                    <button class="inline-edit-btn save" (click)="saveEdit(site.id)">&#10003;</button>
-                    <button class="inline-edit-btn cancel" (click)="cancelEdit()">&#10005;</button>
+          <!-- Stats cards -->
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+              </div>
+              <div class="stat-info">
+                <span class="stat-value">{{ domainSummary().total }}</span>
+                <span class="stat-label">Domains</span>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon success">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              </div>
+              <div class="stat-info">
+                <span class="stat-value">{{ domainSummary().active }}</span>
+                <span class="stat-label">Active</span>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon warn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              </div>
+              <div class="stat-info">
+                <span class="stat-value">{{ domainSummary().pending }}</span>
+                <span class="stat-label">Pending</span>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+              </div>
+              <div class="stat-info">
+                <span class="stat-value">{{ subscription()?.status === 'active' ? 'Pro' : 'Free' }}</span>
+                <span class="stat-label">Plan</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- All sites list -->
+          @if (sites().length > 1) {
+            <div class="section-card">
+              <div class="section-header">
+                <h3>All Sites</h3>
+                <span class="section-count">{{ sites().length }}</span>
+              </div>
+              <div class="sites-table">
+                @for (site of sites(); track site.id) {
+                  <div class="site-row" [class.active]="selectedSite()?.id === site.id" (click)="selectSite(site)">
+                    <div class="site-row-preview">
+                      @if (site.status === 'published' && site.current_build_version) {
+                        <img [src]="getScreenshotUrl(site)" [alt]="site.business_name" loading="lazy" (error)="onScreenshotError($event)" />
+                      } @else {
+                        <div class="site-row-placeholder">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                        </div>
+                      }
+                    </div>
+                    <div class="site-row-info">
+                      <span class="site-row-name">{{ site.business_name || 'Unnamed' }}</span>
+                      <span class="site-row-url">{{ site.slug }}.projectsites.dev</span>
+                    </div>
+                    <span class="status-chip small" [class]="getStatusClass(site.status)">{{ getStatusLabel(site.status) }}</span>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- ═══ PAGES & CONTENT ═══ -->
+      @if (activeNav() === 'pages') {
+        <div class="panel-content panel-full">
+          @if (loadingFiles()) {
+            <div class="panel-loading"><div class="loading-spinner"></div><span>Loading files...</span></div>
+          } @else if (files().length === 0) {
+            <div class="empty-state small">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+              <p>No files found for this site.</p>
+            </div>
+          } @else {
+            <div class="files-toolbar">
+              <span class="files-count-label">{{ files().length }} files</span>
+              <div class="files-toolbar-actions">
+                <button class="action-btn small" (click)="promptNewFile()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                  New File
+                </button>
+                <button class="action-btn small" (click)="promptNewFolder()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                  New Folder
+                </button>
+              </div>
+            </div>
+            <div class="files-split">
+              <div class="file-tree-panel" (dragover)="onTreePanelDragOver($event)" (drop)="onTreePanelDrop($event)" [class.drag-over]="treeDragOver()">
+                <div class="file-tree">
+                  <ng-container *ngTemplateOutlet="treeNodes; context: { $implicit: fileTree() }"></ng-container>
+                </div>
+              </div>
+              <div class="file-editor-panel">
+                @if (editingFile()) {
+                  <div class="file-editor">
+                    <div class="file-editor-header">
+                      <span class="file-editor-name" (dblclick)="startRenameCurrentFile($event)">{{ getFileName(editingFile()!.key) }}</span>
+                      <span class="file-editor-hint">Ctrl+S to save</span>
+                      <button class="action-btn small accent" (click)="saveFileContent()" [disabled]="savingFile()">{{ savingFile() ? 'Saving...' : 'Save' }}</button>
+                      <button class="icon-btn danger" (click)="deleteCurrentFile()" title="Delete this file">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                      </button>
+                    </div>
+                    <div class="file-ai-prompt">
+                      @if (fileAiProcessing()) {
+                        <div class="file-ai-status">
+                          <div class="loading-spinner small"></div>
+                          Applying AI changes...
+                        </div>
+                      } @else {
+                        <input type="text" class="file-ai-input" placeholder="AI: Describe changes to this file..." [(ngModel)]="fileAiPrompt" (keydown.enter)="runFileAiPrompt()" />
+                        <button class="icon-btn accent" (click)="runFileAiPrompt()" [disabled]="!fileAiPrompt.trim()">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26z"/></svg>
+                        </button>
+                      }
+                    </div>
+                    <textarea class="file-editor-content" [(ngModel)]="fileContent" spellcheck="false" (keydown)="onEditorKeydown($event)" (dragover)="onEditorDragOver($event)" (drop)="onEditorDrop($event)"></textarea>
                   </div>
                 } @else {
-                  <h4 class="site-card-name" (dblclick)="startEdit(site.id, 'name', site.business_name)" data-tooltip="Double-click to rename">
-                    {{ site.business_name || 'Unnamed' }}
-                  </h4>
+                  <div class="empty-state small">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6"/><path d="m9 15 3-3 3 3"/></svg>
+                    <p>Select a file to edit</p>
+                    <span>Click any editable file in the tree to open it here.</span>
+                  </div>
                 }
+              </div>
+            </div>
+          }
+        </div>
+      }
 
-                <!-- URL + Slug (editable) -->
-                <div class="site-card-url-row">
-                  @if (editingSiteId() === site.id && editingField() === 'slug') {
-                    <div class="inline-edit-wrap">
-                      <input class="inline-edit-input slug" [(ngModel)]="editValue" (keyup.enter)="saveEdit(site.id)" (keyup.escape)="cancelEdit()" />
-                      <span class="slug-suffix">.projectsites.dev</span>
-                      <button class="inline-edit-btn save" (click)="saveEdit(site.id)">&#10003;</button>
-                      <button class="inline-edit-btn cancel" (click)="cancelEdit()">&#10005;</button>
+      <!-- ═══ DESIGN & THEME ═══ -->
+      @if (activeNav() === 'design') {
+        <div class="panel-content">
+          @if (selectedSite()!.status === 'published') {
+            <div class="section-card">
+              <div class="section-header">
+                <h3>Live Preview</h3>
+                <button class="action-btn small" (click)="editInBolt(selectedSite()!)">Open in AI Editor</button>
+              </div>
+              <div class="design-iframe-wrap">
+                <iframe [src]="getSafeSiteUrl(selectedSite()!)" class="design-iframe" sandbox="allow-scripts allow-same-origin"></iframe>
+              </div>
+            </div>
+          } @else {
+            <div class="empty-state small">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+              <p>Publish your site first to preview and edit the design.</p>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- ═══ DOMAINS ═══ -->
+      @if (activeNav() === 'domains') {
+        <div class="panel-content">
+          <div class="section-card">
+            <div class="tabs-bar">
+              <button class="tab-btn" [class.active]="domainTab() === 'existing'" (click)="domainTab.set('existing')">Your Domains</button>
+              <button class="tab-btn" [class.active]="domainTab() === 'connect'" (click)="domainTab.set('connect')">Connect Domain</button>
+              <button class="tab-btn" [class.active]="domainTab() === 'register'" (click)="domainTab.set('register')">Register New</button>
+            </div>
+
+            @if (loadingHostnames()) {
+              <div class="panel-loading"><div class="loading-spinner"></div><span>Loading domains...</span></div>
+            } @else {
+              @if (domainTab() === 'existing') {
+                <div class="hostname-list">
+                  <div class="hostname-item default">
+                    <div class="hostname-info">
+                      <span class="hn-dot hn-active"></span>
+                      @if (editingSlugInModal()) {
+                        <div class="inline-edit">
+                          <input class="inline-input slug" [(ngModel)]="modalSlugValue" (keyup.enter)="saveSlugFromModal()" (keyup.escape)="cancelSlugEdit()" />
+                          <span class="slug-suffix">.projectsites.dev</span>
+                          <button class="action-btn small" (click)="saveSlugFromModal()">Save</button>
+                          <button class="action-btn small" (click)="cancelSlugEdit()">Cancel</button>
+                        </div>
+                      } @else {
+                        <a [href]="'https://' + selectedSite()!.slug + '.projectsites.dev'" target="_blank" rel="noopener" class="hostname-name">
+                          {{ selectedSite()!.slug }}.projectsites.dev
+                        </a>
+                        <span class="hn-chip">Default</span>
+                        <button class="icon-btn" (click)="startSlugEdit()" title="Change subdomain">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                        </button>
+                      }
                     </div>
-                  } @else {
-                    <a class="site-card-domain" [href]="getSiteUrl(site)" target="_blank" rel="noopener" (dblclick)="startEdit(site.id, 'slug', site.slug); $event.preventDefault()" data-tooltip="Double-click to edit slug">
-                      {{ site.primary_hostname || site.slug + '.projectsites.dev' }}
-                    </a>
-                    <button class="copy-btn" (click)="copyUrl(site)" data-tooltip="Copy URL">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                    </button>
+                  </div>
+
+                  @for (hn of hostnames(); track hn.id) {
+                    <div class="hostname-item">
+                      <div class="hostname-info">
+                        <span class="hn-dot" [class]="getHostnameStatusClass(hn.status)"></span>
+                        <a [href]="'https://' + hn.hostname" target="_blank" rel="noopener" class="hostname-name">{{ hn.hostname }}</a>
+                        @if (hn.is_primary) { <span class="hn-chip primary">Primary</span> }
+                        <span class="hn-chip" [class]="hn.status">{{ hn.status }}</span>
+                      </div>
+                      @if (hn.status === 'pending') {
+                        <div class="cname-hint">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                          Point CNAME to <code>projectsites.dev</code> -- DNS may take 24-72 hours.
+                        </div>
+                      }
+                      <div class="hostname-actions">
+                        @if (!hn.is_primary) {
+                          <button class="action-btn small" (click)="setPrimary(hn.id)">Set Primary</button>
+                        }
+                        <button class="action-btn small danger" (click)="deleteHostname(hn.id)">Remove</button>
+                      </div>
+                    </div>
+                  }
+
+                  @if (hostnames().length === 0) {
+                    <p class="muted-text">No custom domains configured yet.</p>
                   }
                 </div>
+              }
 
-                <!-- Primary action row -->
-                <div class="site-card-actions">
-                  @if (site.status === 'published') {
-                    <button class="site-action-btn" (click)="editInBolt(site)" data-tooltip="Edit in AI code editor">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-                      AI Edit
+              @if (domainTab() === 'connect') {
+                <div class="domain-form">
+                  <div class="form-instructions">
+                    <h4>Connect your domain</h4>
+                    <p>1. Go to your domain registrar's DNS settings</p>
+                    <p>2. Add a <strong>CNAME</strong> record pointing to <code>projectsites.dev</code></p>
+                    <p>3. Enter your domain below and click "Add Domain"</p>
+                  </div>
+                  <div class="form-row">
+                    <input type="text" class="input-field" placeholder="www.yourdomain.com" [(ngModel)]="newHostname" (keyup.enter)="addHostname()" />
+                    <button class="action-btn accent" (click)="addHostname()" [disabled]="!newHostname.trim()">Add Domain</button>
+                  </div>
+                  <p class="muted-text">We will monitor DNS until it resolves. Usually takes 24-72 hours.</p>
+                </div>
+              }
+
+              @if (domainTab() === 'register') {
+                <div class="domain-form">
+                  <div class="form-instructions">
+                    <h4>Register a new domain</h4>
+                    <p>Search for an available domain name and register it through Cloudflare.</p>
+                  </div>
+                  <div class="form-row">
+                    <input type="text" class="input-field" placeholder="yourbusiness.com" [(ngModel)]="registerDomainQuery" (keyup.enter)="checkDomainAvailability()" />
+                    <button class="action-btn accent" (click)="checkDomainAvailability()" [disabled]="checkingDomain() || !registerDomainQuery.trim()">
+                      {{ checkingDomain() ? 'Checking...' : 'Check Availability' }}
                     </button>
+                  </div>
+                  @if (domainCheckResult()) {
+                    <div class="domain-result" [class.available]="domainCheckResult()!.available">
+                      @if (domainCheckResult()!.available) {
+                        <div class="domain-available-msg">
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                          <strong>{{ domainCheckResult()!.domain }}</strong> is available!
+                        </div>
+                        <p class="muted-text">Starting at $12/year</p>
+                        <a class="action-btn accent" href="https://www.cloudflare.com/products/registrar/" target="_blank" rel="noopener">Register on Cloudflare</a>
+                        <p class="muted-text">After registering, come back to the "Connect Domain" tab to link it to your site.</p>
+                      } @else {
+                        <div class="domain-taken-msg">
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                          <strong>{{ domainCheckResult()!.domain }}</strong> is not available.
+                        </div>
+                        <p class="muted-text">Try a different name or extension (.net, .co, .io).</p>
+                      }
+                    </div>
                   }
-                  <button class="site-action-btn" (click)="openDomains(site)" data-tooltip="Manage custom domains">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/></svg>
-                    Domains
-                  </button>
-                  <button class="site-action-btn" (click)="openFiles(site)" data-tooltip="Browse and edit files">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
-                    Files
-                  </button>
-                  <button class="site-action-btn" (click)="openSnapshots(site)" data-tooltip="Manage snapshots">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4m0 12v4M2 12h4m12 0h4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg>
-                  </button>
-                  <button class="site-action-btn" (click)="openLogs(site)" data-tooltip="View build history">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                    Logs
-                  </button>
+                </div>
+              }
+            }
+          </div>
+        </div>
+      }
 
-                  <!-- More dropdown -->
-                  <div class="more-dropdown-wrap">
-                    <button class="site-action-btn" (click)="toggleDropdown(site.id, $event)" data-tooltip="More actions">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+      <!-- ═══ SNAPSHOTS ═══ -->
+      @if (activeNav() === 'snapshots') {
+        <div class="panel-content">
+          <div class="section-card">
+            <div class="section-header">
+              <h3>Snapshots</h3>
+              <span class="section-subtitle">{{ selectedSite()!.slug }}-{{ '{' }}name{{ '}' }}.projectsites.dev</span>
+            </div>
+            <div class="snapshot-create">
+              <div class="form-row">
+                <input type="text" placeholder="Name (e.g., v2, redesign)" [(ngModel)]="newSnapshotName" class="input-field" maxlength="30" />
+                <button class="action-btn accent" [disabled]="creatingSnapshot() || !newSnapshotName.trim()" (click)="createSnapshot()">
+                  {{ creatingSnapshot() ? 'Creating...' : 'Create Snapshot' }}
+                </button>
+              </div>
+              <input type="text" placeholder="Description (optional)" [(ngModel)]="newSnapshotDescription" class="input-field" />
+            </div>
+            @if (loadingSnapshots()) {
+              <div class="panel-loading"><div class="loading-spinner"></div><span>Loading snapshots...</span></div>
+            } @else if (snapshots().length === 0) {
+              <p class="muted-text">No snapshots yet. The first one is created when your site is built.</p>
+            } @else {
+              <div class="snapshot-list">
+                @for (snap of snapshots(); track snap.id) {
+                  <div class="snapshot-item">
+                    <div class="snapshot-info">
+                      <a class="snapshot-name" [href]="'https://' + selectedSite()!.slug + '-' + snap.snapshot_name + '.projectsites.dev'" target="_blank" rel="noopener">
+                        {{ snap.snapshot_name }}
+                      </a>
+                      <span class="snapshot-meta">{{ snap.build_version }} &middot; {{ snap.created_at | date:'short' }}</span>
+                      @if (snap.description) {
+                        <span class="snapshot-desc">{{ snap.description }}</span>
+                      }
+                    </div>
+                    <button class="icon-btn danger" (click)="deleteSnapshot(snap.id)" title="Delete snapshot">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                     </button>
-                    @if (openDropdownId() === site.id) {
-                      <div class="more-dropdown" (click)="$event.stopPropagation()">
-                        <button class="dropdown-item" (click)="openReset(site)">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/></svg>
-                          Reset & Rebuild
-                        </button>
-                        <button class="dropdown-item" (click)="openDeploy(site)">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                          Deploy ZIP
-                        </button>
-                        <div class="dropdown-divider"></div>
-                        <button class="dropdown-item danger" (click)="confirmDelete(site)">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                          Delete Site
-                        </button>
-                      </div>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- ═══ ANALYTICS ═══ -->
+      @if (activeNav() === 'analytics') {
+        <div class="panel-content">
+          <div class="empty-state small">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+            <h3>Analytics</h3>
+            <p>Traffic analytics are coming soon. Your site is being tracked automatically.</p>
+          </div>
+        </div>
+      }
+
+      <!-- ═══ SEO ═══ -->
+      @if (activeNav() === 'seo') {
+        <div class="panel-content">
+          <div class="empty-state small">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <h3>SEO Settings</h3>
+            <p>SEO configuration tools are coming soon. Your site already includes optimized meta tags, schema markup, and sitemap.</p>
+          </div>
+        </div>
+      }
+
+      <!-- ═══ BILLING ═══ -->
+      @if (activeNav() === 'billing') {
+        <div class="panel-content">
+          <div class="section-card">
+            <div class="section-header">
+              <h3>Billing & Plan</h3>
+            </div>
+            <div class="billing-info">
+              <div class="billing-plan">
+                <span class="billing-label">Current Plan</span>
+                <span class="billing-value">{{ subscription()?.status === 'active' ? 'Pro' : 'Free' }}</span>
+              </div>
+              <div class="billing-plan">
+                <span class="billing-label">Status</span>
+                <span class="billing-value">{{ subscription()?.status || 'No subscription' }}</span>
+              </div>
+            </div>
+            @if (subscription()?.status === 'active') {
+              <button class="action-btn" (click)="openBilling()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                Manage Subscription
+              </button>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- ═══ AUDIT LOG ═══ -->
+      @if (activeNav() === 'audit') {
+        <div class="panel-content panel-full">
+          <div class="logs-toolbar">
+            <span class="logs-count">{{ logs().length }} log {{ logs().length === 1 ? 'entry' : 'entries' }}</span>
+            <div class="logs-toolbar-actions">
+              <button class="icon-btn" (click)="copyLogsForAI()" title="Copy logs for AI">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              </button>
+              <button class="icon-btn" (click)="loadLogs(selectedSite()!.id)" title="Refresh logs">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              </button>
+            </div>
+          </div>
+          @if (loadingLogs()) {
+            <div class="panel-loading"><div class="loading-spinner"></div><span>Loading logs...</span></div>
+          } @else if (logs().length === 0) {
+            <div class="empty-state small"><p>No logs yet for this site.</p></div>
+          } @else {
+            <div class="logs-container">
+              @for (log of logs(); track log.id) {
+                <div class="log-entry" [class]="getLogColorClass(log.action)">
+                  <div class="log-edge"></div>
+                  <div class="log-icon" [innerHTML]="getLogIcon(log.action)"></div>
+                  <div class="log-body">
+                    <div class="log-header">
+                      <span class="log-action">{{ formatLogAction(log.action) }}</span>
+                      <span class="log-ts">{{ formatLogTimestamp(log.created_at) }}</span>
+                    </div>
+                    @if (log.metadata_json) {
+                      <div class="log-meta" [innerHTML]="formatLogMeta(log.metadata_json, log.action)"></div>
                     }
                   </div>
                 </div>
-              </div>
+              }
             </div>
           }
+        </div>
+      }
 
-          <!-- New site card -->
-          <div class="site-card new-site-card" (click)="newSite()">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-            <span>New Website</span>
+      <!-- ═══ SETTINGS ═══ -->
+      @if (activeNav() === 'settings') {
+        <div class="panel-content">
+          <div class="section-card">
+            <div class="section-header">
+              <h3>Site Settings</h3>
+            </div>
+            <div class="settings-group">
+              <label class="settings-label">Site Name</label>
+              <div class="form-row">
+                <input type="text" class="input-field" [value]="selectedSite()!.business_name" (keyup.enter)="editValue = $any($event.target).value; editingField.set('name'); saveEdit(selectedSite()!.id)" #nameInput />
+                <button class="action-btn small" (click)="editValue = nameInput.value; editingField.set('name'); saveEdit(selectedSite()!.id)">Save</button>
+              </div>
+            </div>
+            <div class="settings-group">
+              <label class="settings-label">Slug</label>
+              <div class="form-row">
+                <input type="text" class="input-field" [value]="selectedSite()!.slug" #slugInput />
+                <span class="slug-suffix">.projectsites.dev</span>
+                <button class="action-btn small" (click)="editValue = slugInput.value; editingField.set('slug'); saveEdit(selectedSite()!.id)">Save</button>
+              </div>
+            </div>
+            <div class="settings-danger-zone">
+              <h4>Danger Zone</h4>
+              <button class="action-btn danger" (click)="confirmDelete(selectedSite()!)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                Delete Site
+              </button>
+            </div>
           </div>
         </div>
       }
     }
-  </div>
-</section>
+  </main>
+</div>
 
 <!-- ═══════════════════════════════════════════════════════ -->
-<!-- Delete Modal -->
+<!-- File tree recursive template                            -->
 <!-- ═══════════════════════════════════════════════════════ -->
-@if (deletingSite()) {
-  <div class="modal-overlay" (click)="cancelDelete()">
-    <div class="modal-card" (click)="$event.stopPropagation()">
-      <div class="modal-icon danger">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-      </div>
-      <h3>Delete "{{ deletingSite()!.business_name }}"?</h3>
-      <p class="modal-desc">This will permanently remove the site and its domains. This cannot be undone.</p>
-      @if (deletingSite()!.plan === 'paid') {
-        <label class="checkbox-row">
-          <input type="checkbox" [(ngModel)]="deleteCancelSub" />
-          <span>Also cancel my paid subscription</span>
-        </label>
-        <p class="checkbox-hint">Uncheck to keep your subscription credit for a new site.</p>
-      }
-      <div class="modal-actions">
-        <button class="btn btn-outline" (click)="cancelDelete()">Cancel</button>
-        <button class="btn btn-danger" (click)="deleteSite()">Delete Site</button>
-      </div>
-    </div>
-  </div>
-}
-
-<!-- ═══════════════════════════════════════════════════════ -->
-<!-- Domain Modal (Tabbed) -->
-<!-- ═══════════════════════════════════════════════════════ -->
-@if (domainModalSiteId()) {
-  <div class="modal-overlay" (click)="closeDomains()">
-    <div class="modal-card modal-wide" (click)="$event.stopPropagation()">
-      <button class="modal-close" (click)="closeDomains()">&times;</button>
-      <h3>Domains — {{ domainModalSiteName() }}</h3>
-
-      <!-- Tabs -->
-      <div class="modal-tabs">
-        <button class="modal-tab" [class.active]="domainTab() === 'existing'" (click)="domainTab.set('existing')">Your Domains</button>
-        <button class="modal-tab" [class.active]="domainTab() === 'connect'" (click)="domainTab.set('connect')">Connect Domain</button>
-        <button class="modal-tab" [class.active]="domainTab() === 'register'" (click)="domainTab.set('register')">Register New</button>
-      </div>
-
-      @if (loadingHostnames()) {
-        <div class="modal-loading">Loading domains...</div>
-      } @else {
-        <!-- Tab: Existing -->
-        @if (domainTab() === 'existing') {
-          <div class="hostname-list">
-            <!-- Default subdomain (editable) -->
-            <div class="hostname-item default">
-              <div class="hostname-info">
-                <span class="hn-status-dot hn-active"></span>
-                @if (editingSlugInModal()) {
-                  <div class="slug-edit-row">
-                    <input class="slug-edit-input" [(ngModel)]="modalSlugValue" (keyup.enter)="saveSlugFromModal()" (keyup.escape)="cancelSlugEdit()" />
-                    <span class="slug-edit-suffix">.projectsites.dev</span>
-                    <button class="hostname-btn" (click)="saveSlugFromModal()">Save</button>
-                    <button class="hostname-btn" (click)="cancelSlugEdit()">Cancel</button>
-                  </div>
-                } @else {
-                  <a [href]="'https://' + domainModalSlug() + '.projectsites.dev'" target="_blank" rel="noopener" class="hostname-name">
-                    {{ domainModalSlug() }}.projectsites.dev
-                  </a>
-                  <span class="hn-chip">Default</span>
-                  <button class="hostname-btn" (click)="startSlugEdit()" data-tooltip="Change subdomain">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-                    Edit
-                  </button>
-                }
-              </div>
-            </div>
-
-            @for (hn of hostnames(); track hn.id) {
-              <div class="hostname-item">
-                <div class="hostname-info">
-                  <span class="hn-status-dot" [class]="getHostnameStatusClass(hn.status)"></span>
-                  <a [href]="'https://' + hn.hostname" target="_blank" rel="noopener" class="hostname-name">{{ hn.hostname }}</a>
-                  @if (hn.is_primary) { <span class="hn-chip primary">Primary</span> }
-                  <span class="hn-chip" [class]="hn.status">{{ hn.status }}</span>
-                </div>
-                @if (hn.status === 'pending') {
-                  <div class="cname-hint">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                    Point CNAME to <code>projectsites.dev</code> — DNS may take 24-72 hours.
-                  </div>
-                }
-                <div class="hostname-actions">
-                  @if (!hn.is_primary) {
-                    <button class="hostname-btn" (click)="setPrimary(hn.id)">Set Primary</button>
-                  }
-                  <button class="hostname-btn danger" (click)="deleteHostname(hn.id)">Remove</button>
-                </div>
-              </div>
-            }
-
-            @if (hostnames().length === 0) {
-              <p class="no-domains">No custom domains configured yet.</p>
-            }
-          </div>
-        }
-
-        <!-- Tab: Connect -->
-        @if (domainTab() === 'connect') {
-          <div class="connect-domain-panel">
-            <div class="cname-instructions">
-              <h4>Connect your domain</h4>
-              <p>1. Go to your domain registrar's DNS settings</p>
-              <p>2. Add a <strong>CNAME</strong> record pointing to <code>projectsites.dev</code></p>
-              <p>3. Enter your domain below and click "Add Domain"</p>
-            </div>
-            <div class="add-domain">
-              <input
-                type="text"
-                class="input-field"
-                placeholder="www.yourdomain.com"
-                [(ngModel)]="newHostname"
-                (keyup.enter)="addHostname()"
-              />
-              <button class="btn btn-accent" (click)="addHostname()" [disabled]="!newHostname.trim()">Add Domain</button>
-            </div>
-            <p class="cname-note">We'll monitor DNS until it resolves. Usually takes 24-72 hours.</p>
-          </div>
-        }
-
-        <!-- Tab: Register -->
-        @if (domainTab() === 'register') {
-          <div class="connect-domain-panel">
-            <div class="cname-instructions">
-              <h4>Register a new domain</h4>
-              <p>Search for an available domain name and register it directly through our platform.</p>
-            </div>
-            <div class="add-domain">
-              <input
-                type="text"
-                class="input-field"
-                placeholder="yourbusiness.com"
-                [(ngModel)]="registerDomainQuery"
-                (keyup.enter)="checkDomainAvailability()"
-              />
-              <button class="btn btn-accent" (click)="checkDomainAvailability()" [disabled]="checkingDomain() || !registerDomainQuery.trim()">
-                {{ checkingDomain() ? 'Checking...' : 'Check Availability' }}
-              </button>
-            </div>
-            @if (domainCheckResult()) {
-              <div class="domain-check-result" [class.available]="domainCheckResult()!.available">
-                @if (domainCheckResult()!.available) {
-                  <div class="domain-available">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                    <strong>{{ domainCheckResult()!.domain }}</strong> is available!
-                  </div>
-                  <p class="domain-price">Starting at $12/year</p>
-                  <a class="btn btn-accent btn-small" href="https://www.cloudflare.com/products/registrar/" target="_blank" rel="noopener">
-                    Register on Cloudflare
-                  </a>
-                  <p class="cname-note">After registering, come back to the "Connect Domain" tab to link it to your site.</p>
-                } @else {
-                  <div class="domain-taken">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-                    <strong>{{ domainCheckResult()!.domain }}</strong> is not available.
-                  </div>
-                  <p class="cname-note">Try a different name or extension (.net, .co, .io).</p>
-                }
-              </div>
-            }
-          </div>
-        }
-      }
-    </div>
-  </div>
-}
-
-<!-- ═══════════════════════════════════════════════════════ -->
-<!-- Logs Modal (Enhanced) -->
-<!-- ═══════════════════════════════════════════════════════ -->
-@if (snapshotModalSiteId()) {
-  <div class="modal-overlay" (click)="closeSnapshots()">
-    <div class="modal-card snapshots-modal" (click)="$event.stopPropagation()">
-      <button class="modal-close" (click)="closeSnapshots()">&times;</button>
-      <h3>Snapshots — {{ snapshotModalSiteName() }}</h3>
-      <p class="modal-subtitle">Frozen versions accessible at <code>{{ snapshotModalSlug() }}-&#123;name&#125;.projectsites.dev</code></p>
-
-      <!-- Create snapshot -->
-      <div class="snapshot-create">
-        <input type="text" placeholder="Snapshot name (e.g., v2, redesign)" [(ngModel)]="newSnapshotName" class="input-field" maxlength="30" />
-        <input type="text" placeholder="Description (optional)" [(ngModel)]="newSnapshotDescription" class="input-field" />
-        <button class="btn btn-accent btn-sm" [disabled]="creatingSnapshot() || !newSnapshotName.trim()" (click)="createSnapshot()">
-          {{ creatingSnapshot() ? 'Creating...' : 'Create Snapshot' }}
-        </button>
-      </div>
-
-      <!-- Snapshot list -->
-      @if (loadingSnapshots()) {
-        <p class="loading-text">Loading snapshots...</p>
-      } @else if (snapshots().length === 0) {
-        <p class="empty-text">No snapshots yet. The first one is created automatically when your site is built.</p>
-      } @else {
-        <div class="snapshot-list">
-          @for (snap of snapshots(); track snap.id) {
-            <div class="snapshot-item">
-              <div class="snapshot-info">
-                <a class="snapshot-name" [href]="'https://' + snapshotModalSlug() + '-' + snap.snapshot_name + '.projectsites.dev'" target="_blank" rel="noopener">
-                  {{ snap.snapshot_name }}
-                </a>
-                <span class="snapshot-version">{{ snap.build_version }}</span>
-                @if (snap.description) {
-                  <span class="snapshot-desc">{{ snap.description }}</span>
-                }
-                <span class="snapshot-date">{{ snap.created_at | date:'short' }}</span>
-              </div>
-              <button class="btn-icon danger" (click)="deleteSnapshot(snap.id)" title="Delete snapshot">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-              </button>
-            </div>
-          }
-        </div>
-      }
-    </div>
-  </div>
-}
-
-@if (logsModalSiteId()) {
-  <div class="modal-overlay" (click)="closeLogs()">
-    <div class="modal-card logs-modal" (click)="$event.stopPropagation()">
-      <button class="modal-close" (click)="closeLogs()">&times;</button>
-      <div class="logs-modal-title">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-        <span>Logs: {{ logsModalSiteName() }}</span>
-      </div>
-      <div class="logs-toolbar">
-        <span class="logs-count">{{ logs().length }} log {{ logs().length === 1 ? 'entry' : 'entries' }}</span>
-        <div class="logs-toolbar-actions">
-          <button class="logs-refresh-btn" (click)="copyLogsForAI()" data-tooltip="Copy logs for AI" aria-label="Copy logs in AI-friendly format">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-          </button>
-          <button class="logs-refresh-btn" (click)="loadLogs(logsModalSiteId()!)" data-tooltip="Refresh logs" aria-label="Refresh logs">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-          </button>
-        </div>
-      </div>
-
-      @if (loadingLogs()) {
-        <div class="logs-empty">Loading logs...</div>
-      } @else if (logs().length === 0) {
-        <div class="logs-empty">No logs yet for this site.</div>
-      } @else {
-        <div class="logs-container">
-          @for (log of logs(); track log.id) {
-            <div class="log-entry" [class]="getLogColorClass(log.action)">
-              <div class="log-edge"></div>
-              <div class="log-icon" [innerHTML]="getLogIcon(log.action)"></div>
-              <div class="log-body">
-                <div class="log-header">
-                  <span class="log-action">{{ formatLogAction(log.action) }}</span>
-                  <span class="log-ts">{{ formatLogTimestamp(log.created_at) }}</span>
-                </div>
-                @if (log.metadata_json) {
-                  <div class="log-meta" [innerHTML]="formatLogMeta(log.metadata_json, log.action)"></div>
-                }
-              </div>
-            </div>
-          }
-        </div>
-      }
-    </div>
-  </div>
-}
-
-<!-- ═══════════════════════════════════════════════════════ -->
-<!-- Files Modal (Split Panel: Tree + Editor) -->
-<!-- ═══════════════════════════════════════════════════════ -->
-@if (filesModalSiteId()) {
-  <div class="modal-overlay" (click)="closeFiles()">
-    <div class="modal-card files-modal" (click)="$event.stopPropagation()">
-      <button class="modal-close" (click)="closeFiles()">&times;</button>
-
-      <!-- Files modal header -->
-      <div class="files-modal-header">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-        <span>Files — {{ filesModalSiteName() }}</span>
-        <span class="files-count">{{ files().length }}</span>
-        <div class="files-header-actions">
-          <button class="files-action-btn" (click)="promptNewFile()" data-tooltip="New File">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
-          </button>
-          <button class="files-action-btn" (click)="promptNewFolder()" data-tooltip="New Folder">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
-          </button>
-        </div>
-      </div>
-
-      @if (loadingFiles()) {
-        <div class="modal-loading">Loading files...</div>
-      } @else if (files().length === 0) {
-        <p class="no-logs">No files found.</p>
-      } @else {
-        <div class="files-split">
-          <!-- Left: File Tree -->
-          <div class="file-tree-panel" (dragover)="onTreePanelDragOver($event)" (drop)="onTreePanelDrop($event)" [class.drag-over]="treeDragOver()">
-            <div class="file-tree">
-              <ng-container *ngTemplateOutlet="treeNodes; context: { $implicit: fileTree() }"></ng-container>
-            </div>
-          </div>
-
-          <!-- Right: Editor or placeholder -->
-          <div class="file-editor-panel">
-            @if (editingFile()) {
-              <div class="file-editor">
-                <div class="file-editor-header">
-                  <span class="file-editor-name" (dblclick)="startRenameCurrentFile($event)">{{ getFileName(editingFile()!.key) }}</span>
-                  <span class="file-editor-hint">Ctrl+S to save</span>
-                  <button class="btn btn-accent btn-small" (click)="saveFileContent()" [disabled]="savingFile()">
-                    {{ savingFile() ? 'Saving...' : 'Save' }}
-                  </button>
-                  <button class="btn btn-small file-delete-btn" (click)="deleteCurrentFile()" data-tooltip="Delete this file">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                  </button>
-                </div>
-                <!-- AI prompt for this file -->
-                <div class="file-ai-prompt">
-                  @if (fileAiProcessing()) {
-                    <div class="file-ai-status">
-                      <span class="loading-dots"><span></span><span></span><span></span></span>
-                      Applying AI changes...
-                    </div>
-                  } @else {
-                    <input
-                      type="text"
-                      class="file-ai-input"
-                      placeholder="AI: Describe changes to this file..."
-                      [(ngModel)]="fileAiPrompt"
-                      (keydown.enter)="runFileAiPrompt()"
-                    />
-                    <button class="file-ai-btn" (click)="runFileAiPrompt()" [disabled]="!fileAiPrompt.trim()">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26z"/></svg>
-                    </button>
-                  }
-                </div>
-                <textarea
-                  class="file-editor-content"
-                  [(ngModel)]="fileContent"
-                  spellcheck="false"
-                  (keydown)="onEditorKeydown($event)"
-                  (dragover)="onEditorDragOver($event)"
-                  (drop)="onEditorDrop($event)"
-                ></textarea>
-              </div>
-            } @else {
-              <div class="file-editor-placeholder">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6"/><path d="m9 15 3-3 3 3"/></svg>
-                <p>Select a file to edit</p>
-                <span>Click any editable file in the tree to open it here.</span>
-              </div>
-            }
-          </div>
-        </div>
-      }
-    </div>
-  </div>
-}
-
-<!-- File tree recursive template -->
 <ng-template #treeNodes let-nodes>
   @for (node of nodes; track node.name) {
     @if (node.isDir) {
@@ -595,7 +740,7 @@
         @if (node.size) {
           <span class="tree-file-size">{{ formatFileSize(node.size) }}</span>
         }
-        <button class="tree-file-delete" (click)="deleteTreeFile(node, $event)" data-tooltip="Delete">
+        <button class="tree-file-delete" (click)="deleteTreeFile(node, $event)" title="Delete">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
         </button>
       </div>
@@ -604,7 +749,33 @@
 </ng-template>
 
 <!-- ═══════════════════════════════════════════════════════ -->
-<!-- Deploy Modal -->
+<!-- Delete Modal                                            -->
+<!-- ═══════════════════════════════════════════════════════ -->
+@if (deletingSite()) {
+  <div class="modal-overlay" (click)="cancelDelete()">
+    <div class="modal-card" (click)="$event.stopPropagation()">
+      <div class="modal-icon danger">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+      </div>
+      <h3>Delete "{{ deletingSite()!.business_name }}"?</h3>
+      <p class="modal-desc">This will permanently remove the site and its domains. This cannot be undone.</p>
+      @if (deletingSite()!.plan === 'paid') {
+        <label class="checkbox-row">
+          <input type="checkbox" [(ngModel)]="deleteCancelSub" />
+          <span>Also cancel my paid subscription</span>
+        </label>
+        <p class="checkbox-hint">Uncheck to keep your subscription credit for a new site.</p>
+      }
+      <div class="modal-actions">
+        <button class="action-btn" (click)="cancelDelete()">Cancel</button>
+        <button class="action-btn danger" (click)="deleteSite()">Delete Site</button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- Deploy Modal                                            -->
 <!-- ═══════════════════════════════════════════════════════ -->
 @if (deployModalSiteId()) {
   <div class="modal-overlay" (click)="closeDeploy()">
@@ -628,14 +799,11 @@
       </div>
 
       <div class="modal-actions">
-        <button class="btn btn-outline" (click)="closeDeploy()">Cancel</button>
-        <button class="btn btn-accent" (click)="submitDeploy()" [disabled]="deploying() || !deployFile">
+        <button class="action-btn" (click)="closeDeploy()">Cancel</button>
+        <button class="action-btn accent" (click)="submitDeploy()" [disabled]="deploying() || !deployFile">
           {{ deploying() ? 'Deploying...' : 'Deploy' }}
         </button>
       </div>
     </div>
   </div>
 }
-
-<!-- Bolt editor is now at /editor/:slug route -->
-
