@@ -573,7 +573,7 @@ export async function serveSiteFromR2(
       if (fallback) {
         console.warn(JSON.stringify({ level: 'info', action: 'serve_spa_fallback', slug: site.slug, requestPath }));
 
-        return buildSiteResponse(fallback, site, 'text/html; charset=utf-8');
+        return buildSiteResponse(fallback, site, 'text/html; charset=utf-8', env);
       }
     }
 
@@ -585,21 +585,74 @@ export async function serveSiteFromR2(
   // Use the resolved file path for content-type detection, not the raw request path.
   // Raw path '/' has no extension → would return 'application/octet-stream' (download).
   const contentType = getContentType(filePath);
-  return buildSiteResponse(object, site, contentType);
+  return buildSiteResponse(object, site, contentType, env);
 }
 
 /**
- * Build an HTTP response for a site file, injecting the top bar for HTML on free plans.
+ * Generate the PostHog client-side tracking snippet.
+ *
+ * Injects the PostHog JS SDK loader and initializes it with the project API key.
+ * Uses `identified_only` person profiles to minimize data collection.
+ *
+ * @param posthogApiKey - PostHog project API key.
+ * @param slug          - Site slug for event enrichment.
+ * @returns HTML `<script>` block to inject before `</head>`.
+ */
+function generatePostHogSnippet(posthogApiKey: string, slug: string): string {
+  return `<!-- PostHog Analytics -->
+<script>
+!function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.async=!0,p.src=s.api_host+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="capture identify alias people.set people.set_once set_config register register_once unregister opt_out_capturing has_opted_out_capturing opt_in_capturing reset isFeatureEnabled onFeatureFlags getFeatureFlag getFeatureFlagPayload reloadFeatureFlags group updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures getActiveMatchingSurveys getSurveys onSessionId".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+posthog.init('${posthogApiKey}',{api_host:'https://us.i.posthog.com',person_profiles:'identified_only'});
+posthog.capture('$pageview',{site_slug:'${slug}'});
+</script>`;
+}
+
+/**
+ * Generate the Sentry client-side error tracking snippet.
+ *
+ * Uses the lightweight Sentry Loader approach for minimal bundle impact.
+ * The DSN is extracted to build the loader URL.
+ *
+ * @param sentryDsn - Full Sentry DSN string.
+ * @param slug      - Site slug for Sentry tag enrichment.
+ * @returns HTML `<script>` block to inject before `</head>`.
+ */
+function generateSentrySnippet(sentryDsn: string, slug: string): string {
+  // Extract the public key from the DSN for the loader URL
+  // DSN format: https://{public_key}@{host}/{project_id}
+  const dsnMatch = sentryDsn.match(/https:\/\/([^@]+)@[^/]+\/(\d+)/);
+  if (!dsnMatch) return '';
+
+  const projectId = dsnMatch[2];
+  return `<!-- Sentry Error Tracking -->
+<script
+  src="https://js.sentry-cdn.com/${dsnMatch[1]}.min.js"
+  crossorigin="anonymous"
+></script>
+<script>
+window.Sentry && Sentry.onLoad(function(){
+  Sentry.init({dsn:'${sentryDsn}',tracesSampleRate:0.1,environment:'production'});
+  Sentry.setTag('site_slug','${slug}');
+  Sentry.setTag('project_id','${projectId}');
+});
+</script>`;
+}
+
+/**
+ * Build an HTTP response for a site file, injecting analytics, error tracking,
+ * and the promotional top bar for HTML on free plans.
  *
  * @param object      - R2 object body.
  * @param site        - Site metadata (slug, plan).
  * @param contentType - MIME type for the Content-Type header.
+ * @param env         - Worker environment for PostHog/Sentry keys.
  * @returns Fully formed Response.
  */
 async function buildSiteResponse(
   object: R2ObjectBody,
   site: { slug: string; plan: string },
   contentType: string,
+  env?: Env,
 ): Promise<Response> {
   const headers = new Headers({
     'Content-Type': contentType,
@@ -607,15 +660,34 @@ async function buildSiteResponse(
     'X-Site-Slug': site.slug,
   });
 
-  // For HTML responses, inject top bar if unpaid
-  if (contentType.startsWith('text/html') && site.plan !== 'paid') {
-    const html = await object.text();
-    const topBar = generateTopBar(site.slug);
+  // For HTML responses, inject tracking snippets and top bar
+  if (contentType.startsWith('text/html')) {
+    let html = await object.text();
 
-    // Inject after <body> tag
-    const injected = html.replace(/(<body[^>]*>)/i, `$1\n${topBar}\n`);
+    // Inject PostHog + Sentry tracking before </head> (for all sites, paid and free)
+    if (env) {
+      let headInjection = '';
 
-    return new Response(injected, { status: 200, headers });
+      if (env.POSTHOG_API_KEY) {
+        headInjection += generatePostHogSnippet(env.POSTHOG_API_KEY, site.slug);
+      }
+
+      if (env.SENTRY_DSN) {
+        headInjection += generateSentrySnippet(env.SENTRY_DSN, site.slug);
+      }
+
+      if (headInjection) {
+        html = html.replace(/<\/head>/i, `${headInjection}\n</head>`);
+      }
+    }
+
+    // Inject top bar after <body> if unpaid
+    if (site.plan !== 'paid') {
+      const topBar = generateTopBar(site.slug);
+      html = html.replace(/(<body[^>]*>)/i, `$1\n${topBar}\n`);
+    }
+
+    return new Response(html, { status: 200, headers });
   }
 
   return new Response(object.body, { status: 200, headers });

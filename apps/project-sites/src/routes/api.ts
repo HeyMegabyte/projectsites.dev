@@ -50,6 +50,7 @@ import * as auditService from '../services/audit.js';
 import * as contactService from '../services/contact.js';
 import * as posthog from '../lib/posthog.js';
 import { captureError } from '../lib/sentry.js';
+import { fetchSheetData, fetchSheetMeta } from '../services/google_sheets.js';
 
 const api = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -3260,6 +3261,46 @@ api.get('/api/sites/:siteId/git/commits/:commitId', async (c) => {
   if (!commit) throw notFound('Commit not found');
 
   return c.json({ data: commit });
+});
+
+// ─── Google Sheets Data Routes ──────────────────────────────
+
+/**
+ * GET /api/sheets/:sheetId — Fetch row data from a Google Sheet.
+ *
+ * @remarks
+ * Uses `GOOGLE_SHEETS_API_KEY` (falls back to `GOOGLE_PLACES_API_KEY`).
+ * The first row of the sheet is treated as headers; subsequent rows are
+ * returned as key-value records.
+ *
+ * @example
+ * ```
+ * GET /api/sheets/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms?tab=Menu
+ * → { data: [{ Name: "Margherita", Price: "$12" }], count: 1 }
+ * ```
+ */
+api.get('/api/sheets/:sheetId', async (c) => {
+  const sheetId = c.req.param('sheetId');
+  const tab = c.req.query('tab');
+  const apiKey = c.env.GOOGLE_SHEETS_API_KEY || c.env.GOOGLE_PLACES_API_KEY;
+  const data = await fetchSheetData(sheetId, tab || undefined, apiKey);
+  return c.json({ data, count: data.length });
+});
+
+/**
+ * GET /api/sheets/:sheetId/meta — Fetch spreadsheet metadata (tab names, sizes).
+ *
+ * @example
+ * ```
+ * GET /api/sheets/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms/meta
+ * → { tabs: [{ name: "Sheet1", rows: 100, columns: 10 }] }
+ * ```
+ */
+api.get('/api/sheets/:sheetId/meta', async (c) => {
+  const sheetId = c.req.param('sheetId');
+  const apiKey = c.env.GOOGLE_SHEETS_API_KEY || c.env.GOOGLE_PLACES_API_KEY;
+  const tabs = await fetchSheetMeta(sheetId, apiKey);
+  return c.json({ tabs });
 });
 
 /** Helper: guess content type for revert file uploads */

@@ -223,13 +223,15 @@ export interface Env {
   /** Novu API key for multi-channel notifications. */
   NOVU_API_KEY?: string;
 
-  // ── Google (OAuth + Places) ───────────────────────────────
+  // ── Google (OAuth + Places + Sheets) ──────────────────────
   /** Google OAuth 2.0 client ID. */
   GOOGLE_CLIENT_ID: string;
   /** Google OAuth 2.0 client secret. */
   GOOGLE_CLIENT_SECRET: string;
   /** Google Places (new) API key for business search. */
   GOOGLE_PLACES_API_KEY: string;
+  /** Google Sheets API key for spreadsheet data sources. Falls back to GOOGLE_PLACES_API_KEY. */
+  GOOGLE_SHEETS_API_KEY?: string;
 
   // ── Sentry (Error Tracking) ───────────────────────────────
   /** Sentry DSN for error reporting. */
