@@ -19,28 +19,9 @@ import { ToastService } from '../../../services/toast.service';
         <p class="text-[0.9rem] max-w-[400px] m-0">Choose a site from the sidebar to open it in the AI editor.</p>
       </div>
     } @else {
-      <div class="relative w-full h-[calc(100vh-49px)] flex flex-col">
-        <!-- Toolbar -->
-        <div class="flex items-center justify-between px-4 py-2 bg-dark/80 border-b border-white/[0.06] flex-shrink-0">
-          <div class="flex items-center gap-2 text-[0.82rem]">
-            <span class="text-primary font-semibold">{{ state.selectedSite()!.business_name }}</span>
-            <span class="text-text-secondary">-</span>
-            <span class="text-text-secondary">{{ state.selectedSite()!.slug }}.projectsites.dev</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <button class="btn-ghost-sm" (click)="saveAndDeploy()" [disabled]="saving()">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              {{ saving() ? 'Saving...' : 'Save & Deploy' }}
-            </button>
-            <button class="btn-ghost-sm" (click)="openFullscreen()">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
-              Fullscreen
-            </button>
-          </div>
-        </div>
-        <!-- Iframe -->
+      <div class="relative w-full h-[calc(100vh-49px)]">
         @if (iframeUrl()) {
-          <iframe class="flex-1 w-full border-none bg-[#0a0a1a] editor-iframe"
+          <iframe class="w-full h-full border-none bg-[#0a0a1a] editor-iframe"
                   [src]="iframeUrl()!"
                   allow="clipboard-read; clipboard-write; cross-origin-isolated"
                   credentialless>
@@ -83,6 +64,8 @@ export class AdminEditorComponent implements OnInit, OnDestroy {
     const params = new URLSearchParams({
       embedded: 'true',
       hideHeader: 'true',
+      hideDiff: 'true',
+      hideDeploy: 'true',
       slug,
       importChatFrom: `${window.location.origin}${chatUrl}`,
     });

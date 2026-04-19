@@ -2977,11 +2977,19 @@ api.delete('/api/sites/:id/files/:path{.+}', async (c) => {
 
 // ── Site Snapshots ─────────────────────────────────────────────────
 
-/** List snapshots for a site */
+/** List snapshots for a site — combines D1 snapshots with git commit history */
 api.get('/api/sites/:siteId/snapshots', async (c) => {
   const orgId = c.get('orgId');
   if (!orgId) throw unauthorized('Must be authenticated');
   const siteId = c.req.param('siteId');
+
+  // Look up site slug for git history
+  const { dbQueryOne: dbq1 } = await import('../services/db.js');
+  const site = await dbq1<{ slug: string }>(
+    c.env.DB,
+    'SELECT slug FROM sites WHERE id = ? AND org_id = ? AND deleted_at IS NULL',
+    [siteId, orgId],
+  );
 
   const { dbQuery: dbq } = await import('../services/db.js');
   const result = await dbq<{ id: string; snapshot_name: string; build_version: string; description: string | null; created_at: string }>(
@@ -2990,7 +2998,14 @@ api.get('/api/sites/:siteId/snapshots', async (c) => {
     [siteId],
   );
 
-  return c.json({ data: result.data });
+  // Also fetch git commit history if site exists
+  let gitHistory: Array<{ sha: string; message: string; date: string; author: string; fileCount: number; buildVersion?: string }> = [];
+  if (site) {
+    const { getHistory } = await import('../services/git.js');
+    gitHistory = await getHistory(c.env.SITES_BUCKET, site.slug);
+  }
+
+  return c.json({ data: result.data, git_history: gitHistory });
 });
 
 /** Create a snapshot (freeze current version or a specific version) */
@@ -3065,5 +3080,199 @@ api.delete('/api/sites/:siteId/snapshots/:snapshotId', async (c) => {
 
   return c.json({ data: { deleted: true } });
 });
+
+// ── Git-based Snapshot System ─────────────────────────────────────
+
+/**
+ * Revert a site to a specific git snapshot.
+ *
+ * Creates a new commit with the reverted files and deploys them
+ * as the current live version.
+ */
+api.post('/api/sites/:siteId/snapshots/revert', async (c) => {
+  const orgId = c.get('orgId');
+  const userId = c.get('userId');
+  if (!orgId) throw unauthorized('Must be authenticated');
+  const siteId = c.req.param('siteId');
+  const body = await c.req.json() as { commit_id: string };
+
+  if (!body.commit_id?.trim()) {
+    throw badRequest('commit_id is required');
+  }
+
+  // Verify site ownership
+  const { dbQueryOne: dbq1 } = await import('../services/db.js');
+  const site = await dbq1<{ slug: string; current_build_version: string | null }>(
+    c.env.DB,
+    'SELECT slug, current_build_version FROM sites WHERE id = ? AND org_id = ? AND deleted_at IS NULL',
+    [siteId, orgId],
+  );
+  if (!site) throw notFound('Site not found');
+
+  // Perform the revert via git service
+  const { revertToSnapshot } = await import('../services/git.js');
+  const result = await revertToSnapshot(
+    c.env.SITES_BUCKET,
+    site.slug,
+    body.commit_id.trim(),
+    userId ?? 'unknown',
+  );
+
+  // Deploy reverted files to a new R2 version path
+  const version = `v${Date.now()}`;
+  const uploadPromises = result.files.map((f) =>
+    c.env.SITES_BUCKET.put(`sites/${site.slug}/${version}/${f.name}`, f.content, {
+      httpMetadata: { contentType: guessContentTypeForRevert(f.name) },
+    }),
+  );
+  await Promise.all(uploadPromises);
+
+  // Update manifest
+  const manifest = {
+    current_version: version,
+    updated_at: new Date().toISOString(),
+    files: result.files.map((f) => `sites/${site.slug}/${version}/${f.name}`),
+  };
+  await c.env.SITES_BUCKET.put(
+    `sites/${site.slug}/_manifest.json`,
+    JSON.stringify(manifest),
+    { httpMetadata: { contentType: 'application/json' } },
+  );
+
+  // Update D1 site record
+  await c.env.DB.prepare(
+    "UPDATE sites SET current_build_version = ?, status = 'published', updated_at = datetime('now') WHERE id = ?",
+  ).bind(version, siteId).run();
+
+  // Create a D1 snapshot record for the revert
+  const { dbInsert: dbIns } = await import('../services/db.js');
+  const snapshotId = crypto.randomUUID();
+  await dbIns(c.env.DB, 'site_snapshots', {
+    id: snapshotId,
+    site_id: siteId,
+    snapshot_name: `revert-${body.commit_id.substring(0, 8)}`,
+    build_version: version,
+    description: `Reverted to commit ${body.commit_id.substring(0, 8)}`,
+    created_by: userId || null,
+  });
+
+  // Invalidate KV cache
+  await c.env.CACHE_KV.delete(`host:${site.slug}${DOMAINS.SITES_SUFFIX}`).catch(() => {});
+
+  // Audit log
+  await auditService.writeAuditLog(c.env.DB, {
+    org_id: orgId,
+    actor_id: userId ?? null,
+    action: 'site.snapshot_reverted',
+    target_type: 'site',
+    target_id: siteId,
+    metadata_json: {
+      commit_id: body.commit_id,
+      new_commit_id: result.commitId,
+      new_version: version,
+      files_restored: result.files.length,
+    },
+    request_id: c.get('requestId'),
+  }).catch(() => {});
+
+  return c.json({
+    data: {
+      commit_id: result.commitId,
+      version,
+      files_restored: result.files.length,
+      snapshot_id: snapshotId,
+    },
+  });
+});
+
+/**
+ * Get git commit history for a site.
+ *
+ * Returns the full commit chain from HEAD, independent of D1 snapshots.
+ */
+api.get('/api/sites/:siteId/git/history', async (c) => {
+  const orgId = c.get('orgId');
+  if (!orgId) throw unauthorized('Must be authenticated');
+  const siteId = c.req.param('siteId');
+  const depth = parseInt(c.req.query('depth') ?? '20', 10);
+
+  const { dbQueryOne: dbq1 } = await import('../services/db.js');
+  const site = await dbq1<{ slug: string }>(
+    c.env.DB,
+    'SELECT slug FROM sites WHERE id = ? AND org_id = ? AND deleted_at IS NULL',
+    [siteId, orgId],
+  );
+  if (!site) throw notFound('Site not found');
+
+  const { getHistory } = await import('../services/git.js');
+  const history = await getHistory(c.env.SITES_BUCKET, site.slug, Math.min(depth, 100));
+
+  return c.json({ data: history });
+});
+
+/**
+ * Compare two git snapshots (diff).
+ */
+api.get('/api/sites/:siteId/git/diff', async (c) => {
+  const orgId = c.get('orgId');
+  if (!orgId) throw unauthorized('Must be authenticated');
+  const siteId = c.req.param('siteId');
+  const base = c.req.query('base');
+  const target = c.req.query('target');
+
+  if (!base || !target) {
+    throw badRequest('Both "base" and "target" query params are required');
+  }
+
+  const { dbQueryOne: dbq1 } = await import('../services/db.js');
+  const site = await dbq1<{ slug: string }>(
+    c.env.DB,
+    'SELECT slug FROM sites WHERE id = ? AND org_id = ? AND deleted_at IS NULL',
+    [siteId, orgId],
+  );
+  if (!site) throw notFound('Site not found');
+
+  const { diffSnapshots } = await import('../services/git.js');
+  const diff = await diffSnapshots(c.env.SITES_BUCKET, site.slug, base, target);
+
+  return c.json({ data: diff });
+});
+
+/**
+ * Get a specific git commit's metadata and file list.
+ */
+api.get('/api/sites/:siteId/git/commits/:commitId', async (c) => {
+  const orgId = c.get('orgId');
+  if (!orgId) throw unauthorized('Must be authenticated');
+  const siteId = c.req.param('siteId');
+  const commitId = c.req.param('commitId');
+
+  const { dbQueryOne: dbq1 } = await import('../services/db.js');
+  const site = await dbq1<{ slug: string }>(
+    c.env.DB,
+    'SELECT slug FROM sites WHERE id = ? AND org_id = ? AND deleted_at IS NULL',
+    [siteId, orgId],
+  );
+  if (!site) throw notFound('Site not found');
+
+  const { getCommit } = await import('../services/git.js');
+  const commit = await getCommit(c.env.SITES_BUCKET, site.slug, commitId);
+  if (!commit) throw notFound('Commit not found');
+
+  return c.json({ data: commit });
+});
+
+/** Helper: guess content type for revert file uploads */
+function guessContentTypeForRevert(filename: string): string {
+  const ext = filename.split('.').pop()?.toLowerCase();
+  const types: Record<string, string> = {
+    html: 'text/html', css: 'text/css', js: 'application/javascript',
+    json: 'application/json', svg: 'image/svg+xml', png: 'image/png',
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif',
+    webp: 'image/webp', ico: 'image/x-icon', txt: 'text/plain',
+    xml: 'text/xml', woff: 'font/woff', woff2: 'font/woff2',
+  };
+  return types[ext ?? ''] ?? 'application/octet-stream';
+}
 
 export { api };

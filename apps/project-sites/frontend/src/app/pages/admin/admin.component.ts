@@ -1,6 +1,7 @@
 import { Component, OnInit, OnDestroy, inject, signal, HostListener } from '@angular/core';
-import { Router, RouterModule } from '@angular/router';
+import { Router, RouterModule, NavigationEnd } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { Subscription, filter } from 'rxjs';
 import { ApiService, Site } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
@@ -22,6 +23,10 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   siteDropdownOpen = signal(false);
   sidebarCollapsed = signal(false);
+  isEditorRoute = signal(false);
+  editorSaving = signal(false);
+
+  private routerSub?: Subscription;
 
   // Deploy modal
   deployModalSiteId = signal<string | null>(null);
@@ -43,6 +48,11 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.isEditorRoute.set(this.router.url.includes('/admin/editor'));
+    this.routerSub = this.router.events
+      .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
+      .subscribe(e => this.isEditorRoute.set(e.urlAfterRedirects.includes('/admin/editor')));
+
     if (!this.auth.isLoggedIn()) {
       this.state.loading.set(false);
       return;
@@ -52,7 +62,27 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.routerSub?.unsubscribe();
     this.state.stopPolling();
+  }
+
+  // ── Editor save ─────────────────────────────────────
+
+  saveEditor(): void {
+    const iframe = document.querySelector('.editor-iframe') as HTMLIFrameElement;
+    if (!iframe?.contentWindow) {
+      this.toast.error('Editor not ready');
+      return;
+    }
+    this.editorSaving.set(true);
+    iframe.contentWindow.postMessage({
+      type: 'PS_REQUEST_FILES',
+      includeChat: true,
+      correlationId: crypto.randomUUID(),
+    }, '*');
+    this.toast.info('Saving files from editor...');
+    // Reset saving state after a timeout (actual save is handled by editor component's message listener)
+    setTimeout(() => this.editorSaving.set(false), 10000);
   }
 
   // ── Sidebar ─────────────────────────────────────────
