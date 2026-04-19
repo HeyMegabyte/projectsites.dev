@@ -819,6 +819,19 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           // Collect all unique images across the site
           const allImages = [...new Set(pages.flatMap(p => p.images))];
 
+          // Build image profiles with page context (up to 30 for prompt budget)
+          const imageProfiles = allImages.slice(0, 30).map(imgUrl => {
+            // Find which page this image appeared on and what text was near it
+            const sourcePage = pages.find(p => p.images.includes(imgUrl));
+            return {
+              url: imgUrl,
+              source_page: sourcePage?.url || '',
+              source_title: sourcePage?.title || '',
+              // Get text context: headings and paragraphs from the section where the image appeared
+              context: sourcePage ? sourcePage.headings.slice(0, 3).join(', ') + '. ' + sourcePage.paragraphs.slice(0, 2).join(' ').slice(0, 200) : '',
+            };
+          });
+
           // Build comprehensive scraped content
           const scraped = {
             site_url: siteUrl,
@@ -835,6 +848,7 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
               content: p.paragraphs.join('\n'),
             })),
             all_images: allImages.slice(0, 500), // Up to 500 images across the site
+            image_profiles: imageProfiles, // Images with page context for correct placement
             all_text: pages.flatMap(p => p.paragraphs).join('\n\n'),
             ogImage: homepage.paragraphs.length > 0 ? '' : '', // Will be set from meta
           };
@@ -935,11 +949,11 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
                     messages: [{
                       role: 'user',
                       content: [
-                        { type: 'text', text: 'Extract the brand colors from this website screenshot. Identify the dominant colors used in the logo, headers, buttons, accents, and background. Return ONLY valid JSON: {"primary":"#hex","secondary":"#hex","accent":"#hex","background":"#hex","text":"#hex"}' },
+                        { type: 'text', text: 'Extract the brand colors and design spirit from this website screenshot. Identify the dominant colors used in the logo, headers, buttons, accents, and background. Also describe the overall visual feel/design spirit in one sentence (e.g. "warm and earthy with rustic textures" or "sleek corporate with bold geometric accents"). Return ONLY valid JSON: {"primary":"#hex","secondary":"#hex","accent":"#hex","background":"#hex","text":"#hex","design_spirit":"one sentence description of the visual feel"}' },
                         { type: 'image_url', image_url: { url: imageUrl, detail: 'low' } },
                       ],
                     }],
-                    max_tokens: 200,
+                    max_tokens: 300,
                     temperature: 0.1,
                   }),
                 });
@@ -950,14 +964,19 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
                     try {
                       const extractedColors = JSON.parse(colorJson);
                       (scraped as any).extracted_brand_colors = extractedColors;
+                      // Store design spirit from AI vision analysis
+                      if (extractedColors.design_spirit) {
+                        (scraped as any).design_spirit = extractedColors.design_spirit;
+                      }
                       // Override research brand colors with visually extracted ones
                       if (extractedColors.primary) {
                         (brand as any).colors = { ...(brand as any).colors, ...extractedColors };
                       }
                       await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.brand_colors_extracted', {
                         colors: extractedColors,
+                        design_spirit: extractedColors.design_spirit || null,
                         source: 'ai_vision_screenshot',
-                        message: `Brand colors extracted: primary=${extractedColors.primary}, accent=${extractedColors.accent}`,
+                        message: `Brand colors extracted: primary=${extractedColors.primary}, accent=${extractedColors.accent}${extractedColors.design_spirit ? `, spirit: ${extractedColors.design_spirit}` : ''}`,
                         phase: 'research',
                       });
                     } catch { /* ignore parse errors */ }
@@ -1317,12 +1336,16 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
     let scrapedPages: { url: string; title: string; content: string }[] = [];
     let scrapedLogoUrl = '';
     let scrapedAllImages: string[] = [];
+    let scrapedImageProfiles: { url: string; source_page: string; source_title: string; context: string }[] = [];
+    let scrapedDesignSpirit = '';
     if (typeof scrapedContent === 'string' && scrapedContent.length > 0) {
       try {
         const parsed = JSON.parse(scrapedContent);
         scrapedPages = parsed.all_pages || [];
         scrapedLogoUrl = parsed.logo_r2_url || parsed.logo_url || '';
         scrapedAllImages = parsed.all_images || [];
+        scrapedImageProfiles = parsed.image_profiles || [];
+        scrapedDesignSpirit = parsed.design_spirit || '';
 
         // Build content note — include page structure + key content (cap at 30KB to avoid prompt overflow)
         const contentSections = scrapedPages.map((p: any) => {
@@ -1369,6 +1392,7 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           scrapedLogoUrl || logoUrl ? 'Use <img> tag with the logo URL. Do NOT create a generic SVG when a real logo exists.' : 'No logo found — create a professional inline SVG using brand colors.',
           'APP ICON: Create a favicon.svg that extracts the key graphic element from the logo (monogram or symbol). Also reference it as apple-touch-icon.',
           `Brand personality: ${brand.brand_personality || 'professional, warm, approachable'}`,
+          scrapedDesignSpirit ? `Design spirit (from AI analysis of original site): ${scrapedDesignSpirit}` : '',
           '',
           '=== MULTI-PAGE ARCHITECTURE ===',
           'Create MULTIPLE HTML files with CLEAN URLs (use descriptive filenames):',
@@ -1429,7 +1453,9 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           'Augment with researched facts about affiliated organizations.',
           '',
           '=== IMAGES (unique per page, AI-selected) ===',
-          scrapedAllImages.length > 0 ? `Images scraped from original website (USE THESE FIRST):\n${scrapedAllImages.slice(0, 40).join('\n')}` : '',
+          scrapedImageProfiles.length > 0
+            ? `Images from original site (with context for correct placement):\n${scrapedImageProfiles.map((img, i) => `${i + 1}. ${img.url} — From page "${img.source_title || img.source_page}", context: "${img.context}"`).join('\n')}`
+            : scrapedAllImages.length > 0 ? `Images scraped from original website (USE THESE FIRST):\n${scrapedAllImages.slice(0, 40).join('\n')}` : '',
           allAssets.length > 0 ? `Additional discovered/generated assets:\n${allAssets.slice(0, 20).join('\n')}` : '',
           '- NEVER reuse the same image on multiple pages',
           '- USE original business photos from the scraped site first',
@@ -1551,6 +1577,141 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
             "INSERT OR IGNORE INTO site_snapshots (id, site_id, snapshot_name, build_version, description) VALUES (?, ?, 'initial', ?, 'First published version')",
           ).bind(crypto.randomUUID(), params.siteId, version).run();
           return version;
+        });
+        // ── VISUAL INSPECTION (non-blocking) ──────────────────
+        await step.do('visual-inspection', RETRY_3, async () => {
+          try {
+            // 1. Take a screenshot of the published site via microlink.io
+            const screenshotUrl = `https://api.microlink.io/?url=https://${params.slug}.projectsites.dev&screenshot=true&meta=false&embed=screenshot.url`;
+            const ssRes = await fetch(screenshotUrl, {
+              headers: { 'User-Agent': 'ProjectSites/1.0' },
+            });
+
+            if (!ssRes.ok) {
+              await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.visual_inspection_skipped', {
+                step: 'visual-inspection',
+                reason: 'screenshot_failed',
+                status: ssRes.status,
+                message: `Visual inspection skipped: screenshot API returned ${ssRes.status}`,
+              });
+              return JSON.stringify({ skipped: true, reason: 'screenshot_failed' });
+            }
+
+            const ssData = await ssRes.json() as { data?: { screenshot?: { url?: string } } };
+            const imageUrl = ssData.data?.screenshot?.url;
+
+            if (!imageUrl) {
+              await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.visual_inspection_skipped', {
+                step: 'visual-inspection',
+                reason: 'no_screenshot_url',
+                message: 'Visual inspection skipped: no screenshot URL in response',
+              });
+              return JSON.stringify({ skipped: true, reason: 'no_screenshot_url' });
+            }
+
+            // 2. Send screenshot to GPT-4o vision for web design critique
+            if (!env.OPENAI_API_KEY) {
+              await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.visual_inspection_skipped', {
+                step: 'visual-inspection',
+                reason: 'no_openai_key',
+                message: 'Visual inspection skipped: OPENAI_API_KEY not configured',
+              });
+              return JSON.stringify({ skipped: true, reason: 'no_openai_key' });
+            }
+
+            const critiqueRes = await fetch('https://api.openai.com/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${env.OPENAI_API_KEY}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: 'gpt-4o',
+                messages: [{
+                  role: 'user',
+                  content: [
+                    {
+                      type: 'text',
+                      text: 'You are a senior web designer reviewing this website screenshot. Provide a concise critique:\n1. Overall visual quality (1-10)\n2. Color consistency with brand\n3. Typography quality\n4. Image placement and relevance\n5. Mobile-readiness assessment\n6. Top 3 specific issues to fix\n7. Is the logo visible and properly placed?\nReturn JSON: { score: number, issues: string[], logo_visible: boolean, brand_colors_correct: boolean }',
+                    },
+                    {
+                      type: 'image_url',
+                      image_url: { url: imageUrl, detail: 'high' },
+                    },
+                  ],
+                }],
+                max_tokens: 500,
+                temperature: 0.2,
+              }),
+            });
+
+            if (!critiqueRes.ok) {
+              const errText = await critiqueRes.text().catch(() => 'unknown');
+              await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.visual_inspection_failed', {
+                step: 'visual-inspection',
+                reason: 'gpt4o_api_error',
+                status: critiqueRes.status,
+                error: errText.substring(0, 500),
+                message: `Visual inspection GPT-4o call failed: ${critiqueRes.status}`,
+              });
+              return JSON.stringify({ skipped: true, reason: 'gpt4o_api_error', status: critiqueRes.status });
+            }
+
+            const critiqueData = await critiqueRes.json() as {
+              choices?: { message?: { content?: string } }[];
+            };
+            const rawContent = critiqueData.choices?.[0]?.message?.content ?? '';
+            const cleanedContent = rawContent.replace(/```json\n?/g, '').replace(/```/g, '').trim();
+
+            let critique: { score?: number; issues?: string[]; logo_visible?: boolean; brand_colors_correct?: boolean } = {};
+            try {
+              critique = JSON.parse(cleanedContent);
+            } catch {
+              // GPT-4o returned non-JSON — log the raw content
+              await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.visual_inspection_complete', {
+                step: 'visual-inspection',
+                raw_critique: cleanedContent.substring(0, 1000),
+                parse_error: true,
+                message: 'Visual inspection complete but critique was not valid JSON',
+              });
+              return JSON.stringify({ raw_critique: cleanedContent.substring(0, 1000), parse_error: true });
+            }
+
+            // 3. Log the critique to D1 via workflowLog
+            const score = typeof critique.score === 'number' ? critique.score : 0;
+            const issues = Array.isArray(critique.issues) ? critique.issues : [];
+            const hasCriticalIssues = !critique.logo_visible || !critique.brand_colors_correct;
+
+            await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.visual_inspection_complete', {
+              step: 'visual-inspection',
+              score,
+              issues,
+              logo_visible: critique.logo_visible ?? null,
+              brand_colors_correct: critique.brand_colors_correct ?? null,
+              has_critical_issues: hasCriticalIssues,
+              needs_improvement: score < 7 || hasCriticalIssues,
+              screenshot_url: imageUrl,
+              message: `Visual inspection: score=${score}/10, ${issues.length} issues, logo=${critique.logo_visible ? 'visible' : 'missing'}, colors=${critique.brand_colors_correct ? 'correct' : 'incorrect'}`,
+            });
+
+            // 4. Return critique for future improvement
+            return JSON.stringify({
+              score,
+              issues,
+              logo_visible: critique.logo_visible ?? null,
+              brand_colors_correct: critique.brand_colors_correct ?? null,
+              needs_improvement: score < 7 || hasCriticalIssues,
+            });
+          } catch (inspectionErr) {
+            // Non-blocking: log the failure but don't fail the workflow
+            const errMsg = inspectionErr instanceof Error ? inspectionErr.message : String(inspectionErr);
+            await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.visual_inspection_failed', {
+              step: 'visual-inspection',
+              error: errMsg,
+              message: 'Visual inspection failed (non-blocking): ' + errMsg,
+            });
+            return JSON.stringify({ skipped: true, reason: 'exception', error: errMsg });
+          }
         });
       } else {
         await updateSiteStatus(env.DB, params.siteId, 'error');

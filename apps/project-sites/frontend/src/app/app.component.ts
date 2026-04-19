@@ -1,5 +1,6 @@
-import { Component, OnInit, inject } from '@angular/core';
-import { RouterOutlet, Router, ActivatedRoute } from '@angular/router';
+import { Component, OnInit, inject, signal } from '@angular/core';
+import { RouterOutlet, Router, ActivatedRoute, NavigationEnd } from '@angular/router';
+import { filter } from 'rxjs';
 import { HeaderComponent } from './components/header/header.component';
 import { ToastComponent } from './components/toast/toast.component';
 import { BgOrbsComponent } from './components/bg-orbs/bg-orbs.component';
@@ -12,10 +13,10 @@ import { MetaService } from './services/meta.service';
   standalone: true,
   imports: [RouterOutlet, HeaderComponent, ToastComponent, BgOrbsComponent],
   template: `
-    <app-header />
+    @if (showHeader()) { <app-header /> }
     <app-bg-orbs />
     <app-toast />
-    <main class="app">
+    <main class="app" [class.no-pad]="!showHeader()">
       <router-outlet />
     </main>
   `,
@@ -24,6 +25,9 @@ import { MetaService } from './services/meta.service';
       min-height: 100vh;
       padding-top: 64px;
       position: relative;
+    }
+    .app.no-pad {
+      padding-top: 0;
     }
   `],
 })
@@ -34,11 +38,32 @@ export class AppComponent implements OnInit {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
 
+  showHeader = signal(true);
+
   ngOnInit(): void {
     this.meta.init();
     this.handleAuthCallback();
     this.restoreSession();
+    this.trackRoute();
     this.initCursorFollower();
+  }
+
+  private isHeaderlessRoute(url: string): boolean {
+    const path = url.split('?')[0];
+    // Homepage has its own nav; admin/billing/editor have their own chrome
+    if (path === '/' || path === '') return true;
+    return ['/admin', '/billing', '/editor'].some(r => path.startsWith(r));
+  }
+
+  private trackRoute(): void {
+    // Set initial value
+    this.showHeader.set(!this.isHeaderlessRoute(this.router.url));
+    // Listen for route changes
+    this.router.events
+      .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
+      .subscribe(e => {
+        this.showHeader.set(!this.isHeaderlessRoute(e.urlAfterRedirects));
+      });
   }
 
   private initCursorFollower(): void {
