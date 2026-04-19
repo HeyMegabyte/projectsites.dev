@@ -125,8 +125,10 @@ app.all('*', async (c) => {
     hostname === `www.${DOMAINS.SITES_BASE}` ||
     hostname.startsWith('localhost')
   ) {
-    // Try to serve from R2 first (for production)
-    const marketingPath = `marketing${path === '/' ? '/index.html' : path}`;
+    // Root "/" serves the vanilla marketing homepage (homepage.html)
+    // Angular SPA handles /admin, /create, /billing, etc. via index.html
+    const isRoot = path === '/';
+    const marketingPath = isRoot ? 'marketing/homepage.html' : `marketing${path}`;
     let marketingAsset = await c.env.SITES_BUCKET.get(marketingPath);
 
     // Clean URL support: try .html extension for paths like /privacy → marketing/privacy.html
