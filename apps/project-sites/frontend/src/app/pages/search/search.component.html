@@ -1,18 +1,18 @@
-<section class="screen-search">
+<section class="px-6 text-center relative z-[9] flex flex-col items-center pt-[10vh] pb-8 min-h-0">
   <!-- Hero -->
-  <div class="hero-brand">
-    <h1>
+  <div class="mb-4 animate-fade-in-up">
+    <h1 class="text-[clamp(2.2rem,5.5vw,3.8rem)] font-[900] tracking-tight leading-[1.1] mb-3 text-white">
       Your Website,
       <span class="gradient-text">Handled.</span>
       Finally.
     </h1>
-    <p class="tagline">AI builds your business website in minutes. We handle hosting, updates, and everything else — for $50/mo.</p>
+    <p class="text-[clamp(1rem,2vw,1.25rem)] text-text-secondary font-normal max-w-[600px] mx-auto">AI builds your business website in minutes. We handle hosting, updates, and everything else — for $50/mo.</p>
   </div>
 
   <!-- Search bar -->
-  <div class="search-wrapper">
-    <div class="search-input-wrap">
-      <span class="search-icon">
+  <div class="relative z-[9999] w-full max-w-[640px] mt-8 animate-fade-in-up" style="animation-delay:0.15s">
+    <div class="relative flex items-center">
+      <span class="absolute left-[18px] top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none flex z-[3]">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
         </svg>
@@ -21,7 +21,7 @@
         #searchInput
         id="homepage-search"
         type="text"
-        class="search-input"
+        class="w-full py-[18px] px-5 pl-[52px] text-[1.1rem] font-sans bg-dark-surface border-2 border-white/[0.08] rounded-2xl text-light outline-none transition-all duration-300 relative z-[2] placeholder:text-gray-500 hover:border-primary/[0.15] focus:border-primary focus:shadow-[0_0_0_4px_rgba(0,229,255,0.12),0_0_40px_rgba(0,229,255,0.15)] focus:bg-[rgba(8,8,32,0.9)]"
         placeholder="Search for your business..."
         [(ngModel)]="query"
         (input)="onSearchInput()"
@@ -35,35 +35,35 @@
 
     <!-- Dropdown -->
     @if (dropdownOpen() && results().length > 0) {
-      <div class="search-dropdown open">
+      <div class="absolute top-full -mt-3.5 left-0 right-0 bg-dark-card border border-primary/25 border-t-0 rounded-b-xl max-h-[400px] overflow-y-auto z-[1000] shadow-[0_8px_40px_rgba(0,0,0,0.6)] animate-fade-in-up">
         @for (item of results(); track item.name + item.address) {
           <div
-            class="search-result"
-            [class.search-result-custom]="item.type === 'custom'"
+            class="py-3.5 px-5 cursor-pointer transition-all duration-200 border-b border-white/[0.03] text-left flex items-start gap-3.5 first:pt-7 last:border-b-0 hover:bg-[#12123a] active:bg-primary/[0.06]"
+            [style.background]="item.type === 'custom' ? 'rgba(0,229,255,0.04)' : ''"
             (mousedown)="selectItem(item)"
           >
-            <div class="search-result-icon">
+            <div class="flex-shrink-0 w-[38px] h-[38px] rounded-[10px] bg-primary/[0.1] flex items-center justify-center mt-0.5 transition-all duration-200">
               @if (item.type === 'custom') {
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg class="w-[18px] h-[18px] text-secondary" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M12 5v14M5 12h14" />
                 </svg>
               } @else {
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg class="w-[18px] h-[18px] text-primary" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
                 </svg>
               }
             </div>
-            <div class="search-result-text">
-              <div class="search-result-name">
+            <div class="flex-1 min-w-0">
+              <div class="font-semibold text-[0.95rem] text-light truncate">
                 {{ item.name }}
                 @if (item.type === 'prebuilt') {
-                  <span class="prebuilt-badge">PRE-BUILT</span>
+                  <span class="inline-block py-px px-1.5 text-[0.6rem] font-bold bg-green-500/[0.15] text-green-500 rounded ml-2 align-middle">PRE-BUILT</span>
                 }
               </div>
-              <div class="search-result-address">
+              <div class="text-[0.82rem] text-gray-500 italic mt-0.5 truncate">
                 {{ item.address }}
                 @if (item.distance) {
-                  <span class="distance-badge">{{ item.distance }}</span>
+                  <span class="ml-2 text-[0.75rem] text-text-secondary not-italic">{{ item.distance }}</span>
                 }
               </div>
             </div>
@@ -73,140 +73,141 @@
     }
   </div>
 
-  <p class="search-hint">Search for your business to generate a free preview — no account or credit card required.</p>
+  <p class="mt-5 text-[0.85rem] text-gray-500 max-w-[540px] animate-fade-in-up" style="animation-delay:0.3s">Search for your business to generate a free preview — no account or credit card required.</p>
 
-  <div class="hero-actions">
-    <button class="btn btn-accent btn-large" (click)="startBuildFlow()">Build Your Free Website</button>
-    <button class="btn btn-ghost" (click)="scrollToHow()">How it works <span class="arrow-down">↓</span></button>
+  <div class="flex gap-4 mt-7 flex-wrap justify-center animate-fade-in-up" style="animation-delay:0.4s">
+    <button class="bg-primary text-dark font-semibold rounded-xl px-8 py-4 text-[1.05rem] hover:brightness-110 hover:shadow-[0_0_24px_rgba(0,229,255,0.4)] hover:-translate-y-0.5 transition-all duration-300" (click)="startBuildFlow()">Build Your Free Website</button>
+    <button class="bg-primary/[0.03] border border-primary/[0.15] text-text-secondary rounded-xl px-6 py-3 text-[0.95rem] font-semibold cursor-pointer transition-all duration-300 hover:border-primary hover:text-primary" (click)="scrollToHow()">How it works <span class="inline-block transition-transform duration-300 group-hover:translate-y-[3px]">↓</span></button>
   </div>
-  <p class="hero-micro">Free preview includes a full AI-generated site. Pay only when you're ready to go live.</p>
+  <p class="mt-4 text-[0.8rem] text-gray-500 animate-fade-in-up" style="animation-delay:0.5s">Free preview includes a full AI-generated site. Pay only when you're ready to go live.</p>
 </section>
 
 <!-- ═══════════════════════════════════════════ -->
 <!-- How It Works -->
 <!-- ═══════════════════════════════════════════ -->
-<section id="how-it-works" class="marketing-section">
-  <h2 class="section-title">How It Works</h2>
-  <p class="section-subtitle">Three steps. Five minutes. Zero technical skills. <strong>No account needed until you're ready to go live.</strong></p>
+<section id="how-it-works" class="py-20 px-6 max-w-[1000px] mx-auto relative z-[1]">
+  <h2 class="text-[clamp(1.6rem,3.5vw,2.4rem)] font-[800] tracking-tight mb-3 text-center text-white">How It Works</h2>
+  <p class="text-[clamp(0.95rem,1.5vw,1.1rem)] text-text-secondary text-center max-w-[640px] mx-auto mb-12 leading-relaxed">Three steps. Five minutes. Zero technical skills. <strong class="text-light">No account needed until you're ready to go live.</strong></p>
 
-  <div class="steps-row">
-    <div class="step-card">
-      <div class="step-number">1</div>
-      <h3>Search & Preview Free</h3>
-      <p>Type your business name above. Our AI pulls data from Google, social profiles, and public listings — then builds a full preview site in minutes. <strong>No sign-up. No credit card.</strong></p>
+  <div class="grid grid-cols-3 gap-6 max-md:grid-cols-1 max-md:gap-5">
+    <div class="bg-dark-card border border-white/[0.08] rounded-2xl p-8 text-center transition-all duration-300 hover:-translate-y-1 hover:border-primary/25 hover:shadow-[0_8px_32px_rgba(0,229,255,0.06)]">
+      <div class="w-11 h-11 rounded-full bg-gradient-to-br from-primary to-cyan-700 text-dark font-[800] text-xl flex items-center justify-center mx-auto mb-4 shadow-[0_0_20px_rgba(0,229,255,0.2)]">1</div>
+      <h3 class="text-[1.1rem] font-bold text-white mb-2.5">Search & Preview Free</h3>
+      <p class="text-[0.9rem] text-text-secondary leading-relaxed">Type your business name above. Our AI pulls data from Google, social profiles, and public listings — then builds a full preview site in minutes. <strong class="text-light">No sign-up. No credit card.</strong></p>
     </div>
-    <div class="step-card">
-      <div class="step-number">2</div>
-      <h3>Review & Customize</h3>
-      <p>Get a mobile-first site with original copy, local SEO, and legal pages. Add details, upload photos, or hit "Improve with AI" to polish it. Your preview is live and shareable immediately.</p>
+    <div class="bg-dark-card border border-white/[0.08] rounded-2xl p-8 text-center transition-all duration-300 hover:-translate-y-1 hover:border-primary/25 hover:shadow-[0_8px_32px_rgba(0,229,255,0.06)]">
+      <div class="w-11 h-11 rounded-full bg-gradient-to-br from-primary to-cyan-700 text-dark font-[800] text-xl flex items-center justify-center mx-auto mb-4 shadow-[0_0_20px_rgba(0,229,255,0.2)]">2</div>
+      <h3 class="text-[1.1rem] font-bold text-white mb-2.5">Review & Customize</h3>
+      <p class="text-[0.9rem] text-text-secondary leading-relaxed">Get a mobile-first site with original copy, local SEO, and legal pages. Add details, upload photos, or hit "Improve with AI" to polish it. Your preview is live and shareable immediately.</p>
     </div>
-    <div class="step-card">
-      <div class="step-number">3</div>
-      <h3>Go Live on Your Domain</h3>
-      <p>Sign in and upgrade to connect your own domain (or buy one through us at cost). We handle hosting, SSL, performance, and ongoing updates. <strong>$50/mo — everything included.</strong></p>
+    <div class="bg-dark-card border border-white/[0.08] rounded-2xl p-8 text-center transition-all duration-300 hover:-translate-y-1 hover:border-primary/25 hover:shadow-[0_8px_32px_rgba(0,229,255,0.06)]">
+      <div class="w-11 h-11 rounded-full bg-gradient-to-br from-primary to-cyan-700 text-dark font-[800] text-xl flex items-center justify-center mx-auto mb-4 shadow-[0_0_20px_rgba(0,229,255,0.2)]">3</div>
+      <h3 class="text-[1.1rem] font-bold text-white mb-2.5">Go Live on Your Domain</h3>
+      <p class="text-[0.9rem] text-text-secondary leading-relaxed">Sign in and upgrade to connect your own domain (or buy one through us at cost). We handle hosting, SSL, performance, and ongoing updates. <strong class="text-light">$50/mo — everything included.</strong></p>
     </div>
   </div>
 
-  <div class="roi-callout">
-    <p>Most small businesses spend $2,000–$5,000 on a website that takes weeks. With Project Sites, yours is live in five minutes for $50/mo — with unlimited changes included.</p>
-    <button class="btn btn-accent" (click)="startBuildFlow()">See My Free Preview</button>
+  <div class="text-center mt-9 flex flex-col gap-3 items-center">
+    <p class="text-gray-500 text-[0.85rem] max-w-[540px] leading-relaxed">Most small businesses spend $2,000–$5,000 on a website that takes weeks. With Project Sites, yours is live in five minutes for $50/mo — with unlimited changes included.</p>
+    <button class="bg-primary text-dark font-semibold rounded-xl px-6 py-3 hover:brightness-110 hover:shadow-[0_0_24px_rgba(0,229,255,0.4)] hover:-translate-y-0.5 transition-all duration-300" (click)="startBuildFlow()">See My Free Preview</button>
   </div>
 </section>
 
 <!-- ═══════════════════════════════════════════ -->
 <!-- What "Handled" Actually Means -->
 <!-- ═══════════════════════════════════════════ -->
-<section id="handled" class="marketing-section">
-  <h2 class="section-title">What "Handled" Actually Means</h2>
-  <p class="section-subtitle">Everything you need to run a professional web presence — without lifting a finger.</p>
+<section id="handled" class="py-20 px-6 max-w-[1000px] mx-auto relative z-[1]">
+  <h2 class="text-[clamp(1.6rem,3.5vw,2.4rem)] font-[800] tracking-tight mb-3 text-center text-white">What "Handled" Actually Means</h2>
+  <p class="text-[clamp(0.95rem,1.5vw,1.1rem)] text-text-secondary text-center max-w-[640px] mx-auto mb-12 leading-relaxed">Everything you need to run a professional web presence — without lifting a finger.</p>
 
-  <div class="handled-grid">
-    <div class="handled-card">
-      <div class="handled-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <div class="grid grid-cols-3 gap-6 max-md:grid-cols-1">
+    <div class="bg-dark-card border border-white/[0.08] rounded-2xl p-8 transition-all duration-300 hover:-translate-y-1 hover:border-primary/25 hover:shadow-[0_8px_32px_rgba(0,229,255,0.06)]">
+      <div class="mb-4">
+        <svg class="w-8 h-8 text-primary drop-shadow-[0_0_6px_rgba(0,229,255,0.2)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
         </svg>
       </div>
-      <h3>Unlimited AI Edits</h3>
-      <p>Change hours, add services, swap photos, rewrite copy — anytime. Use the built-in <a href="https://editor.projectsites.dev" target="_blank" rel="noopener noreferrer">Project Sites Editor →</a> or just tell us what you want. Changes go live instantly.</p>
+      <h3 class="text-[1.05rem] font-bold text-white mb-2.5">Unlimited AI Edits</h3>
+      <p class="text-[0.88rem] text-text-secondary leading-relaxed">Change hours, add services, swap photos, rewrite copy — anytime. Use the built-in <a class="text-primary font-semibold hover:text-cyan-300 transition-colors" href="https://editor.projectsites.dev" target="_blank" rel="noopener noreferrer">Project Sites Editor →</a> or just tell us what you want. Changes go live instantly.</p>
     </div>
-    <div class="handled-card">
-      <div class="handled-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <div class="bg-dark-card border border-white/[0.08] rounded-2xl p-8 transition-all duration-300 hover:-translate-y-1 hover:border-primary/25 hover:shadow-[0_8px_32px_rgba(0,229,255,0.06)]">
+      <div class="mb-4">
+        <svg class="w-8 h-8 text-primary drop-shadow-[0_0_6px_rgba(0,229,255,0.2)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
         </svg>
       </div>
-      <h3>Hosting, SSL & Security</h3>
-      <p>Cloudflare edge hosting, automatic SSL, DDoS protection, and 99.9% uptime. Your site loads in under 1 second from 300+ global locations. No server bills, no config.</p>
+      <h3 class="text-[1.05rem] font-bold text-white mb-2.5">Hosting, SSL & Security</h3>
+      <p class="text-[0.88rem] text-text-secondary leading-relaxed">Cloudflare edge hosting, automatic SSL, DDoS protection, and 99.9% uptime. Your site loads in under 1 second from 300+ global locations. No server bills, no config.</p>
     </div>
-    <div class="handled-card">
-      <div class="handled-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <div class="bg-dark-card border border-white/[0.08] rounded-2xl p-8 transition-all duration-300 hover:-translate-y-1 hover:border-primary/25 hover:shadow-[0_8px_32px_rgba(0,229,255,0.06)]">
+      <div class="mb-4">
+        <svg class="w-8 h-8 text-primary drop-shadow-[0_0_6px_rgba(0,229,255,0.2)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
         </svg>
       </div>
-      <h3>SEO & Local Search</h3>
-      <p>Schema markup, meta tags, sitemaps, and performance tuning — baked in from day one. Built on 15+ years of engineering experience so your business ranks where customers are searching.</p>
+      <h3 class="text-[1.05rem] font-bold text-white mb-2.5">SEO & Local Search</h3>
+      <p class="text-[0.88rem] text-text-secondary leading-relaxed">Schema markup, meta tags, sitemaps, and performance tuning — baked in from day one. Built on 15+ years of engineering experience so your business ranks where customers are searching.</p>
     </div>
   </div>
 
-  <div class="included-strip">
-    <div class="included-strip-label">Included in every paid plan</div>
-    <div class="included-items">
-      <div class="included-item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-        <div class="included-text">
-          <strong>Custom domain</strong>
-          <span>Bring your own, or buy through us at registrar cost</span>
+  <!-- Included strip -->
+  <div class="mt-12">
+    <div class="text-center text-[0.72rem] font-bold uppercase tracking-[0.12em] text-primary mb-6">Included in every paid plan</div>
+    <div class="grid grid-cols-4 gap-3 max-lg:grid-cols-2 max-sm:grid-cols-1">
+      <div class="flex items-start gap-3 p-4 rounded-xl bg-primary/[0.04] border border-primary/[0.06] transition-all duration-300 hover:border-primary/[0.18] hover:-translate-y-0.5">
+        <svg class="w-5 h-5 text-primary flex-shrink-0 mt-px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        <div class="flex flex-col gap-0.5">
+          <strong class="text-[0.82rem] font-bold text-light leading-tight">Custom domain</strong>
+          <span class="text-[0.72rem] text-gray-500 leading-snug">Bring your own, or buy through us at registrar cost</span>
         </div>
       </div>
-      <div class="included-item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
-        <div class="included-text">
-          <strong>Unlimited changes</strong>
-          <span>Request updates anytime — we handle the work</span>
+      <div class="flex items-start gap-3 p-4 rounded-xl bg-primary/[0.04] border border-primary/[0.06] transition-all duration-300 hover:border-primary/[0.18] hover:-translate-y-0.5">
+        <svg class="w-5 h-5 text-primary flex-shrink-0 mt-px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+        <div class="flex flex-col gap-0.5">
+          <strong class="text-[0.82rem] font-bold text-light leading-tight">Unlimited changes</strong>
+          <span class="text-[0.72rem] text-gray-500 leading-snug">Request updates anytime — we handle the work</span>
         </div>
       </div>
-      <div class="included-item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-        <div class="included-text">
-          <strong>AI content editor</strong>
-          <span>Edit copy, images, and layout with AI assistance</span>
+      <div class="flex items-start gap-3 p-4 rounded-xl bg-primary/[0.04] border border-primary/[0.06] transition-all duration-300 hover:border-primary/[0.18] hover:-translate-y-0.5">
+        <svg class="w-5 h-5 text-primary flex-shrink-0 mt-px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        <div class="flex flex-col gap-0.5">
+          <strong class="text-[0.82rem] font-bold text-light leading-tight">AI content editor</strong>
+          <span class="text-[0.72rem] text-gray-500 leading-snug">Edit copy, images, and layout with AI assistance</span>
         </div>
       </div>
-      <div class="included-item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
-        <div class="included-text">
-          <strong>Mobile-responsive</strong>
-          <span>Looks great on every screen, every device</span>
+      <div class="flex items-start gap-3 p-4 rounded-xl bg-primary/[0.04] border border-primary/[0.06] transition-all duration-300 hover:border-primary/[0.18] hover:-translate-y-0.5">
+        <svg class="w-5 h-5 text-primary flex-shrink-0 mt-px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>
+        <div class="flex flex-col gap-0.5">
+          <strong class="text-[0.82rem] font-bold text-light leading-tight">Mobile-responsive</strong>
+          <span class="text-[0.72rem] text-gray-500 leading-snug">Looks great on every screen, every device</span>
         </div>
       </div>
-      <div class="included-item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-        <div class="included-text">
-          <strong>Legal pages</strong>
-          <span>Privacy policy & terms of service auto-generated</span>
+      <div class="flex items-start gap-3 p-4 rounded-xl bg-primary/[0.04] border border-primary/[0.06] transition-all duration-300 hover:border-primary/[0.18] hover:-translate-y-0.5">
+        <svg class="w-5 h-5 text-primary flex-shrink-0 mt-px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        <div class="flex flex-col gap-0.5">
+          <strong class="text-[0.82rem] font-bold text-light leading-tight">Legal pages</strong>
+          <span class="text-[0.72rem] text-gray-500 leading-snug">Privacy policy & terms of service auto-generated</span>
         </div>
       </div>
-      <div class="included-item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
-        <div class="included-text">
-          <strong>Analytics dashboard</strong>
-          <span>Track visitors, views, and engagement</span>
+      <div class="flex items-start gap-3 p-4 rounded-xl bg-primary/[0.04] border border-primary/[0.06] transition-all duration-300 hover:border-primary/[0.18] hover:-translate-y-0.5">
+        <svg class="w-5 h-5 text-primary flex-shrink-0 mt-px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+        <div class="flex flex-col gap-0.5">
+          <strong class="text-[0.82rem] font-bold text-light leading-tight">Analytics dashboard</strong>
+          <span class="text-[0.72rem] text-gray-500 leading-snug">Track visitors, views, and engagement</span>
         </div>
       </div>
-      <div class="included-item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        <div class="included-text">
-          <strong>Priority support</strong>
-          <span>Real humans, fast responses</span>
+      <div class="flex items-start gap-3 p-4 rounded-xl bg-primary/[0.04] border border-primary/[0.06] transition-all duration-300 hover:border-primary/[0.18] hover:-translate-y-0.5">
+        <svg class="w-5 h-5 text-primary flex-shrink-0 mt-px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <div class="flex flex-col gap-0.5">
+          <strong class="text-[0.82rem] font-bold text-light leading-tight">Priority support</strong>
+          <span class="text-[0.72rem] text-gray-500 leading-snug">Real humans, fast responses</span>
         </div>
       </div>
-      <div class="included-item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-        <div class="included-text">
-          <strong>No contracts</strong>
-          <span>Cancel anytime, no questions asked</span>
+      <div class="flex items-start gap-3 p-4 rounded-xl bg-primary/[0.04] border border-primary/[0.06] transition-all duration-300 hover:border-primary/[0.18] hover:-translate-y-0.5">
+        <svg class="w-5 h-5 text-primary flex-shrink-0 mt-px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        <div class="flex flex-col gap-0.5">
+          <strong class="text-[0.82rem] font-bold text-light leading-tight">No contracts</strong>
+          <span class="text-[0.72rem] text-gray-500 leading-snug">Cancel anytime, no questions asked</span>
         </div>
       </div>
     </div>
@@ -216,22 +217,22 @@
 <!-- ═══════════════════════════════════════════ -->
 <!-- Trust Signals -->
 <!-- ═══════════════════════════════════════════ -->
-<section id="trust" class="marketing-section trust-section">
-  <div class="trust-bar">
-    <div class="trust-item">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+<section id="trust" class="py-10 px-6 max-w-[1000px] mx-auto relative z-[1]">
+  <div class="flex justify-center flex-wrap gap-8">
+    <div class="flex items-center gap-2 text-text-secondary text-[0.88rem] font-medium">
+      <svg class="text-primary flex-shrink-0" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
       <span>SSL & DDoS Protection</span>
     </div>
-    <div class="trust-item">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+    <div class="flex items-center gap-2 text-text-secondary text-[0.88rem] font-medium">
+      <svg class="text-primary flex-shrink-0" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
       <span>99.9% Uptime Guarantee</span>
     </div>
-    <div class="trust-item">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+    <div class="flex items-center gap-2 text-text-secondary text-[0.88rem] font-medium">
+      <svg class="text-primary flex-shrink-0" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
       <span>No Contracts, Cancel Anytime</span>
     </div>
-    <div class="trust-item">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    <div class="flex items-center gap-2 text-text-secondary text-[0.88rem] font-medium">
+      <svg class="text-primary flex-shrink-0" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
       <span>Priority Support Included</span>
     </div>
   </div>
@@ -240,67 +241,31 @@
 <!-- ═══════════════════════════════════════════ -->
 <!-- Done-for-You vs DIY -->
 <!-- ═══════════════════════════════════════════ -->
-<section id="dvd" class="marketing-section">
-  <h2 class="section-title">Done-for-You vs. DIY</h2>
-  <p class="section-subtitle">Other platforms give you tools. We give you a finished website — and keep it running.</p>
+<section id="dvd" class="py-20 px-6 max-w-[1000px] mx-auto relative z-[1]">
+  <h2 class="text-[clamp(1.6rem,3.5vw,2.4rem)] font-[800] tracking-tight mb-3 text-center text-white">Done-for-You vs. DIY</h2>
+  <p class="text-[clamp(0.95rem,1.5vw,1.1rem)] text-text-secondary text-center max-w-[640px] mx-auto mb-12 leading-relaxed">Other platforms give you tools. We give you a finished website — and keep it running.</p>
 
-  <div class="dvd-grid">
-    <div class="dvd-column dvd-highlight">
-      <div class="dvd-header">Project Sites (Done-for-You)</div>
-      <ul class="dvd-list">
-        <li>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-          AI writes your content from real business data
-        </li>
-        <li>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-          Site designed and launched in minutes
-        </li>
-        <li>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-          Unlimited change requests — we do the work
-        </li>
-        <li>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-          Hosting, SSL, domain, SEO — all included
-        </li>
-        <li>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-          Ongoing maintenance handled for you
-        </li>
-        <li>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-          No technical skills required — ever
-        </li>
+  <div class="grid grid-cols-2 gap-6 max-md:grid-cols-1">
+    <div class="rounded-2xl p-8 bg-gradient-to-br from-primary/[0.06] to-primary/[0.02] border border-primary/[0.15]">
+      <div class="font-bold text-base text-primary mb-5 pb-3 border-b border-primary/[0.1]">Project Sites (Done-for-You)</div>
+      <ul class="list-none p-0 m-0 flex flex-col gap-3.5">
+        @for (item of ['AI writes your content from real business data', 'Site designed and launched in minutes', 'Unlimited change requests — we do the work', 'Hosting, SSL, domain, SEO — all included', 'Ongoing maintenance handled for you', 'No technical skills required — ever']; track $index) {
+          <li class="flex items-start gap-3 text-[0.9rem] text-text-secondary leading-normal">
+            <svg class="w-5 h-5 text-green-500 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            {{ item }}
+          </li>
+        }
       </ul>
     </div>
-    <div class="dvd-column dvd-other">
-      <div class="dvd-header">DIY Builders (Squarespace, Wix, etc.)</div>
-      <ul class="dvd-list">
-        <li>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          You write all content yourself
-        </li>
-        <li>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          Hours to days learning the builder
-        </li>
-        <li>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          Every update is your responsibility
-        </li>
-        <li>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          Domain, SEO plugins cost extra
-        </li>
-        <li>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          You manage security and performance
-        </li>
-        <li>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          Requires learning a page builder
-        </li>
+    <div class="rounded-2xl p-8 bg-dark-card border border-white/[0.08]">
+      <div class="font-bold text-base text-gray-500 mb-5 pb-3 border-b border-white/[0.08]">DIY Builders (Squarespace, Wix, etc.)</div>
+      <ul class="list-none p-0 m-0 flex flex-col gap-3.5">
+        @for (item of ['You write all content yourself', 'Hours to days learning the builder', 'Every update is your responsibility', 'Domain, SEO plugins cost extra', 'You manage security and performance', 'Requires learning a page builder']; track $index) {
+          <li class="flex items-start gap-3 text-[0.9rem] text-text-secondary leading-normal">
+            <svg class="w-5 h-5 text-red-500 flex-shrink-0 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            {{ item }}
+          </li>
+        }
       </ul>
     </div>
   </div>
@@ -309,11 +274,11 @@
 <!-- ═══════════════════════════════════════════ -->
 <!-- FAQ -->
 <!-- ═══════════════════════════════════════════ -->
-<section id="faq" class="marketing-section">
-  <h2 class="section-title">Frequently Asked Questions</h2>
-  <p class="section-subtitle">Everything you need to know before getting started.</p>
+<section id="faq" class="py-20 px-6 max-w-[1000px] mx-auto relative z-[1]">
+  <h2 class="text-[clamp(1.6rem,3.5vw,2.4rem)] font-[800] tracking-tight mb-3 text-center text-white">Frequently Asked Questions</h2>
+  <p class="text-[clamp(0.95rem,1.5vw,1.1rem)] text-text-secondary text-center max-w-[640px] mx-auto mb-12 leading-relaxed">Everything you need to know before getting started.</p>
 
-  <div class="faq-list">
+  <div class="max-w-[700px] mx-auto flex flex-col gap-2">
     @for (faq of [
       { q: 'How does the AI build my website?', a: 'When you search for your business, we pull data from Google Places, public listings, and social profiles. Our AI then runs a multi-step pipeline: it researches your business profile, analyzes your brand identity and services, generates selling points, creates a fully designed website with responsive layouts, and produces legal pages (privacy policy & terms of service). The whole process takes just a few minutes and you can watch each step in real time.' },
       { q: 'How accurate is the AI-generated content?', a: 'Our AI researches your business using Google Places data, public listings, social media profiles, and any additional context you provide. It generates original content specific to your services, location, and industry. Every site goes through an 8-dimension quality scoring check. You can review and request changes before going live.' },
@@ -324,13 +289,13 @@
       { q: 'Do I own the website and content?', a: 'Yes. All content generated for your site belongs to you. If you cancel, you can export your site files. Your business data is never shared or sold. Sites are hosted on Cloudflare\'s global CDN for fast loading worldwide.' },
       { q: 'What happens if I cancel?', a: 'You can cancel anytime. Your site stays live through the end of your billing period. After that, it reverts to the free tier (subdomain hosting with a branding bar). We offer a 14-day money-back guarantee on your first payment.' }
     ]; track $index; let i = $index) {
-      <div class="faq-item" [class.open]="openFaqIndex() === i">
-        <button class="faq-question" (click)="toggleFaq(i)">
+      <div class="faq-item border border-primary/[0.1] rounded-xl overflow-hidden transition-colors hover:border-primary/25" [class.open]="openFaqIndex() === i">
+        <button class="w-full py-[18px] px-5 bg-transparent border-none text-light text-[0.95rem] font-semibold font-sans text-left cursor-pointer flex justify-between items-center gap-4 transition-colors hover:text-primary" (click)="toggleFaq(i)">
           {{ faq.q }}
-          <svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          <svg class="w-5 h-5 flex-shrink-0 text-text-secondary transition-transform duration-300" [class.rotate-180]="openFaqIndex() === i" [class.text-primary]="openFaqIndex() === i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
         <div class="faq-answer">
-          <div class="faq-answer-inner">{{ faq.a }}</div>
+          <div class="px-5 pb-5 text-[0.88rem] text-text-secondary leading-relaxed">{{ faq.a }}</div>
         </div>
       </div>
     }
@@ -340,89 +305,61 @@
 <!-- ═══════════════════════════════════════════ -->
 <!-- Pricing -->
 <!-- ═══════════════════════════════════════════ -->
-<section id="pricing" class="marketing-section">
-  <h2 class="section-title">Simple, Transparent Pricing</h2>
-  <p class="section-subtitle">Start free. Pay only when you're ready to go live.</p>
+<section id="pricing" class="py-20 px-6 max-w-[1000px] mx-auto relative z-[1]">
+  <h2 class="text-[clamp(1.6rem,3.5vw,2.4rem)] font-[800] tracking-tight mb-3 text-center text-white">Simple, Transparent Pricing</h2>
+  <p class="text-[clamp(0.95rem,1.5vw,1.1rem)] text-text-secondary text-center max-w-[640px] mx-auto mb-12 leading-relaxed">Start free. Pay only when you're ready to go live.</p>
 
-  <div class="pricing-toggle">
-    <span class="pricing-toggle-label" [class.active]="!annualPricing()">Monthly</span>
-    <div class="pricing-toggle-switch" [class.annual]="annualPricing()" (click)="togglePricing()">
-      <div class="pricing-toggle-knob"></div>
+  <div class="flex items-center justify-center gap-3.5 mb-10">
+    <span class="text-[0.9rem] font-medium transition-colors" [class.text-light]="!annualPricing()" [class.font-bold]="!annualPricing()" [class.text-gray-500]="annualPricing()">Monthly</span>
+    <div class="pricing-toggle-switch w-12 h-[26px] rounded-[13px] cursor-pointer relative transition-all" [class.annual]="annualPricing()" [style.background]="annualPricing() ? 'rgba(0,229,255,0.1)' : '#111128'" [style.border]="annualPricing() ? '2px solid #00E5FF' : '2px solid rgba(255,255,255,0.08)'" (click)="togglePricing()">
+      <div class="pricing-toggle-knob w-[18px] h-[18px] rounded-full absolute top-0.5 left-0.5 transition-all" [class.bg-primary]="annualPricing()" [class.bg-gray-500]="!annualPricing()"></div>
     </div>
-    <span class="pricing-toggle-label" [class.active]="annualPricing()">Annual <span class="pricing-save-badge">Save $120</span></span>
+    <span class="text-[0.9rem] font-medium transition-colors" [class.text-light]="annualPricing()" [class.font-bold]="annualPricing()" [class.text-gray-500]="!annualPricing()">Annual <span class="inline-block py-0.5 px-2 text-[0.7rem] font-bold bg-green-500/[0.15] text-green-500 rounded ml-1.5">Save $120</span></span>
   </div>
 
-  <div class="pricing-grid">
-    <div class="pricing-card pricing-card-free">
-      <div class="plan-label plan-label-free">Free Preview</div>
-      <div class="pricing-price">$0</div>
-      <p class="pricing-desc">See your AI-generated site before committing.</p>
-      <ul class="pricing-features">
-        <li>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-          Full AI-generated website preview
-        </li>
-        <li>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-          No account or credit card required
-        </li>
-        <li>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-          Hosted on free subdomain
-        </li>
-        <li>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-          Includes "Powered by Project Sites" banner
-        </li>
+  <div class="grid grid-cols-2 gap-6 max-w-[800px] mx-auto max-sm:grid-cols-1">
+    <div class="bg-dark-card border border-white/[0.08] rounded-2xl p-9 text-center transition-all hover:border-primary/25">
+      <div class="inline-block py-1 px-3.5 text-[0.75rem] font-bold uppercase tracking-wide rounded-full mb-4 bg-gradient-to-r from-primary to-cyan-700 text-dark">Free Preview</div>
+      <div class="text-5xl font-[900] text-white tracking-tight mb-2">$0</div>
+      <p class="text-[0.88rem] text-text-secondary mb-6">See your AI-generated site before committing.</p>
+      <ul class="list-none p-0 m-0 mb-7 text-left flex flex-col gap-3">
+        @for (feat of ['Full AI-generated website preview', 'No account or credit card required', 'Hosted on free subdomain', 'Includes "Powered by Project Sites" banner']; track $index) {
+          <li class="flex items-start gap-2.5 text-[0.88rem] text-text-secondary leading-normal">
+            <svg class="w-[18px] h-[18px] text-green-500 flex-shrink-0 mt-px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            {{ feat }}
+          </li>
+        }
       </ul>
-      <button class="btn btn-outline btn-large btn-full" (click)="startBuildFlow()">Generate Free Preview</button>
+      <button class="w-full border border-white/[0.08] bg-transparent text-text-secondary rounded-xl px-6 py-3.5 text-base font-semibold transition-all hover:border-primary hover:text-primary hover:bg-primary/[0.04]" (click)="startBuildFlow()">Generate Free Preview</button>
     </div>
 
-    <div class="pricing-card pricing-card-paid">
-      <div class="plan-label">All-Inclusive</div>
-      <div class="pricing-price">
+    <div class="bg-gradient-to-br from-primary/[0.06] to-primary/[0.02] border border-primary/[0.2] rounded-2xl p-9 text-center transition-all shadow-[0_0_40px_rgba(0,229,255,0.04)] hover:border-primary/35 hover:shadow-[0_0_60px_rgba(0,229,255,0.08)]">
+      <div class="inline-block py-1 px-3.5 text-[0.75rem] font-bold uppercase tracking-wide rounded-full mb-4 bg-primary/[0.1] text-primary">All-Inclusive</div>
+      <div class="text-5xl font-[900] text-white tracking-tight mb-2">
         @if (annualPricing()) {
-          $40<span>/mo</span>
+          $40<span class="text-base font-medium text-gray-500">/mo</span>
         } @else {
-          $50<span>/mo</span>
+          $50<span class="text-base font-medium text-gray-500">/mo</span>
         }
       </div>
-      <p class="pricing-desc">
+      <p class="text-[0.88rem] text-text-secondary mb-6">
         @if (annualPricing()) {
           $480/year — save $120 vs. monthly.
         } @else {
           Everything you need from a business website.
         }
       </p>
-      <ul class="pricing-features">
-        <li>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-          AI-generated content & design
-        </li>
-        <li>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-          Custom domain + SSL included
-        </li>
-        <li>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-          Mobile-first, SEO-optimized
-        </li>
-        <li>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-          Built-in analytics dashboard
-        </li>
-        <li>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-          Unlimited updates & maintenance
-        </li>
-        <li>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-          No branding — 100% your brand
-        </li>
+      <ul class="list-none p-0 m-0 mb-7 text-left flex flex-col gap-3">
+        @for (feat of ['AI-generated content & design', 'Custom domain + SSL included', 'Mobile-first, SEO-optimized', 'Built-in analytics dashboard', 'Unlimited updates & maintenance', 'No branding — 100% your brand']; track $index) {
+          <li class="flex items-start gap-2.5 text-[0.88rem] text-text-secondary leading-normal">
+            <svg class="w-[18px] h-[18px] text-green-500 flex-shrink-0 mt-px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            {{ feat }}
+          </li>
+        }
       </ul>
-      <button class="btn btn-accent btn-large btn-full" (click)="startBuildFlow()">Get Started</button>
-      <div class="pricing-guarantee">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <button class="w-full bg-primary text-dark font-semibold rounded-xl px-6 py-3.5 text-base hover:brightness-110 hover:shadow-[0_0_24px_rgba(0,229,255,0.4)] transition-all" (click)="startBuildFlow()">Get Started</button>
+      <div class="flex items-center justify-center gap-2 mt-4 text-[0.78rem] text-gray-500">
+        <svg class="w-4 h-4 text-primary flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
         14-day money-back guarantee — cancel anytime
       </div>
     </div>
@@ -432,37 +369,37 @@
 <!-- ═══════════════════════════════════════════ -->
 <!-- Contact Form -->
 <!-- ═══════════════════════════════════════════ -->
-<section id="contact-section" class="marketing-section">
-  <h2 class="section-title">Get in Touch</h2>
-  <p class="section-subtitle">Have a question, feedback, or need help? We'd love to hear from you.</p>
+<section id="contact-section" class="py-20 px-6 max-w-[1000px] mx-auto relative z-[1]">
+  <h2 class="text-[clamp(1.6rem,3.5vw,2.4rem)] font-[800] tracking-tight mb-3 text-center text-white">Get in Touch</h2>
+  <p class="text-[clamp(0.95rem,1.5vw,1.1rem)] text-text-secondary text-center max-w-[640px] mx-auto mb-12 leading-relaxed">Have a question, feedback, or need help? We'd love to hear from you.</p>
 
-  <div class="contact-form-wrap">
+  <div class="max-w-[600px] mx-auto">
     @if (contactSuccess()) {
-      <div class="contact-success">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-        <h3>Message sent!</h3>
-        <p>We'll get back to you shortly.</p>
-        <button class="btn btn-outline" (click)="contactSuccess.set(false)">Send another message</button>
+      <div class="text-center py-12 px-6">
+        <svg class="text-green-500 mb-4" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        <h3 class="text-white text-xl font-bold mb-2">Message sent!</h3>
+        <p class="text-text-secondary mb-6">We'll get back to you shortly.</p>
+        <button class="border border-white/[0.08] bg-transparent text-text-secondary rounded-xl px-6 py-3 font-semibold transition-all hover:border-primary hover:text-primary" (click)="contactSuccess.set(false)">Send another message</button>
       </div>
     } @else {
       <form (submit)="$event.preventDefault(); submitContact()" novalidate>
-        <div class="input-group">
-          <label for="contact-name">Name <span class="required">*</span></label>
-          <input type="text" id="contact-name" class="input-field" placeholder="Your full name" maxlength="200" [(ngModel)]="contactName" name="name" required />
+        <div class="mb-5 text-left">
+          <label class="block text-[0.85rem] font-semibold text-light mb-1.5" for="contact-name">Name <span class="text-primary">*</span></label>
+          <input type="text" id="contact-name" class="w-full py-3 px-4 text-[0.95rem] font-sans bg-dark-surface border border-white/[0.08] rounded-xl text-light outline-none transition-all placeholder:text-gray-500 hover:border-primary/[0.15] focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,229,255,0.12)]" placeholder="Your full name" maxlength="200" [(ngModel)]="contactName" name="name" required />
         </div>
-        <div class="input-group">
-          <label for="contact-email">Email <span class="required">*</span></label>
-          <input type="email" id="contact-email" class="input-field" placeholder="you&#64;example.com" maxlength="254" [(ngModel)]="contactEmail" name="email" required />
+        <div class="mb-5 text-left">
+          <label class="block text-[0.85rem] font-semibold text-light mb-1.5" for="contact-email">Email <span class="text-primary">*</span></label>
+          <input type="email" id="contact-email" class="w-full py-3 px-4 text-[0.95rem] font-sans bg-dark-surface border border-white/[0.08] rounded-xl text-light outline-none transition-all placeholder:text-gray-500 hover:border-primary/[0.15] focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,229,255,0.12)]" placeholder="you&#64;example.com" maxlength="254" [(ngModel)]="contactEmail" name="email" required />
         </div>
-        <div class="input-group">
-          <label for="contact-phone">Phone <span class="optional">(optional)</span></label>
-          <input type="tel" id="contact-phone" class="input-field" placeholder="+1 (555) 123-4567" maxlength="20" [(ngModel)]="contactPhone" name="phone" />
+        <div class="mb-5 text-left">
+          <label class="block text-[0.85rem] font-semibold text-light mb-1.5" for="contact-phone">Phone <span class="text-gray-500 font-normal">(optional)</span></label>
+          <input type="tel" id="contact-phone" class="w-full py-3 px-4 text-[0.95rem] font-sans bg-dark-surface border border-white/[0.08] rounded-xl text-light outline-none transition-all placeholder:text-gray-500 hover:border-primary/[0.15] focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,229,255,0.12)]" placeholder="+1 (555) 123-4567" maxlength="20" [(ngModel)]="contactPhone" name="phone" />
         </div>
-        <div class="input-group">
-          <label for="contact-message">Message <span class="required">*</span></label>
-          <textarea id="contact-message" class="input-field" placeholder="How can we help you?" maxlength="5000" [(ngModel)]="contactMessage" name="message" required></textarea>
+        <div class="mb-5 text-left">
+          <label class="block text-[0.85rem] font-semibold text-light mb-1.5" for="contact-message">Message <span class="text-primary">*</span></label>
+          <textarea id="contact-message" class="w-full py-3 px-4 text-[0.95rem] font-sans bg-dark-surface border border-white/[0.08] rounded-xl text-light outline-none transition-all placeholder:text-gray-500 hover:border-primary/[0.15] focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,229,255,0.12)] min-h-[150px] resize-y" placeholder="How can we help you?" maxlength="5000" [(ngModel)]="contactMessage" name="message" required></textarea>
         </div>
-        <button class="btn btn-accent btn-large btn-full" type="submit" [disabled]="contactSubmitting()">
+        <button class="w-full bg-primary text-dark font-semibold rounded-xl px-6 py-4 text-[1.05rem] hover:brightness-110 hover:shadow-[0_0_24px_rgba(0,229,255,0.4)] transition-all disabled:opacity-50 disabled:cursor-not-allowed" type="submit" [disabled]="contactSubmitting()">
           @if (contactSubmitting()) {
             Sending...
           } @else {
@@ -477,49 +414,49 @@
 <!-- ═══════════════════════════════════════════ -->
 <!-- Footer -->
 <!-- ═══════════════════════════════════════════ -->
-<footer class="site-footer">
-  <div class="footer-inner">
-    <div class="footer-social">
-      <a href="https://github.com/HeyMegabyte" target="_blank" rel="noopener noreferrer" aria-label="GitHub" data-tooltip="GitHub">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+<footer class="py-12 px-6 relative z-[1]">
+  <div class="max-w-[800px] mx-auto text-center">
+    <div class="flex justify-center gap-5 mb-6">
+      <a class="flex items-center justify-center text-white/60 transition-all duration-300 hover:-translate-y-0.5 hover:scale-110" href="https://github.com/HeyMegabyte" target="_blank" rel="noopener noreferrer" aria-label="GitHub">
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
       </a>
-      <a href="https://x.com/HeyMegabyte" target="_blank" rel="noopener noreferrer" aria-label="X" data-tooltip="X / Twitter">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+      <a class="flex items-center justify-center text-white/60 transition-all duration-300 hover:-translate-y-0.5 hover:scale-110" href="https://x.com/HeyMegabyte" target="_blank" rel="noopener noreferrer" aria-label="X">
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
       </a>
-      <a href="https://www.linkedin.com/in/blzalewski" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" data-tooltip="LinkedIn">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+      <a class="flex items-center justify-center text-white/60 transition-all duration-300 hover:-translate-y-0.5 hover:scale-110 hover:text-[#0A66C2]" href="https://www.linkedin.com/in/blzalewski" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn">
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
       </a>
-      <a href="https://www.youtube.com/@HeyMegabyte" target="_blank" rel="noopener noreferrer" aria-label="YouTube" data-tooltip="YouTube">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+      <a class="flex items-center justify-center text-white/60 transition-all duration-300 hover:-translate-y-0.5 hover:scale-110 hover:text-[#FF0000]" href="https://www.youtube.com/@HeyMegabyte" target="_blank" rel="noopener noreferrer" aria-label="YouTube">
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
       </a>
-      <a href="https://www.instagram.com/heymegabyteofficial/" target="_blank" rel="noopener noreferrer" aria-label="Instagram" data-tooltip="Instagram">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C8.74 0 8.333.015 7.053.072 5.775.132 4.905.333 4.14.63c-.789.306-1.459.717-2.126 1.384S.935 3.35.63 4.14C.333 4.905.131 5.775.072 7.053.012 8.333 0 8.74 0 12s.015 3.667.072 4.947c.06 1.277.261 2.148.558 2.913.306.788.717 1.459 1.384 2.126.667.666 1.336 1.079 2.126 1.384.766.296 1.636.499 2.913.558C8.333 23.988 8.74 24 12 24s3.667-.015 4.947-.072c1.277-.06 2.148-.262 2.913-.558.788-.306 1.459-.718 2.126-1.384.666-.667 1.079-1.335 1.384-2.126.296-.765.499-1.636.558-2.913.06-1.28.072-1.687.072-4.947s-.015-3.667-.072-4.947c-.06-1.277-.262-2.149-.558-2.913-.306-.789-.718-1.459-1.384-2.126C21.319 1.347 20.651.935 19.86.63c-.765-.297-1.636-.499-2.913-.558C15.667.012 15.26 0 12 0zm0 2.16c3.203 0 3.585.016 4.85.071 1.17.055 1.805.249 2.227.415.562.217.96.477 1.382.896.419.42.679.819.896 1.381.164.422.36 1.057.413 2.227.057 1.266.07 1.646.07 4.85s-.015 3.585-.074 4.85c-.061 1.17-.256 1.805-.421 2.227-.224.562-.479.96-.899 1.382-.419.419-.824.679-1.38.896-.42.164-1.065.36-2.235.413-1.274.057-1.649.07-4.859.07-3.211 0-3.586-.015-4.859-.074-1.171-.061-1.816-.256-2.236-.421-.569-.224-.96-.479-1.379-.899-.421-.419-.69-.824-.9-1.38-.165-.42-.359-1.065-.42-2.235-.045-1.26-.061-1.649-.061-4.844 0-3.196.016-3.586.061-4.861.061-1.17.255-1.814.42-2.234.21-.57.479-.96.9-1.381.419-.419.81-.689 1.379-.898.42-.166 1.051-.361 2.221-.421 1.275-.045 1.65-.06 4.859-.06l.045.03zm0 3.678c-3.405 0-6.162 2.76-6.162 6.162 0 3.405 2.76 6.162 6.162 6.162 3.405 0 6.162-2.76 6.162-6.162 0-3.405-2.76-6.162-6.162-6.162zM12 16c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm7.846-10.405c0 .795-.646 1.44-1.44 1.44-.795 0-1.44-.646-1.44-1.44 0-.794.646-1.439 1.44-1.439.793-.001 1.44.645 1.44 1.439z"/></svg>
+      <a class="flex items-center justify-center text-white/60 transition-all duration-300 hover:-translate-y-0.5 hover:scale-110 hover:text-[#E4405F]" href="https://www.instagram.com/heymegabyteofficial/" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C8.74 0 8.333.015 7.053.072 5.775.132 4.905.333 4.14.63c-.789.306-1.459.717-2.126 1.384S.935 3.35.63 4.14C.333 4.905.131 5.775.072 7.053.012 8.333 0 8.74 0 12s.015 3.667.072 4.947c.06 1.277.261 2.148.558 2.913.306.788.717 1.459 1.384 2.126.667.666 1.336 1.079 2.126 1.384.766.296 1.636.499 2.913.558C8.333 23.988 8.74 24 12 24s3.667-.015 4.947-.072c1.277-.06 2.148-.262 2.913-.558.788-.306 1.459-.718 2.126-1.384.666-.667 1.079-1.335 1.384-2.126.296-.765.499-1.636.558-2.913.06-1.28.072-1.687.072-4.947s-.015-3.667-.072-4.947c-.06-1.277-.262-2.149-.558-2.913-.306-.789-.718-1.459-1.384-2.126C21.319 1.347 20.651.935 19.86.63c-.765-.297-1.636-.499-2.913-.558C15.667.012 15.26 0 12 0zm0 2.16c3.203 0 3.585.016 4.85.071 1.17.055 1.805.249 2.227.415.562.217.96.477 1.382.896.419.42.679.819.896 1.381.164.422.36 1.057.413 2.227.057 1.266.07 1.646.07 4.85s-.015 3.585-.074 4.85c-.061 1.17-.256 1.805-.421 2.227-.224.562-.479.96-.899 1.382-.419.419-.824.679-1.38.896-.42.164-1.065.36-2.235.413-1.274.057-1.649.07-4.859.07-3.211 0-3.586-.015-4.859-.074-1.171-.061-1.816-.256-2.236-.421-.569-.224-.96-.479-1.379-.899-.421-.419-.69-.824-.9-1.38-.165-.42-.359-1.065-.42-2.235-.045-1.26-.061-1.649-.061-4.844 0-3.196.016-3.586.061-4.861.061-1.17.255-1.814.42-2.234.21-.57.479-.96.9-1.381.419-.419.81-.689 1.379-.898.42-.166 1.051-.361 2.221-.421 1.275-.045 1.65-.06 4.859-.06l.045.03zm0 3.678c-3.405 0-6.162 2.76-6.162 6.162 0 3.405 2.76 6.162 6.162 6.162 3.405 0 6.162-2.76 6.162-6.162 0-3.405-2.76-6.162-6.162-6.162zM12 16c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm7.846-10.405c0 .795-.646 1.44-1.44 1.44-.795 0-1.44-.646-1.44-1.44 0-.794.646-1.439 1.44-1.439.793-.001 1.44.645 1.44 1.439z"/></svg>
       </a>
-      <a href="https://www.facebook.com/HeyMegabyte" target="_blank" rel="noopener noreferrer" aria-label="Facebook" data-tooltip="Facebook">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+      <a class="flex items-center justify-center text-white/60 transition-all duration-300 hover:-translate-y-0.5 hover:scale-110 hover:text-[#1877F2]" href="https://www.facebook.com/HeyMegabyte" target="_blank" rel="noopener noreferrer" aria-label="Facebook">
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
       </a>
     </div>
-    <div class="footer-bottom">
-      <span>&copy; 2026 <a href="https://megabyte.space" target="_blank" rel="noopener noreferrer">Megabyte LLC</a></span>
-      <span><a href="/privacy">Privacy Policy</a> | <a href="/terms">Terms of Service</a> | <a href="/content">Content Policy</a></span>
+    <div class="flex justify-between items-center flex-wrap gap-3 text-[0.8rem] text-gray-500 max-sm:flex-col max-sm:text-center">
+      <span>&copy; 2026 <a class="text-gray-500 hover:text-primary transition-colors" href="https://megabyte.space" target="_blank" rel="noopener noreferrer">Megabyte LLC</a></span>
+      <span><a class="text-gray-500 hover:text-primary transition-colors" href="/privacy">Privacy Policy</a> | <a class="text-gray-500 hover:text-primary transition-colors" href="/terms">Terms of Service</a> | <a class="text-gray-500 hover:text-primary transition-colors" href="/content">Content Policy</a></span>
     </div>
   </div>
 </footer>
 
 <!-- Location permission modal -->
 @if (showLocationPrompt()) {
-  <div class="location-modal-overlay">
-    <div class="location-modal">
-      <div class="location-modal-icon">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+  <div class="fixed inset-0 bg-black/75 backdrop-blur-xl z-[500] flex items-center justify-center animate-[fadeIn_0.3s_ease]">
+    <div class="bg-gradient-to-br from-[rgba(13,13,40,0.98)] to-dark border border-primary/[0.12] rounded-2xl p-9 max-w-[400px] w-[90%] text-center animate-[fadeInScale_0.3s_cubic-bezier(0.34,1.56,0.64,1)] shadow-[0_16px_48px_rgba(0,0,0,0.5)]">
+      <div class="mb-4 text-primary">
+        <svg class="drop-shadow-[0_0_8px_rgba(0,229,255,0.3)]" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
           <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
         </svg>
       </div>
-      <h3>Find nearby businesses</h3>
-      <p>Allow location access to sort search results by distance and find businesses near you.</p>
-      <div class="location-modal-actions">
-        <button class="btn-skip" (click)="skipLocation()">Not now</button>
-        <button class="btn-allow" (click)="allowLocation()">Allow</button>
+      <h3 class="text-white text-[1.15rem] font-bold mb-2">Find nearby businesses</h3>
+      <p class="text-text-secondary text-[0.9rem] leading-normal mb-6">Allow location access to sort search results by distance and find businesses near you.</p>
+      <div class="flex gap-3">
+        <button class="flex-1 py-2.5 px-4 rounded-[10px] text-[0.9rem] font-semibold cursor-pointer border border-white/[0.08] bg-dark-surface text-text-secondary transition-all hover:border-primary/25 hover:text-light hover:bg-primary/[0.04]" (click)="skipLocation()">Not now</button>
+        <button class="flex-1 py-2.5 px-4 rounded-[10px] text-[0.9rem] font-semibold cursor-pointer border-none bg-gradient-to-r from-primary to-cyan-700 text-dark transition-all hover:-translate-y-0.5 hover:shadow-[0_0_24px_rgba(0,229,255,0.3)] hover:brightness-110" (click)="allowLocation()">Allow</button>
       </div>
     </div>
   </div>
