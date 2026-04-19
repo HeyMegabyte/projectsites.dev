@@ -34,11 +34,58 @@ export const routes: Routes = [
     path: 'admin',
     loadComponent: () =>
       import('./pages/admin/admin.component').then((m) => m.AdminComponent),
+    children: [
+      {
+        path: '',
+        loadComponent: () =>
+          import('./pages/admin/sections/dashboard.component').then((m) => m.AdminDashboardComponent),
+        pathMatch: 'full',
+      },
+      {
+        path: 'editor',
+        loadComponent: () =>
+          import('./pages/admin/sections/editor.component').then((m) => m.AdminEditorComponent),
+      },
+      {
+        path: 'domains',
+        loadComponent: () =>
+          import('./pages/admin/sections/domains.component').then((m) => m.AdminDomainsComponent),
+      },
+      {
+        path: 'snapshots',
+        loadComponent: () =>
+          import('./pages/admin/sections/snapshots.component').then((m) => m.AdminSnapshotsComponent),
+      },
+      {
+        path: 'analytics',
+        loadComponent: () =>
+          import('./pages/admin/sections/analytics.component').then((m) => m.AdminAnalyticsComponent),
+      },
+      {
+        path: 'seo',
+        loadComponent: () =>
+          import('./pages/admin/sections/seo.component').then((m) => m.AdminSeoComponent),
+      },
+      {
+        path: 'billing',
+        loadComponent: () =>
+          import('./pages/admin/sections/billing.component').then((m) => m.AdminBillingComponent),
+      },
+      {
+        path: 'audit',
+        loadComponent: () =>
+          import('./pages/admin/sections/audit.component').then((m) => m.AdminAuditComponent),
+      },
+      {
+        path: 'settings',
+        loadComponent: () =>
+          import('./pages/admin/sections/settings.component').then((m) => m.AdminSettingsComponent),
+      },
+    ],
   },
   {
     path: 'editor/:slug',
-    loadComponent: () =>
-      import('./pages/editor/editor.component').then((m) => m.EditorComponent),
+    redirectTo: 'admin/editor',
   },
   {
     path: 'privacy',
@@ -60,8 +107,7 @@ export const routes: Routes = [
   },
   {
     path: 'billing',
-    loadComponent: () =>
-      import('./pages/admin/admin.component').then((m) => m.AdminComponent),
+    redirectTo: 'admin/billing',
   },
   { path: '**', redirectTo: '' },
 ];

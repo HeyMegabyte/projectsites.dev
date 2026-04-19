@@ -64,6 +64,11 @@
     background: #00E5FF; box-shadow: 0 0 8px rgba(0, 229, 255, 0.4);
   }
 }
+.nav-item-editor {
+  color: #00E5FF;
+  svg { color: #00E5FF; opacity: 0.85; }
+  &:hover { background: rgba(0, 229, 255, 0.08); }
+}
 
 // Buttons
 .top-btn {
