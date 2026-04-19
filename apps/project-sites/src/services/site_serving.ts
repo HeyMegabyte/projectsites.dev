@@ -554,6 +554,17 @@ export async function serveSiteFromR2(
   const object = await env.SITES_BUCKET.get(r2Path);
 
   if (!object) {
+    // Try assets/ directory (logo, favicon, discovered images — not versioned)
+    if (requestPath.startsWith('/assets/')) {
+      const assetPath = `sites/${site.slug}${requestPath}`;
+      const asset = await env.SITES_BUCKET.get(assetPath);
+      if (asset) {
+        const ext = requestPath.split('.').pop()?.toLowerCase() || '';
+        const ct = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', svg: 'image/svg+xml', webp: 'image/webp', ico: 'image/x-icon' }[ext] || 'application/octet-stream';
+        return new Response(asset.body, { headers: { 'Content-Type': ct, 'Cache-Control': 'public, max-age=86400' } });
+      }
+    }
+
     // Try index.html for SPA fallback
     if (!requestPath.includes('.')) {
       const fallbackPath = `sites/${site.slug}/${version}/index.html`;
