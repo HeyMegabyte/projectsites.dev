@@ -125,26 +125,15 @@ app.all('*', async (c) => {
     hostname === `www.${DOMAINS.SITES_BASE}` ||
     hostname.startsWith('localhost')
   ) {
-    // Root "/" serves the vanilla marketing homepage (homepage.html)
-    // Angular SPA handles /admin, /create, /billing, etc. via index.html
-    const isRoot = path === '/';
-    const marketingPath = isRoot ? 'marketing/homepage.html' : `marketing${path}`;
-    let marketingAsset = await c.env.SITES_BUCKET.get(marketingPath);
-
-    // Clean URL support: try .html extension for paths like /privacy → marketing/privacy.html
-    if (!marketingAsset && !path.includes('.') && path !== '/') {
-      marketingAsset = await c.env.SITES_BUCKET.get(`${marketingPath}.html`);
-    }
-
-    // /contact scrolls to contact section on homepage
-    if (!marketingAsset && path === '/contact') {
+    // /contact redirects to contact section on homepage
+    if (path === '/contact') {
       return Response.redirect(`https://${DOMAINS.SITES_BASE}/#contact-section`, 301);
     }
 
-    // SPA fallback: serve index.html for Angular client-side routes (e.g. /signin, /admin, /details, /waiting)
-    if (!marketingAsset && !path.includes('.') && path !== '/') {
-      marketingAsset = await c.env.SITES_BUCKET.get('marketing/index.html');
-    }
+    // Angular SPA handles all routes — serve index.html for non-file paths
+    const hasExtension = path.includes('.') && !path.endsWith('/');
+    const marketingPath = hasExtension ? `marketing${path}` : 'marketing/index.html';
+    const marketingAsset = await c.env.SITES_BUCKET.get(marketingPath);
 
     if (marketingAsset) {
       const resolvedPath = marketingAsset.key;
@@ -161,6 +150,7 @@ app.all('*', async (c) => {
         xml: 'application/xml',
         webmanifest: 'application/manifest+json',
         txt: 'text/plain',
+        woff2: 'font/woff2',
       };
 
       // For HTML, inject runtime env vars (PostHog key, Stripe publishable key)

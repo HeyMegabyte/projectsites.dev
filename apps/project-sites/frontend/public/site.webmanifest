@@ -1,6 +1,6 @@
 {
-  "name": "Project Sites - Your Website, Handled.",
-  "short_name": "Project Sites",
+  "name": "ProjectSites",
+  "short_name": "ProjectSites",
   "description": "AI-powered websites for small businesses. Professional sites in minutes.",
   "start_url": "/",
   "id": "/",
@@ -50,8 +50,8 @@
       "url": "website"
     }
   },
-  "theme_color": "#050510",
-  "background_color": "#050510",
+  "theme_color": "#060610",
+  "background_color": "#060610",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "orientation": "any",

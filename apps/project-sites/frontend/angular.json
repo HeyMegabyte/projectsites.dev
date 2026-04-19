@@ -59,9 +59,15 @@
                 "glob": "**/*",
                 "input": "public/.well-known",
                 "output": ".well-known"
+              },
+              {
+                "glob": "**/*",
+                "input": "src/assets",
+                "output": "assets"
               }
             ],
             "styles": [
+              "src/tailwind.css",
               "src/styles.scss"
             ],
             "scripts": []
@@ -131,9 +137,15 @@
                 "glob": "**/*",
                 "input": "public/.well-known",
                 "output": ".well-known"
+              },
+              {
+                "glob": "**/*",
+                "input": "src/assets",
+                "output": "assets"
               }
             ],
             "styles": [
+              "src/tailwind.css",
               "src/styles.scss"
             ],
             "scripts": []

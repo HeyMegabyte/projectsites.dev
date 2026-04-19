@@ -39,7 +39,7 @@ export type NavSection =
 })
 export class AdminComponent implements OnInit, OnDestroy {
   private api = inject(ApiService);
-  private auth = inject(AuthService);
+  auth = inject(AuthService);
   private toast = inject(ToastService);
   private router = inject(Router);
   private geo = inject(GeolocationService);
@@ -274,6 +274,22 @@ export class AdminComponent implements OnInit, OnDestroy {
       error: 'error', failed: 'error', draft: 'draft',
     };
     return map[status] || 'draft';
+  }
+
+  getStatusTextClass(status: string): string {
+    const cls = this.getStatusClass(status);
+    const map: Record<string, string> = {
+      published: 'text-green-500',
+      building: 'text-amber-400 animate-pulse',
+      error: 'text-red-500',
+      draft: 'text-text-secondary',
+    };
+    return map[cls] || 'text-text-secondary';
+  }
+
+  signOut(): void {
+    this.auth.clearSession();
+    this.router.navigate(['/signin']);
   }
 
   getStatusLabel(status: string): string {

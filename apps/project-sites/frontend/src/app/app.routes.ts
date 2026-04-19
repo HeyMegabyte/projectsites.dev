@@ -4,6 +4,11 @@ export const routes: Routes = [
   {
     path: '',
     loadComponent: () =>
+      import('./pages/homepage/homepage.component').then((m) => m.HomepageComponent),
+  },
+  {
+    path: 'search',
+    loadComponent: () =>
       import('./pages/search/search.component').then((m) => m.SearchComponent),
   },
   {
@@ -52,6 +57,11 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./pages/legal/legal.component').then((m) => m.LegalComponent),
     data: { type: 'content' },
+  },
+  {
+    path: 'billing',
+    loadComponent: () =>
+      import('./pages/admin/admin.component').then((m) => m.AdminComponent),
   },
   { path: '**', redirectTo: '' },
 ];

@@ -1,55 +1,67 @@
-<div class="admin-layout" (click)="closeDropdowns()">
+<div class="flex min-h-screen bg-dark-surface animate-fade-in" (click)="closeDropdowns()">
   <!-- Mobile hamburger -->
-  <button class="mobile-toggle" (click)="toggleSidebar(); $event.stopPropagation()">
+  <button
+    class="fixed top-3 left-3 z-[1001] p-2 rounded-md border border-white/[0.06] bg-dark/95 text-text-secondary backdrop-blur-lg cursor-pointer hover:text-primary hover:border-primary/30 hidden max-md:flex"
+    (click)="toggleSidebar(); $event.stopPropagation()">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
   </button>
 
   <!-- ═══════════════════════════════════════════════════ -->
   <!-- LEFT SIDEBAR                                        -->
   <!-- ═══════════════════════════════════════════════════ -->
-  <aside class="sidebar" [class.collapsed]="sidebarCollapsed()">
+  <aside
+    class="w-[260px] min-w-[260px] bg-dark border-r border-white/[0.06] flex flex-col h-screen sticky top-0 z-[100] overflow-y-auto overflow-x-hidden flex-shrink-0 sidebar-scrollbar max-md:fixed max-md:left-0 max-md:top-0 max-md:bottom-0 max-md:z-[1000] max-md:transition-transform max-md:duration-[250ms] max-md:ease-[cubic-bezier(0.4,0,0.2,1)]"
+    [class.max-md:-translate-x-full]="sidebarCollapsed()">
+
     <!-- Logo -->
-    <div class="sidebar-logo">
+    <div class="flex items-center gap-2.5 px-5 pt-[18px] pb-3.5 border-b border-white/[0.06]">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00E5FF" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-      <span class="sidebar-logo-text">ProjectSites</span>
-      <button class="sidebar-close-mobile" (click)="sidebarCollapsed.set(true)">
+      <span class="text-[0.95rem] font-bold text-white tracking-tight">ProjectSites</span>
+      <button class="hidden max-md:flex items-center justify-center bg-transparent border-none text-text-secondary cursor-pointer p-1 rounded ml-auto hover:text-white" (click)="sidebarCollapsed.set(true)">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
 
     <!-- Site Selector -->
-    <div class="site-selector" (click)="$event.stopPropagation()">
-      <button class="site-selector-btn" (click)="toggleSiteDropdown($event)">
+    <div class="px-3 pt-3 relative" (click)="$event.stopPropagation()">
+      <button
+        class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] border border-white/[0.06] bg-white/[0.02] cursor-pointer transition-all duration-200 text-left hover:border-primary/20 hover:bg-primary/[0.04]"
+        (click)="toggleSiteDropdown($event)">
         @if (selectedSite(); as site) {
-          <div class="site-selector-icon">
+          <div class="w-8 h-8 rounded-lg bg-primary/[0.08] flex items-center justify-center flex-shrink-0 text-primary">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
           </div>
-          <div class="site-selector-info">
-            <span class="site-selector-name">{{ site.business_name || 'Unnamed' }}</span>
-            <span class="site-selector-status" [class]="getStatusClass(site.status)">{{ getStatusLabel(site.status) }}</span>
+          <div class="flex-1 min-w-0 flex flex-col gap-0.5">
+            <span class="text-[0.82rem] font-semibold text-white truncate">{{ site.business_name || 'Unnamed' }}</span>
+            <span class="text-[0.62rem] font-bold uppercase tracking-wide" [class]="getStatusTextClass(site.status)">{{ getStatusLabel(site.status) }}</span>
           </div>
         } @else {
-          <div class="site-selector-icon">
+          <div class="w-8 h-8 rounded-lg bg-primary/[0.08] flex items-center justify-center flex-shrink-0 text-primary">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
           </div>
-          <div class="site-selector-info">
-            <span class="site-selector-name">No sites</span>
+          <div class="flex-1 min-w-0 flex flex-col gap-0.5">
+            <span class="text-[0.82rem] font-semibold text-white">No sites</span>
           </div>
         }
-        <svg class="site-selector-chevron" [class.open]="siteDropdownOpen()" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+        <svg class="text-text-secondary flex-shrink-0 transition-transform duration-200" [class.rotate-180]="siteDropdownOpen()" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
       </button>
 
       @if (siteDropdownOpen()) {
-        <div class="site-dropdown">
+        <div class="absolute left-3 right-3 top-[calc(100%+4px)] bg-[rgba(10,10,30,0.98)] border border-primary/[0.12] rounded-[10px] p-1.5 z-[200] shadow-[0_12px_40px_rgba(0,0,0,0.6),0_0_30px_rgba(0,229,255,0.04)] site-dropdown-anim max-h-[300px] overflow-y-auto">
           @for (site of sites(); track site.id) {
-            <button class="site-dropdown-item" [class.active]="selectedSite()?.id === site.id" (click)="selectSite(site)">
+            <button
+              class="flex items-center gap-2 w-full py-2 px-2.5 border-none bg-transparent text-text-secondary text-[0.78rem] font-sans cursor-pointer rounded-[7px] transition-all duration-150 text-left hover:bg-primary/[0.06] hover:text-white"
+              [class.file-active]="selectedSite()?.id === site.id"
+              (click)="selectSite(site)">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/></svg>
-              <span class="site-dropdown-name">{{ site.business_name || 'Unnamed' }}</span>
-              <span class="site-dropdown-status" [class]="getStatusClass(site.status)">{{ getStatusLabel(site.status) }}</span>
+              <span class="flex-1 truncate">{{ site.business_name || 'Unnamed' }}</span>
+              <span class="text-[0.58rem] font-bold uppercase" [class]="getStatusTextClass(site.status)">{{ getStatusLabel(site.status) }}</span>
             </button>
           }
-          <div class="site-dropdown-divider"></div>
-          <button class="site-dropdown-item add-new" (click)="newSite()">
+          <div class="h-px mx-2 my-1 bg-white/[0.06]"></div>
+          <button
+            class="flex items-center gap-2 w-full py-2 px-2.5 border-none bg-transparent text-primary text-[0.78rem] font-sans cursor-pointer rounded-[7px] transition-all duration-150 text-left hover:bg-primary/[0.12]"
+            (click)="newSite()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
             <span>Add New Site</span>
           </button>
@@ -58,71 +70,84 @@
     </div>
 
     <!-- Navigation -->
-    <nav class="sidebar-nav">
-      <button class="nav-item" [class.active]="activeNav() === 'dashboard'" (click)="selectNav('dashboard')">
+    <nav class="px-3 pt-3 pb-6 flex flex-col gap-0.5 flex-1">
+      <button class="nav-item" [class.nav-item-active]="activeNav() === 'dashboard'" (click)="selectNav('dashboard')">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
         <span>Dashboard</span>
       </button>
-      <button class="nav-item" [class.active]="activeNav() === 'pages'" (click)="selectNav('pages')">
+      <button class="nav-item" [class.nav-item-active]="activeNav() === 'pages'" (click)="selectNav('pages')">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
         <span>Pages & Content</span>
       </button>
-      <button class="nav-item" [class.active]="activeNav() === 'design'" (click)="selectNav('design')">
+      <button class="nav-item" [class.nav-item-active]="activeNav() === 'design'" (click)="selectNav('design')">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
         <span>Design & Theme</span>
       </button>
-      <button class="nav-item" [class.active]="activeNav() === 'domains'" (click)="selectNav('domains')">
+      <button class="nav-item" [class.nav-item-active]="activeNav() === 'domains'" (click)="selectNav('domains')">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
         <span>Domains</span>
         @if (domainSummary().total > 0) {
-          <span class="nav-badge">{{ domainSummary().total }}</span>
+          <span class="text-[0.6rem] font-bold py-px px-[7px] rounded-[10px] bg-primary/[0.12] text-primary">{{ domainSummary().total }}</span>
         }
       </button>
-      <button class="nav-item" [class.active]="activeNav() === 'snapshots'" (click)="selectNav('snapshots')">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2v4m0 12v4M2 12h4m12 0h4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg>
+      <button class="nav-item" [class.nav-item-active]="activeNav() === 'snapshots'" (click)="selectNav('snapshots')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
         <span>Snapshots</span>
       </button>
-      <button class="nav-item" [class.active]="activeNav() === 'analytics'" (click)="selectNav('analytics')">
+      <button class="nav-item" [class.nav-item-active]="activeNav() === 'analytics'" (click)="selectNav('analytics')">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
         <span>Analytics</span>
       </button>
-      <button class="nav-item" [class.active]="activeNav() === 'seo'" (click)="selectNav('seo')">
+      <button class="nav-item" [class.nav-item-active]="activeNav() === 'seo'" (click)="selectNav('seo')">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <span>SEO Settings</span>
       </button>
 
-      <div class="nav-divider"></div>
+      <div class="h-px mx-3.5 my-2 bg-white/[0.06]"></div>
 
-      <button class="nav-item" [class.active]="activeNav() === 'billing'" (click)="selectNav('billing')">
+      <button class="nav-item" [class.nav-item-active]="activeNav() === 'billing'" (click)="selectNav('billing')">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
         <span>Billing & Plan</span>
       </button>
-      <button class="nav-item" [class.active]="activeNav() === 'audit'" (click)="selectNav('audit')">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      <button class="nav-item" [class.nav-item-active]="activeNav() === 'audit'" (click)="selectNav('audit')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         <span>Audit Log</span>
       </button>
-      <button class="nav-item" [class.active]="activeNav() === 'settings'" (click)="selectNav('settings')">
+      <button class="nav-item" [class.nav-item-active]="activeNav() === 'settings'" (click)="selectNav('settings')">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         <span>Settings</span>
       </button>
     </nav>
+
+    <!-- Bottom: user info -->
+    <div class="px-3 py-3 border-t border-white/[0.06] flex items-center gap-2.5">
+      <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold flex-shrink-0">
+        {{ (auth.email() || '?')[0].toUpperCase() }}
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="text-[0.75rem] text-white truncate">{{ auth.email() || 'User' }}</div>
+      </div>
+      <button class="p-1.5 rounded-md border-none bg-transparent text-text-secondary cursor-pointer hover:text-red-400 transition-colors" (click)="signOut()" title="Sign out">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
   </aside>
 
   <!-- Sidebar overlay for mobile -->
   @if (!sidebarCollapsed()) {
-    <div class="sidebar-overlay" (click)="sidebarCollapsed.set(true)"></div>
+    <div class="hidden max-md:block fixed inset-0 bg-black/50 z-[999] backdrop-blur-sm" (click)="sidebarCollapsed.set(true)"></div>
   }
 
   <!-- ═══════════════════════════════════════════════════ -->
   <!-- RIGHT PANEL (MAIN CONTENT)                          -->
   <!-- ═══════════════════════════════════════════════════ -->
-  <main class="main-content">
+  <main class="flex-1 min-w-0 flex flex-col min-h-screen">
     <!-- Top bar -->
-    <div class="top-bar">
-      <div class="breadcrumb">
-        <span class="breadcrumb-root">{{ selectedSite()?.business_name || 'My Sites' }}</span>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
-        <span class="breadcrumb-current">
+    <div class="flex items-center justify-between px-7 py-3 border-b border-white/[0.06] bg-dark/60 backdrop-blur-lg flex-shrink-0 gap-3 flex-wrap max-md:px-4 max-md:pl-[52px]">
+      <div class="flex items-center gap-1.5 text-[0.82rem] text-text-secondary">
+        <span class="font-medium max-w-[180px] truncate">{{ selectedSite()?.business_name || 'My Sites' }}</span>
+        <svg class="opacity-50" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+        <span class="text-white font-semibold">
           @switch (activeNav()) {
             @case ('dashboard') { Overview }
             @case ('pages') { Pages & Content }
@@ -137,7 +162,7 @@
           }
         </span>
       </div>
-      <div class="top-bar-actions">
+      <div class="flex items-center gap-2">
         <button class="top-btn" (click)="loadData()" title="Refresh">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
         </button>
@@ -147,7 +172,7 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
               Preview
             </button>
-            <button class="top-btn accent" (click)="editInBolt(site)" title="Edit in AI code editor">
+            <button class="top-btn-accent" (click)="editInBolt(site)" title="Edit in AI code editor">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
               AI Edit
             </button>
@@ -158,17 +183,17 @@
 
     <!-- Loading -->
     @if (loading()) {
-      <div class="panel-loading">
+      <div class="flex flex-col items-center justify-center gap-3 py-[60px] px-5 text-text-secondary text-[0.85rem]">
         <div class="loading-spinner"></div>
         <span>Loading dashboard...</span>
       </div>
     } @else if (!selectedSite()) {
       <!-- No sites -->
-      <div class="empty-state">
-        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-        <h2>No sites yet</h2>
-        <p>Create your first AI-powered website in minutes.</p>
-        <button class="action-btn accent" (click)="newSite()">
+      <div class="flex flex-col items-center justify-center text-center py-20 px-5 text-text-secondary gap-3">
+        <svg class="opacity-40" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        <h2 class="text-white font-semibold text-xl m-0">No sites yet</h2>
+        <p class="text-[0.9rem] max-w-[400px] m-0">Create your first AI-powered website in minutes.</p>
+        <button class="btn-accent mt-2" (click)="newSite()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
           Create Site
         </button>
@@ -177,84 +202,84 @@
 
       <!-- ═══ DASHBOARD ═══ -->
       @if (activeNav() === 'dashboard') {
-        <div class="panel-content">
+        <div class="p-7 flex-1 overflow-y-auto animate-fade-in max-md:p-4">
           <!-- Site preview card -->
-          <div class="dashboard-hero">
-            <div class="hero-preview" (click)="isBuilding(selectedSite()!) ? goToWaiting(selectedSite()!) : visitSite(selectedSite()!)">
+          <div class="flex gap-6 mb-6 p-6 bg-white/[0.02] border border-white/[0.06] rounded-[14px] max-md:flex-col max-md:p-4">
+            <div class="w-[280px] h-[180px] rounded-[10px] overflow-hidden flex-shrink-0 cursor-pointer bg-primary/[0.03] border border-primary/[0.06] max-md:w-full max-md:h-[160px]" (click)="isBuilding(selectedSite()!) ? goToWaiting(selectedSite()!) : visitSite(selectedSite()!)">
               @if (selectedSite()!.status === 'published' && selectedSite()!.current_build_version) {
-                <img class="hero-screenshot" [src]="getScreenshotUrl(selectedSite()!)" [alt]="selectedSite()!.business_name" loading="lazy" (error)="onScreenshotError($event)" />
+                <img class="w-full h-full object-cover object-top transition-transform duration-300 hover:scale-[1.03]" [src]="getScreenshotUrl(selectedSite()!)" [alt]="selectedSite()!.business_name" loading="lazy" (error)="onScreenshotError($event)" />
               } @else if (isBuilding(selectedSite()!)) {
-                <div class="hero-placeholder building">
+                <div class="flex flex-col items-center justify-center h-full gap-2 text-amber-400 text-[0.78rem]">
                   <div class="building-spinner"></div>
                   <span>{{ getStatusLabel(selectedSite()!.status) }}...</span>
-                  <span class="hero-hint">Click to view progress</span>
+                  <span class="text-[0.65rem] text-primary opacity-60">Click to view progress</span>
                 </div>
               } @else if (selectedSite()!.status === 'error' || selectedSite()!.status === 'failed') {
-                <div class="hero-placeholder error">
+                <div class="flex flex-col items-center justify-center h-full gap-2 text-red-500 text-[0.78rem]">
                   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
                   <span>Build failed</span>
                 </div>
               } @else {
-                <div class="hero-placeholder">
+                <div class="flex flex-col items-center justify-center h-full gap-2 text-text-secondary text-[0.78rem]">
                   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
                   <span>Draft</span>
                 </div>
               }
             </div>
 
-            <div class="hero-info">
-              <div class="hero-status-row">
+            <div class="flex-1 flex flex-col gap-2.5 min-w-0">
+              <div class="flex items-center gap-2">
                 <span class="status-chip" [class]="getStatusClass(selectedSite()!.status)">{{ getStatusLabel(selectedSite()!.status) }}</span>
                 @if (selectedSite()!.plan) {
-                  <span class="plan-chip" [class]="selectedSite()!.plan">{{ selectedSite()!.plan }}</span>
+                  <span class="text-[0.62rem] font-bold py-[3px] px-2.5 rounded-md uppercase" [class]="selectedSite()!.plan === 'paid' ? 'bg-green-500/10 text-green-500' : 'bg-text-secondary/10 text-text-secondary'">{{ selectedSite()!.plan }}</span>
                 }
               </div>
-              <h1 class="hero-title" (dblclick)="startEdit(selectedSite()!.id, 'name', selectedSite()!.business_name)">
+              <h1 class="text-[1.4rem] font-bold text-white m-0 cursor-pointer transition-colors hover:text-primary" (dblclick)="startEdit(selectedSite()!.id, 'name', selectedSite()!.business_name)">
                 @if (editingSiteId() === selectedSite()!.id && editingField() === 'name') {
-                  <div class="inline-edit">
-                    <input class="inline-input" [(ngModel)]="editValue" (keyup.enter)="saveEdit(selectedSite()!.id)" (keyup.escape)="cancelEdit()" />
-                    <button class="inline-btn save" (click)="saveEdit(selectedSite()!.id)">&#10003;</button>
-                    <button class="inline-btn cancel" (click)="cancelEdit()">&#10005;</button>
+                  <div class="flex items-center gap-1">
+                    <input class="text-[0.9rem] font-semibold font-sans bg-black/30 border border-primary rounded-md text-white py-1 px-2.5 outline-none flex-1 min-w-0 shadow-[0_0_0_2px_rgba(0,229,255,0.1)]" [(ngModel)]="editValue" (keyup.enter)="saveEdit(selectedSite()!.id)" (keyup.escape)="cancelEdit()" />
+                    <button class="py-1 px-2 rounded border border-white/[0.06] bg-transparent text-text-secondary text-[0.85rem] cursor-pointer leading-none hover:text-green-500 hover:border-green-500" (click)="saveEdit(selectedSite()!.id)">&#10003;</button>
+                    <button class="py-1 px-2 rounded border border-white/[0.06] bg-transparent text-text-secondary text-[0.85rem] cursor-pointer leading-none hover:text-red-500 hover:border-red-500" (click)="cancelEdit()">&#10005;</button>
                   </div>
                 } @else {
                   {{ selectedSite()!.business_name || 'Unnamed' }}
                 }
               </h1>
-              <div class="hero-url-row">
+              <div class="flex items-center gap-1.5">
                 @if (editingSiteId() === selectedSite()!.id && editingField() === 'slug') {
-                  <div class="inline-edit">
-                    <input class="inline-input slug" [(ngModel)]="editValue" (keyup.enter)="saveEdit(selectedSite()!.id)" (keyup.escape)="cancelEdit()" />
-                    <span class="slug-suffix">.projectsites.dev</span>
-                    <button class="inline-btn save" (click)="saveEdit(selectedSite()!.id)">&#10003;</button>
-                    <button class="inline-btn cancel" (click)="cancelEdit()">&#10005;</button>
+                  <div class="flex items-center gap-1">
+                    <input class="text-[0.8rem] font-medium font-sans bg-black/30 border border-primary rounded-md text-white py-1 px-2.5 outline-none flex-1 min-w-0 shadow-[0_0_0_2px_rgba(0,229,255,0.1)]" [(ngModel)]="editValue" (keyup.enter)="saveEdit(selectedSite()!.id)" (keyup.escape)="cancelEdit()" />
+                    <span class="text-[0.75rem] text-text-secondary whitespace-nowrap">.projectsites.dev</span>
+                    <button class="py-1 px-2 rounded border border-white/[0.06] bg-transparent text-text-secondary text-[0.85rem] cursor-pointer leading-none hover:text-green-500 hover:border-green-500" (click)="saveEdit(selectedSite()!.id)">&#10003;</button>
+                    <button class="py-1 px-2 rounded border border-white/[0.06] bg-transparent text-text-secondary text-[0.85rem] cursor-pointer leading-none hover:text-red-500 hover:border-red-500" (click)="cancelEdit()">&#10005;</button>
                   </div>
                 } @else {
-                  <a class="hero-url" [href]="getSiteUrl(selectedSite()!)" target="_blank" rel="noopener" (dblclick)="startEdit(selectedSite()!.id, 'slug', selectedSite()!.slug); $event.preventDefault()">
+                  <a class="text-[0.8rem] text-primary no-underline transition-all hover:underline hover:text-shadow-[0_0_8px_rgba(0,229,255,0.3)]" [href]="getSiteUrl(selectedSite()!)" target="_blank" rel="noopener" (dblclick)="startEdit(selectedSite()!.id, 'slug', selectedSite()!.slug); $event.preventDefault()">
                     {{ selectedSite()!.primary_hostname || selectedSite()!.slug + '.projectsites.dev' }}
                   </a>
-                  <button class="icon-btn" (click)="copyUrl(selectedSite()!)" title="Copy URL">
+                  <button class="icon-btn-sm" (click)="copyUrl(selectedSite()!)" title="Copy URL">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                   </button>
                 }
               </div>
 
               <!-- Quick actions -->
-              <div class="hero-actions">
+              <div class="flex gap-2 flex-wrap mt-1.5">
                 @if (selectedSite()!.status === 'published') {
-                  <button class="action-btn" (click)="editInBolt(selectedSite()!)">
+                  <button class="btn-ghost" (click)="editInBolt(selectedSite()!)">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
                     AI Edit
                   </button>
                 }
-                <button class="action-btn" (click)="openDeploy(selectedSite()!)">
+                <button class="btn-ghost" (click)="openDeploy(selectedSite()!)">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                   Deploy ZIP
                 </button>
-                <button class="action-btn" (click)="openReset(selectedSite()!)">
+                <button class="btn-ghost" (click)="openReset(selectedSite()!)">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/></svg>
                   Rebuild
                 </button>
-                <button class="action-btn danger" (click)="confirmDelete(selectedSite()!)">
+                <button class="btn-ghost-danger" (click)="confirmDelete(selectedSite()!)">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                   Delete
                 </button>
@@ -263,69 +288,72 @@
           </div>
 
           <!-- Stats cards -->
-          <div class="stats-grid">
-            <div class="stat-card">
-              <div class="stat-icon">
+          <div class="grid grid-cols-4 gap-3.5 mb-6 max-lg:grid-cols-2 max-[480px]:grid-cols-1">
+            <div class="flex items-center gap-3.5 py-4 px-[18px] bg-white/[0.02] border border-white/[0.06] rounded-[10px] transition-colors hover:border-primary/[0.15]">
+              <div class="w-10 h-10 rounded-[10px] bg-primary/[0.08] flex items-center justify-center text-primary flex-shrink-0">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
               </div>
-              <div class="stat-info">
-                <span class="stat-value">{{ domainSummary().total }}</span>
-                <span class="stat-label">Domains</span>
+              <div class="flex flex-col gap-0.5">
+                <span class="text-[1.3rem] font-bold text-white">{{ domainSummary().total }}</span>
+                <span class="text-[0.72rem] text-text-secondary uppercase tracking-wide">Domains</span>
               </div>
             </div>
-            <div class="stat-card">
-              <div class="stat-icon success">
+            <div class="flex items-center gap-3.5 py-4 px-[18px] bg-white/[0.02] border border-white/[0.06] rounded-[10px] transition-colors hover:border-primary/[0.15]">
+              <div class="w-10 h-10 rounded-[10px] bg-green-500/[0.08] flex items-center justify-center text-green-500 flex-shrink-0">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
               </div>
-              <div class="stat-info">
-                <span class="stat-value">{{ domainSummary().active }}</span>
-                <span class="stat-label">Active</span>
+              <div class="flex flex-col gap-0.5">
+                <span class="text-[1.3rem] font-bold text-white">{{ domainSummary().active }}</span>
+                <span class="text-[0.72rem] text-text-secondary uppercase tracking-wide">Active</span>
               </div>
             </div>
-            <div class="stat-card">
-              <div class="stat-icon warn">
+            <div class="flex items-center gap-3.5 py-4 px-[18px] bg-white/[0.02] border border-white/[0.06] rounded-[10px] transition-colors hover:border-primary/[0.15]">
+              <div class="w-10 h-10 rounded-[10px] bg-amber-400/[0.08] flex items-center justify-center text-amber-400 flex-shrink-0">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
               </div>
-              <div class="stat-info">
-                <span class="stat-value">{{ domainSummary().pending }}</span>
-                <span class="stat-label">Pending</span>
+              <div class="flex flex-col gap-0.5">
+                <span class="text-[1.3rem] font-bold text-white">{{ domainSummary().pending }}</span>
+                <span class="text-[0.72rem] text-text-secondary uppercase tracking-wide">Pending</span>
               </div>
             </div>
-            <div class="stat-card">
-              <div class="stat-icon">
+            <div class="flex items-center gap-3.5 py-4 px-[18px] bg-white/[0.02] border border-white/[0.06] rounded-[10px] transition-colors hover:border-primary/[0.15]">
+              <div class="w-10 h-10 rounded-[10px] bg-primary/[0.08] flex items-center justify-center text-primary flex-shrink-0">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
               </div>
-              <div class="stat-info">
-                <span class="stat-value">{{ subscription()?.status === 'active' ? 'Pro' : 'Free' }}</span>
-                <span class="stat-label">Plan</span>
+              <div class="flex flex-col gap-0.5">
+                <span class="text-[1.3rem] font-bold text-white">{{ subscription()?.status === 'active' ? 'Pro' : 'Free' }}</span>
+                <span class="text-[0.72rem] text-text-secondary uppercase tracking-wide">Plan</span>
               </div>
             </div>
           </div>
 
           <!-- All sites list -->
           @if (sites().length > 1) {
-            <div class="section-card">
-              <div class="section-header">
-                <h3>All Sites</h3>
-                <span class="section-count">{{ sites().length }}</span>
+            <div class="bg-white/[0.02] border border-white/[0.06] rounded-[14px] p-6">
+              <div class="flex items-center gap-3 mb-[18px]">
+                <h3 class="text-base font-semibold text-white m-0">All Sites</h3>
+                <span class="text-[0.65rem] font-bold py-0.5 px-2 rounded-[10px] bg-primary/10 text-primary">{{ sites().length }}</span>
               </div>
-              <div class="sites-table">
+              <div class="flex flex-col gap-1">
                 @for (site of sites(); track site.id) {
-                  <div class="site-row" [class.active]="selectedSite()?.id === site.id" (click)="selectSite(site)">
-                    <div class="site-row-preview">
+                  <div
+                    class="flex items-center gap-3.5 py-2.5 px-3.5 rounded-[10px] cursor-pointer transition-colors hover:bg-primary/[0.04]"
+                    [class.file-active]="selectedSite()?.id === site.id"
+                    (click)="selectSite(site)">
+                    <div class="w-12 h-8 rounded-md overflow-hidden flex-shrink-0 bg-primary/[0.04]">
                       @if (site.status === 'published' && site.current_build_version) {
-                        <img [src]="getScreenshotUrl(site)" [alt]="site.business_name" loading="lazy" (error)="onScreenshotError($event)" />
+                        <img class="w-full h-full object-cover" [src]="getScreenshotUrl(site)" [alt]="site.business_name" loading="lazy" (error)="onScreenshotError($event)" />
                       } @else {
-                        <div class="site-row-placeholder">
+                        <div class="flex items-center justify-center h-full text-text-secondary opacity-50">
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
                         </div>
                       }
                     </div>
-                    <div class="site-row-info">
-                      <span class="site-row-name">{{ site.business_name || 'Unnamed' }}</span>
-                      <span class="site-row-url">{{ site.slug }}.projectsites.dev</span>
+                    <div class="flex-1 min-w-0 flex flex-col gap-px">
+                      <span class="text-[0.82rem] font-semibold text-white truncate">{{ site.business_name || 'Unnamed' }}</span>
+                      <span class="text-[0.68rem] text-text-secondary">{{ site.slug }}.projectsites.dev</span>
                     </div>
-                    <span class="status-chip small" [class]="getStatusClass(site.status)">{{ getStatusLabel(site.status) }}</span>
+                    <span class="status-chip-sm" [class]="getStatusClass(site.status)">{{ getStatusLabel(site.status) }}</span>
                   </div>
                 }
               </div>
@@ -336,65 +364,65 @@
 
       <!-- ═══ PAGES & CONTENT ═══ -->
       @if (activeNav() === 'pages') {
-        <div class="panel-content panel-full">
+        <div class="p-5 flex-1 overflow-y-auto animate-fade-in">
           @if (loadingFiles()) {
-            <div class="panel-loading"><div class="loading-spinner"></div><span>Loading files...</span></div>
+            <div class="flex flex-col items-center justify-center gap-3 py-[60px] text-text-secondary text-[0.85rem]"><div class="loading-spinner"></div><span>Loading files...</span></div>
           } @else if (files().length === 0) {
-            <div class="empty-state small">
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
-              <p>No files found for this site.</p>
+            <div class="flex flex-col items-center justify-center text-center py-10 px-5 text-text-secondary gap-3">
+              <svg class="opacity-40" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+              <p class="m-0">No files found for this site.</p>
             </div>
           } @else {
-            <div class="files-toolbar">
-              <span class="files-count-label">{{ files().length }} files</span>
-              <div class="files-toolbar-actions">
-                <button class="action-btn small" (click)="promptNewFile()">
+            <div class="flex items-center justify-between mb-3 gap-3">
+              <span class="text-[0.78rem] text-text-secondary">{{ files().length }} files</span>
+              <div class="flex gap-1.5">
+                <button class="btn-ghost-sm" (click)="promptNewFile()">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
                   New File
                 </button>
-                <button class="action-btn small" (click)="promptNewFolder()">
+                <button class="btn-ghost-sm" (click)="promptNewFolder()">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                   New Folder
                 </button>
               </div>
             </div>
-            <div class="files-split">
-              <div class="file-tree-panel" (dragover)="onTreePanelDragOver($event)" (drop)="onTreePanelDrop($event)" [class.drag-over]="treeDragOver()">
-                <div class="file-tree">
+            <div class="flex flex-1 min-h-0 gap-px bg-primary/[0.06] rounded-xl overflow-hidden border border-primary/[0.08] h-[calc(100vh-200px)]">
+              <div class="w-60 min-w-[200px] bg-[rgba(4,4,16,0.9)] overflow-y-auto py-2 flex-shrink-0 sidebar-scrollbar" [class.tree-drag-over]="treeDragOver()" (dragover)="onTreePanelDragOver($event)" (drop)="onTreePanelDrop($event)">
+                <div class="text-[0.75rem] font-mono">
                   <ng-container *ngTemplateOutlet="treeNodes; context: { $implicit: fileTree() }"></ng-container>
                 </div>
               </div>
-              <div class="file-editor-panel">
+              <div class="flex-1 min-w-0 flex flex-col bg-[rgba(6,6,18,0.85)]">
                 @if (editingFile()) {
-                  <div class="file-editor">
-                    <div class="file-editor-header">
-                      <span class="file-editor-name" (dblclick)="startRenameCurrentFile($event)">{{ getFileName(editingFile()!.key) }}</span>
-                      <span class="file-editor-hint">Ctrl+S to save</span>
-                      <button class="action-btn small accent" (click)="saveFileContent()" [disabled]="savingFile()">{{ savingFile() ? 'Saving...' : 'Save' }}</button>
-                      <button class="icon-btn danger" (click)="deleteCurrentFile()" title="Delete this file">
+                  <div class="flex flex-col flex-1 min-h-0 overflow-hidden">
+                    <div class="flex items-center gap-3 px-3.5 py-2 border-b border-primary/[0.06] bg-black/20">
+                      <span class="flex-1 text-[0.82rem] font-semibold text-white truncate font-mono cursor-pointer hover:underline hover:decoration-dashed hover:underline-offset-[3px]" (dblclick)="startRenameCurrentFile($event)">{{ getFileName(editingFile()!.key) }}</span>
+                      <span class="text-[0.65rem] text-text-secondary py-0.5 px-2 bg-primary/5 rounded border border-white/[0.04] whitespace-nowrap">Ctrl+S to save</span>
+                      <button class="btn-accent-sm" (click)="saveFileContent()" [disabled]="savingFile()">{{ savingFile() ? 'Saving...' : 'Save' }}</button>
+                      <button class="icon-btn-sm-danger" (click)="deleteCurrentFile()" title="Delete this file">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                       </button>
                     </div>
-                    <div class="file-ai-prompt">
+                    <div class="flex gap-1.5 px-3 py-1.5 bg-primary/[0.03] border-b border-white/[0.06] items-center">
                       @if (fileAiProcessing()) {
-                        <div class="file-ai-status">
-                          <div class="loading-spinner small"></div>
+                        <div class="flex items-center gap-1.5 text-[0.78rem] text-primary py-1">
+                          <div class="loading-spinner-sm"></div>
                           Applying AI changes...
                         </div>
                       } @else {
-                        <input type="text" class="file-ai-input" placeholder="AI: Describe changes to this file..." [(ngModel)]="fileAiPrompt" (keydown.enter)="runFileAiPrompt()" />
-                        <button class="icon-btn accent" (click)="runFileAiPrompt()" [disabled]="!fileAiPrompt.trim()">
+                        <input type="text" class="flex-1 py-1.5 px-2.5 text-[0.78rem] font-sans bg-black/20 border border-white/[0.06] rounded-md text-white outline-none transition-colors focus:border-primary placeholder:text-text-secondary" placeholder="AI: Describe changes to this file..." [(ngModel)]="fileAiPrompt" (keydown.enter)="runFileAiPrompt()" />
+                        <button class="icon-btn-sm-accent" (click)="runFileAiPrompt()" [disabled]="!fileAiPrompt.trim()">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26z"/></svg>
                         </button>
                       }
                     </div>
-                    <textarea class="file-editor-content" [(ngModel)]="fileContent" spellcheck="false" (keydown)="onEditorKeydown($event)" (dragover)="onEditorDragOver($event)" (drop)="onEditorDrop($event)"></textarea>
+                    <textarea class="flex-1 min-h-0 bg-transparent border-none text-[#e2e8f0] font-mono text-[0.78rem] leading-[1.7] p-4 resize-none outline-none w-full whitespace-pre overflow-auto caret-primary selection:bg-primary/20 sidebar-scrollbar" [(ngModel)]="fileContent" spellcheck="false" (keydown)="onEditorKeydown($event)" (dragover)="onEditorDragOver($event)" (drop)="onEditorDrop($event)" style="tab-size:2"></textarea>
                   </div>
                 } @else {
-                  <div class="empty-state small">
-                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6"/><path d="m9 15 3-3 3 3"/></svg>
-                    <p>Select a file to edit</p>
-                    <span>Click any editable file in the tree to open it here.</span>
+                  <div class="flex flex-col items-center justify-center text-center py-10 px-5 text-text-secondary gap-3">
+                    <svg class="opacity-40" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6"/><path d="m9 15 3-3 3 3"/></svg>
+                    <p class="m-0">Select a file to edit</p>
+                    <span class="text-[0.75rem]">Click any editable file in the tree to open it here.</span>
                   </div>
                 }
               </div>
@@ -405,21 +433,21 @@
 
       <!-- ═══ DESIGN & THEME ═══ -->
       @if (activeNav() === 'design') {
-        <div class="panel-content">
+        <div class="p-7 flex-1 overflow-y-auto animate-fade-in max-md:p-4">
           @if (selectedSite()!.status === 'published') {
-            <div class="section-card">
-              <div class="section-header">
-                <h3>Live Preview</h3>
-                <button class="action-btn small" (click)="editInBolt(selectedSite()!)">Open in AI Editor</button>
+            <div class="bg-white/[0.02] border border-white/[0.06] rounded-[14px] p-6">
+              <div class="flex items-center gap-3 mb-[18px]">
+                <h3 class="text-base font-semibold text-white m-0">Live Preview</h3>
+                <button class="btn-ghost-sm ml-auto" (click)="editInBolt(selectedSite()!)">Open in AI Editor</button>
               </div>
-              <div class="design-iframe-wrap">
-                <iframe [src]="getSafeSiteUrl(selectedSite()!)" class="design-iframe" sandbox="allow-scripts allow-same-origin"></iframe>
+              <div class="rounded-[10px] overflow-hidden border border-white/[0.06]">
+                <iframe [src]="getSafeSiteUrl(selectedSite()!)" class="w-full h-[70vh] border-none bg-[#0a0a1a]" sandbox="allow-scripts allow-same-origin"></iframe>
               </div>
             </div>
           } @else {
-            <div class="empty-state small">
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-              <p>Publish your site first to preview and edit the design.</p>
+            <div class="flex flex-col items-center justify-center text-center py-10 px-5 text-text-secondary gap-3">
+              <svg class="opacity-40" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+              <p class="m-0">Publish your site first to preview and edit the design.</p>
             </div>
           }
         </div>
@@ -427,35 +455,37 @@
 
       <!-- ═══ DOMAINS ═══ -->
       @if (activeNav() === 'domains') {
-        <div class="panel-content">
-          <div class="section-card">
-            <div class="tabs-bar">
-              <button class="tab-btn" [class.active]="domainTab() === 'existing'" (click)="domainTab.set('existing')">Your Domains</button>
-              <button class="tab-btn" [class.active]="domainTab() === 'connect'" (click)="domainTab.set('connect')">Connect Domain</button>
-              <button class="tab-btn" [class.active]="domainTab() === 'register'" (click)="domainTab.set('register')">Register New</button>
+        <div class="p-7 flex-1 overflow-y-auto animate-fade-in max-md:p-4">
+          <div class="bg-white/[0.02] border border-white/[0.06] rounded-[14px] p-6">
+            <!-- Tabs -->
+            <div class="flex gap-1 mb-5 p-1 bg-primary/[0.03] rounded-[10px] border border-white/[0.06]">
+              <button class="flex-1 py-2 px-4 border-none bg-transparent text-text-secondary text-[0.78rem] font-medium font-sans cursor-pointer rounded-[7px] transition-all" [class.tab-active]="domainTab() === 'existing'" (click)="domainTab.set('existing')">Your Domains</button>
+              <button class="flex-1 py-2 px-4 border-none bg-transparent text-text-secondary text-[0.78rem] font-medium font-sans cursor-pointer rounded-[7px] transition-all" [class.tab-active]="domainTab() === 'connect'" (click)="domainTab.set('connect')">Connect Domain</button>
+              <button class="flex-1 py-2 px-4 border-none bg-transparent text-text-secondary text-[0.78rem] font-medium font-sans cursor-pointer rounded-[7px] transition-all" [class.tab-active]="domainTab() === 'register'" (click)="domainTab.set('register')">Register New</button>
             </div>
 
             @if (loadingHostnames()) {
-              <div class="panel-loading"><div class="loading-spinner"></div><span>Loading domains...</span></div>
+              <div class="flex flex-col items-center justify-center gap-3 py-[60px] text-text-secondary text-[0.85rem]"><div class="loading-spinner"></div><span>Loading domains...</span></div>
             } @else {
               @if (domainTab() === 'existing') {
-                <div class="hostname-list">
-                  <div class="hostname-item default">
-                    <div class="hostname-info">
-                      <span class="hn-dot hn-active"></span>
+                <div class="flex flex-col gap-2">
+                  <!-- Default subdomain -->
+                  <div class="flex flex-col gap-2 p-3.5 px-4 bg-primary/[0.04] rounded-[10px] border border-primary/10">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span class="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.4)] flex-shrink-0"></span>
                       @if (editingSlugInModal()) {
-                        <div class="inline-edit">
-                          <input class="inline-input slug" [(ngModel)]="modalSlugValue" (keyup.enter)="saveSlugFromModal()" (keyup.escape)="cancelSlugEdit()" />
-                          <span class="slug-suffix">.projectsites.dev</span>
-                          <button class="action-btn small" (click)="saveSlugFromModal()">Save</button>
-                          <button class="action-btn small" (click)="cancelSlugEdit()">Cancel</button>
+                        <div class="flex items-center gap-1">
+                          <input class="text-[0.8rem] font-medium font-sans bg-black/30 border border-primary rounded-md text-white py-1 px-2.5 outline-none flex-1 min-w-0 shadow-[0_0_0_2px_rgba(0,229,255,0.1)]" [(ngModel)]="modalSlugValue" (keyup.enter)="saveSlugFromModal()" (keyup.escape)="cancelSlugEdit()" />
+                          <span class="text-[0.75rem] text-text-secondary whitespace-nowrap">.projectsites.dev</span>
+                          <button class="btn-ghost-sm" (click)="saveSlugFromModal()">Save</button>
+                          <button class="btn-ghost-sm" (click)="cancelSlugEdit()">Cancel</button>
                         </div>
                       } @else {
-                        <a [href]="'https://' + selectedSite()!.slug + '.projectsites.dev'" target="_blank" rel="noopener" class="hostname-name">
+                        <a [href]="'https://' + selectedSite()!.slug + '.projectsites.dev'" target="_blank" rel="noopener" class="text-[0.85rem] text-primary no-underline hover:text-shadow-[0_0_8px_rgba(0,229,255,0.3)]">
                           {{ selectedSite()!.slug }}.projectsites.dev
                         </a>
-                        <span class="hn-chip">Default</span>
-                        <button class="icon-btn" (click)="startSlugEdit()" title="Change subdomain">
+                        <span class="text-[0.58rem] font-bold py-px px-2 rounded uppercase bg-text-secondary/10 text-text-secondary">Default</span>
+                        <button class="icon-btn-sm" (click)="startSlugEdit()" title="Change subdomain">
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
                         </button>
                       }
@@ -463,78 +493,78 @@
                   </div>
 
                   @for (hn of hostnames(); track hn.id) {
-                    <div class="hostname-item">
-                      <div class="hostname-info">
-                        <span class="hn-dot" [class]="getHostnameStatusClass(hn.status)"></span>
-                        <a [href]="'https://' + hn.hostname" target="_blank" rel="noopener" class="hostname-name">{{ hn.hostname }}</a>
-                        @if (hn.is_primary) { <span class="hn-chip primary">Primary</span> }
-                        <span class="hn-chip" [class]="hn.status">{{ hn.status }}</span>
+                    <div class="flex flex-col gap-2 p-3.5 px-4 bg-primary/[0.02] rounded-[10px] border border-white/[0.06] transition-colors hover:border-primary/[0.15]">
+                      <div class="flex items-center gap-2 flex-wrap">
+                        <span class="w-2 h-2 rounded-full flex-shrink-0" [class]="'hn-dot-' + hn.status"></span>
+                        <a [href]="'https://' + hn.hostname" target="_blank" rel="noopener" class="text-[0.85rem] text-primary no-underline hover:text-shadow-[0_0_8px_rgba(0,229,255,0.3)]">{{ hn.hostname }}</a>
+                        @if (hn.is_primary) { <span class="text-[0.58rem] font-bold py-px px-2 rounded uppercase bg-primary/[0.12] text-primary">Primary</span> }
+                        <span class="text-[0.58rem] font-bold py-px px-2 rounded uppercase" [class]="'hn-chip-' + hn.status">{{ hn.status }}</span>
                       </div>
                       @if (hn.status === 'pending') {
-                        <div class="cname-hint">
+                        <div class="flex items-center gap-1.5 text-[0.75rem] text-amber-400 py-1.5 px-2.5 bg-amber-400/5 rounded-md">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                          Point CNAME to <code>projectsites.dev</code> -- DNS may take 24-72 hours.
+                          Point CNAME to <code class="bg-primary/10 py-px px-1.5 rounded text-[0.72rem] text-primary">projectsites.dev</code> -- DNS may take 24-72 hours.
                         </div>
                       }
-                      <div class="hostname-actions">
+                      <div class="flex gap-1.5">
                         @if (!hn.is_primary) {
-                          <button class="action-btn small" (click)="setPrimary(hn.id)">Set Primary</button>
+                          <button class="btn-ghost-sm" (click)="setPrimary(hn.id)">Set Primary</button>
                         }
-                        <button class="action-btn small danger" (click)="deleteHostname(hn.id)">Remove</button>
+                        <button class="btn-ghost-sm-danger" (click)="deleteHostname(hn.id)">Remove</button>
                       </div>
                     </div>
                   }
 
                   @if (hostnames().length === 0) {
-                    <p class="muted-text">No custom domains configured yet.</p>
+                    <p class="text-[0.78rem] text-text-secondary my-2">No custom domains configured yet.</p>
                   }
                 </div>
               }
 
               @if (domainTab() === 'connect') {
-                <div class="domain-form">
-                  <div class="form-instructions">
-                    <h4>Connect your domain</h4>
-                    <p>1. Go to your domain registrar's DNS settings</p>
-                    <p>2. Add a <strong>CNAME</strong> record pointing to <code>projectsites.dev</code></p>
-                    <p>3. Enter your domain below and click "Add Domain"</p>
+                <div class="flex flex-col gap-4">
+                  <div class="p-4 bg-primary/[0.03] rounded-[10px] border border-white/[0.06]">
+                    <h4 class="text-white text-[0.9rem] m-0 mb-2.5">Connect your domain</h4>
+                    <p class="text-text-secondary text-[0.8rem] my-1">1. Go to your domain registrar's DNS settings</p>
+                    <p class="text-text-secondary text-[0.8rem] my-1">2. Add a <strong>CNAME</strong> record pointing to <code class="bg-primary/10 py-px px-1.5 rounded text-[0.78rem] text-primary">projectsites.dev</code></p>
+                    <p class="text-text-secondary text-[0.8rem] my-1">3. Enter your domain below and click "Add Domain"</p>
                   </div>
-                  <div class="form-row">
-                    <input type="text" class="input-field" placeholder="www.yourdomain.com" [(ngModel)]="newHostname" (keyup.enter)="addHostname()" />
-                    <button class="action-btn accent" (click)="addHostname()" [disabled]="!newHostname.trim()">Add Domain</button>
+                  <div class="flex gap-2.5 items-center">
+                    <input type="text" class="input-field flex-1" placeholder="www.yourdomain.com" [(ngModel)]="newHostname" (keyup.enter)="addHostname()" />
+                    <button class="btn-accent" (click)="addHostname()" [disabled]="!newHostname.trim()">Add Domain</button>
                   </div>
-                  <p class="muted-text">We will monitor DNS until it resolves. Usually takes 24-72 hours.</p>
+                  <p class="text-[0.78rem] text-text-secondary my-0">We will monitor DNS until it resolves. Usually takes 24-72 hours.</p>
                 </div>
               }
 
               @if (domainTab() === 'register') {
-                <div class="domain-form">
-                  <div class="form-instructions">
-                    <h4>Register a new domain</h4>
-                    <p>Search for an available domain name and register it through Cloudflare.</p>
+                <div class="flex flex-col gap-4">
+                  <div class="p-4 bg-primary/[0.03] rounded-[10px] border border-white/[0.06]">
+                    <h4 class="text-white text-[0.9rem] m-0 mb-2.5">Register a new domain</h4>
+                    <p class="text-text-secondary text-[0.8rem] my-1">Search for an available domain name and register it through Cloudflare.</p>
                   </div>
-                  <div class="form-row">
-                    <input type="text" class="input-field" placeholder="yourbusiness.com" [(ngModel)]="registerDomainQuery" (keyup.enter)="checkDomainAvailability()" />
-                    <button class="action-btn accent" (click)="checkDomainAvailability()" [disabled]="checkingDomain() || !registerDomainQuery.trim()">
+                  <div class="flex gap-2.5 items-center">
+                    <input type="text" class="input-field flex-1" placeholder="yourbusiness.com" [(ngModel)]="registerDomainQuery" (keyup.enter)="checkDomainAvailability()" />
+                    <button class="btn-accent" (click)="checkDomainAvailability()" [disabled]="checkingDomain() || !registerDomainQuery.trim()">
                       {{ checkingDomain() ? 'Checking...' : 'Check Availability' }}
                     </button>
                   </div>
                   @if (domainCheckResult()) {
-                    <div class="domain-result" [class.available]="domainCheckResult()!.available">
+                    <div class="p-4 rounded-[10px] border border-white/[0.06] bg-black/10" [class.domain-available]="domainCheckResult()!.available">
                       @if (domainCheckResult()!.available) {
-                        <div class="domain-available-msg">
+                        <div class="flex items-center gap-2 text-green-500 text-[0.9rem] mb-2">
                           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                          <strong>{{ domainCheckResult()!.domain }}</strong> is available!
+                          <strong class="text-primary">{{ domainCheckResult()!.domain }}</strong> is available!
                         </div>
-                        <p class="muted-text">Starting at $12/year</p>
-                        <a class="action-btn accent" href="https://www.cloudflare.com/products/registrar/" target="_blank" rel="noopener">Register on Cloudflare</a>
-                        <p class="muted-text">After registering, come back to the "Connect Domain" tab to link it to your site.</p>
+                        <p class="text-[0.78rem] text-text-secondary my-1">Starting at $12/year</p>
+                        <a class="btn-accent inline-flex mt-2" href="https://www.cloudflare.com/products/registrar/" target="_blank" rel="noopener">Register on Cloudflare</a>
+                        <p class="text-[0.78rem] text-text-secondary mt-2 mb-0">After registering, come back to the "Connect Domain" tab to link it to your site.</p>
                       } @else {
-                        <div class="domain-taken-msg">
+                        <div class="flex items-center gap-2 text-red-500 text-[0.9rem] mb-2">
                           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-                          <strong>{{ domainCheckResult()!.domain }}</strong> is not available.
+                          <strong class="text-white">{{ domainCheckResult()!.domain }}</strong> is not available.
                         </div>
-                        <p class="muted-text">Try a different name or extension (.net, .co, .io).</p>
+                        <p class="text-[0.78rem] text-text-secondary my-1">Try a different name or extension (.net, .co, .io).</p>
                       }
                     </div>
                   }
@@ -547,39 +577,39 @@
 
       <!-- ═══ SNAPSHOTS ═══ -->
       @if (activeNav() === 'snapshots') {
-        <div class="panel-content">
-          <div class="section-card">
-            <div class="section-header">
-              <h3>Snapshots</h3>
-              <span class="section-subtitle">{{ selectedSite()!.slug }}-{{ '{' }}name{{ '}' }}.projectsites.dev</span>
+        <div class="p-7 flex-1 overflow-y-auto animate-fade-in max-md:p-4">
+          <div class="bg-white/[0.02] border border-white/[0.06] rounded-[14px] p-6">
+            <div class="flex items-center gap-3 mb-[18px]">
+              <h3 class="text-base font-semibold text-white m-0">Snapshots</h3>
+              <span class="text-[0.75rem] text-text-secondary font-mono">{{ selectedSite()!.slug }}-&#123;name&#125;.projectsites.dev</span>
             </div>
-            <div class="snapshot-create">
-              <div class="form-row">
-                <input type="text" placeholder="Name (e.g., v2, redesign)" [(ngModel)]="newSnapshotName" class="input-field" maxlength="30" />
-                <button class="action-btn accent" [disabled]="creatingSnapshot() || !newSnapshotName.trim()" (click)="createSnapshot()">
+            <div class="flex flex-col gap-2 pb-5 mb-5 border-b border-white/[0.06]">
+              <div class="flex gap-2.5 items-center">
+                <input type="text" placeholder="Name (e.g., v2, redesign)" [(ngModel)]="newSnapshotName" class="input-field flex-1" maxlength="30" />
+                <button class="btn-accent" [disabled]="creatingSnapshot() || !newSnapshotName.trim()" (click)="createSnapshot()">
                   {{ creatingSnapshot() ? 'Creating...' : 'Create Snapshot' }}
                 </button>
               </div>
               <input type="text" placeholder="Description (optional)" [(ngModel)]="newSnapshotDescription" class="input-field" />
             </div>
             @if (loadingSnapshots()) {
-              <div class="panel-loading"><div class="loading-spinner"></div><span>Loading snapshots...</span></div>
+              <div class="flex flex-col items-center justify-center gap-3 py-[60px] text-text-secondary text-[0.85rem]"><div class="loading-spinner"></div><span>Loading snapshots...</span></div>
             } @else if (snapshots().length === 0) {
-              <p class="muted-text">No snapshots yet. The first one is created when your site is built.</p>
+              <p class="text-[0.78rem] text-text-secondary my-2">No snapshots yet. The first one is created when your site is built.</p>
             } @else {
-              <div class="snapshot-list">
+              <div class="flex flex-col gap-2 max-h-[400px] overflow-y-auto">
                 @for (snap of snapshots(); track snap.id) {
-                  <div class="snapshot-item">
-                    <div class="snapshot-info">
-                      <a class="snapshot-name" [href]="'https://' + selectedSite()!.slug + '-' + snap.snapshot_name + '.projectsites.dev'" target="_blank" rel="noopener">
+                  <div class="flex items-center justify-between p-3 px-3.5 rounded-lg bg-white/[0.02] border border-white/[0.06] transition-colors hover:border-primary/[0.12]">
+                    <div class="flex flex-col gap-0.5 min-w-0">
+                      <a class="font-semibold text-[0.85rem] text-primary no-underline hover:underline" [href]="'https://' + selectedSite()!.slug + '-' + snap.snapshot_name + '.projectsites.dev'" target="_blank" rel="noopener">
                         {{ snap.snapshot_name }}
                       </a>
-                      <span class="snapshot-meta">{{ snap.build_version }} &middot; {{ snap.created_at | date:'short' }}</span>
+                      <span class="text-[0.68rem] text-text-secondary font-mono">{{ snap.build_version }} &middot; {{ snap.created_at | date:'short' }}</span>
                       @if (snap.description) {
-                        <span class="snapshot-desc">{{ snap.description }}</span>
+                        <span class="text-[0.75rem] text-text-secondary">{{ snap.description }}</span>
                       }
                     </div>
-                    <button class="icon-btn danger" (click)="deleteSnapshot(snap.id)" title="Delete snapshot">
+                    <button class="icon-btn-sm-danger" (click)="deleteSnapshot(snap.id)" title="Delete snapshot">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                     </button>
                   </div>
@@ -592,45 +622,45 @@
 
       <!-- ═══ ANALYTICS ═══ -->
       @if (activeNav() === 'analytics') {
-        <div class="panel-content">
-          <div class="empty-state small">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
-            <h3>Analytics</h3>
-            <p>Traffic analytics are coming soon. Your site is being tracked automatically.</p>
+        <div class="p-7 flex-1 overflow-y-auto animate-fade-in max-md:p-4">
+          <div class="flex flex-col items-center justify-center text-center py-10 px-5 text-text-secondary gap-3">
+            <svg class="opacity-40" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+            <h3 class="text-white font-semibold text-base m-0">Analytics</h3>
+            <p class="text-[0.9rem] max-w-[400px] m-0">Traffic analytics are coming soon. Your site is being tracked automatically.</p>
           </div>
         </div>
       }
 
       <!-- ═══ SEO ═══ -->
       @if (activeNav() === 'seo') {
-        <div class="panel-content">
-          <div class="empty-state small">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <h3>SEO Settings</h3>
-            <p>SEO configuration tools are coming soon. Your site already includes optimized meta tags, schema markup, and sitemap.</p>
+        <div class="p-7 flex-1 overflow-y-auto animate-fade-in max-md:p-4">
+          <div class="flex flex-col items-center justify-center text-center py-10 px-5 text-text-secondary gap-3">
+            <svg class="opacity-40" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <h3 class="text-white font-semibold text-base m-0">SEO Settings</h3>
+            <p class="text-[0.9rem] max-w-[400px] m-0">SEO configuration tools are coming soon. Your site already includes optimized meta tags, schema markup, and sitemap.</p>
           </div>
         </div>
       }
 
       <!-- ═══ BILLING ═══ -->
       @if (activeNav() === 'billing') {
-        <div class="panel-content">
-          <div class="section-card">
-            <div class="section-header">
-              <h3>Billing & Plan</h3>
+        <div class="p-7 flex-1 overflow-y-auto animate-fade-in max-md:p-4">
+          <div class="bg-white/[0.02] border border-white/[0.06] rounded-[14px] p-6">
+            <div class="flex items-center gap-3 mb-[18px]">
+              <h3 class="text-base font-semibold text-white m-0">Billing & Plan</h3>
             </div>
-            <div class="billing-info">
-              <div class="billing-plan">
-                <span class="billing-label">Current Plan</span>
-                <span class="billing-value">{{ subscription()?.status === 'active' ? 'Pro' : 'Free' }}</span>
+            <div class="flex gap-8 mb-5">
+              <div class="flex flex-col gap-1">
+                <span class="text-[0.72rem] text-text-secondary uppercase tracking-wide">Current Plan</span>
+                <span class="text-lg font-bold text-white">{{ subscription()?.status === 'active' ? 'Pro' : 'Free' }}</span>
               </div>
-              <div class="billing-plan">
-                <span class="billing-label">Status</span>
-                <span class="billing-value">{{ subscription()?.status || 'No subscription' }}</span>
+              <div class="flex flex-col gap-1">
+                <span class="text-[0.72rem] text-text-secondary uppercase tracking-wide">Status</span>
+                <span class="text-lg font-bold text-white">{{ subscription()?.status || 'No subscription' }}</span>
               </div>
             </div>
             @if (subscription()?.status === 'active') {
-              <button class="action-btn" (click)="openBilling()">
+              <button class="btn-ghost" (click)="openBilling()">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
                 Manage Subscription
               </button>
@@ -641,35 +671,35 @@
 
       <!-- ═══ AUDIT LOG ═══ -->
       @if (activeNav() === 'audit') {
-        <div class="panel-content panel-full">
-          <div class="logs-toolbar">
-            <span class="logs-count">{{ logs().length }} log {{ logs().length === 1 ? 'entry' : 'entries' }}</span>
-            <div class="logs-toolbar-actions">
-              <button class="icon-btn" (click)="copyLogsForAI()" title="Copy logs for AI">
+        <div class="p-5 flex-1 overflow-y-auto animate-fade-in">
+          <div class="flex items-center justify-between mb-3 gap-2">
+            <span class="text-[0.72rem] text-text-secondary">{{ logs().length }} log {{ logs().length === 1 ? 'entry' : 'entries' }}</span>
+            <div class="flex items-center gap-1">
+              <button class="icon-btn-sm" (click)="copyLogsForAI()" title="Copy logs for AI">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
               </button>
-              <button class="icon-btn" (click)="loadLogs(selectedSite()!.id)" title="Refresh logs">
+              <button class="icon-btn-sm" (click)="loadLogs(selectedSite()!.id)" title="Refresh logs">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
               </button>
             </div>
           </div>
           @if (loadingLogs()) {
-            <div class="panel-loading"><div class="loading-spinner"></div><span>Loading logs...</span></div>
+            <div class="flex flex-col items-center justify-center gap-3 py-[60px] text-text-secondary text-[0.85rem]"><div class="loading-spinner"></div><span>Loading logs...</span></div>
           } @else if (logs().length === 0) {
-            <div class="empty-state small"><p>No logs yet for this site.</p></div>
+            <div class="flex flex-col items-center justify-center text-center py-10 px-5 text-text-secondary"><p class="m-0">No logs yet for this site.</p></div>
           } @else {
-            <div class="logs-container">
+            <div class="bg-[rgba(6,6,18,0.85)] border border-primary/[0.06] rounded-xl overflow-y-auto overflow-x-hidden max-h-[calc(100vh-200px)] font-mono text-[0.72rem] leading-relaxed sidebar-scrollbar">
               @for (log of logs(); track log.id) {
-                <div class="log-entry" [class]="getLogColorClass(log.action)">
-                  <div class="log-edge"></div>
-                  <div class="log-icon" [innerHTML]="getLogIcon(log.action)"></div>
-                  <div class="log-body">
-                    <div class="log-header">
-                      <span class="log-action">{{ formatLogAction(log.action) }}</span>
-                      <span class="log-ts">{{ formatLogTimestamp(log.created_at) }}</span>
+                <div class="grid grid-cols-[3px_28px_1fr] border-b border-white/[0.025] items-stretch transition-colors hover:bg-primary/[0.025] last:border-b-0" [class]="getLogColorClass(log.action)">
+                  <div class="log-edge rounded-l"></div>
+                  <div class="flex items-center justify-center py-2 px-0.5 opacity-70" [innerHTML]="getLogIcon(log.action)"></div>
+                  <div class="py-[7px] pr-3 pl-1.5 min-w-0">
+                    <div class="flex items-baseline gap-2 flex-wrap">
+                      <span class="font-semibold text-[0.72rem] whitespace-nowrap log-action">{{ formatLogAction(log.action) }}</span>
+                      <span class="text-text-secondary/50 text-[0.62rem] whitespace-nowrap ml-auto">{{ formatLogTimestamp(log.created_at) }}</span>
                     </div>
                     @if (log.metadata_json) {
-                      <div class="log-meta" [innerHTML]="formatLogMeta(log.metadata_json, log.action)"></div>
+                      <div class="text-text-secondary/[0.55] text-[0.65rem] mt-0.5 break-words leading-snug log-meta-html" [innerHTML]="formatLogMeta(log.metadata_json, log.action)"></div>
                     }
                   </div>
                 </div>
@@ -681,29 +711,29 @@
 
       <!-- ═══ SETTINGS ═══ -->
       @if (activeNav() === 'settings') {
-        <div class="panel-content">
-          <div class="section-card">
-            <div class="section-header">
-              <h3>Site Settings</h3>
+        <div class="p-7 flex-1 overflow-y-auto animate-fade-in max-md:p-4">
+          <div class="bg-white/[0.02] border border-white/[0.06] rounded-[14px] p-6">
+            <div class="flex items-center gap-3 mb-[18px]">
+              <h3 class="text-base font-semibold text-white m-0">Site Settings</h3>
             </div>
-            <div class="settings-group">
-              <label class="settings-label">Site Name</label>
-              <div class="form-row">
-                <input type="text" class="input-field" [value]="selectedSite()!.business_name" (keyup.enter)="editValue = $any($event.target).value; editingField.set('name'); saveEdit(selectedSite()!.id)" #nameInput />
-                <button class="action-btn small" (click)="editValue = nameInput.value; editingField.set('name'); saveEdit(selectedSite()!.id)">Save</button>
+            <div class="mb-5">
+              <label class="block text-[0.78rem] font-semibold text-text-secondary mb-2">Site Name</label>
+              <div class="flex gap-2.5 items-center">
+                <input type="text" class="input-field flex-1" [value]="selectedSite()!.business_name" (keyup.enter)="editValue = $any($event.target).value; editingField.set('name'); saveEdit(selectedSite()!.id)" #nameInput />
+                <button class="btn-ghost-sm" (click)="editValue = nameInput.value; editingField.set('name'); saveEdit(selectedSite()!.id)">Save</button>
               </div>
             </div>
-            <div class="settings-group">
-              <label class="settings-label">Slug</label>
-              <div class="form-row">
-                <input type="text" class="input-field" [value]="selectedSite()!.slug" #slugInput />
-                <span class="slug-suffix">.projectsites.dev</span>
-                <button class="action-btn small" (click)="editValue = slugInput.value; editingField.set('slug'); saveEdit(selectedSite()!.id)">Save</button>
+            <div class="mb-5">
+              <label class="block text-[0.78rem] font-semibold text-text-secondary mb-2">Slug</label>
+              <div class="flex gap-2.5 items-center">
+                <input type="text" class="input-field flex-1" [value]="selectedSite()!.slug" #slugInput />
+                <span class="text-[0.75rem] text-text-secondary whitespace-nowrap">.projectsites.dev</span>
+                <button class="btn-ghost-sm" (click)="editValue = slugInput.value; editingField.set('slug'); saveEdit(selectedSite()!.id)">Save</button>
               </div>
             </div>
-            <div class="settings-danger-zone">
-              <h4>Danger Zone</h4>
-              <button class="action-btn danger" (click)="confirmDelete(selectedSite()!)">
+            <div class="mt-8 pt-5 border-t border-red-500/[0.12]">
+              <h4 class="text-[0.85rem] font-semibold text-red-500 m-0 mb-3">Danger Zone</h4>
+              <button class="btn-ghost-danger" (click)="confirmDelete(selectedSite()!)">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                 Delete Site
               </button>
@@ -721,26 +751,33 @@
 <ng-template #treeNodes let-nodes>
   @for (node of nodes; track node.name) {
     @if (node.isDir) {
-      <div class="tree-dir">
-        <div class="tree-dir-label" (click)="toggleTreeDir(node)">
-          <svg class="tree-chevron" [class.expanded]="node.expanded" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m9 18 6-6-6-6"/></svg>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-          <span>{{ node.name }}</span>
+      <div>
+        <div class="flex items-center gap-[5px] py-1 px-2.5 text-text-secondary cursor-pointer select-none transition-all hover:bg-primary/5 hover:text-primary" (click)="toggleTreeDir(node)">
+          <svg class="flex-shrink-0 opacity-50 transition-transform" [class.rotate-90]="node.expanded" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m9 18 6-6-6-6"/></svg>
+          <svg class="flex-shrink-0 text-primary opacity-60" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          <span class="overflow-hidden text-ellipsis whitespace-nowrap font-semibold">{{ node.name }}</span>
         </div>
         @if (node.expanded) {
-          <div class="tree-children">
+          <div class="pl-3.5 border-l border-primary/[0.06] ml-2.5">
             <ng-container *ngTemplateOutlet="treeNodes; context: { $implicit: node.children }"></ng-container>
           </div>
         }
       </div>
     } @else {
-      <div class="tree-file" [class.active]="editingFile()?.key === node.key" [class.editable]="isEditableFile(node.key || '')" (click)="selectTreeFile(node)" (dragover)="onTreeDragOver($event)" (drop)="onTreeDrop($event, node)">
-        <span class="tree-file-icon" [innerHTML]="getFileIcon(node.name)"></span>
-        <span class="tree-file-name" (dblclick)="startRenameFile(node, $event)">{{ node.name }}</span>
+      <div
+        class="flex items-center gap-1.5 py-[3px] px-2.5 pl-3 text-text-secondary select-none cursor-default transition-all group"
+        [class.cursor-pointer]="isEditableFile(node.key || '')"
+        [class.file-hover]="isEditableFile(node.key || '')"
+        [class.file-active]="editingFile()?.key === node.key"
+        (click)="selectTreeFile(node)"
+        (dragover)="onTreeDragOver($event)"
+        (drop)="onTreeDrop($event, node)">
+        <span class="flex-shrink-0 flex items-center opacity-60" [innerHTML]="getFileIcon(node.name)"></span>
+        <span class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap transition-colors cursor-pointer" [class.text-primary]="editingFile()?.key === node.key" [class.font-semibold]="editingFile()?.key === node.key" (dblclick)="startRenameFile(node, $event)">{{ node.name }}</span>
         @if (node.size) {
-          <span class="tree-file-size">{{ formatFileSize(node.size) }}</span>
+          <span class="text-[0.62rem] text-text-secondary/60 flex-shrink-0 whitespace-nowrap">{{ formatFileSize(node.size) }}</span>
         }
-        <button class="tree-file-delete" (click)="deleteTreeFile(node, $event)" title="Delete">
+        <button class="hidden group-hover:flex items-center justify-center w-5 h-5 border-none rounded bg-transparent text-text-secondary cursor-pointer ml-auto flex-shrink-0 hover:bg-red-500/[0.15] hover:text-red-500" (click)="deleteTreeFile(node, $event)" title="Delete">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
         </button>
       </div>
@@ -752,23 +789,23 @@
 <!-- Delete Modal                                            -->
 <!-- ═══════════════════════════════════════════════════════ -->
 @if (deletingSite()) {
-  <div class="modal-overlay" (click)="cancelDelete()">
-    <div class="modal-card" (click)="$event.stopPropagation()">
-      <div class="modal-icon danger">
+  <div class="fixed inset-0 bg-black/75 backdrop-blur-[12px] z-[10000] flex items-center justify-center p-6" (click)="cancelDelete()">
+    <div class="bg-gradient-to-br from-[rgba(13,13,40,0.98)] to-[rgba(8,8,32,1)] border border-primary/10 rounded-2xl p-8 max-w-[480px] w-full modal-anim shadow-[0_16px_48px_rgba(0,0,0,0.5),0_0_60px_rgba(0,229,255,0.03)] relative" (click)="$event.stopPropagation()">
+      <div class="w-14 h-14 rounded-[14px] bg-red-500/10 flex items-center justify-center mb-4 text-red-500">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
       </div>
-      <h3>Delete "{{ deletingSite()!.business_name }}"?</h3>
-      <p class="modal-desc">This will permanently remove the site and its domains. This cannot be undone.</p>
+      <h3 class="text-xl font-bold mb-3 text-white">Delete "{{ deletingSite()!.business_name }}"?</h3>
+      <p class="text-text-secondary text-[0.85rem] mb-5">This will permanently remove the site and its domains. This cannot be undone.</p>
       @if (deletingSite()!.plan === 'paid') {
-        <label class="checkbox-row">
-          <input type="checkbox" [(ngModel)]="deleteCancelSub" />
+        <label class="flex items-center gap-2.5 p-3 px-3.5 bg-red-500/[0.04] rounded-[10px] border border-red-500/[0.08] cursor-pointer mb-2 text-[0.85rem] text-text-secondary">
+          <input type="checkbox" class="accent-primary w-4 h-4" [(ngModel)]="deleteCancelSub" />
           <span>Also cancel my paid subscription</span>
         </label>
-        <p class="checkbox-hint">Uncheck to keep your subscription credit for a new site.</p>
+        <p class="text-[0.75rem] text-text-secondary mb-4 pl-1">Uncheck to keep your subscription credit for a new site.</p>
       }
-      <div class="modal-actions">
-        <button class="action-btn" (click)="cancelDelete()">Cancel</button>
-        <button class="action-btn danger" (click)="deleteSite()">Delete Site</button>
+      <div class="flex gap-3 justify-end mt-5">
+        <button class="btn-ghost" (click)="cancelDelete()">Cancel</button>
+        <button class="btn-ghost-danger" (click)="deleteSite()">Delete Site</button>
       </div>
     </div>
   </div>
@@ -778,16 +815,16 @@
 <!-- Deploy Modal                                            -->
 <!-- ═══════════════════════════════════════════════════════ -->
 @if (deployModalSiteId()) {
-  <div class="modal-overlay" (click)="closeDeploy()">
-    <div class="modal-card" (click)="$event.stopPropagation()">
-      <button class="modal-close" (click)="closeDeploy()">&times;</button>
-      <div class="modal-icon">
+  <div class="fixed inset-0 bg-black/75 backdrop-blur-[12px] z-[10000] flex items-center justify-center p-6" (click)="closeDeploy()">
+    <div class="bg-gradient-to-br from-[rgba(13,13,40,0.98)] to-[rgba(8,8,32,1)] border border-primary/10 rounded-2xl p-8 max-w-[480px] w-full modal-anim shadow-[0_16px_48px_rgba(0,0,0,0.5),0_0_60px_rgba(0,229,255,0.03)] relative" (click)="$event.stopPropagation()">
+      <button class="absolute top-3 right-3 bg-white/[0.04] border border-white/[0.06] text-text-secondary cursor-pointer py-1 px-2 text-xl leading-none rounded-lg transition-all hover:text-white hover:bg-red-500/[0.08]" (click)="closeDeploy()">&times;</button>
+      <div class="w-14 h-14 rounded-[14px] bg-primary/[0.08] flex items-center justify-center mb-4 text-primary">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
       </div>
-      <h3>Deploy to {{ deployModalSiteName() }}</h3>
-      <p class="modal-desc">Upload a ZIP file containing your site files. It will be extracted and deployed.</p>
+      <h3 class="text-xl font-bold mb-3 text-white">Deploy to {{ deployModalSiteName() }}</h3>
+      <p class="text-text-secondary text-[0.85rem] mb-5">Upload a ZIP file containing your site files. It will be extracted and deployed.</p>
 
-      <div class="deploy-zone" (click)="deployFileInput.click()">
+      <div class="flex flex-col items-center justify-center gap-2.5 py-8 px-6 border-2 border-dashed border-primary/[0.15] rounded-xl bg-primary/[0.02] cursor-pointer transition-all text-text-secondary text-[0.85rem] mb-4 hover:border-primary/[0.35] hover:bg-primary/5 hover:text-primary" (click)="deployFileInput.click()">
         <input #deployFileInput type="file" accept=".zip" (change)="onDeployFileSelect($event)" hidden />
         @if (deployFileName()) {
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
@@ -798,9 +835,9 @@
         }
       </div>
 
-      <div class="modal-actions">
-        <button class="action-btn" (click)="closeDeploy()">Cancel</button>
-        <button class="action-btn accent" (click)="submitDeploy()" [disabled]="deploying() || !deployFile">
+      <div class="flex gap-3 justify-end mt-5">
+        <button class="btn-ghost" (click)="closeDeploy()">Cancel</button>
+        <button class="btn-accent" (click)="submitDeploy()" [disabled]="deploying() || !deployFile">
           {{ deploying() ? 'Deploying...' : 'Deploy' }}
         </button>
       </div>
