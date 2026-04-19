@@ -1482,6 +1482,8 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           '- Check image_profiles in _research.json for context about each image',
           '- NO empty image holders — if no image available, use a relevant Unsplash photo',
           '- 8+ unique images per page. Alt text with keywords. loading="lazy" below fold.',
+          '- TEXT OVER IMAGES: Never place text over the focal point of a background image.',
+          '  Position text in low-complexity areas (sky, edges, solid colors). Use gradient overlays that fade from one side.',
           '',
           '=== SEO ===',
           `<title>: ${safeName} — primary keyword + location`,

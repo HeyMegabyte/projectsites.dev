@@ -163,6 +163,10 @@ app.all('*', async (c) => {
           headers: {
             'Content-Type': 'text/html',
             'Cache-Control': 'public, max-age=60',
+            // Cross-origin isolation for WebContainers in embedded bolt.diy editor
+            'Cross-Origin-Opener-Policy': 'same-origin',
+            'Cross-Origin-Embedder-Policy': 'credentialless',
+            'Origin-Agent-Cluster': '?1',
           },
         });
       }

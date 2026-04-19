@@ -43,7 +43,7 @@ import { ToastService } from '../../../services/toast.service';
           <iframe class="flex-1 w-full border-none bg-[#0a0a1a] editor-iframe"
                   [src]="iframeUrl()!"
                   allow="clipboard-read; clipboard-write; cross-origin-isolated"
-                  sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-modals">
+                  credentialless>
           </iframe>
         }
       </div>
