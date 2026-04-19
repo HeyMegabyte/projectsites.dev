@@ -1324,11 +1324,15 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
         scrapedLogoUrl = parsed.logo_r2_url || parsed.logo_url || '';
         scrapedAllImages = parsed.all_images || [];
 
-        // Build a comprehensive content note — don't truncate, pass everything
-        const contentSections = scrapedPages.map((p: any) =>
-          `--- PAGE: ${p.url} ---\nTitle: ${p.title}\n${(p.headings || []).map((h: string) => `## ${h}`).join('\n')}\n${p.content || ''}`
-        ).join('\n\n');
-        scrapedNote = '\n\n=== ORIGINAL WEBSITE CONTENT (use ALL of this — do NOT skip any content) ===\n' + contentSections;
+        // Build content note — include page structure + key content (cap at 30KB to avoid prompt overflow)
+        const contentSections = scrapedPages.map((p: any) => {
+          const content = (p.content || '').slice(0, 1500); // First 1500 chars per page
+          return `--- PAGE: ${p.url} ---\nTitle: ${p.title}\nHeadings: ${(p.headings || []).join(' | ')}\n${content}`;
+        }).join('\n\n');
+        const cappedContent = contentSections.slice(0, 30000);
+        scrapedNote = '\n\n=== ORIGINAL WEBSITE CONTENT (recreate ALL pages with this content) ===\n' +
+          `Total pages scraped: ${scrapedPages.length}\n` +
+          `Total images found: ${scrapedAllImages.length}\n\n` + cappedContent;
       } catch {
         scrapedNote = '\n\nORIGINAL WEBSITE CONTENT:\n' + scrapedContent.slice(0, 20000);
       }
