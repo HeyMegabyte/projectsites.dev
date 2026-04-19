@@ -1,3 +1,29 @@
+@if (!auth.isLoggedIn()) {
+  <!-- Not signed in: show sign-in prompt -->
+  <section class="min-h-screen flex flex-col items-center justify-center bg-dark-surface px-6 relative z-[1]">
+    <div class="w-full max-w-[440px] bg-gradient-to-br from-[rgba(13,13,40,0.95)] to-[rgba(8,8,32,0.98)] border border-primary/[0.12] rounded-2xl py-11 px-9 animate-[fadeInScale_0.4s_cubic-bezier(0.34,1.56,0.64,1)] shadow-[0_8px_32px_rgba(0,0,0,0.4),0_0_60px_rgba(0,229,255,0.03)] backdrop-blur-2xl text-center">
+      <div class="w-14 h-14 rounded-2xl bg-primary/[0.08] flex items-center justify-center mx-auto mb-5">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#00E5FF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+      </div>
+      <h2 class="text-[1.6rem] font-[800] mb-2 bg-gradient-to-r from-white to-primary bg-clip-text text-transparent">Dashboard</h2>
+      <p class="text-[0.9rem] text-text-secondary mb-8 leading-normal">Sign in to access your admin dashboard and manage your sites.</p>
+      <a class="inline-flex items-center justify-center gap-2.5 w-full py-3.5 px-6 rounded-xl bg-primary text-dark font-semibold text-base cursor-pointer transition-all hover:brightness-110 hover:shadow-[0_0_24px_rgba(0,229,255,0.4)] no-underline" href="/signin">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>
+        </svg>
+        Sign In
+      </a>
+      <a class="inline-flex items-center gap-1.5 text-[0.85rem] text-text-secondary cursor-pointer mt-5 transition-all hover:text-primary no-underline" href="/">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
+        Back to homepage
+      </a>
+    </div>
+  </section>
+} @else {
+
 <div class="flex min-h-screen bg-dark-surface animate-fade-in" (click)="closeDropdowns()">
   <!-- Mobile hamburger -->
   <button
@@ -119,17 +145,15 @@
       </button>
     </nav>
 
-    <!-- Bottom: user info -->
+    <!-- Bottom: user info (sign-out is in top bar) -->
     <div class="px-3 py-3 border-t border-white/[0.06] flex items-center gap-2.5">
       <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold flex-shrink-0">
         {{ (auth.email() || '?')[0].toUpperCase() }}
       </div>
       <div class="flex-1 min-w-0">
         <div class="text-[0.75rem] text-white truncate">{{ auth.email() || 'User' }}</div>
+        <div class="text-[0.62rem] text-text-secondary uppercase tracking-wide font-semibold">{{ subscription()?.status === 'active' ? 'Pro' : 'Free' }} Plan</div>
       </div>
-      <button class="p-1.5 rounded-md border-none bg-transparent text-text-secondary cursor-pointer hover:text-red-400 transition-colors" (click)="signOut()" title="Sign out">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-      </button>
     </div>
   </aside>
 
@@ -178,6 +202,11 @@
             </button>
           }
         }
+        <div class="w-px h-6 bg-white/[0.06] mx-1"></div>
+        <button class="top-btn" (click)="signOut()" title="Sign out">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Sign Out
+        </button>
       </div>
     </div>
 
@@ -744,6 +773,8 @@
     }
   </main>
 </div>
+
+} <!-- end @else (auth.isLoggedIn) -->
 
 <!-- ═══════════════════════════════════════════════════════ -->
 <!-- File tree recursive template                            -->

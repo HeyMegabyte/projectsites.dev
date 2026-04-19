@@ -143,7 +143,8 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     if (!this.auth.isLoggedIn()) {
-      this.router.navigate(['/signin']);
+      // Don't redirect — show "please sign in" card in template
+      this.loading.set(false);
       return;
     }
     this.loadData();
@@ -289,7 +290,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   signOut(): void {
     this.auth.clearSession();
-    this.router.navigate(['/signin']);
+    this.router.navigate(['/']);
   }
 
   getStatusLabel(status: string): string {
