@@ -105,24 +105,32 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
         <span>Editor</span>
       </a>
-      <a class="nav-item" routerLink="/admin/domains" routerLinkActive="nav-item-active">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-        <span>Domains</span>
-        @if (state.domainSummary().total > 0) {
-          <span class="text-[0.6rem] font-bold py-px px-[7px] rounded-[10px] bg-primary/[0.12] text-primary">{{ state.domainSummary().total }}</span>
-        }
-      </a>
       <a class="nav-item" routerLink="/admin/snapshots" routerLinkActive="nav-item-active">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
         <span>Snapshots</span>
       </a>
       <a class="nav-item" routerLink="/admin/analytics" routerLinkActive="nav-item-active">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
         <span>Analytics</span>
       </a>
-      <a class="nav-item" routerLink="/admin/seo" routerLinkActive="nav-item-active">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <span>SEO Settings</span>
+
+      <div class="h-px mx-3.5 my-2 bg-white/[0.06]"></div>
+
+      <a class="nav-item" routerLink="/admin/email" routerLinkActive="nav-item-active">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        <span>Email</span>
+      </a>
+      <a class="nav-item" routerLink="/admin/social" routerLinkActive="nav-item-active">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+        <span>Social</span>
+      </a>
+      <a class="nav-item" routerLink="/admin/forms" routerLinkActive="nav-item-active">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
+        <span>Forms</span>
+      </a>
+      <a class="nav-item" routerLink="/admin/integrations" routerLinkActive="nav-item-active">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13.5 2H6a2 2 0 0 0-2 2v5"/><path d="M22 13.5V20a2 2 0 0 1-2 2h-5"/><path d="M18 2l4 4-4 4"/><path d="M2 18l4 4 4-4"/><path d="M2 8V4a2 2 0 0 1 2-2h4"/><path d="M22 16v4a2 2 0 0 1-2 2h-4"/></svg>
+        <span>Integrations</span>
       </a>
 
       <div class="h-px mx-3.5 my-2 bg-white/[0.06]"></div>

@@ -53,8 +53,9 @@ export class AdminComponent implements OnInit, OnDestroy {
     const segment = url.split('/').pop() || '';
     const labels: Record<string, string> = {
       '': 'Dashboard', 'admin': 'Dashboard', 'editor': 'Editor',
-      'domains': 'Domains', 'snapshots': 'Snapshots', 'analytics': 'Analytics',
-      'seo': 'SEO', 'billing': 'Billing', 'audit': 'Audit Log', 'settings': 'Settings',
+      'snapshots': 'Snapshots', 'analytics': 'Analytics',
+      'email': 'Email', 'social': 'Social', 'forms': 'Forms', 'integrations': 'Integrations',
+      'billing': 'Billing', 'audit': 'Audit Log', 'settings': 'Settings',
     };
     this.currentSection.set(labels[segment] || 'Dashboard');
   }

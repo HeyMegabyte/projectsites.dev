@@ -47,11 +47,6 @@ export const routes: Routes = [
           import('./pages/admin/sections/editor.component').then((m) => m.AdminEditorComponent),
       },
       {
-        path: 'domains',
-        loadComponent: () =>
-          import('./pages/admin/sections/domains.component').then((m) => m.AdminDomainsComponent),
-      },
-      {
         path: 'snapshots',
         loadComponent: () =>
           import('./pages/admin/sections/snapshots.component').then((m) => m.AdminSnapshotsComponent),
@@ -62,9 +57,24 @@ export const routes: Routes = [
           import('./pages/admin/sections/analytics.component').then((m) => m.AdminAnalyticsComponent),
       },
       {
-        path: 'seo',
+        path: 'email',
         loadComponent: () =>
-          import('./pages/admin/sections/seo.component').then((m) => m.AdminSeoComponent),
+          import('./pages/admin/sections/email.component').then((m) => m.AdminEmailComponent),
+      },
+      {
+        path: 'social',
+        loadComponent: () =>
+          import('./pages/admin/sections/social.component').then((m) => m.AdminSocialComponent),
+      },
+      {
+        path: 'forms',
+        loadComponent: () =>
+          import('./pages/admin/sections/forms.component').then((m) => m.AdminFormsComponent),
+      },
+      {
+        path: 'integrations',
+        loadComponent: () =>
+          import('./pages/admin/sections/integrations.component').then((m) => m.AdminIntegrationsComponent),
       },
       {
         path: 'billing',
@@ -80,6 +90,15 @@ export const routes: Routes = [
         path: 'settings',
         loadComponent: () =>
           import('./pages/admin/sections/settings.component').then((m) => m.AdminSettingsComponent),
+      },
+      // Redirects for removed routes
+      {
+        path: 'domains',
+        redirectTo: 'settings',
+      },
+      {
+        path: 'seo',
+        redirectTo: 'settings',
       },
     ],
   },
