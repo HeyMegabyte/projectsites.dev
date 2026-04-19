@@ -949,7 +949,7 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
                     messages: [{
                       role: 'user',
                       content: [
-                        { type: 'text', text: 'Extract the brand colors and design spirit from this website screenshot. Identify the dominant colors used in the logo, headers, buttons, accents, and background. Also describe the overall visual feel/design spirit in one sentence (e.g. "warm and earthy with rustic textures" or "sleek corporate with bold geometric accents"). Return ONLY valid JSON: {"primary":"#hex","secondary":"#hex","accent":"#hex","background":"#hex","text":"#hex","design_spirit":"one sentence description of the visual feel"}' },
+                        { type: 'text', text: 'Analyze this website screenshot carefully. Extract the EXACT brand colors used in the design. Look at:\n1. The logo colors (most important)\n2. Header/nav background color\n3. Button and link colors\n4. Text colors (headings vs body)\n5. Background colors (main page bg)\n6. Accent/highlight colors\n\nReturn ONLY valid JSON:\n{"primary":"#hex","secondary":"#hex","accent":"#hex","background":"#hex","text":"#hex","header_bg":"#hex","design_spirit":"one sentence describing the visual feel and mood of this website"}' },
                         { type: 'image_url', image_url: { url: imageUrl, detail: 'low' } },
                       ],
                     }],
@@ -1464,6 +1464,13 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           'You MUST use this real content — do NOT make up placeholder text.',
           'Include ALL programs, services, team members, history, and details from the original.',
           'Augment with researched facts about affiliated organizations.',
+          '',
+          '=== IMAGE QUALITY RULES (apply to ALL images before placement) ===',
+          '- NEVER use images that contain white space, text overlays, solid color borders, or watermarks',
+          '- If an image has text/logos embedded in the photo, crop to extract just the photograph',
+          '- Hero images must be high-quality photos only — no graphics, no text, no solid colors',
+          '- If the only available image has text overlay, use a relevant Unsplash photo instead',
+          '- Logo images with white backgrounds must be made transparent or placed on matching backgrounds',
           '',
           '=== IMAGES (unique per page, AI-selected) ===',
           scrapedImageProfiles.length > 0
