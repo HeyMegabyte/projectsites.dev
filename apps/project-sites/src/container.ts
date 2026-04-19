@@ -112,10 +112,13 @@ export class SiteBuilderContainer extends Container<Env> {
           'if(P._anthropicKey)process.env.ANTHROPIC_API_KEY=P._anthropicKey;' +
           'var dir="/tmp/build-"+(P.slug||"site")+"-"+Date.now();' +
           'fs.mkdirSync(dir,{recursive:true});' +
-          // Write existing files to dir (from previous stage)
+          // Write existing files to dir (from previous stage) — create subdirs as needed
           'if(P.existingFiles&&Array.isArray(P.existingFiles)){' +
             'for(var f of P.existingFiles){' +
-              'fs.writeFileSync(path.join(dir,f.name),f.content)' +
+              'var fp=path.join(dir,f.name);' +
+              'var fd=path.dirname(fp);' +
+              'if(fd!==dir)fs.mkdirSync(fd,{recursive:true});' +
+              'fs.writeFileSync(fp,f.content)' +
             '}' +
             'console.log("[container] Restored "+P.existingFiles.length+" existing files")' +
           '}' +
