@@ -1535,14 +1535,56 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
         });
       }
 
-      // ── STAGE B: Enhancement (3 individual steps to avoid timeout) ──
+      // Visual inspection after Stage A — feed critique into Stage B
+      let visualCritique = '';
+      if (env.OPENAI_API_KEY && currentFiles.length > 0) {
+        try {
+          const inspectResult = await step.do('inspect-after-a', RETRY_3, async () => {
+            const ssUrl = `https://api.microlink.io/?url=https://${params.slug}.${DOMAINS.SITES_SUFFIX}&screenshot=true&meta=false&embed=screenshot.url`;
+            const ssRes = await fetch(ssUrl);
+            if (!ssRes.ok) return '';
+            const ssData = await ssRes.json() as any;
+            const imageUrl = ssData?.data?.screenshot?.url;
+            if (!imageUrl) return '';
+
+            const critiqueRes = await fetch('https://api.openai.com/v1/chat/completions', {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                model: 'gpt-4o',
+                messages: [{
+                  role: 'user',
+                  content: [
+                    { type: 'text', text: 'You are reviewing a website screenshot. List the TOP 5 visual/design issues to fix. Be specific about CSS changes needed. Focus on: image placement, color consistency, text readability, spacing, and overall polish. Return a concise numbered list.' },
+                    { type: 'image_url', image_url: { url: imageUrl, detail: 'high' } },
+                  ],
+                }],
+                max_tokens: 400,
+                temperature: 0.3,
+              }),
+            });
+            if (!critiqueRes.ok) return '';
+            const critiqueData = await critiqueRes.json() as any;
+            return critiqueData.choices?.[0]?.message?.content || '';
+          });
+          visualCritique = (inspectResult as string) || '';
+          if (visualCritique) {
+            await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.visual_critique', {
+              stage: 'after-a', critique: visualCritique.slice(0, 500),
+              message: 'AI visual critique after Stage A: ' + visualCritique.slice(0, 200),
+            });
+          }
+        } catch { /* non-critical */ }
+      }
+
+      // ── STAGE B: Enhancement (individual steps to avoid timeout) ──
       if (currentFiles.some(f => f.name === 'index.html')) {
         const b1 = await step.do('stage-b1-beauty', {
           retries: { limit: 1, delay: '10 seconds', backoff: 'exponential' },
           timeout: '15 minutes',
         }, async () => {
           return callContainer([
-            { label: 'B1-beauty', timeoutMin: 10, text: 'Make ALL pages MORE BEAUTIFUL. Do NOT rewrite from scratch — enhance what exists.\n\nFor ALL HTML files:\n- 10+ @keyframes animations (fadeInUp, slideInLeft, scaleIn, subtleFloat, gradientShift, glowPulse)\n- IntersectionObserver: sections start opacity:0 translateY:30px, animate to visible on scroll\n- Glassmorphism on cards (backdrop-filter:blur(20px))\n- Use the BRAND COLORS from the original site (check _research.json for extracted colors)\n- Gradient text on hero headings using brand primary color\n- Smooth hover transforms on cards (translateY -4px + shadow)\n- @media prefers-reduced-motion\n- Check every image: is it RELEVANT to its section? Is it duplicated on another page? Fix any mismatches.\n- Fill any empty image placeholders with relevant Unsplash photos.\n- SELF-PROMPT: Look at each page critically. What would make it more stunning? Do it.' },
+            { label: 'B1-beauty', timeoutMin: 10, text: 'Make ALL pages MORE BEAUTIFUL. Do NOT rewrite from scratch — enhance what exists.\n\nFor ALL HTML files:\n- 10+ @keyframes animations (fadeInUp, slideInLeft, scaleIn, subtleFloat, gradientShift, glowPulse)\n- IntersectionObserver: sections start opacity:0 translateY:30px, animate to visible on scroll\n- Glassmorphism on cards (backdrop-filter:blur(20px))\n- Use the BRAND COLORS from the original site (check _research.json for extracted colors)\n- Gradient text on hero headings using brand primary color\n- Smooth hover transforms on cards (translateY -4px + shadow)\n- @media prefers-reduced-motion\n- Check every image: is it RELEVANT to its section? Is it duplicated on another page? Fix any mismatches.\n- Fill any empty image placeholders with relevant Unsplash photos.\n- ALL asset paths must be ABSOLUTE (start with /) so they work on sub-pages\n- SELF-PROMPT: Look at each page critically. What would make it more stunning? Do it.' + (visualCritique ? '\n\nAI VISUAL INSPECTION FOUND THESE ISSUES (fix ALL of them):\n' + visualCritique : '') },
           ], currentFiles, 'stage-b1');
         });
         const b1Arr = b1 as { name: string; content: string }[];
