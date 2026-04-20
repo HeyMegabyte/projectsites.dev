@@ -3,7 +3,7 @@
 > Cloudflare Worker powering the SaaS website delivery engine at `projectsites.dev`.
 > Built with Hono framework, Cloudflare D1/KV/R2/Workflows/AI.
 >
-> **Template repo:** https://github.com/HeyMegabyte/projectsites-template
+> **Template repo:** https://github.com/HeyMegabyte/template.projectsites.dev
 
 ## Website Generation Philosophy (CRITICAL — read this first)
 
@@ -125,7 +125,7 @@ Workflow Step 4c: stage-cd-quality-final (20 min timeout)
 
 **Templates are pre-built project skeletons stored in R2.** Instead of generating from scratch every time, Claude Code starts from a template and customizes it.
 
-**Template repo:** https://github.com/HeyMegabyte/projectsites-template
+**Template repo:** https://github.com/HeyMegabyte/template.projectsites.dev
 
 **How templates work:**
 1. Templates are Vite + React + Tailwind + shadcn/ui project skeletons
