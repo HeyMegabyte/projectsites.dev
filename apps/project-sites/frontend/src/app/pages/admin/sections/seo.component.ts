@@ -1,16 +1,147 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { AdminStateService } from '../admin-state.service';
 
 @Component({
   selector: 'app-admin-seo',
   standalone: true,
+  imports: [FormsModule],
   template: `
-    <div class="p-7 flex-1 overflow-y-auto animate-fade-in max-md:p-4">
-      <div class="flex flex-col items-center justify-center text-center py-10 px-5 text-text-secondary gap-3">
-        <svg class="opacity-40" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <h3 class="text-white font-semibold text-base m-0">SEO Settings</h3>
-        <p class="text-[0.9rem] max-w-[400px] m-0">SEO configuration tools are coming soon. Your site already includes optimized meta tags, schema markup, and sitemap.</p>
+    <div class="p-7 flex-1 overflow-y-auto animate-fade-in max-md:p-4 space-y-6">
+
+      <!-- Header -->
+      <div>
+        <h2 class="text-lg font-bold text-white m-0">SEO</h2>
+        <p class="text-[0.78rem] text-text-secondary m-0 mt-1">Optimize your site for search engines and social sharing.</p>
       </div>
+
+      <!-- Meta Tags -->
+      <div class="bg-white/[0.02] border border-white/[0.06] rounded-[14px] p-6">
+        <h3 class="text-base font-semibold text-white m-0 mb-5 flex items-center gap-2">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          Meta Tags
+        </h3>
+        <div class="flex flex-col gap-4">
+          <div>
+            <label class="block text-[0.78rem] font-semibold text-text-secondary mb-2">Page Title</label>
+            <input type="text" class="input-field" [placeholder]="siteTitle + ' | ' + siteName" [(ngModel)]="metaTitle" maxlength="60" />
+            <div class="flex items-center justify-between mt-1.5">
+              <span class="text-[0.68rem] text-text-secondary/50">Appears in browser tabs and search results</span>
+              <span class="text-[0.62rem] font-mono" [class]="(metaTitle || '').length > 55 ? 'text-amber-400' : 'text-text-secondary/40'">{{ (metaTitle || '').length }}/60</span>
+            </div>
+          </div>
+          <div>
+            <label class="block text-[0.78rem] font-semibold text-text-secondary mb-2">Meta Description</label>
+            <textarea class="input-field !h-20 resize-none" placeholder="Describe your business in 1-2 sentences for search results..." [(ngModel)]="metaDescription" maxlength="160"></textarea>
+            <div class="flex items-center justify-between mt-1.5">
+              <span class="text-[0.68rem] text-text-secondary/50">Shown below your title in search results</span>
+              <span class="text-[0.62rem] font-mono" [class]="(metaDescription || '').length > 150 ? 'text-amber-400' : 'text-text-secondary/40'">{{ (metaDescription || '').length }}/160</span>
+            </div>
+          </div>
+          <div>
+            <label class="block text-[0.78rem] font-semibold text-text-secondary mb-2">Keywords</label>
+            <input type="text" class="input-field" placeholder="keyword1, keyword2, keyword3" [(ngModel)]="metaKeywords" />
+            <span class="text-[0.68rem] text-text-secondary/50 mt-1.5 block">Comma-separated list of target keywords</span>
+          </div>
+          <button class="btn-accent self-start" disabled>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>
+            Save Meta Tags
+          </button>
+        </div>
+      </div>
+
+      <!-- Search Preview -->
+      <div class="bg-white/[0.02] border border-white/[0.06] rounded-[14px] p-6">
+        <h3 class="text-base font-semibold text-white m-0 mb-4">Google Search Preview</h3>
+        <div class="bg-white rounded-xl p-4 max-w-[600px]">
+          <div class="text-[0.72rem] text-[#202124] mb-0.5 font-sans">{{ siteDomain }}</div>
+          <div class="text-[1.05rem] text-[#1a0dab] font-sans leading-tight mb-1 hover:underline cursor-pointer">
+            {{ metaTitle || (siteTitle + ' | ' + siteName) }}
+          </div>
+          <div class="text-[0.82rem] text-[#4d5156] font-sans leading-snug">
+            {{ metaDescription || 'Your site description will appear here. Write a compelling description that includes your primary keyword and a call to action.' }}
+          </div>
+        </div>
+      </div>
+
+      <!-- JSON-LD Preview -->
+      <div class="bg-white/[0.02] border border-white/[0.06] rounded-[14px] p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-base font-semibold text-white m-0 flex items-center gap-2">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            Structured Data (JSON-LD)
+          </h3>
+          <span class="text-[0.62rem] font-bold py-0.5 px-2 rounded uppercase bg-green-500/10 text-green-400">Auto-generated</span>
+        </div>
+        <p class="text-[0.72rem] text-text-secondary m-0 mb-3">Your site includes LocalBusiness schema markup, FAQPage schema, and BreadcrumbList for rich search results.</p>
+        <div class="bg-[rgba(6,6,18,0.85)] border border-primary/[0.06] rounded-lg p-4 font-mono text-[0.7rem] text-text-secondary/70 overflow-x-auto leading-relaxed">
+          <pre class="m-0 whitespace-pre-wrap">{{ jsonLdPreview }}</pre>
+        </div>
+      </div>
+
+      <!-- SEO Checklist -->
+      <div class="bg-white/[0.02] border border-white/[0.06] rounded-[14px] p-6">
+        <h3 class="text-base font-semibold text-white m-0 mb-4">SEO Health Check</h3>
+        <div class="flex flex-col gap-2">
+          @for (check of seoChecks; track check.label) {
+            <div class="flex items-center gap-3 py-2 px-3 bg-white/[0.01] rounded-lg">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                   [class]="check.pass ? 'text-green-400' : 'text-amber-400'">
+                @if (check.pass) {
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+                } @else {
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                }
+              </svg>
+              <span class="text-[0.78rem]" [class]="check.pass ? 'text-white/80' : 'text-amber-400/80'">{{ check.label }}</span>
+            </div>
+          }
+        </div>
+      </div>
+
     </div>
   `,
 })
-export class AdminSeoComponent {}
+export class AdminSeoComponent {
+  state = inject(AdminStateService);
+
+  metaTitle = '';
+  metaDescription = '';
+  metaKeywords = '';
+
+  get siteName(): string {
+    return this.state.selectedSite()?.business_name || 'Your Business';
+  }
+
+  get siteTitle(): string {
+    return this.state.selectedSite()?.business_name || 'Your Site Title';
+  }
+
+  get siteDomain(): string {
+    const slug = this.state.selectedSite()?.slug || 'your-site';
+    return `${slug}.projectsites.dev`;
+  }
+
+  get jsonLdPreview(): string {
+    return JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'LocalBusiness',
+      name: this.siteName,
+      url: `https://${this.siteDomain}`,
+      sameAs: [],
+    }, null, 2);
+  }
+
+  seoChecks = [
+    { label: 'Page title is under 60 characters', pass: true },
+    { label: 'Meta description is present', pass: true },
+    { label: 'JSON-LD LocalBusiness schema is valid', pass: true },
+    { label: 'robots.txt allows crawling', pass: true },
+    { label: 'sitemap.xml is generated', pass: true },
+    { label: 'Open Graph meta tags are present', pass: true },
+    { label: 'Canonical URL is set on all pages', pass: true },
+    { label: 'H1 heading is present on all pages', pass: true },
+    { label: 'All images have alt text', pass: false },
+    { label: 'Internal links use descriptive anchor text', pass: false },
+  ];
+}

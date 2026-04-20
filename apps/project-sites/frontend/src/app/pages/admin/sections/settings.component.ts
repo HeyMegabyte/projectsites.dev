@@ -157,16 +157,22 @@ import { ToastService } from '../../../services/toast.service';
         }
       </div>
 
-      <!-- ── SEO ─────────────────────────────────────── -->
+      <!-- ── Contact Email ─────────────────────────── -->
       <div class="bg-white/[0.02] border border-white/[0.06] rounded-[14px] p-6">
-        <h3 class="text-base font-semibold text-white m-0 mb-4 flex items-center gap-2">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          SEO
+        <h3 class="text-base font-semibold text-white m-0 mb-5 flex items-center gap-2">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          Contact Email
         </h3>
-        <div class="flex flex-col items-center justify-center text-center py-6 text-text-secondary gap-2">
-          <p class="text-[0.85rem] max-w-[400px] m-0">SEO configuration tools are coming soon. Your site already includes optimized meta tags, schema markup, and sitemap.</p>
-          <span class="text-[0.65rem] font-bold py-0.5 px-2.5 rounded-full uppercase bg-primary/10 text-primary mt-1">Coming soon</span>
-        </div>
+        @if (state.selectedSite(); as site) {
+          <div>
+            <label class="block text-[0.78rem] font-semibold text-text-secondary mb-2">Contact Form Recipient</label>
+            <div class="flex gap-2.5 items-center">
+              <input type="email" class="input-field flex-1" placeholder="you@email.com" #emailInput />
+              <button class="btn-ghost-sm" disabled>Save</button>
+            </div>
+            <span class="text-[0.68rem] text-text-secondary/50 mt-1.5 block">Contact form submissions will be forwarded to this email address.</span>
+          </div>
+        }
       </div>
 
       <!-- ── Danger Zone ─────────────────────────────── -->

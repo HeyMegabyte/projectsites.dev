@@ -181,6 +181,20 @@ export class AdminStateService {
     });
   }
 
+  openCheckout(): void {
+    const site = this.selectedSite();
+    if (!site) return;
+    this.api.post<{ data: { checkout_url?: string; client_secret?: string } }>('/billing/checkout', {
+      site_id: site.id,
+      return_url: window.location.href,
+    }).subscribe({
+      next: (res) => {
+        if (res.data?.checkout_url) window.location.href = res.data.checkout_url;
+      },
+      error: () => this.toast.error('Failed to start checkout'),
+    });
+  }
+
   openBilling(): void {
     this.api.getBillingPortal(window.location.href).subscribe({
       next: (res) => {
