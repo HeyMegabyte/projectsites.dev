@@ -618,12 +618,14 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
       }
     }
 
-    // Discover brand images from web (optional, non-blocking)
-    if ((env as any).GOOGLE_CSE_KEY) {
+    // Discover brand images from ALL available APIs in parallel (optional, non-blocking)
+    // The discoverBrandImages function internally checks which API keys are available
+    // and uses Promise.allSettled to query all sources simultaneously.
+    {
       try {
         const discoveredResult = await step.do('discover-brand-images', {
           retries: { limit: 1, delay: '5 seconds', backoff: 'exponential' },
-          timeout: '2 minutes',
+          timeout: '3 minutes',
         }, async () => {
           const { discoverBrandImages } = await import('../services/image_discovery.js');
           const results = await discoverBrandImages(env, params.slug, params.businessName,
@@ -633,7 +635,10 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
         const discovered = JSON.parse(discoveredResult);
         for (const d of discovered) assetManifest.push(d.key);
         await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.complete', {
-          step: 'discover-brand-images', message: `Discovered ${discovered.length} brand images`,
+          step: 'discover-brand-images',
+          source_count: discovered.length,
+          sources: [...new Set(discovered.map((d: any) => d.attribution?.split(' — ')[0] || 'unknown'))],
+          message: `Discovered ${discovered.length} brand images from parallel API queries`,
         });
       } catch (err) {
         await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.failed', {
@@ -1475,34 +1480,40 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           'Include ALL programs, services, team members, history, and details from the original.',
           'Augment with researched facts about affiliated organizations.',
           '',
-          '=== IMAGE QUALITY RULES (apply to ALL images before placement) ===',
-          '- NEVER use images that contain white space, text overlays, solid color borders, or watermarks',
-          '- If an image has text/logos embedded in the photo, crop to extract just the photograph',
-          '- Hero images must be high-quality photos only — no graphics, no text, no solid colors',
-          '- If the only available image has text overlay, use a relevant Unsplash photo instead',
-          '- Logo images with white backgrounds must be made transparent or placed on matching backgrounds',
-          '- Images containing TEXT (banners, signs, overlays) must be CROPPED to extract just the photograph portion',
-          '- Beige/solid-color images with text overlaid = BAD. Crop the photo out and use the text as HTML instead.',
-          '- PNG/JPG files with embedded text should generally be avoided — convert text to HTML',
-          '- Multi-layer images (like section dividers with photos + text + solid bg) should be decomposed: use the photo, recreate the text as HTML',
-          '',
-          '=== IMAGES (15-20 per page, AI-inspected) ===',
+          '=== IMAGES & MULTIMEDIA (15-20 per page, professional quality) ===',
           scrapedImageProfiles.length > 0
             ? `Images from original site (with context for correct placement):\n${scrapedImageProfiles.map((img, i) => `${i + 1}. ${img.url} — From page "${img.source_title || img.source_page}", context: "${img.context}"`).join('\n')}`
             : scrapedAllImages.length > 0 ? `Images scraped from original website (USE THESE FIRST):\n${scrapedAllImages.slice(0, 40).join('\n')}` : '',
           allAssets.length > 0 ? `Additional discovered/generated assets:\n${allAssets.slice(0, 20).join('\n')}` : '',
-          '- 15-20 unique images PER PAGE (double the previous standard)',
-          '- Use image GALLERIES, GRIDS, and CAROUSELS to showcase multiple images per section',
-          '- NEVER use images with baked-in text, white space borders, or montage-style layouts',
-          '- If the only available image has text/banners → CROP to extract just the photograph',
-          '- If image has big empty spaces → CROP to the content area only',
-          '- Every section needs MULTIPLE images, not just one',
-          '- Source priority: original site photos > Unsplash > Pexels > DALL-E',
-          '- Use Unsplash: https://images.unsplash.com/photo-{ID}?w={W}&h={H}&fit=crop',
-          '- Use Pexels videos for hero: search at https://api.pexels.com/videos/search',
+          'QUANTITY: 15-20 unique images per page. Use galleries, grids, carousels.',
+          'QUALITY RULES:',
+          '- NEVER use images with baked-in text, white borders, montage layouts, or watermarks',
+          '- Crop images that have embedded text/banners — extract just the photograph',
+          '- Crop images with large empty/solid-color areas to focus on the content',
+          '- Replace generic icons with quality stock photography or DALL-E art',
+          '- Every section header should have a relevant photo, not just an icon',
+          'FORMAT:',
+          '- Use <picture> element with WebP source + PNG/JPG fallback:',
+          '  <picture><source srcset="image.webp" type="image/webp"><img src="image.jpg"></picture>',
+          '- All images: loading="lazy" below fold, explicit width/height for CLS',
+          '- Alt text with keywords on every image',
           '- ALL asset paths ABSOLUTE (start with /)',
-          '- NEVER reuse the same image on multiple pages',
-          '- USE original business photos from the scraped site first',
+          'SOURCES (in priority order):',
+          '1. Original business photos (from scraped site)',
+          '2. Unsplash: https://images.unsplash.com/photo-{ID}?w={W}&h={H}&fit=crop&auto=format',
+          '3. Pexels: https://images.pexels.com/photos/{ID}/pexels-photo-{ID}.jpeg?auto=compress&w={W}',
+          '4. DALL-E: generate ultra-realistic images for any gaps',
+          'VIDEO:',
+          '- Homepage hero: background video (muted, autoplay, loop, playsinline)',
+          '- Service pages: relevant video if available',
+          '- Use Pexels videos: https://player.vimeo.com/video/{ID} or direct MP4',
+          '- Embed YouTube videos where business has relevant content',
+          '- Use video ANYWHERE it makes sense — testimonials, tours, demonstrations',
+          'ICONS → PHOTOS:',
+          '- Instead of SVG icons for feature cards, use small stock photos or DALL-E art',
+          '- Feature cards should have a photo that represents the feature, not a generic icon',
+          '- Use photos for testimonial avatars, team members, service illustrations',
+          '',
           'CRITICAL: Match images to their content context:',
           '- A photo of a person must be used where that person is discussed',
           '- A photo of a building must be used in location/about sections',
@@ -1511,9 +1522,18 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           '- If an image doesn\'t match any section, don\'t use it',
           '- Check image_profiles in _research.json for context about each image',
           '- NO empty image holders — if no image available, use a relevant Unsplash photo',
-          '- Alt text with keywords. loading="lazy" below fold.',
+          '- NEVER reuse the same image on multiple pages',
           '- TEXT OVER IMAGES: Never place text over the focal point of a background image.',
           '  Position text in low-complexity areas (sky, edges, solid colors). Use gradient overlays that fade from one side.',
+          '',
+          '=== AI IMAGE GENERATION ===',
+          'After placing all discovered/stock images, identify sections that still need better imagery.',
+          'For each gap, generate a DALL-E prompt that creates an ultra-realistic photo matching:',
+          '- The business category and mood',
+          '- The section content and purpose',
+          '- The brand color palette',
+          'Use: https://api.openai.com/v1/images/generations with model dall-e-3, size 1792x1024',
+          'Style: photorealistic, professional, warm lighting, high quality',
           '',
           '=== SEO ===',
           `<title>: ${safeName} — primary keyword + location`,
@@ -1603,7 +1623,7 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           timeout: '15 minutes',
         }, async () => {
           return callContainer([
-            { label: 'B1-beauty', timeoutMin: 10, text: 'Make ALL pages MORE BEAUTIFUL. Do NOT rewrite from scratch — enhance what exists.\n\nFor ALL HTML files:\n- 10+ @keyframes animations (fadeInUp, slideInLeft, scaleIn, subtleFloat, gradientShift, glowPulse)\n- IntersectionObserver: sections start opacity:0 translateY:30px, animate to visible on scroll\n- Glassmorphism on cards (backdrop-filter:blur(20px))\n- Use the BRAND COLORS from the original site (check _research.json for extracted colors)\n- Gradient text on hero headings using brand primary color\n- Smooth hover transforms on cards (translateY -4px + shadow)\n- @media prefers-reduced-motion\n- Check every image: is it RELEVANT to its section? Is it duplicated on another page? Fix any mismatches.\n- Scan every image: does it have baked-in text, white borders, or montage styling? If so, remove it or replace with a clean photo.\n- Every section should have 3-5 images minimum, arranged in grids or galleries.\n- Fill any empty image placeholders with relevant Unsplash photos.\n- ALL asset paths must be ABSOLUTE (start with /) so they work on sub-pages\n- SELF-PROMPT: Look at each page critically. What would make it more stunning? Do it.' + (visualCritique ? '\n\nAI VISUAL INSPECTION FOUND THESE ISSUES (fix ALL of them):\n' + visualCritique : '') },
+            { label: 'B1-beauty', timeoutMin: 10, text: 'Make ALL pages MORE BEAUTIFUL. Do NOT rewrite from scratch — enhance what exists.\n\nFor ALL HTML files:\n- 10+ @keyframes animations (fadeInUp, slideInLeft, scaleIn, subtleFloat, gradientShift, glowPulse)\n- IntersectionObserver: sections start opacity:0 translateY:30px, animate to visible on scroll\n- Glassmorphism on cards (backdrop-filter:blur(20px))\n- Use the BRAND COLORS from the original site (check _research.json for extracted colors)\n- Gradient text on hero headings using brand primary color\n- Smooth hover transforms on cards (translateY -4px + shadow)\n- @media prefers-reduced-motion\n- Check every image: is it RELEVANT to its section? Is it duplicated on another page? Fix any mismatches.\n- Scan every image: does it have baked-in text, white borders, or montage styling? If so, remove it or replace with a clean photo.\n- Every section should have 3-5 images minimum, arranged in grids or galleries.\n- Fill any empty image placeholders with relevant Unsplash photos.\n- ALL asset paths must be ABSOLUTE (start with /) so they work on sub-pages\n- Replace ALL generic SVG icons with relevant stock photos or DALL-E-generated images\n- Add image galleries (3-4 photos) to sections that only have 1 image\n- Use <picture> with WebP source for all images\n- SELF-PROMPT: Look at each page critically. What would make it more stunning? Do it.' + (visualCritique ? '\n\nAI VISUAL INSPECTION FOUND THESE ISSUES (fix ALL of them):\n' + visualCritique : '') },
           ], currentFiles, 'stage-b1');
         });
         const b1Arr = b1 as { name: string; content: string }[];
@@ -1614,7 +1634,7 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           timeout: '15 minutes',
         }, async () => {
           return callContainer([
-            { label: 'B2-seo-content', timeoutMin: 10, text: 'SEO + content audit on ALL HTML files. Do NOT rewrite from scratch.\n\n1. SEO: Verify meta description, og tags, canonical URL, heading hierarchy on every page. JSON-LD LocalBusiness on index.html. FAQPage schema. Internal links between ALL pages. robots.txt + sitemap.xml listing ALL pages.\n2. CONTENT: Read _scraped.txt and _research.json. Ensure ALL original website content is present. If any services, programs, team members, or details are missing — add them. Every page should have images. No empty background-image. loading=lazy. Alt text with keywords.' },
+            { label: 'B2-seo-content', timeoutMin: 10, text: 'SEO + content audit on ALL HTML files. Do NOT rewrite from scratch.\n\n1. SEO: Verify meta description, og tags, canonical URL, heading hierarchy on every page. JSON-LD LocalBusiness on index.html. FAQPage schema. Internal links between ALL pages. robots.txt + sitemap.xml listing ALL pages.\n2. CONTENT: Read _scraped.txt and _research.json. Ensure ALL original website content is present. If any services, programs, team members, or details are missing — add them. Every page should have images. No empty background-image. loading=lazy. Alt text with keywords.\n3. IMAGE COMPLETENESS: Count images per page — if any page has fewer than 15, add more from Unsplash/Pexels. Verify no image appears on more than one page.' },
           ], currentFiles, 'stage-b2');
         });
         const b2Arr = b2 as { name: string; content: string }[];
@@ -1646,7 +1666,7 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           timeout: '20 minutes',
         }, async () => {
           return callContainer([
-            { label: 'C1-visual', timeoutMin: 5, text: 'Visual quality audit on ALL HTML files.\n\n1. Check EVERY image: is it relevant to the section content? Remove/replace irrelevant ones.\n2. Check for DUPLICATE images across pages — each page must have unique imagery.\n3. Fill any empty image placeholders with relevant Unsplash photos.\n4. Ensure the LOGO from the original site is visible in the header of every page.\n5. Verify brand colors match the original site (not generic blue/cyan).\n6. Text contrast: readable on all backgrounds.\n7. Grid partial rows centered.\n8. Nav should have max 5-7 top-level links, use dropdowns for sub-pages.\n9. Google Maps address should link to directions URL.\n10. Audit EVERY image: no white space, no embedded text, no solid color borders.\n11. If an image looks like a montage/collage with text → replace with a clean photograph.\n12. Each page should have 15+ images — add more if under that count.\n13. SELF-PROMPT: What else would make each page more stunning? Do it.' },
+            { label: 'C1-visual', timeoutMin: 5, text: 'Visual quality audit on ALL HTML files.\n\n1. Check EVERY image: is it relevant to the section content? Remove/replace irrelevant ones.\n2. Check for DUPLICATE images across pages — each page must have unique imagery.\n3. Fill any empty image placeholders with relevant Unsplash photos.\n4. Ensure the LOGO from the original site is visible in the header of every page.\n5. Verify brand colors match the original site (not generic blue/cyan).\n6. Text contrast: readable on all backgrounds.\n7. Grid partial rows centered.\n8. Nav should have max 5-7 top-level links, use dropdowns for sub-pages.\n9. Google Maps address should link to directions URL.\n10. AUDIT every image: no white space, no text overlays, no borders, no montage styling.\n11. Replace any montage/collage images with clean individual photographs.\n12. Verify all images use <picture> with WebP + fallback.\n13. Check that icons have been replaced with photos where appropriate.\n14. Each page should have 15+ images — add more if under that count.\n15. SELF-PROMPT: What else would make each page more stunning? Do it.' },
             { label: 'C2-domain', timeoutMin: 5, text: domainPrompt },
           ], currentFiles, 'stage-c');
         });
