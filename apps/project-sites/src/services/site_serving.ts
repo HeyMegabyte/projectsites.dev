@@ -543,15 +543,44 @@ export async function serveSiteFromR2(
 
   const version = site.current_build_version;
 
-  // Normalize path: strip leading slash for file lookup
+  // Normalize path: resolve directory-style URLs to index.html
   let filePath = requestPath;
-  if (filePath === '/') filePath = '/index.html';
+  if (filePath === '/') {
+    filePath = '/index.html';
+  } else if (filePath.endsWith('/')) {
+    // /about/ → /about/index.html
+    filePath += 'index.html';
+  }
 
   const r2Path = `sites/${site.slug}/${version}${filePath}`;
 
   console.warn(JSON.stringify({ level: 'info', action: 'serve_site_lookup', slug: site.slug, version, r2Path }));
 
-  const object = await env.SITES_BUCKET.get(r2Path);
+  let object = await env.SITES_BUCKET.get(r2Path);
+
+  // For paths without extensions (e.g. /about), try directory index then .html extension
+  if (!object && !filePath.includes('.')) {
+    // /about → try /about/index.html
+    const dirIndexPath = `sites/${site.slug}/${version}${filePath}/index.html`;
+    object = await env.SITES_BUCKET.get(dirIndexPath);
+
+    if (!object) {
+      // /about → try /about.html
+      const htmlPath = `sites/${site.slug}/${version}${filePath}.html`;
+      object = await env.SITES_BUCKET.get(htmlPath);
+    }
+  }
+
+  // For paths with nested directories that didn't match, try flat file name fallback
+  // e.g. /blog/barbara-cary → try /blog-barbara-cary.html
+  if (!object && filePath.includes('/') && !filePath.includes('.')) {
+    const flatName = filePath.replace(/^\//, '').replace(/\//g, '-');
+    const flatPath = `sites/${site.slug}/${version}/${flatName}.html`;
+    object = await env.SITES_BUCKET.get(flatPath);
+    if (object) {
+      console.warn(JSON.stringify({ level: 'info', action: 'serve_flat_fallback', slug: site.slug, flatPath }));
+    }
+  }
 
   if (!object) {
     // Try assets/ directory (logo, favicon, discovered images — not versioned)
@@ -565,7 +594,7 @@ export async function serveSiteFromR2(
       }
     }
 
-    // Try index.html for SPA fallback
+    // Try index.html for SPA fallback (catch-all for client-side routing)
     if (!requestPath.includes('.')) {
       const fallbackPath = `sites/${site.slug}/${version}/index.html`;
       const fallback = await env.SITES_BUCKET.get(fallbackPath);
@@ -584,7 +613,8 @@ export async function serveSiteFromR2(
 
   // Use the resolved file path for content-type detection, not the raw request path.
   // Raw path '/' has no extension → would return 'application/octet-stream' (download).
-  const contentType = getContentType(filePath);
+  // For directory/bare paths that resolved via fallback, force text/html.
+  const contentType = filePath.includes('.') ? getContentType(filePath) : 'text/html; charset=utf-8';
   return buildSiteResponse(object, site, contentType, env);
 }
 
