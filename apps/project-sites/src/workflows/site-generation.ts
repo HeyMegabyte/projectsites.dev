@@ -1429,6 +1429,16 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           '- Each page must be a COMPELLING MULTIMEDIA EXPERIENCE',
           '- Consistent header (logo + nav) and footer across all pages',
           '',
+          '=== HERO BACKGROUND VIDEO ===',
+          'The homepage hero MUST use a background VIDEO (not just an image):',
+          '- Use a relevant video from Pexels: https://player.vimeo.com/video/{ID} or direct MP4',
+          '- Style: muted, autoplay, loop, playsinline, object-fit:cover, position:absolute',
+          '- Add a dark overlay gradient on top for text readability',
+          '- Fallback: <img> for browsers that dont support video',
+          '- Choose video relevant to: ' + (category || 'community service'),
+          '',
+          discoveredVideos.length > 0 ? `Discovered videos:\n${discoveredVideos.map((v: any) => v.url || v.embed_url || JSON.stringify(v)).join('\n')}` : '',
+          '',
           '=== DESIGN (Stripe / Linear / Vercel quality) ===',
           '- Dark theme preferred with vibrant brand accent colors',
           '- Font: Inter or Satoshi (Google Fonts, display=swap)',
@@ -1476,14 +1486,23 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           '- PNG/JPG files with embedded text should generally be avoided — convert text to HTML',
           '- Multi-layer images (like section dividers with photos + text + solid bg) should be decomposed: use the photo, recreate the text as HTML',
           '',
-          '=== IMAGES (unique per page, AI-selected) ===',
+          '=== IMAGES (15-20 per page, AI-inspected) ===',
           scrapedImageProfiles.length > 0
             ? `Images from original site (with context for correct placement):\n${scrapedImageProfiles.map((img, i) => `${i + 1}. ${img.url} — From page "${img.source_title || img.source_page}", context: "${img.context}"`).join('\n')}`
             : scrapedAllImages.length > 0 ? `Images scraped from original website (USE THESE FIRST):\n${scrapedAllImages.slice(0, 40).join('\n')}` : '',
           allAssets.length > 0 ? `Additional discovered/generated assets:\n${allAssets.slice(0, 20).join('\n')}` : '',
+          '- 15-20 unique images PER PAGE (double the previous standard)',
+          '- Use image GALLERIES, GRIDS, and CAROUSELS to showcase multiple images per section',
+          '- NEVER use images with baked-in text, white space borders, or montage-style layouts',
+          '- If the only available image has text/banners → CROP to extract just the photograph',
+          '- If image has big empty spaces → CROP to the content area only',
+          '- Every section needs MULTIPLE images, not just one',
+          '- Source priority: original site photos > Unsplash > Pexels > DALL-E',
+          '- Use Unsplash: https://images.unsplash.com/photo-{ID}?w={W}&h={H}&fit=crop',
+          '- Use Pexels videos for hero: search at https://api.pexels.com/videos/search',
+          '- ALL asset paths ABSOLUTE (start with /)',
           '- NEVER reuse the same image on multiple pages',
           '- USE original business photos from the scraped site first',
-          '- Fill gaps with relevant Unsplash: https://images.unsplash.com/photo-{ID}?w={W}&h={H}&fit=crop',
           'CRITICAL: Match images to their content context:',
           '- A photo of a person must be used where that person is discussed',
           '- A photo of a building must be used in location/about sections',
@@ -1492,7 +1511,7 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           '- If an image doesn\'t match any section, don\'t use it',
           '- Check image_profiles in _research.json for context about each image',
           '- NO empty image holders — if no image available, use a relevant Unsplash photo',
-          '- 8+ unique images per page. Alt text with keywords. loading="lazy" below fold.',
+          '- Alt text with keywords. loading="lazy" below fold.',
           '- TEXT OVER IMAGES: Never place text over the focal point of a background image.',
           '  Position text in low-complexity areas (sky, edges, solid colors). Use gradient overlays that fade from one side.',
           '',
@@ -1584,7 +1603,7 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           timeout: '15 minutes',
         }, async () => {
           return callContainer([
-            { label: 'B1-beauty', timeoutMin: 10, text: 'Make ALL pages MORE BEAUTIFUL. Do NOT rewrite from scratch — enhance what exists.\n\nFor ALL HTML files:\n- 10+ @keyframes animations (fadeInUp, slideInLeft, scaleIn, subtleFloat, gradientShift, glowPulse)\n- IntersectionObserver: sections start opacity:0 translateY:30px, animate to visible on scroll\n- Glassmorphism on cards (backdrop-filter:blur(20px))\n- Use the BRAND COLORS from the original site (check _research.json for extracted colors)\n- Gradient text on hero headings using brand primary color\n- Smooth hover transforms on cards (translateY -4px + shadow)\n- @media prefers-reduced-motion\n- Check every image: is it RELEVANT to its section? Is it duplicated on another page? Fix any mismatches.\n- Fill any empty image placeholders with relevant Unsplash photos.\n- ALL asset paths must be ABSOLUTE (start with /) so they work on sub-pages\n- SELF-PROMPT: Look at each page critically. What would make it more stunning? Do it.' + (visualCritique ? '\n\nAI VISUAL INSPECTION FOUND THESE ISSUES (fix ALL of them):\n' + visualCritique : '') },
+            { label: 'B1-beauty', timeoutMin: 10, text: 'Make ALL pages MORE BEAUTIFUL. Do NOT rewrite from scratch — enhance what exists.\n\nFor ALL HTML files:\n- 10+ @keyframes animations (fadeInUp, slideInLeft, scaleIn, subtleFloat, gradientShift, glowPulse)\n- IntersectionObserver: sections start opacity:0 translateY:30px, animate to visible on scroll\n- Glassmorphism on cards (backdrop-filter:blur(20px))\n- Use the BRAND COLORS from the original site (check _research.json for extracted colors)\n- Gradient text on hero headings using brand primary color\n- Smooth hover transforms on cards (translateY -4px + shadow)\n- @media prefers-reduced-motion\n- Check every image: is it RELEVANT to its section? Is it duplicated on another page? Fix any mismatches.\n- Scan every image: does it have baked-in text, white borders, or montage styling? If so, remove it or replace with a clean photo.\n- Every section should have 3-5 images minimum, arranged in grids or galleries.\n- Fill any empty image placeholders with relevant Unsplash photos.\n- ALL asset paths must be ABSOLUTE (start with /) so they work on sub-pages\n- SELF-PROMPT: Look at each page critically. What would make it more stunning? Do it.' + (visualCritique ? '\n\nAI VISUAL INSPECTION FOUND THESE ISSUES (fix ALL of them):\n' + visualCritique : '') },
           ], currentFiles, 'stage-b1');
         });
         const b1Arr = b1 as { name: string; content: string }[];
@@ -1627,7 +1646,7 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           timeout: '20 minutes',
         }, async () => {
           return callContainer([
-            { label: 'C1-visual', timeoutMin: 5, text: 'Visual quality audit on ALL HTML files.\n\n1. Check EVERY image: is it relevant to the section content? Remove/replace irrelevant ones.\n2. Check for DUPLICATE images across pages — each page must have unique imagery.\n3. Fill any empty image placeholders with relevant Unsplash photos.\n4. Ensure the LOGO from the original site is visible in the header of every page.\n5. Verify brand colors match the original site (not generic blue/cyan).\n6. Text contrast: readable on all backgrounds.\n7. Grid partial rows centered.\n8. Nav should have max 5-7 top-level links, use dropdowns for sub-pages.\n9. Google Maps address should link to directions URL.\n10. SELF-PROMPT: What else would make each page more stunning? Do it.' },
+            { label: 'C1-visual', timeoutMin: 5, text: 'Visual quality audit on ALL HTML files.\n\n1. Check EVERY image: is it relevant to the section content? Remove/replace irrelevant ones.\n2. Check for DUPLICATE images across pages — each page must have unique imagery.\n3. Fill any empty image placeholders with relevant Unsplash photos.\n4. Ensure the LOGO from the original site is visible in the header of every page.\n5. Verify brand colors match the original site (not generic blue/cyan).\n6. Text contrast: readable on all backgrounds.\n7. Grid partial rows centered.\n8. Nav should have max 5-7 top-level links, use dropdowns for sub-pages.\n9. Google Maps address should link to directions URL.\n10. Audit EVERY image: no white space, no embedded text, no solid color borders.\n11. If an image looks like a montage/collage with text → replace with a clean photograph.\n12. Each page should have 15+ images — add more if under that count.\n13. SELF-PROMPT: What else would make each page more stunning? Do it.' },
             { label: 'C2-domain', timeoutMin: 5, text: domainPrompt },
           ], currentFiles, 'stage-c');
         });
