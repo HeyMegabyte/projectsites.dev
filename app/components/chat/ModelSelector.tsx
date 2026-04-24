@@ -4,6 +4,7 @@ import type { KeyboardEvent } from 'react';
 import type { ModelInfo } from '~/lib/modules/llm/types';
 import { classNames } from '~/utils/classNames';
 import { LOCAL_PROVIDERS } from '~/lib/stores/settings';
+import { DEFAULT_MODEL } from '~/utils/constants';
 
 // Fuzzy search utilities
 const levenshteinDistance = (str1: string, str2: string): number => {

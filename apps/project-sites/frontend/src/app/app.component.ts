@@ -1,9 +1,14 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, type OnInit, HostListener, inject, signal } from '@angular/core';
 import { RouterOutlet, Router, ActivatedRoute, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs';
 import { HeaderComponent } from './components/header/header.component';
 import { ToastComponent } from './components/toast/toast.component';
 import { BgOrbsComponent } from './components/bg-orbs/bg-orbs.component';
+import { EasterEggsComponent } from './components/easter-eggs/easter-eggs.component';
+import { CommandPaletteComponent } from './components/command-palette/command-palette.component';
+import { ShortcutsOverlayComponent } from './components/shortcuts-overlay/shortcuts-overlay.component';
+import { OnboardingComponent } from './components/onboarding/onboarding.component';
+import { FeedbackWidgetComponent } from './components/feedback-widget/feedback-widget.component';
 import { AuthService } from './services/auth.service';
 import { ApiService } from './services/api.service';
 import { MetaService } from './services/meta.service';
@@ -11,14 +16,27 @@ import { MetaService } from './services/meta.service';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, HeaderComponent, ToastComponent, BgOrbsComponent],
+  imports: [RouterOutlet, HeaderComponent, ToastComponent, BgOrbsComponent, EasterEggsComponent, CommandPaletteComponent, ShortcutsOverlayComponent, OnboardingComponent, FeedbackWidgetComponent],
   template: `
-    @if (showHeader()) { <app-header /> }
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+    @if (showHeader()) { <app-header role="banner" /> }
     <app-bg-orbs />
+    <app-easter-eggs />
     <app-toast />
-    <main class="app" [class.no-pad]="!showHeader()">
+    @if (showCommandPalette()) {
+      <app-command-palette
+        (closed)="showCommandPalette.set(false)"
+        (showShortcuts)="onPaletteShowShortcuts()"
+      />
+    }
+    @if (showShortcuts()) {
+      <app-shortcuts-overlay (closed)="showShortcuts.set(false)" />
+    }
+    <main id="main-content" role="main" class="app" [class.no-pad]="!showHeader()">
       <router-outlet />
     </main>
+    <app-onboarding />
+    <app-feedback-widget />
   `,
   styles: [`
     .app {
@@ -39,6 +57,44 @@ export class AppComponent implements OnInit {
   private route = inject(ActivatedRoute);
 
   showHeader = signal(true);
+  showCommandPalette = signal(false);
+  showShortcuts = signal(false);
+
+  @HostListener('document:keydown', ['$event'])
+  onGlobalKeydown(event: KeyboardEvent): void {
+    // Cmd+K / Ctrl+K — toggle command palette
+    if (event.key === 'k' && (event.metaKey || event.ctrlKey)) {
+      event.preventDefault();
+      this.showCommandPalette.update(v => !v);
+      this.showShortcuts.set(false);
+      return;
+    }
+    // '?' — show shortcuts overlay (only when not typing in an input/textarea)
+    if (event.key === '?' && !this.isInputFocused()) {
+      this.showShortcuts.update(v => !v);
+      this.showCommandPalette.set(false);
+      return;
+    }
+    // '/' — focus the first visible search input (only when not typing)
+    if (event.key === '/' && !this.isInputFocused()) {
+      event.preventDefault();
+      const search = document.querySelector<HTMLInputElement>('input[type="text"][placeholder*="earch"]');
+      if (search) search.focus();
+    }
+  }
+
+  /** Show shortcuts from the command palette action */
+  onPaletteShowShortcuts(): void {
+    this.showCommandPalette.set(false);
+    this.showShortcuts.set(true);
+  }
+
+  private isInputFocused(): boolean {
+    const el = document.activeElement;
+    if (!el) return false;
+    const tag = el.tagName.toLowerCase();
+    return tag === 'input' || tag === 'textarea' || (el as HTMLElement).isContentEditable;
+  }
 
   ngOnInit(): void {
     this.meta.init();
@@ -67,7 +123,10 @@ export class AppComponent implements OnInit {
   }
 
   private initCursorFollower(): void {
-    if (typeof window === 'undefined' || !window.matchMedia('(hover: hover)').matches) return;
+    if (typeof window === 'undefined') return;
+    // Respect prefers-reduced-motion and hover capability
+    if (!window.matchMedia('(hover: hover)').matches) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
     const follower = document.createElement('div');
     follower.className = 'cursor-follower';

@@ -60,16 +60,16 @@ export interface GenerationStatusMessage {
   correlationId: string;
 }
 
-export type ParentToChildMessage = SubmitPromptMessage | ImportFilesMessage | RequestFilesMessage | LoadBuildContextMessage;
+export type ParentToChildMessage =
+  | SubmitPromptMessage
+  | ImportFilesMessage
+  | RequestFilesMessage
+  | LoadBuildContextMessage;
 export type ChildToParentMessage = BoltReadyMessage | FilesReadyMessage | GenerationStatusMessage;
 
 // ── Allowed origins ──────────────────────────────────────────
 
-const ALLOWED_ORIGINS = new Set([
-  'https://projectsites.dev',
-  'http://localhost:4200',
-  'http://localhost:4300',
-]);
+const ALLOWED_ORIGINS = new Set(['https://projectsites.dev', 'http://localhost:4200', 'http://localhost:4300']);
 
 // ── Detection (synchronous — must run before WebContainer boot) ──
 
@@ -123,6 +123,7 @@ function isPSMessage(data: unknown): data is ParentToChildMessage {
 // ── Message listener ─────────────────────────────────────────
 
 type MessageHandler = (message: ParentToChildMessage) => void;
+
 const handlers: MessageHandler[] = [];
 
 /** Register a handler for incoming parent messages. Returns an unsubscribe function. */
@@ -148,6 +149,7 @@ function handleMessage(event: MessageEvent): void {
     if (isEmbedded && event.data?.type?.startsWith?.('PS_')) {
       console.warn('[embed] REJECTED — origin not allowed:', event.origin, 'Allowed:', [...ALLOWED_ORIGINS]);
     }
+
     return;
   }
 
@@ -169,8 +171,10 @@ function handleMessage(event: MessageEvent): void {
 if (isEmbedded && typeof window !== 'undefined') {
   window.addEventListener('message', handleMessage);
 
-  // Notify parent that bolt.diy is ready
-  // Delay slightly to allow React to mount
+  /*
+   * Notify parent that bolt.diy is ready
+   * Delay slightly to allow React to mount
+   */
   requestAnimationFrame(() => {
     postToParent({ type: 'PS_BOLT_READY' });
   });

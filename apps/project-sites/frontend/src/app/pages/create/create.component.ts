@@ -1,9 +1,9 @@
-import { Component, OnInit, OnDestroy, inject, signal, ChangeDetectorRef } from '@angular/core';
+import { Component, type OnInit, type OnDestroy, inject, signal, ChangeDetectorRef } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Subject, debounceTime, distinctUntilChanged, switchMap, of, takeUntil } from 'rxjs';
 import { ApiService } from '../../services/api.service';
-import { AuthService, SelectedBusiness } from '../../services/auth.service';
+import { AuthService, type SelectedBusiness } from '../../services/auth.service';
 import { GeolocationService } from '../../services/geolocation.service';
 import { ToastService } from '../../services/toast.service';
 

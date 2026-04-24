@@ -1,4 +1,4 @@
-import { Routes } from '@angular/router';
+import { type Routes } from '@angular/router';
 
 export const routes: Routes = [
   {
@@ -128,5 +128,39 @@ export const routes: Routes = [
     path: 'billing',
     redirectTo: 'admin/billing',
   },
-  { path: '**', redirectTo: '' },
+  {
+    path: 'blog',
+    loadComponent: () =>
+      import('./pages/blog/blog-list.component').then((m) => m.BlogListComponent),
+  },
+  {
+    path: 'blog/:slug',
+    loadComponent: () =>
+      import('./pages/blog/blog-post.component').then((m) => m.BlogPostComponent),
+  },
+  {
+    path: 'changelog',
+    loadComponent: () =>
+      import('./pages/changelog/changelog.component').then((m) => m.ChangelogComponent),
+  },
+  {
+    path: 'status',
+    loadComponent: () =>
+      import('./pages/status/status.component').then((m) => m.StatusComponent),
+  },
+  {
+    path: 'error',
+    loadComponent: () =>
+      import('./pages/error/server-error.component').then((m) => m.ServerErrorComponent),
+  },
+  {
+    path: 'offline',
+    loadComponent: () =>
+      import('./pages/error/offline.component').then((m) => m.OfflineComponent),
+  },
+  {
+    path: '**',
+    loadComponent: () =>
+      import('./pages/error/not-found.component').then((m) => m.NotFoundComponent),
+  },
 ];

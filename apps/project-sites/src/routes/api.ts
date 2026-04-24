@@ -48,6 +48,7 @@ import * as billingService from '../services/billing.js';
 import * as domainService from '../services/domains.js';
 import * as auditService from '../services/audit.js';
 import * as contactService from '../services/contact.js';
+import { classifyError } from '../services/retry.js';
 import * as posthog from '../lib/posthog.js';
 import { captureError } from '../lib/sentry.js';
 import { fetchSheetData, fetchSheetMeta } from '../services/google_sheets.js';
@@ -235,6 +236,72 @@ api.get('/api/auth/google/callback', async (c) => {
   redirectTarget.searchParams.set('token', session.token);
   redirectTarget.searchParams.set('email', result.email);
   posthog.trackAuth(c.env, c.executionCtx, 'google_oauth', 'verified', result.email);
+  return c.redirect(redirectTarget.toString());
+});
+
+// ─── GitHub OAuth ──────────────────────────────────────────
+
+api.get('/api/auth/github', async (c) => {
+  const redirectUrl = c.req.query('redirect_url');
+  const result = await authService.createGitHubOAuthState(c.env.DB, c.env, redirectUrl);
+
+  auditService.writeAuditLog(c.env.DB, {
+    org_id: 'system',
+    actor_id: null,
+    action: 'auth.github_oauth_started',
+    target_type: 'auth',
+    target_id: 'github',
+    metadata_json: {
+      redirect_url: redirectUrl || '/',
+      message: 'GitHub OAuth sign-in flow initiated',
+    },
+    request_id: c.get('requestId'),
+  }).catch(() => {});
+
+  return c.redirect(result.authUrl);
+});
+
+api.get('/api/auth/github/callback', async (c) => {
+  const code = c.req.query('code');
+  const state = c.req.query('state');
+
+  if (!code || !state) {
+    throw badRequest('Missing code or state parameter');
+  }
+
+  const result = await authService.handleGitHubOAuthCallback(c.env.DB, c.env, code, state);
+
+  const user = await authService.findOrCreateUser(c.env.DB, {
+    email: result.email,
+    display_name: result.display_name ?? undefined,
+    avatar_url: result.avatar_url ?? undefined,
+  });
+  const session = await authService.createSession(c.env.DB, user.user_id);
+
+  await auditService.writeAuditLog(c.env.DB, {
+    org_id: user.org_id,
+    actor_id: user.user_id,
+    action: 'auth.github_oauth_verified',
+    target_type: 'user',
+    target_id: user.user_id,
+    metadata_json: { method: 'github_oauth' },
+    request_id: c.get('requestId'),
+  });
+
+  const baseUrl = `https://${DOMAINS.SITES_BASE}`;
+  const rawRedirect = result.redirect_url ?? baseUrl;
+  const redirectTarget = new URL(rawRedirect);
+  const ghAllowedDomains = ['projectsites.dev', 'megabyte.space'];
+  const ghHostname = redirectTarget.hostname;
+  const ghAllowed = ghAllowedDomains.some(domain =>
+    ghHostname === domain || (ghHostname.endsWith('.' + domain) && ghHostname.split('.').length <= domain.split('.').length + 1),
+  );
+  if (!ghAllowed || redirectTarget.protocol !== 'https:') {
+    return c.redirect(`${baseUrl}/?error=invalid_redirect`);
+  }
+  redirectTarget.searchParams.set('token', session.token);
+  redirectTarget.searchParams.set('email', result.email);
+  posthog.trackAuth(c.env, c.executionCtx, 'github_oauth', 'verified', result.email);
   return c.redirect(redirectTarget.toString());
 });
 
@@ -3302,6 +3369,430 @@ api.get('/api/sheets/:sheetId/meta', async (c) => {
   const tabs = await fetchSheetMeta(sheetId, apiKey);
   return c.json({ tabs });
 });
+
+// ─── Feedback Routes ────────────────────────────────────────
+
+/**
+ * POST /api/feedback — Submit feedback (rating + optional comment).
+ * Authenticated: uses userId/orgId from session. Anonymous: stores without user.
+ */
+api.post('/api/feedback', async (c) => {
+  const requestId = c.get('requestId');
+  try {
+    const body = await c.req.json();
+    const rating = Number(body.rating);
+    if (!rating || rating < 1 || rating > 5) {
+      return c.json({ error: { code: 'BAD_REQUEST', message: 'Rating must be 1-5', request_id: requestId } }, 400);
+    }
+    const comment = typeof body.comment === 'string' ? body.comment.slice(0, 2000) : null;
+    const pageUrl = typeof body.page_url === 'string' ? body.page_url.slice(0, 500) : null;
+    const userId = c.get('userId') ?? null;
+    const orgId = c.get('orgId') ?? null;
+
+    await dbInsert(c.env.DB, 'feedback', {
+      id: crypto.randomUUID(),
+      org_id: orgId,
+      user_id: userId,
+      page_url: pageUrl,
+      rating,
+      comment,
+      status: 'pending',
+    });
+
+    return c.json({ data: { submitted: true } }, 201);
+  } catch (err) {
+    // Re-throw known error types for the global error handler
+    if (err && typeof err === 'object' && 'code' in err) throw err;
+    const category = classifyError(err);
+    console.warn(JSON.stringify({
+      level: 'error',
+      service: 'api',
+      route: 'POST /api/feedback',
+      error_category: category,
+      request_id: requestId,
+      error: err instanceof Error ? err.message : String(err),
+    }));
+    return c.json({ error: { code: 'INTERNAL_ERROR', message: 'Failed to submit feedback', request_id: requestId } }, 500);
+  }
+});
+
+/**
+ * GET /api/feedback — List approved feedback (public testimonials).
+ * Returns only approved feedback, sorted by newest first.
+ */
+api.get('/api/feedback', async (c) => {
+  const requestId = c.get('requestId');
+  try {
+    const limit = Math.min(Number(c.req.query('limit') || '20'), 50);
+    const result = await dbQuery<{
+      id: string; rating: number; comment: string; page_url: string; created_at: string;
+    }>(
+      c.env.DB,
+      `SELECT id, rating, comment, page_url, created_at FROM feedback
+       WHERE status = 'approved' AND deleted_at IS NULL
+       ORDER BY created_at DESC LIMIT ?`,
+      [limit],
+    );
+    return c.json({ data: result.data });
+  } catch (err) {
+    if (err && typeof err === 'object' && 'code' in err) throw err;
+    const category = classifyError(err);
+    console.warn(JSON.stringify({
+      level: 'error',
+      service: 'api',
+      route: 'GET /api/feedback',
+      error_category: category,
+      request_id: requestId,
+      error: err instanceof Error ? err.message : String(err),
+    }));
+    return c.json({ error: { code: 'INTERNAL_ERROR', message: 'Failed to load feedback', request_id: requestId } }, 500);
+  }
+});
+
+// ─── Notification Routes ────────────────────────────────────
+
+/**
+ * GET /api/notifications — List notifications for the authenticated user.
+ */
+api.get('/api/notifications', async (c) => {
+  const requestId = c.get('requestId');
+  const userId = c.get('userId');
+  if (!userId) return c.json({ error: { code: 'UNAUTHORIZED', message: 'Not authenticated', request_id: requestId } }, 401);
+
+  try {
+    const limit = Math.min(Number(c.req.query('limit') || '30'), 100);
+    const result = await dbQuery<{
+      id: string; type: string; title: string; message: string;
+      action_url: string; read: number; created_at: string;
+    }>(
+      c.env.DB,
+      `SELECT id, type, title, message, action_url, read, created_at
+       FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT ?`,
+      [userId, limit],
+    );
+
+    const unreadCount = result.data.filter((n) => !n.read).length;
+    return c.json({ data: result.data, unread_count: unreadCount });
+  } catch (err) {
+    if (err && typeof err === 'object' && 'code' in err) throw err;
+    const category = classifyError(err);
+    console.warn(JSON.stringify({
+      level: 'error',
+      service: 'api',
+      route: 'GET /api/notifications',
+      error_category: category,
+      request_id: requestId,
+      error: err instanceof Error ? err.message : String(err),
+    }));
+    return c.json({ error: { code: 'INTERNAL_ERROR', message: 'Failed to load notifications', request_id: requestId } }, 500);
+  }
+});
+
+/**
+ * PATCH /api/notifications/:id/read — Mark a notification as read.
+ */
+api.patch('/api/notifications/:id/read', async (c) => {
+  const requestId = c.get('requestId');
+  const userId = c.get('userId');
+  if (!userId) return c.json({ error: { code: 'UNAUTHORIZED', message: 'Not authenticated', request_id: requestId } }, 401);
+
+  try {
+    const notifId = c.req.param('id');
+    await c.env.DB.prepare(
+      'UPDATE notifications SET read = 1 WHERE id = ? AND user_id = ?',
+    ).bind(notifId, userId).run();
+
+    return c.json({ data: { read: true } });
+  } catch (err) {
+    if (err && typeof err === 'object' && 'code' in err) throw err;
+    const category = classifyError(err);
+    console.warn(JSON.stringify({
+      level: 'error',
+      service: 'api',
+      route: 'PATCH /api/notifications/:id/read',
+      error_category: category,
+      request_id: requestId,
+      error: err instanceof Error ? err.message : String(err),
+    }));
+    return c.json({ error: { code: 'INTERNAL_ERROR', message: 'Failed to mark notification as read', request_id: requestId } }, 500);
+  }
+});
+
+/**
+ * POST /api/notifications/read-all — Mark all notifications as read for the user.
+ */
+api.post('/api/notifications/read-all', async (c) => {
+  const requestId = c.get('requestId');
+  const userId = c.get('userId');
+  if (!userId) return c.json({ error: { code: 'UNAUTHORIZED', message: 'Not authenticated', request_id: requestId } }, 401);
+
+  try {
+    await c.env.DB.prepare(
+      'UPDATE notifications SET read = 1 WHERE user_id = ? AND read = 0',
+    ).bind(userId).run();
+
+    return c.json({ data: { read_all: true } });
+  } catch (err) {
+    if (err && typeof err === 'object' && 'code' in err) throw err;
+    const category = classifyError(err);
+    console.warn(JSON.stringify({
+      level: 'error',
+      service: 'api',
+      route: 'POST /api/notifications/read-all',
+      error_category: category,
+      request_id: requestId,
+      error: err instanceof Error ? err.message : String(err),
+    }));
+    return c.json({ error: { code: 'INTERNAL_ERROR', message: 'Failed to mark all notifications as read', request_id: requestId } }, 500);
+  }
+});
+
+// ─── Changelog Route ────────────────────────────────────────
+
+/**
+ * GET /api/changelog — Returns version history entries.
+ * Hardcoded for now; future: auto-generate from git tags.
+ */
+api.get('/api/changelog', async (c) => {
+  const requestId = c.get('requestId');
+  try {
+    const entries = [
+      { version: '1.5.0', date: '2026-04-20', type: 'feat', title: 'Full skill implementation — 50 agent skills', description: 'Error pages, command palette, easter eggs, blog, changelog, status page, feedback widget, notifications, onboarding, accessibility improvements, i18n switcher, empty states.' },
+      { version: '1.4.0', date: '2026-04-19', type: 'feat', title: 'Comprehensive multimedia pipeline', description: '7 parallel image/video sources, DALL-E generation, WebP optimization, brand image discovery.' },
+      { version: '1.3.0', date: '2026-04-14', type: 'feat', title: 'Complete admin dashboard', description: 'All 11 sections polished: dashboard, editor, snapshots, analytics, email, social, forms, integrations, billing, audit, settings.' },
+      { version: '1.2.0', date: '2026-04-10', type: 'feat', title: '41 Playwright E2E tests', description: 'End-to-end tests across 3 user journeys with parallel execution.' },
+      { version: '1.1.0', date: '2026-04-09', type: 'feat', title: 'Google Sheets + PostHog + Sentry', description: 'Full observability stack with analytics, error tracking, and data integration.' },
+      { version: '1.0.0', date: '2026-03-25', type: 'feat', title: 'Initial production launch', description: 'AI-powered site generation with Claude, Stripe billing, magic link auth, custom domains.' },
+    ];
+    return c.json({ data: entries });
+  } catch (err) {
+    if (err && typeof err === 'object' && 'code' in err) throw err;
+    const category = classifyError(err);
+    console.warn(JSON.stringify({
+      level: 'error',
+      service: 'api',
+      route: 'GET /api/changelog',
+      error_category: category,
+      request_id: requestId,
+      error: err instanceof Error ? err.message : String(err),
+    }));
+    return c.json({ error: { code: 'INTERNAL_ERROR', message: 'Failed to load changelog', request_id: requestId } }, 500);
+  }
+});
+
+// ─── Analytics (GA4 Data API) ────────────────────────────────────────────────
+
+/**
+ * GET /api/analytics/:siteId
+ * Returns analytics data for a site from GA4 Data API, filtered by site_slug dimension.
+ * Falls back to basic aggregated data if GA4 service account isn't configured.
+ */
+api.get('/api/analytics/:siteId', async (c) => {
+  const requestId = c.get('requestId') ?? crypto.randomUUID();
+  const userId = c.get('userId');
+  if (!userId) return c.json({ error: { code: 'UNAUTHORIZED', message: 'Authentication required', request_id: requestId } }, 401);
+
+  const siteId = c.req.param('siteId');
+  const period = c.req.query('period') || '7'; // days
+
+  // Look up the site to get slug
+  const site = await dbQueryOne<{ slug: string; org_id: string }>(c.env.DB, 'SELECT slug, org_id FROM sites WHERE id = ? AND deleted_at IS NULL', [siteId]);
+  if (!site) return c.json({ error: { code: 'NOT_FOUND', message: 'Site not found', request_id: requestId } }, 404);
+
+  // Verify user belongs to the org
+  const membership = await dbQueryOne(c.env.DB, 'SELECT id FROM memberships WHERE org_id = ? AND user_id = ? AND deleted_at IS NULL', [site.org_id, userId]);
+  if (!membership) return c.json({ error: { code: 'FORBIDDEN', message: 'Access denied', request_id: requestId } }, 403);
+
+  const propertyId = c.env.GA4_PROPERTY_ID;
+  const serviceAccountJson = c.env.GA4_SERVICE_ACCOUNT_JSON;
+
+  // If GA4 is fully configured, query the Data API
+  if (propertyId && serviceAccountJson) {
+    try {
+      const analyticsData = await queryGa4DataApi(propertyId, serviceAccountJson, site.slug, parseInt(period));
+      return c.json({ data: analyticsData });
+    } catch (err) {
+      console.warn(JSON.stringify({
+        level: 'warn', service: 'api', route: 'GET /api/analytics/:siteId',
+        error: err instanceof Error ? err.message : String(err),
+        request_id: requestId,
+      }));
+      // Fall through to basic data
+    }
+  }
+
+  // Fallback: return basic data from audit logs + page view estimates
+  const dayCount = parseInt(period) || 7;
+  const since = new Date(Date.now() - dayCount * 86_400_000).toISOString();
+
+  const logCounts = await dbQuery<{ day: string; cnt: number }>(c.env.DB,
+    `SELECT DATE(created_at) as day, COUNT(*) as cnt FROM audit_logs
+     WHERE target_id = ? AND action LIKE 'site.%' AND created_at >= ?
+     GROUP BY DATE(created_at) ORDER BY day`, [siteId, since]);
+
+  return c.json({
+    data: {
+      period: dayCount,
+      slug: site.slug,
+      ga4_connected: !!(propertyId && serviceAccountJson),
+      ga4_measurement_id: c.env.GA4_MEASUREMENT_ID || null,
+      gtm_container_id: c.env.GTM_CONTAINER_ID || null,
+      stats: {
+        pageViews: 0,
+        uniqueVisitors: 0,
+        avgSessionDuration: '0s',
+        bounceRate: 0,
+      },
+      chartData: (logCounts.data || []).map(r => ({ date: r.day, views: r.cnt })),
+      trafficSources: [],
+      topPages: [],
+    },
+  });
+});
+
+/**
+ * Query the GA4 Data API using a service account.
+ * Uses the Google Analytics Data API v1beta to run a report filtered by site_slug dimension.
+ */
+async function queryGa4DataApi(
+  propertyId: string,
+  serviceAccountJsonB64: string,
+  siteSlug: string,
+  days: number,
+): Promise<Record<string, unknown>> {
+  // Decode the base64-encoded service account JSON
+  const saJson = JSON.parse(atob(serviceAccountJsonB64));
+
+  // Build a JWT for Google OAuth2
+  const now = Math.floor(Date.now() / 1000);
+  const header = btoa(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+  const payload = btoa(JSON.stringify({
+    iss: saJson.client_email,
+    scope: 'https://www.googleapis.com/auth/analytics.readonly',
+    aud: 'https://oauth2.googleapis.com/token',
+    iat: now,
+    exp: now + 3600,
+  }));
+
+  // Import the private key and sign
+  const pemContents = saJson.private_key
+    .replace(/-----BEGIN PRIVATE KEY-----/, '')
+    .replace(/-----END PRIVATE KEY-----/, '')
+    .replace(/\s/g, '');
+  const keyData = Uint8Array.from(atob(pemContents), (c: string) => c.charCodeAt(0));
+  const cryptoKey = await crypto.subtle.importKey('pkcs8', keyData, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
+  const signatureInput = new TextEncoder().encode(`${header}.${payload}`);
+  const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', cryptoKey, signatureInput);
+  const signatureB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const jwt = `${header}.${payload}.${signatureB64}`;
+
+  // Exchange JWT for access token
+  const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
+  });
+  const tokenData = await tokenRes.json() as { access_token: string };
+
+  // Run GA4 Data API report
+  const reportRes = await fetch(
+    `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${tokenData.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        dateRanges: [{ startDate: `${days}daysAgo`, endDate: 'today' }],
+        dimensions: [{ name: 'date' }, { name: 'pagePath' }, { name: 'sessionDefaultChannelGroup' }],
+        metrics: [
+          { name: 'screenPageViews' },
+          { name: 'totalUsers' },
+          { name: 'averageSessionDuration' },
+          { name: 'bounceRate' },
+        ],
+        dimensionFilter: {
+          filter: {
+            fieldName: 'customEvent:site_slug',
+            stringFilter: { matchType: 'EXACT', value: siteSlug },
+          },
+        },
+        limit: 10000,
+      }),
+    },
+  );
+  const report = await reportRes.json() as { rows?: { dimensionValues: { value: string }[]; metricValues: { value: string }[] }[] };
+
+  // Aggregate the report data
+  let totalPageViews = 0;
+  let totalUsers = 0;
+  let totalDuration = 0;
+  let totalBounceRate = 0;
+  let rowCount = 0;
+  const dailyViews = new Map<string, number>();
+  const pagePaths = new Map<string, number>();
+  const channels = new Map<string, number>();
+
+  for (const row of report.rows || []) {
+    const date = row.dimensionValues[0].value;
+    const pagePath = row.dimensionValues[1].value;
+    const channel = row.dimensionValues[2].value;
+    const views = parseInt(row.metricValues[0].value) || 0;
+    const users = parseInt(row.metricValues[1].value) || 0;
+    const duration = parseFloat(row.metricValues[2].value) || 0;
+    const bounce = parseFloat(row.metricValues[3].value) || 0;
+
+    totalPageViews += views;
+    totalUsers += users;
+    totalDuration += duration;
+    totalBounceRate += bounce;
+    rowCount++;
+
+    dailyViews.set(date, (dailyViews.get(date) || 0) + views);
+    pagePaths.set(pagePath, (pagePaths.get(pagePath) || 0) + views);
+    channels.set(channel, (channels.get(channel) || 0) + views);
+  }
+
+  const avgDuration = rowCount > 0 ? totalDuration / rowCount : 0;
+  const avgBounce = rowCount > 0 ? totalBounceRate / rowCount : 0;
+  const mins = Math.floor(avgDuration / 60);
+  const secs = Math.floor(avgDuration % 60);
+
+  // Sort and format results
+  const chartData = Array.from(dailyViews.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, views]) => ({ date, views }));
+
+  const topPages = Array.from(pagePaths.entries())
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 10)
+    .map(([path, views]) => ({ path, views }));
+
+  const totalChannelViews = Array.from(channels.values()).reduce((s, v) => s + v, 0) || 1;
+  const trafficSources = Array.from(channels.entries())
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 6)
+    .map(([name, views]) => ({
+      name,
+      percent: Math.round((views / totalChannelViews) * 100),
+    }));
+
+  return {
+    period: days,
+    ga4_connected: true,
+    stats: {
+      pageViews: totalPageViews,
+      uniqueVisitors: totalUsers,
+      avgSessionDuration: `${mins}m ${secs}s`,
+      bounceRate: Math.round(avgBounce * 1000) / 10,
+    },
+    chartData,
+    trafficSources,
+    topPages,
+  };
+}
 
 /** Helper: guess content type for revert file uploads */
 function guessContentTypeForRevert(filename: string): string {

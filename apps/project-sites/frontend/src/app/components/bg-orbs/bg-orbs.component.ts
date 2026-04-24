@@ -4,7 +4,7 @@ import { Component } from '@angular/core';
   selector: 'app-bg-orbs',
   standalone: true,
   template: `
-    <div class="bg-orbs">
+    <div class="bg-orbs" aria-hidden="true">
       <div class="orb orb-1"></div>
       <div class="orb orb-2"></div>
       <div class="orb orb-3"></div>
@@ -36,6 +36,9 @@ import { Component } from '@angular/core';
     @keyframes orbFloat2 {
       0%, 100% { transform: translate(0, 0); }
       50% { transform: translate(-20px, 30px); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .orb { animation: none !important; }
     }
   `],
 })

@@ -1,8 +1,8 @@
 import {
   Component,
-  OnInit,
-  OnDestroy,
-  AfterViewInit,
+  type OnInit,
+  type OnDestroy,
+  type AfterViewInit,
   inject,
   signal,
   ElementRef,
@@ -300,6 +300,9 @@ export class HomepageComponent implements OnInit, OnDestroy, AfterViewInit {
     const next = this.currentLang() === 'en' ? 'es' : 'en';
     this.translate.use(next);
     this.currentLang.set(next);
+    localStorage.setItem('ps_language', next);
+    // Update document lang attribute for accessibility + SEO
+    document.documentElement.lang = next;
   }
 
   scrollTo(id: string): void {

@@ -1,6 +1,6 @@
-import { Component, inject, signal, OnInit, OnDestroy } from '@angular/core';
+import { Component, inject, signal, type OnInit, type OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
 import { AdminStateService } from '../admin-state.service';
 import { ApiService } from '../../../services/api.service';
 import { ToastService } from '../../../services/toast.service';
@@ -53,16 +53,40 @@ import { ToastService } from '../../../services/toast.service';
           </iframe>
         }
 
+        <!-- Floating Publish Button — glassmorphic pill, bottom-right -->
+        @if (editorReady() && !saving()) {
+          <button
+            class="absolute bottom-5 right-5 z-20 flex items-center gap-2.5 pl-4 pr-5 py-2.5 rounded-full border border-primary/25 text-primary text-[0.85rem] font-semibold cursor-pointer transition-all duration-300 publish-btn hover:border-primary/50 hover:shadow-[0_0_32px_rgba(0,229,255,0.25)] hover:-translate-y-0.5 active:scale-95"
+            (click)="saveAndDeploy()"
+            title="Publish changes to R2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Publish to R2
+          </button>
+        }
+
         <!-- Save status indicator -->
         @if (saving()) {
-          <div class="absolute bottom-4 right-4 z-20 flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 border border-primary/20 text-primary text-sm">
+          <div class="absolute bottom-5 right-5 z-20 flex items-center gap-2.5 px-5 py-2.5 rounded-full border border-primary/25 text-primary text-[0.85rem] font-semibold publish-btn">
             <div class="loading-spinner-sm"></div>
-            <span>Saving and deploying...</span>
+            <span>Publishing to R2...</span>
           </div>
         }
       </div>
     }
   `,
+  styles: [`
+    .publish-btn {
+      background: rgba(6, 6, 16, 0.85);
+      backdrop-filter: blur(16px) saturate(1.8);
+      -webkit-backdrop-filter: blur(16px) saturate(1.8);
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), 0 0 40px rgba(0, 229, 255, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+      animation: publishFadeIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    @keyframes publishFadeIn {
+      from { opacity: 0; transform: translateY(12px) scale(0.95); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+  `],
 })
 export class AdminEditorComponent implements OnInit, OnDestroy {
   state = inject(AdminStateService);

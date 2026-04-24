@@ -2,12 +2,14 @@ import { Component, inject, signal, HostListener } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { ApiService } from '../../services/api.service';
+import { NotificationBellComponent } from '../notification-bell/notification-bell.component';
 
 @Component({
   selector: 'app-header',
   standalone: true,
+  imports: [NotificationBellComponent],
   template: `
-    <header class="header">
+    <header class="header" role="banner">
       <div class="header-inner">
         <a class="logo" (click)="goHome()">
           <img src="/logo-header-icon.png" alt="Project Sites" width="48" height="48" class="logo-icon" />
@@ -15,6 +17,7 @@ import { ApiService } from '../../services/api.service';
         </a>
         <div class="header-right">
           @if (auth.isLoggedIn()) {
+            <app-notification-bell />
             <div class="user-menu" (click)="toggleMenu($event)">
               <div class="user-avatar">{{ getInitial() }}</div>
               <svg class="chevron" [class.open]="menuOpen()" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -305,7 +308,7 @@ export class HeaderComponent {
 
   logout(): void {
     this.menuOpen.set(false);
-    this.auth.clearSession();
+    this.auth.logout();
     this.router.navigate(['/']);
   }
 }

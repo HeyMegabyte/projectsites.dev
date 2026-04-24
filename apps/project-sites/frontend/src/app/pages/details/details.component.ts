@@ -1,8 +1,8 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, type OnInit, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
-import { AuthService, SelectedBusiness } from '../../services/auth.service';
+import { AuthService, type SelectedBusiness } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 
 @Component({

@@ -26,6 +26,23 @@
   transform: translateY(0);
 }
 
+/* Accessibility: show content immediately for reduced-motion users */
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* Print: show all content */
+@media print {
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* ── Placeholder color fix ─────────────────── */
 input::placeholder {
   color: #94a3b8;
@@ -51,4 +68,13 @@ input::placeholder {
 /* ── Smooth section scroll ─────────────────── */
 section {
   scroll-margin-top: 64px;
+}
+
+/* ── Footer contrast fix (GPT-4o Round 3 feedback) ── */
+footer {
+  p, a, button, span {
+    &.text-text-secondary {
+      color: #94a3b8; // slate-400 for minimum 4.5:1 contrast on #060610
+    }
+  }
 }

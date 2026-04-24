@@ -101,7 +101,7 @@ export const selectStarterTemplate = async (options: { message: string; model: s
     return { template: 'blank', title: '' };
   }
 
-  const respJson = await response.json() as { text?: string };
+  const respJson = (await response.json()) as { text?: string };
 
   const text = respJson?.text;
 

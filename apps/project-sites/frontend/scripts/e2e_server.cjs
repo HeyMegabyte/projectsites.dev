@@ -33,10 +33,31 @@ const MOCK_SITE = {
   updated_at: '2026-03-10T15:30:00Z',
 };
 
-const MOCK_SITES = [MOCK_SITE];
+const MOCK_SITE_2 = {
+  id: 'site-002',
+  slug: 'hey-pizza',
+  business_name: 'Hey Pizza',
+  business_address: '100 Main St, Newark, NJ 07102',
+  status: 'building',
+  plan: null,
+  current_build_version: null,
+  primary_hostname: null,
+  created_at: '2026-04-01T12:00:00Z',
+  updated_at: '2026-04-10T15:30:00Z',
+};
+
+const MOCK_SITES = [MOCK_SITE, MOCK_SITE_2];
 
 let siteIdCounter = 1;
+let snapshotIdCounter = 2;
 const buildAssetPolls = {}; // Track poll count per site for drip-feed
+
+// ─── Stateful snapshot store (per-site) ──────────
+const siteSnapshots = new Map();
+// Pre-populate site-001 with an "initial" snapshot
+siteSnapshots.set('site-001', [
+  { id: 'snap-001', snapshot_name: 'initial', build_version: '1', description: 'Initial AI build', created_at: '2026-03-10T15:30:00Z' },
+]);
 
 const MOCK_FILES = [
   { key: 'sites/vitos-mens-salon/1/index.html', size: 12400, uploaded: '2026-03-10T15:30:00Z' },
@@ -250,7 +271,11 @@ async function handleAPI(req, res, urlPath) {
     };
     createdSites.set(newId, newSite);
     // Auto-progress the build — timing matches the progressive logs
-    const statuses = ['building', 'imaging', 'generating', 'uploading', 'published'];
+    // If name includes "FAILTEST", simulate a build error
+    const isErrorBuild = rawName.toLowerCase().includes('failtest');
+    const statuses = isErrorBuild
+      ? ['building', 'imaging', 'error']
+      : ['building', 'imaging', 'generating', 'uploading', 'published'];
     let step = 0;
     const interval = setInterval(() => {
       step++;
@@ -259,6 +284,19 @@ async function handleAPI(req, res, urlPath) {
         newSite.updated_at = new Date().toISOString();
         if (statuses[step] === 'published') {
           newSite.current_build_version = 1;
+          // Auto-create "initial" snapshot when site publishes
+          const snaps = siteSnapshots.get(newId) || [];
+          snaps.push({
+            id: 'snap-' + (++snapshotIdCounter),
+            snapshot_name: 'initial',
+            build_version: '1',
+            description: 'Initial AI build',
+            created_at: new Date().toISOString(),
+          });
+          siteSnapshots.set(newId, snaps);
+          clearInterval(interval);
+        }
+        if (statuses[step] === 'error') {
           clearInterval(interval);
         }
       } else {
@@ -647,14 +685,27 @@ async function handleAPI(req, res, urlPath) {
     });
   }
 
-  // Publish from bolt.diy (files + chat)
+  // Publish from bolt.diy (files + chat) — also auto-creates a snapshot
   const publishBoltMatch = urlPath.match(/^\/api\/sites\/([^/]+)\/publish-bolt$/);
   if (publishBoltMatch && method === 'POST') {
+    const siteId = publishBoltMatch[1];
+    const site = createdSites.get(siteId) || (siteId === 'site-001' ? MOCK_SITE : null);
+    const slug = site?.slug || 'unknown';
+    const snaps = siteSnapshots.get(siteId) || [];
+    const editSnap = {
+      id: 'snap-' + (++snapshotIdCounter),
+      snapshot_name: 'edit-' + new Date().toISOString().slice(0, 16).replace(/[:.T]/g, '-'),
+      build_version: String(snaps.length + 1),
+      description: 'Published from AI editor',
+      created_at: new Date().toISOString(),
+    };
+    snaps.push(editSnap);
+    siteSnapshots.set(siteId, snaps);
     return json(res, {
       data: {
-        slug: 'vitos-mens-salon',
-        version: new Date().toISOString().replace(/[:.]/g, '-'),
-        url: 'https://vitos-mens-salon.projectsites.dev',
+        slug,
+        version: editSnap.build_version,
+        url: `https://${slug}.projectsites.dev`,
       },
     });
   }
@@ -712,6 +763,193 @@ async function handleAPI(req, res, urlPath) {
     });
   }
 
+  // ─── Snapshots (stateful per-site) ──────────────
+
+  const snapshotsMatch = urlPath.match(/^\/api\/sites\/([^/]+)\/snapshots$/);
+  if (snapshotsMatch && method === 'GET') {
+    const siteId = snapshotsMatch[1];
+    const snaps = siteSnapshots.get(siteId) || [];
+    // Return newest first
+    return json(res, { data: [...snaps].reverse() });
+  }
+  if (snapshotsMatch && method === 'POST') {
+    const siteId = snapshotsMatch[1];
+    const body = await readBody(req);
+    const snaps = siteSnapshots.get(siteId) || [];
+    const newSnap = {
+      id: 'snap-' + (++snapshotIdCounter),
+      snapshot_name: body.name || 'snapshot',
+      build_version: String(snaps.length + 1),
+      description: body.description || null,
+      created_at: new Date().toISOString(),
+    };
+    snaps.push(newSnap);
+    siteSnapshots.set(siteId, snaps);
+    return json(res, { data: newSnap });
+  }
+
+  const snapshotDeleteMatch = urlPath.match(/^\/api\/sites\/([^/]+)\/snapshots\/([^/]+)$/);
+  if (snapshotDeleteMatch && method === 'DELETE') {
+    const siteId = snapshotDeleteMatch[1];
+    const snapId = snapshotDeleteMatch[2];
+    const snaps = siteSnapshots.get(siteId) || [];
+    siteSnapshots.set(siteId, snaps.filter(s => s.id !== snapId));
+    return json(res, {});
+  }
+
+  const snapshotRevertMatch = urlPath.match(/^\/api\/sites\/([^/]+)\/snapshots\/revert$/);
+  if (snapshotRevertMatch && method === 'POST') {
+    const siteId = snapshotRevertMatch[1];
+    const body = await readBody(req);
+    const snaps = siteSnapshots.get(siteId) || [];
+    const target = snaps.find(s => s.id === body.snapshot_id);
+    if (!target) return json(res, { error: { code: 'NOT_FOUND', message: 'Snapshot not found' } }, 404);
+    // Revert creates a new snapshot with the old name + "-restored"
+    const revertedSnap = {
+      id: 'snap-' + (++snapshotIdCounter),
+      snapshot_name: target.snapshot_name + '-restored',
+      build_version: String(snaps.length + 1),
+      description: `Reverted to ${target.snapshot_name}`,
+      created_at: new Date().toISOString(),
+    };
+    snaps.push(revertedSnap);
+    siteSnapshots.set(siteId, snaps);
+    return json(res, { data: { message: 'Reverted successfully', snapshot_name: target.snapshot_name } });
+  }
+
+  // ─── Analytics ──────────────────────────────────
+
+  const analyticsMatch = urlPath.match(/^\/api\/analytics\/([^/]+)$/);
+  if (analyticsMatch && method === 'GET') {
+    return json(res, { data: {
+      pageviews: 1234, unique_visitors: 567, bounce_rate: 42.5,
+      avg_session_duration: 125,
+      top_pages: [{ path: '/', views: 800 }, { path: '/about', views: 234 }, { path: '/services', views: 200 }],
+      daily: [
+        { date: '2026-04-14', pageviews: 180, visitors: 85 },
+        { date: '2026-04-15', pageviews: 165, visitors: 78 },
+        { date: '2026-04-16', pageviews: 210, visitors: 98 },
+        { date: '2026-04-17', pageviews: 195, visitors: 90 },
+        { date: '2026-04-18', pageviews: 220, visitors: 105 },
+        { date: '2026-04-19', pageviews: 145, visitors: 68 },
+        { date: '2026-04-20', pageviews: 119, visitors: 43 },
+      ],
+    } });
+  }
+
+  // ─── Notifications ──────────────────────────────
+
+  if (urlPath === '/api/notifications' && method === 'GET') {
+    return json(res, { data: [
+      { id: 'notif-001', type: 'build_complete', message: 'Your site vitos-mens-salon is live!', read: false, created_at: '2026-04-20T15:30:00Z' },
+      { id: 'notif-002', type: 'domain_verified', message: 'Domain www.vitos-salon.com verified', read: true, created_at: '2026-04-19T10:00:00Z' },
+    ] });
+  }
+
+  const notifReadMatch = urlPath.match(/^\/api\/notifications\/([^/]+)\/read$/);
+  if (notifReadMatch && method === 'PATCH') {
+    return json(res, {});
+  }
+
+  if (urlPath === '/api/notifications/read-all' && method === 'POST') {
+    return json(res, {});
+  }
+
+  // ─── Feedback ──────────────────────────────────
+
+  if (urlPath === '/api/feedback' && method === 'GET') {
+    return json(res, { data: [] });
+  }
+  if (urlPath === '/api/feedback' && method === 'POST') {
+    return json(res, { data: { id: 'fb-' + Date.now() } });
+  }
+
+  // ─── Changelog ──────────────────────────────────
+
+  if (urlPath === '/api/changelog' && method === 'GET') {
+    return json(res, { data: [
+      { id: 'cl-001', title: 'Multi-page AI generation', description: 'Sites now generate 5-8 gorgeous pages with shadcn/ui components.', created_at: '2026-04-15T00:00:00Z' },
+      { id: 'cl-002', title: 'Snapshot system', description: 'Create and revert to snapshots of your site.', created_at: '2026-04-10T00:00:00Z' },
+    ] });
+  }
+
+  // ─── Google OAuth (mock redirect) ──────────────
+
+  if (urlPath === '/api/auth/google' && method === 'GET') {
+    res.writeHead(302, { Location: '/?token=mock-token-123&email=test@example.com&auth_callback=1' });
+    res.end();
+    return;
+  }
+
+  // ─── GitHub OAuth (mock redirect) ─────────────
+
+  if (urlPath === '/api/auth/github' && method === 'GET') {
+    res.writeHead(302, { Location: '/?token=mock-gh-token-456&email=dev@github.com&auth_callback=1' });
+    res.end();
+    return;
+  }
+
+  // ─── Contact form submissions (per-site) ──────
+
+  const submissionsMatch = urlPath.match(/^\/api\/sites\/([^/]+)\/submissions$/);
+  if (submissionsMatch && method === 'GET') {
+    return json(res, { data: [
+      { id: 'sub-001', name: 'Jane Doe', email: 'jane@example.com', phone: '555-0101', message: 'I want to book an appointment for Saturday', created_at: '2026-04-20T10:00:00Z', read: false },
+      { id: 'sub-002', name: 'Bob Smith', email: 'bob@example.com', phone: '', message: 'Do you offer group discounts?', created_at: '2026-04-19T14:30:00Z', read: true },
+      { id: 'sub-003', name: 'Alice Chen', email: 'alice@example.com', phone: '555-0303', message: 'Great website! Love the new design.', created_at: '2026-04-18T09:15:00Z', read: true },
+    ] });
+  }
+
+  // ─── Social links save ────────────────────────
+
+  const socialMatch = urlPath.match(/^\/api\/sites\/([^/]+)\/social$/);
+  if (socialMatch && method === 'PATCH') {
+    return json(res, { data: { saved: true } });
+  }
+
+  // ─── Integrations save ────────────────────────
+
+  const integrationsMatch = urlPath.match(/^\/api\/sites\/([^/]+)\/integrations$/);
+  if (integrationsMatch && method === 'PATCH') {
+    return json(res, { data: { saved: true } });
+  }
+
+  // ─── Email routing config ─────────────────────
+
+  const emailRoutingMatch = urlPath.match(/^\/api\/sites\/([^/]+)\/email\/routing$/);
+  if (emailRoutingMatch && method === 'GET') {
+    return json(res, { data: { enabled: false, forwarding_address: null, catch_all: false, rules: [] } });
+  }
+  if (emailRoutingMatch && method === 'POST') {
+    const body = await readBody(req);
+    return json(res, { data: { enabled: true, forwarding_address: body.forwarding_address || 'owner@example.com', catch_all: body.catch_all || false, rules: [{ from: 'contact@', to: body.forwarding_address }] } });
+  }
+
+  // ─── Domain search ────────────────────────────
+
+  if (urlPath === '/api/domains/search' && method === 'GET') {
+    const q = new URL(req.url, `http://localhost:${PORT}`).searchParams.get('q') || 'example';
+    return json(res, { data: [
+      { domain: `${q}.com`, available: true, price: '$12.99/yr' },
+      { domain: `${q}.dev`, available: true, price: '$15.99/yr' },
+      { domain: `${q}.io`, available: false, price: null },
+    ] });
+  }
+
+  // ─── AI image edit ──────────────────────────────
+
+  if (urlPath === '/api/ai/edit-image' && method === 'POST') {
+    return json(res, { data: { url: `http://localhost:${PORT}/mock-img/ai-edited-${Date.now()}` } });
+  }
+
+  // ─── Site deletion with options ─────────────────
+
+  const deleteSiteOptionsMatch = urlPath.match(/^\/api\/sites\/([^/]+)$/);
+  if (deleteSiteOptionsMatch && method === 'DELETE') {
+    createdSites.delete(deleteSiteOptionsMatch[1]);
+    return json(res, {});
+  }
+
   // Fallback
   json(res, { error: { code: 'NOT_FOUND', message: `No mock for ${method} ${urlPath}` } }, 404);
 }
@@ -721,6 +959,11 @@ async function handleAPI(req, res, urlPath) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   const urlPath = url.pathname;
+
+  // Health endpoint (not under /api/)
+  if (urlPath === '/health' && req.method === 'GET') {
+    return json(res, { status: 'ok', version: '1.0.0', timestamp: new Date().toISOString(), kv_latency_ms: 2, r2_latency_ms: 3 });
+  }
 
   // API routes
   if (urlPath.startsWith('/api/') || urlPath.startsWith('/webhooks/')) {
@@ -783,6 +1026,59 @@ const server = http.createServer(async (req, res) => {
     </svg>`;
     res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=3600' });
     res.end(svg);
+    return;
+  }
+
+  // Mock bolt.diy editor page — serves a minimal page that implements PS_ postMessage protocol
+  if (urlPath === '/mock-editor' || urlPath.startsWith('/mock-editor/')) {
+    const html = `<!DOCTYPE html>
+<html><head><title>Mock Bolt Editor</title></head>
+<body style="margin:0;background:#0a0a1a;color:#fff;font-family:sans-serif;padding:20px">
+<div id="status">Editor loading...</div>
+<div id="files" style="margin-top:20px;font-size:12px;color:#64748b"></div>
+<script>
+  // Notify parent that editor is ready
+  setTimeout(function() {
+    document.getElementById('status').textContent = 'Editor ready';
+    window.parent.postMessage({ type: 'PS_BOLT_READY' }, '*');
+  }, 500);
+
+  // Listen for file requests from parent
+  window.addEventListener('message', function(e) {
+    if (e.data && e.data.type === 'PS_REQUEST_FILES') {
+      // Return mock files after a short delay
+      setTimeout(function() {
+        window.parent.postMessage({
+          type: 'PS_FILES_READY',
+          correlationId: e.data.correlationId,
+          files: {
+            '/home/project/index.html': '<!DOCTYPE html><html><head><title>Edited Site</title></head><body><h1>Hello World - Edited!</h1><p>This content was modified in the AI editor.</p></body></html>',
+            '/home/project/css/styles.css': 'body { margin: 0; font-family: sans-serif; background: #0a0a1a; color: #fff; }',
+            '/home/project/js/main.js': 'document.addEventListener("DOMContentLoaded", function() { console.warn("Site loaded"); });'
+          },
+          chat: {
+            messages: [
+              { id: 'msg-1', role: 'user', content: 'Edit the heading', createdAt: new Date().toISOString() },
+              { id: 'msg-2', role: 'assistant', content: 'I updated the heading to Hello World - Edited!', createdAt: new Date().toISOString() }
+            ],
+            description: 'Edited site',
+            exportDate: new Date().toISOString()
+          }
+        }, '*');
+      }, 300);
+    }
+    if (e.data && e.data.type === 'PS_SUBMIT_PROMPT') {
+      document.getElementById('status').textContent = 'Generating...';
+      setTimeout(function() {
+        document.getElementById('status').textContent = 'Generation complete';
+        window.parent.postMessage({ type: 'PS_GENERATION_STATUS', status: 'complete' }, '*');
+      }, 1000);
+    }
+  });
+</script>
+</body></html>`;
+    res.writeHead(200, { 'Content-Type': 'text/html', 'Access-Control-Allow-Origin': '*' });
+    res.end(html);
     return;
   }
 

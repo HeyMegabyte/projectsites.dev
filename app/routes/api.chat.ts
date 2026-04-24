@@ -12,6 +12,7 @@ import { WORK_DIR } from '~/utils/constants';
 import { createSummary } from '~/lib/.server/llm/create-summary';
 import { extractPropertiesFromMessage } from '~/lib/.server/llm/utils';
 import type { DesignScheme } from '~/types/design-scheme';
+
 // MCPService uses Node.js stdio transport — dynamic import to avoid crash on Cloudflare Pages
 type MCPServiceType = import('~/lib/services/mcpService').MCPService;
 import { StreamRecoveryManager } from '~/lib/.server/llm/stream-recovery';
@@ -88,11 +89,13 @@ async function chatAction({ context, request }: ActionFunctionArgs) {
     let mcpService: MCPServiceType | null = null;
 
     try {
+      // eslint-disable-next-line @typescript-eslint/naming-convention
       const { MCPService } = await import('~/lib/services/mcpService');
       mcpService = MCPService.getInstance();
     } catch {
       // MCP not available on Cloudflare Pages — continue without it
     }
+
     const totalMessageContent = messages.reduce((acc, message) => acc + message.content, '');
     logger.debug(`Total message length: ${totalMessageContent.split(' ').length}, words`);
 
@@ -220,11 +223,13 @@ async function chatAction({ context, request }: ActionFunctionArgs) {
           toolChoice: 'auto',
           tools: mcpService?.toolsWithoutExecute,
           maxSteps: mcpService ? maxLLMSteps : undefined,
-          onStepFinish: mcpService ? ({ toolCalls }) => {
-            toolCalls.forEach((toolCall) => {
-              mcpService!.processToolCall(toolCall, dataStream);
-            });
-          } : undefined,
+          onStepFinish: mcpService
+            ? ({ toolCalls }) => {
+                toolCalls.forEach((toolCall) => {
+                  mcpService!.processToolCall(toolCall, dataStream);
+                });
+              }
+            : undefined,
           onFinish: async ({ text: content, finishReason, usage }) => {
             logger.debug('usage', JSON.stringify(usage));
 

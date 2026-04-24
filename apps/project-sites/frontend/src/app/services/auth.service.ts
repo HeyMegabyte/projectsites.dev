@@ -7,9 +7,14 @@ const PENDING_BUILD_KEY = 'ps_pending_build';
 const LOCATION_DECLINED_KEY = 'ps_location_declined';
 const AUTO_CREATE_KEY = 'ps_auto_create';
 
+/** Session TTL in milliseconds (7 days). */
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
 export interface Session {
   token: string;
   identifier: string;
+  /** Timestamp when the session was created (for expiry). */
+  createdAt?: number;
 }
 
 export interface SelectedBusiness {
@@ -33,7 +38,14 @@ export class AuthService {
   private loadSession(): Session | null {
     try {
       const raw = localStorage.getItem(SESSION_KEY);
-      return raw ? JSON.parse(raw) : null;
+      if (!raw) return null;
+      const session: Session = JSON.parse(raw);
+      // Expire sessions older than TTL
+      if (session.createdAt && Date.now() - session.createdAt > SESSION_TTL_MS) {
+        localStorage.removeItem(SESSION_KEY);
+        return null;
+      }
+      return session;
     } catch {
       return null;
     }
@@ -44,14 +56,23 @@ export class AuthService {
   }
 
   setSession(token: string, identifier: string): void {
-    const session: Session = { token, identifier };
+    const session: Session = { token, identifier, createdAt: Date.now() };
     localStorage.setItem(SESSION_KEY, JSON.stringify(session));
     this.sessionSignal.set(session);
   }
 
   clearSession(): void {
     localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(BUSINESS_KEY);
+    localStorage.removeItem(MODE_KEY);
+    localStorage.removeItem(PENDING_BUILD_KEY);
+    localStorage.removeItem(AUTO_CREATE_KEY);
     this.sessionSignal.set(null);
+  }
+
+  /** Full logout: clear all session data. */
+  logout(): void {
+    this.clearSession();
   }
 
   getSelectedBusiness(): SelectedBusiness | null {

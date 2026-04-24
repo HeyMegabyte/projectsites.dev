@@ -507,6 +507,148 @@ export async function handleGoogleOAuthCallback(
   };
 }
 
+// ─── GitHub OAuth ──────────────────────────────────────────
+
+/**
+ * Create a GitHub OAuth state and return the authorization URL.
+ */
+export async function createGitHubOAuthState(
+  db: D1Database,
+  env: Env,
+  redirectUrl?: string,
+): Promise<{ authUrl: string; state: string }> {
+  if (!env.GITHUB_CLIENT_ID) {
+    throw badRequest('GitHub OAuth is not configured. GITHUB_CLIENT_ID secret is missing.');
+  }
+
+  const state = randomHex(32);
+
+  await dbInsert(db, 'oauth_states', {
+    id: crypto.randomUUID(),
+    state,
+    provider: 'github',
+    redirect_url: redirectUrl ?? null,
+    expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+    deleted_at: null,
+  });
+
+  const params = new URLSearchParams({
+    client_id: env.GITHUB_CLIENT_ID,
+    redirect_uri: `https://${DOMAINS.SITES_BASE}/api/auth/github/callback`,
+    scope: 'read:user user:email',
+    state,
+  });
+
+  return {
+    authUrl: `https://github.com/login/oauth/authorize?${params.toString()}`,
+    state,
+  };
+}
+
+/**
+ * Handle the GitHub OAuth callback.
+ */
+export async function handleGitHubOAuthCallback(
+  db: D1Database,
+  env: Env,
+  code: string,
+  state: string,
+): Promise<{ email: string; display_name: string | null; avatar_url: string | null; redirect_url: string | null }> {
+  // Verify state
+  const stateRecord = await dbQueryOne<{ id: string; state: string; redirect_url: string | null; expires_at: string }>(
+    db,
+    'SELECT id, state, redirect_url, expires_at FROM oauth_states WHERE state = ? AND provider = ?',
+    [state, 'github'],
+  );
+
+  if (!stateRecord) {
+    throw unauthorized('Invalid OAuth state');
+  }
+
+  if (new Date(stateRecord.expires_at) < new Date()) {
+    throw unauthorized('OAuth state expired');
+  }
+
+  // Delete used state
+  await dbExecute(db, 'DELETE FROM oauth_states WHERE id = ?', [stateRecord.id]);
+
+  // Exchange code for access token
+  const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify({
+      client_id: env.GITHUB_CLIENT_ID,
+      client_secret: env.GITHUB_CLIENT_SECRET,
+      code,
+      redirect_uri: `https://${DOMAINS.SITES_BASE}/api/auth/github/callback`,
+    }),
+  });
+
+  if (!tokenResponse.ok) {
+    console.warn(JSON.stringify({ level: 'error', service: 'auth', message: 'GitHub OAuth token exchange failed', status: tokenResponse.status }));
+    throw badRequest('Failed to exchange GitHub OAuth code');
+  }
+
+  const tokenData = (await tokenResponse.json()) as { access_token: string; error?: string };
+
+  if (tokenData.error || !tokenData.access_token) {
+    throw badRequest(`GitHub OAuth error: ${tokenData.error || 'no access token'}`);
+  }
+
+  // Get user info
+  const userResponse = await fetch('https://api.github.com/user', {
+    headers: {
+      Authorization: `Bearer ${tokenData.access_token}`,
+      Accept: 'application/vnd.github+json',
+      'User-Agent': 'ProjectSites/1.0',
+    },
+  });
+
+  if (!userResponse.ok) {
+    throw badRequest('Failed to fetch GitHub user info');
+  }
+
+  const ghUser = (await userResponse.json()) as {
+    email: string | null;
+    name: string | null;
+    avatar_url: string | null;
+    login: string;
+  };
+
+  // GitHub may not return email in user profile — fetch from emails endpoint
+  let email = ghUser.email;
+  if (!email) {
+    const emailsResponse = await fetch('https://api.github.com/user/emails', {
+      headers: {
+        Authorization: `Bearer ${tokenData.access_token}`,
+        Accept: 'application/vnd.github+json',
+        'User-Agent': 'ProjectSites/1.0',
+      },
+    });
+
+    if (emailsResponse.ok) {
+      const emails = (await emailsResponse.json()) as Array<{ email: string; primary: boolean; verified: boolean }>;
+      const primary = emails.find((e) => e.primary && e.verified);
+      email = primary?.email ?? emails.find((e) => e.verified)?.email ?? null;
+    }
+  }
+
+  if (!email) {
+    throw badRequest('GitHub account has no verified email. Please add a verified email to your GitHub account.');
+  }
+
+  console.warn(JSON.stringify({ level: 'info', service: 'auth', message: 'GitHub OAuth callback success', email, github_login: ghUser.login }));
+  return {
+    email,
+    display_name: ghUser.name ?? ghUser.login,
+    avatar_url: ghUser.avatar_url,
+    redirect_url: stateRecord.redirect_url ?? null,
+  };
+}
+
 /**
  * Create a session for an authenticated user.
  *

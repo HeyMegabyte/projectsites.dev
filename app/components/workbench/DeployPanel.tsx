@@ -283,9 +283,7 @@ export const DeployPanel = memo(() => {
             {/* Primary domain (non-deletable) */}
             <div className="flex items-center gap-2 py-2 px-3 bg-bolt-elements-background-depth-1 rounded-md border border-bolt-elements-borderColor">
               <div className="i-ph:lock-simple text-sm text-bolt-elements-textTertiary" />
-              <span className="flex-1 text-sm font-mono text-bolt-elements-textPrimary">
-                {slug}.projectsites.dev
-              </span>
+              <span className="flex-1 text-sm font-mono text-bolt-elements-textPrimary">{slug}.projectsites.dev</span>
               <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/10 text-green-500 border border-green-500/20">
                 Primary
               </span>

@@ -1,4 +1,7 @@
-import { Component } from '@angular/core';
+import { Component, inject, computed } from '@angular/core';
+import { AdminStateService } from '../admin-state.service';
+
+const SOURCE_COLORS = ['#00E5FF', '#22c55e', '#8b5cf6', '#f59e0b', '#ec4899', '#06b6d4'];
 
 @Component({
   selector: 'app-admin-analytics',
@@ -10,29 +13,49 @@ import { Component } from '@angular/core';
       <div class="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 class="text-lg font-bold text-white m-0">Analytics</h2>
-          <p class="text-[0.78rem] text-text-secondary m-0 mt-1">Monitor your site traffic and visitor behavior.</p>
+          <p class="text-[0.78rem] text-text-secondary m-0 mt-1">
+            @if (ga4Connected()) {
+              Live data from Google Analytics 4
+              <span class="inline-flex items-center gap-1 ml-1.5 text-green-400 text-[0.68rem]">
+                <span class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
+                Connected
+              </span>
+            } @else {
+              Monitor your site traffic and visitor behavior.
+            }
+          </p>
         </div>
         <div class="flex items-center gap-2">
-          <select class="input-field !w-auto !py-1.5 !px-3 !text-[0.75rem]">
-            <option>Last 7 days</option>
-            <option>Last 30 days</option>
-            <option>Last 90 days</option>
+          <select
+            class="bg-white/[0.04] border border-white/[0.08] rounded-lg py-1.5 px-3 text-[0.75rem] text-white outline-none font-sans"
+            [value]="state.analyticsPeriod()"
+            (change)="onPeriodChange($event)"
+          >
+            <option value="7">Last 7 days</option>
+            <option value="30">Last 30 days</option>
+            <option value="90">Last 90 days</option>
           </select>
+          <button
+            class="text-[0.72rem] text-primary/70 hover:text-primary transition-colors px-2 py-1"
+            (click)="state.loadAnalytics()"
+            [disabled]="state.analyticsLoading()"
+          >
+            @if (state.analyticsLoading()) {
+              <span class="inline-block w-3 h-3 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></span>
+            } @else {
+              Refresh
+            }
+          </button>
         </div>
       </div>
 
       <!-- Stats Cards -->
       <div class="grid grid-cols-4 gap-3 max-lg:grid-cols-2 max-[480px]:grid-cols-1">
-        @for (stat of stats; track stat.label) {
+        @for (stat of statsCards(); track stat.label) {
           <div class="bg-white/[0.02] border border-white/[0.06] rounded-[14px] p-4 flex flex-col gap-1.5 transition-colors hover:border-primary/[0.12]">
-            <div class="flex items-center justify-between">
-              <span class="text-[0.68rem] text-text-secondary uppercase tracking-wide font-semibold">{{ stat.label }}</span>
-              <span class="text-[0.62rem] font-semibold px-1.5 py-0.5 rounded" [class]="stat.changePositive ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'">
-                {{ stat.changePositive ? '+' : '' }}{{ stat.change }}
-              </span>
-            </div>
+            <span class="text-[0.68rem] text-text-secondary uppercase tracking-wide font-semibold">{{ stat.label }}</span>
             <span class="text-2xl font-bold text-white">{{ stat.value }}</span>
-            <span class="text-[0.68rem] text-text-secondary/60">vs. previous period</span>
+            <span class="text-[0.68rem] text-text-secondary/60">last {{ state.analyticsPeriod() }} days</span>
           </div>
         }
       </div>
@@ -41,25 +64,34 @@ import { Component } from '@angular/core';
       <div class="bg-white/[0.02] border border-white/[0.06] rounded-[14px] p-6">
         <div class="flex items-center justify-between mb-5">
           <h3 class="text-[0.9rem] font-semibold text-white m-0">Page Views</h3>
-          <div class="flex gap-1 p-0.5 bg-white/[0.03] rounded-lg border border-white/[0.06]">
-            <button class="text-[0.68rem] py-1 px-2.5 rounded-md bg-primary/10 text-primary border-none cursor-pointer font-sans font-medium">Views</button>
-            <button class="text-[0.68rem] py-1 px-2.5 rounded-md bg-transparent text-text-secondary border-none cursor-pointer font-sans font-medium hover:text-white">Visitors</button>
+        </div>
+        @if (chartBars().length > 0) {
+          <div class="flex items-end gap-[3px] h-[140px] px-2">
+            @for (bar of chartBars(); track $index) {
+              <div
+                class="flex-1 rounded-t-[3px] transition-all duration-300 min-h-[2px]"
+                [style.height.%]="bar.height"
+                [style.background]="'linear-gradient(to top, rgba(0,229,255,0.15), rgba(0,229,255,' + (0.25 + bar.height/200) + '))'"
+                [attr.title]="bar.label + ': ' + bar.views + ' views'"
+              ></div>
+            }
           </div>
-        </div>
-        <!-- CSS-only mini chart -->
-        <div class="flex items-end gap-[3px] h-[140px] px-2">
-          @for (bar of chartBars; track $index) {
-            <div class="flex-1 rounded-t-[3px] transition-all duration-300"
-                 [style.height.%]="bar"
-                 [style.background]="'linear-gradient(to top, rgba(0,229,255,0.15), rgba(0,229,255,' + (0.25 + bar/200) + '))'">
-            </div>
-          }
-        </div>
-        <div class="flex justify-between mt-2 px-2">
-          @for (day of chartLabels; track $index) {
-            <span class="text-[0.6rem] text-text-secondary/50">{{ day }}</span>
-          }
-        </div>
+          <div class="flex justify-between mt-2 px-2">
+            @for (bar of chartBars(); track $index) {
+              @if ($index % labelSkip() === 0) {
+                <span class="text-[0.6rem] text-text-secondary/50">{{ bar.label }}</span>
+              }
+            }
+          </div>
+        } @else {
+          <div class="flex items-center justify-center h-[140px] text-text-secondary/40 text-sm">
+            @if (state.analyticsLoading()) {
+              Loading chart data...
+            } @else {
+              No data yet — traffic will appear here once visitors arrive.
+            }
+          </div>
+        }
       </div>
 
       <!-- Bottom Grid -->
@@ -68,74 +100,158 @@ import { Component } from '@angular/core';
         <!-- Traffic Sources -->
         <div class="bg-white/[0.02] border border-white/[0.06] rounded-[14px] p-6">
           <h3 class="text-[0.9rem] font-semibold text-white m-0 mb-4">Traffic Sources</h3>
-          <div class="flex flex-col gap-2.5">
-            @for (source of trafficSources; track source.name) {
-              <div class="flex items-center gap-3">
-                <span class="text-[0.78rem] text-white w-20 flex-shrink-0">{{ source.name }}</span>
-                <div class="flex-1 h-2 bg-white/[0.04] rounded-full overflow-hidden">
-                  <div class="h-full rounded-full transition-all duration-500" [style.width.%]="source.percent" [style.background]="source.color"></div>
+          @if (trafficSources().length > 0) {
+            <div class="flex flex-col gap-2.5">
+              @for (source of trafficSources(); track source.name; let i = $index) {
+                <div class="flex items-center gap-3">
+                  <span class="text-[0.78rem] text-white w-20 flex-shrink-0">{{ source.name }}</span>
+                  <div class="flex-1 h-2 bg-white/[0.04] rounded-full overflow-hidden">
+                    <div
+                      class="h-full rounded-full transition-all duration-500"
+                      [style.width.%]="source.percent"
+                      [style.background]="sourceColor(i)"
+                    ></div>
+                  </div>
+                  <span class="text-[0.72rem] text-text-secondary w-10 text-right">{{ source.percent }}%</span>
                 </div>
-                <span class="text-[0.72rem] text-text-secondary w-10 text-right">{{ source.percent }}%</span>
-              </div>
-            }
-          </div>
+              }
+            </div>
+          } @else {
+            <p class="text-text-secondary/40 text-sm">No traffic data yet.</p>
+          }
         </div>
 
         <!-- Top Pages -->
         <div class="bg-white/[0.02] border border-white/[0.06] rounded-[14px] p-6">
           <h3 class="text-[0.9rem] font-semibold text-white m-0 mb-4">Top Pages</h3>
-          <div class="flex flex-col gap-0">
-            @for (page of topPages; track page.path) {
-              <div class="flex items-center justify-between py-2 border-b border-white/[0.04] last:border-0">
-                <span class="text-[0.78rem] text-primary/80 font-mono">{{ page.path }}</span>
-                <span class="text-[0.72rem] text-text-secondary">{{ page.views }} views</span>
-              </div>
-            }
-          </div>
+          @if (topPages().length > 0) {
+            <div class="flex flex-col gap-0">
+              @for (page of topPages(); track page.path) {
+                <div class="flex items-center justify-between py-2 border-b border-white/[0.04] last:border-0">
+                  <span class="text-[0.78rem] text-primary/80 font-mono">{{ page.path }}</span>
+                  <span class="text-[0.72rem] text-text-secondary">{{ page.views }} views</span>
+                </div>
+              }
+            </div>
+          } @else {
+            <p class="text-text-secondary/40 text-sm">No page data yet.</p>
+          }
         </div>
       </div>
 
-      <!-- Connect GA CTA -->
-      <div class="bg-primary/[0.03] border border-primary/[0.08] rounded-[14px] p-6 flex items-center gap-4 max-md:flex-col max-md:text-center">
-        <div class="w-12 h-12 rounded-xl bg-primary/[0.08] flex items-center justify-center text-primary flex-shrink-0">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+      <!-- GA4 Connection Status -->
+      <div
+        class="border rounded-[14px] p-6 flex items-center gap-4 max-md:flex-col max-md:text-center"
+        [class]="ga4Connected() ? 'bg-green-500/[0.03] border-green-500/[0.12]' : 'bg-primary/[0.03] border-primary/[0.08]'"
+      >
+        <div
+          class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+          [class]="ga4Connected() ? 'bg-green-500/[0.08] text-green-400' : 'bg-primary/[0.08] text-primary'"
+        >
+          @if (ga4Connected()) {
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          } @else {
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+          }
         </div>
         <div class="flex-1 min-w-0">
-          <h4 class="text-white text-[0.9rem] font-semibold m-0 mb-1">Connect Google Analytics</h4>
-          <p class="text-[0.78rem] text-text-secondary m-0">Link your GA4 property for real-time traffic data, conversion tracking, and audience insights.</p>
+          @if (ga4Connected()) {
+            <h4 class="text-white text-[0.9rem] font-semibold m-0 mb-1">Google Analytics Connected</h4>
+            <p class="text-[0.78rem] text-text-secondary m-0">
+              GA4: {{ measurementId() }}
+              @if (gtmId()) {
+                &middot; GTM: {{ gtmId() }}
+              }
+              &middot; Data refreshes every 60 seconds.
+            </p>
+          } @else {
+            <h4 class="text-white text-[0.9rem] font-semibold m-0 mb-1">Google Analytics</h4>
+            <p class="text-[0.78rem] text-text-secondary m-0">
+              GA4 is automatically injected into your site. Once configured by the admin, live data will appear here.
+            </p>
+          }
         </div>
-        <button class="btn-accent whitespace-nowrap" disabled>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-          Connect GA4
-        </button>
       </div>
 
     </div>
   `,
 })
 export class AdminAnalyticsComponent {
-  stats = [
-    { label: 'Page Views', value: '1,247', change: '12.3%', changePositive: true },
-    { label: 'Unique Visitors', value: '438', change: '8.1%', changePositive: true },
-    { label: 'Avg. Session', value: '2m 34s', change: '-3.2%', changePositive: false },
-    { label: 'Bounce Rate', value: '34.2%', change: '-5.7%', changePositive: true },
-  ];
+  readonly state = inject(AdminStateService);
 
-  chartBars = [35, 52, 48, 65, 72, 58, 85, 78, 92, 68, 74, 88, 95, 82, 70, 63, 80, 90, 75, 68, 85, 92, 78, 65, 72, 88, 95, 82];
-  chartLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  readonly ga4Connected = computed(() => this.state.analytics()?.ga4_connected ?? false);
+  readonly measurementId = computed(() => this.state.analytics()?.ga4_measurement_id ?? '');
+  readonly gtmId = computed(() => this.state.analytics()?.gtm_container_id ?? '');
 
-  trafficSources = [
-    { name: 'Direct', percent: 42, color: '#00E5FF' },
-    { name: 'Search', percent: 31, color: '#22c55e' },
-    { name: 'Social', percent: 18, color: '#8b5cf6' },
-    { name: 'Referral', percent: 9, color: '#f59e0b' },
-  ];
+  readonly statsCards = computed(() => {
+    const s = this.state.analytics()?.stats;
+    if (!s) {
+      return [
+        { label: 'Page Views', value: '—' },
+        { label: 'Unique Visitors', value: '—' },
+        { label: 'Avg. Session', value: '—' },
+        { label: 'Bounce Rate', value: '—' },
+      ];
+    }
+    return [
+      { label: 'Page Views', value: this.fmt(s.pageViews) },
+      { label: 'Unique Visitors', value: this.fmt(s.uniqueVisitors) },
+      { label: 'Avg. Session', value: s.avgSessionDuration },
+      { label: 'Bounce Rate', value: `${s.bounceRate}%` },
+    ];
+  });
 
-  topPages = [
-    { path: '/', views: 523 },
-    { path: '/about', views: 287 },
-    { path: '/services', views: 198 },
-    { path: '/contact', views: 142 },
-    { path: '/blog', views: 97 },
-  ];
+  readonly chartBars = computed(() => {
+    const data = this.state.analytics()?.chartData ?? [];
+    if (!data.length) return [];
+    const maxViews = Math.max(...data.map(d => d.views), 1);
+    return data.map(d => ({
+      height: Math.max(2, (d.views / maxViews) * 100),
+      views: d.views,
+      label: this.formatDateLabel(d.date),
+    }));
+  });
+
+  readonly labelSkip = computed(() => {
+    const len = this.chartBars().length;
+    if (len <= 7) return 1;
+    if (len <= 14) return 2;
+    return Math.ceil(len / 7);
+  });
+
+  readonly trafficSources = computed(() => this.state.analytics()?.trafficSources ?? []);
+  readonly topPages = computed(() => this.state.analytics()?.topPages ?? []);
+
+  sourceColor(index: number): string {
+    return SOURCE_COLORS[index % SOURCE_COLORS.length];
+  }
+
+  onPeriodChange(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+    this.state.setAnalyticsPeriod(value);
+  }
+
+  private fmt(n: number): string {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+    return n.toLocaleString();
+  }
+
+  private formatDateLabel(dateStr: string): string {
+    if (!dateStr || dateStr.length < 8) return dateStr;
+    // GA4 returns YYYYMMDD format
+    const y = dateStr.slice(0, 4);
+    const m = dateStr.slice(4, 6);
+    const d = dateStr.slice(6, 8);
+    const date = new Date(`${y}-${m}-${d}`);
+    if (isNaN(date.getTime())) {
+      // Try ISO format
+      const isoDate = new Date(dateStr);
+      if (!isNaN(isoDate.getTime())) {
+        return isoDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      }
+      return dateStr;
+    }
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
 }

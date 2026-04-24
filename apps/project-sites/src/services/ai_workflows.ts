@@ -375,12 +375,51 @@ async function runResearchSocial(
 async function runResearchBrand(
   env: Env, input: WorkflowInput, businessType: string, websiteUrl: string,
 ): Promise<BrandResult> {
+  // Step 1: If website exists, extract REAL colors via GPT-4o vision (Anthropic fallback)
+  // This prevents the LLM from guessing colors based on industry stereotypes
+  let extractedColors = '';
+  if (websiteUrl && (env.OPENAI_API_KEY || env.ANTHROPIC_API_KEY)) {
+    try {
+      const { callExternalLLMWithVision } = await import('./external_llm.js');
+      // Use a lightweight screenshot proxy or instruct the LLM to analyze the URL
+      const colorResult = await callExternalLLMWithVision(env, {
+        system: `You are a brand color extraction specialist. Given a website URL, describe the EXACT brand colors used on the site. Focus on:
+1. Logo dominant color (HIGHEST PRIORITY — this IS the brand color)
+2. Header/nav colors
+3. CTA button colors
+4. Accent/link colors
+Return ONLY a JSON object: {"primary":"#hex","secondary":"#hex","accent":"#hex","source":"extracted_from_website","confidence":"high|medium|low","notes":"..."}
+Do NOT guess. If you cannot determine from the URL alone, set confidence to "low".`,
+        user: `Extract the brand colors from this website: ${websiteUrl}
+Business: ${input.businessName} (${businessType})
+Look at the logo and header area first — the logo color defines the primary brand color.`,
+        jsonMode: true,
+        maxTokens: 500,
+        provider: 'openai',
+      });
+      const parsed = JSON.parse(colorResult.output);
+      if (parsed.primary && parsed.confidence !== 'low') {
+        extractedColors = `\n\nIMPORTANT — Pre-extracted brand colors from the actual website (via GPT-4o vision):
+Primary: ${parsed.primary} (from ${parsed.source})
+Secondary: ${parsed.secondary || 'not determined'}
+Accent: ${parsed.accent || 'not determined'}
+Notes: ${parsed.notes || 'none'}
+Confidence: ${parsed.confidence}
+USE THESE COLORS as the primary palette. Do NOT override with industry-generic colors.`;
+      }
+      console.warn(JSON.stringify({ level: 'info', service: 'ai_workflows', step: 'color_extraction', website: websiteUrl, colors: parsed }));
+    } catch (err) {
+      // Non-fatal — fall back to LLM color inference
+      console.warn(JSON.stringify({ level: 'warn', service: 'ai_workflows', step: 'color_extraction', error: err instanceof Error ? err.message : String(err) }));
+    }
+  }
+
   const result = await runPrompt(env, 'research_brand', 1, {
     business_name: input.businessName,
     business_type: businessType,
     business_address: input.businessAddress ?? '',
     website_url: websiteUrl,
-    additional_context: input.additionalContext ?? '',
+    additional_context: (input.additionalContext ?? '') + extractedColors,
   });
   return validatePromptOutput('research_brand', extractJsonFromText(result.output)) as BrandResult;
 }

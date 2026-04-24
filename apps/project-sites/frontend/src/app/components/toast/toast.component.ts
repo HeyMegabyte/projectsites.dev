@@ -5,10 +5,18 @@ import { ToastService } from '../../services/toast.service';
   selector: 'app-toast',
   standalone: true,
   template: `
-    <div class="toast-container">
+    <div class="toast-container" aria-live="polite" aria-atomic="true" role="status">
       @for (toast of toastService.toasts(); track toast.id) {
-        <div class="toast" [class]="'toast-' + toast.type" (click)="toastService.dismiss(toast.id)">
-          <span class="toast-icon">
+        <div
+          class="toast"
+          [class]="'toast-' + toast.type"
+          [attr.role]="toast.type === 'error' ? 'alert' : 'status'"
+          tabindex="0"
+          (click)="toastService.dismiss(toast.id)"
+          (keydown.escape)="toastService.dismiss(toast.id)"
+          (keydown.enter)="toastService.dismiss(toast.id)"
+        >
+          <span class="toast-icon" aria-hidden="true">
             @switch (toast.type) {
               @case ('error') {
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -28,6 +36,9 @@ import { ToastService } from '../../services/toast.service';
             }
           </span>
           <span class="toast-text">{{ toast.message }}</span>
+          <button class="toast-close" (click)="$event.stopPropagation(); toastService.dismiss(toast.id)" aria-label="Dismiss notification">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
         </div>
       }
     </div>
@@ -49,6 +60,12 @@ import { ToastService } from '../../services/toast.service';
     .toast:hover { transform: translateX(-4px); }
     .toast-icon { display: flex; flex-shrink: 0; }
     .toast-text { flex: 1; }
+    .toast-close {
+      display: flex; align-items: center; background: none; border: none;
+      color: inherit; cursor: pointer; padding: 2px; opacity: 0.6;
+      transition: opacity 0.15s ease; flex-shrink: 0;
+    }
+    .toast-close:hover { opacity: 1; }
     .toast-error {
       background: rgba(239, 68, 68, 0.12); color: #ef4444;
       border: 1px solid rgba(239, 68, 68, 0.2);

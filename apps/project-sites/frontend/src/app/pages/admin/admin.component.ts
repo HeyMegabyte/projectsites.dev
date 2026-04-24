@@ -1,8 +1,8 @@
-import { Component, OnInit, OnDestroy, inject, signal, HostListener } from '@angular/core';
+import { Component, type OnInit, type OnDestroy, inject, signal, HostListener } from '@angular/core';
 import { Router, RouterModule, NavigationEnd } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Subscription, filter } from 'rxjs';
-import { ApiService, Site } from '../../services/api.service';
+import { ApiService, type Site } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 import { AdminStateService } from './admin-state.service';

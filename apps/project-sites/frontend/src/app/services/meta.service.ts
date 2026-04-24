@@ -42,6 +42,22 @@ const PAGE_META: Record<string, PageMeta> = {
     title: 'Content Policy - Project Sites',
     description: 'Acceptable use and content guidelines for websites built on Project Sites.',
   },
+  'blog': {
+    title: 'Blog - Project Sites',
+    description: 'Tips, updates, and insights on AI-powered website building for small businesses.',
+  },
+  'changelog': {
+    title: 'Changelog - Project Sites',
+    description: 'See what\'s new in Project Sites. Feature releases, improvements, and fixes.',
+  },
+  'status': {
+    title: 'System Status - Project Sites',
+    description: 'Real-time status of Project Sites infrastructure, API, and build services.',
+  },
+  'search': {
+    title: 'Search - Project Sites',
+    description: 'Find businesses, browse pre-built sites, and discover what AI can build for you.',
+  },
 };
 
 const BASE_URL = 'https://projectsites.dev';

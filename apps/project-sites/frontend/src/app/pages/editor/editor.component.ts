@@ -1,7 +1,7 @@
-import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
-import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { Component, type OnInit, type OnDestroy, inject, signal } from '@angular/core';
+import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
 import { ActivatedRoute, Router } from '@angular/router';
-import { ApiService, Site } from '../../services/api.service';
+import { ApiService, type Site } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 

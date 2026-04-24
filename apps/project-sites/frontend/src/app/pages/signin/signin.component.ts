@@ -33,15 +33,25 @@ export class SigninComponent {
   }
 
   signInWithGoogle(): void {
+    const redirectUrl = this.buildRedirectUrl('google');
+    window.location.href = `/api/auth/google?redirect_url=${encodeURIComponent(redirectUrl)}`;
+  }
+
+  signInWithGitHub(): void {
+    const redirectUrl = this.buildRedirectUrl('github');
+    window.location.href = `/api/auth/github?redirect_url=${encodeURIComponent(redirectUrl)}`;
+  }
+
+  private buildRedirectUrl(provider: string): string {
     const business = this.auth.getSelectedBusiness();
     const mode = this.auth.getMode();
-    let redirectUrl = window.location.origin + '/?auth_callback=google';
+    let redirectUrl = window.location.origin + `/?auth_callback=${provider}`;
     if (business) {
       redirectUrl += `&biz_name=${encodeURIComponent(business.name)}&biz_address=${encodeURIComponent(business.address)}`;
       if (business.place_id) redirectUrl += `&biz_place_id=${encodeURIComponent(business.place_id)}`;
       redirectUrl += `&mode=${mode}`;
     }
-    window.location.href = `/api/auth/google?redirect_url=${encodeURIComponent(redirectUrl)}`;
+    return redirectUrl;
   }
 
   sendMagicLink(): void {

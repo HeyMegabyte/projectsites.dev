@@ -2,7 +2,8 @@ import { json } from '@remix-run/cloudflare';
 import JSZip from 'jszip';
 
 // Function to detect if we're running in Cloudflare
-function isCloudflareEnvironment(context: any): boolean {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _isCloudflareEnvironment(context: any): boolean {
   // Check if we're in production AND have Cloudflare Pages specific env vars
   const isProduction = process.env.NODE_ENV === 'production';
   const hasCfPagesVars = !!(
@@ -119,7 +120,8 @@ async function fetchRepoContentsCloudflare(repo: string, githubToken?: string) {
 }
 
 // Your existing method for non-Cloudflare environments
-async function fetchRepoContentsZip(repo: string, githubToken?: string) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function _fetchRepoContentsZip(repo: string, githubToken?: string) {
   const baseUrl = 'https://api.github.com';
 
   // Get the latest release

@@ -71,6 +71,16 @@ export interface Env {
   /** Current deployment environment (`"staging"` | `"production"`). */
   ENVIRONMENT: string;
 
+  // ── Google Analytics & Tag Manager ────────────────────────
+  /** GA4 Measurement ID (e.g., G-XXXXXXXX) injected into every served site. */
+  GA4_MEASUREMENT_ID?: string;
+  /** GTM Container ID (e.g., GTM-XXXXXXX) injected into every served site. */
+  GTM_CONTAINER_ID?: string;
+  /** Google Analytics Data API credentials (service account JSON, base64-encoded). */
+  GA4_SERVICE_ACCOUNT_JSON?: string;
+  /** GA4 Property ID for Data API queries (numeric, e.g., 123456789). */
+  GA4_PROPERTY_ID?: string;
+
   // ── PostHog (Analytics) ───────────────────────────────────
   /** PostHog project API key for server-side event capture. */
   POSTHOG_API_KEY: string;
@@ -222,6 +232,12 @@ export interface Env {
   // ── Novu (Notifications) ──────────────────────────────────
   /** Novu API key for multi-channel notifications. */
   NOVU_API_KEY?: string;
+
+  // ── GitHub (OAuth) ─────────────────────────────────────────
+  /** GitHub OAuth App client ID. */
+  GITHUB_CLIENT_ID?: string;
+  /** GitHub OAuth App client secret. */
+  GITHUB_CLIENT_SECRET?: string;
 
   // ── Google (OAuth + Places + Sheets) ──────────────────────
   /** Google OAuth 2.0 client ID. */

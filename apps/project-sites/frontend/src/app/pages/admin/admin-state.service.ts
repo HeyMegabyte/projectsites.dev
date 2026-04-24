@@ -1,8 +1,8 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
-import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { forkJoin, interval, takeWhile, switchMap } from 'rxjs';
-import { ApiService, Site, DomainSummary, SubscriptionInfo } from '../../services/api.service';
+import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
+import { forkJoin, interval, takeWhile, switchMap, of, catchError } from 'rxjs';
+import { ApiService, type Site, type DomainSummary, type SubscriptionInfo, type AnalyticsData } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 
@@ -29,9 +29,13 @@ export class AdminStateService {
   selectedSiteId = signal<string | null>(null);
   domainSummary = signal<DomainSummary>({ total: 0, active: 0, pending: 0, failed: 0 });
   subscription = signal<SubscriptionInfo | null>(null);
+  analytics = signal<AnalyticsData | null>(null);
+  analyticsPeriod = signal<string>('7');
+  analyticsLoading = signal(false);
   loading = signal(true);
 
   private alive = true;
+  private refreshTimer: ReturnType<typeof setInterval> | null = null;
 
   selectedSite = computed(() => {
     const id = this.selectedSiteId();
@@ -51,12 +55,70 @@ export class AdminStateService {
         this.domainSummary.set(res.domains.data || { total: 0, active: 0, pending: 0, failed: 0 });
         this.subscription.set(res.sub.data || null);
         this.loading.set(false);
+        // Load analytics for selected site
+        this.loadAnalytics();
+        // Start live refresh (every 60s for analytics, 30s for sites)
+        this.startLiveRefresh();
       },
       error: () => {
         this.loading.set(false);
         this.toast.error('Failed to load dashboard data');
       },
     });
+  }
+
+  /** Load GA4 analytics data for the currently selected site. */
+  loadAnalytics(): void {
+    const site = this.selectedSite();
+    if (!site) return;
+    this.analyticsLoading.set(true);
+    this.api.getAnalytics(site.id, this.analyticsPeriod()).pipe(
+      catchError(() => of({ data: null as AnalyticsData | null }))
+    ).subscribe((res) => {
+      this.analytics.set(res.data);
+      this.analyticsLoading.set(false);
+    });
+  }
+
+  /** Change analytics period and reload. */
+  setAnalyticsPeriod(period: string): void {
+    this.analyticsPeriod.set(period);
+    this.loadAnalytics();
+  }
+
+  /** Start live data refresh for the dashboard. */
+  private startLiveRefresh(): void {
+    this.stopLiveRefresh();
+    // Refresh sites + domains + subscription every 30s, analytics every 60s
+    let tick = 0;
+    this.refreshTimer = setInterval(() => {
+      if (!this.alive) return;
+      tick++;
+      // Sites + domains every 30s
+      forkJoin({
+        sites: this.api.listSites(),
+        domains: this.api.getDomainSummary(),
+        sub: this.api.getSubscription(),
+      }).pipe(catchError(() => of(null))).subscribe((res) => {
+        if (res) {
+          this.sites.set(res.sites.data || []);
+          this.domainSummary.set(res.domains.data || { total: 0, active: 0, pending: 0, failed: 0 });
+          this.subscription.set(res.sub.data || null);
+        }
+      });
+      // Analytics every 60s (every other tick)
+      if (tick % 2 === 0) {
+        this.loadAnalytics();
+      }
+    }, 30_000);
+  }
+
+  /** Stop live refresh timer. */
+  private stopLiveRefresh(): void {
+    if (this.refreshTimer) {
+      clearInterval(this.refreshTimer);
+      this.refreshTimer = null;
+    }
   }
 
   startPolling(): void {
@@ -74,10 +136,13 @@ export class AdminStateService {
 
   stopPolling(): void {
     this.alive = false;
+    this.stopLiveRefresh();
   }
 
   selectSite(site: Site): void {
     this.selectedSiteId.set(site.id);
+    // Reload analytics for the newly selected site
+    this.loadAnalytics();
   }
 
   deleteSite(site: Site, cancelSub: boolean): void {

@@ -196,6 +196,7 @@ export const ChatImpl = memo(
           setTimeout(async () => {
             try {
               toast.info('Deploying to Project Sites...');
+
               const files = workbenchStore.getTextFiles();
               const fileList = Object.entries(files).map(([path, content]) => ({
                 path: path.replace(/^\/home\/project\//, ''),
@@ -209,7 +210,7 @@ export const ChatImpl = memo(
 
               const chatExport = {
                 messages: messages.map((m) => ({ id: m.id, role: m.role, content: m.content })),
-                description: description.get() || slug,
+                description: description || slug,
                 exportDate: new Date().toISOString(),
               };
 
@@ -272,10 +273,7 @@ export const ChatImpl = memo(
           if (fileEntries.length > 0) {
             // Create a synthetic assistant message with boltArtifact to load files
             const fileActions = fileEntries
-              .map(
-                ([filePath, content]) =>
-                  `<boltAction type="file" filePath="${filePath}">${content}</boltAction>`,
-              )
+              .map(([filePath, content]) => `<boltAction type="file" filePath="${filePath}">${content}</boltAction>`)
               .join('\n');
 
             const artifactMsg = `<boltArtifact id="imported-site" title="Imported Site Files">\n${fileActions}\n</boltArtifact>`;
@@ -312,7 +310,7 @@ export const ChatImpl = memo(
                 content: m.content,
                 createdAt: m.createdAt,
               })),
-              description: description.get() || 'bolt.diy session',
+              description: description || 'bolt.diy session',
               exportDate: new Date().toISOString(),
             };
           }
@@ -336,18 +334,18 @@ export const ChatImpl = memo(
                 '',
                 '## Design Instructions',
                 ctx.instructions || 'Build a modern, gorgeous website using the provided assets.',
-              ].filter(Boolean).join('\n');
+              ]
+                .filter(Boolean)
+                .join('\n');
 
               // Set the brief as a user message, then auto-submit generation prompt
-              setMessages([
-                ...messages,
-                { id: `brief-${Date.now()}`, role: 'user' as const, content: briefLines },
-              ]);
+              setMessages([...messages, { id: `brief-${Date.now()}`, role: 'user' as const, content: briefLines }]);
 
               // After a small delay, submit the generation prompt
               setTimeout(() => {
                 postToParent({ type: 'PS_GENERATION_STATUS', status: 'generating', correlationId: msg.correlationId });
                 runAnimation();
+
                 const assetList = (ctx.assets || [])
                   .filter((a: any) => a.url)
                   .map((a: any) => `${a.name}: ${a.url}`)
@@ -375,6 +373,7 @@ export const ChatImpl = memo(
         }
       });
 
+      // eslint-disable-next-line consistent-return
       return unsub;
     }, [model, provider, append, messages, setMessages]);
 
@@ -439,7 +438,10 @@ export const ChatImpl = memo(
 
         fetch(contextUrl)
           .then((res) => {
-            if (!res.ok) throw new Error(`Failed to fetch build context: ${res.status}`);
+            if (!res.ok) {
+              throw new Error(`Failed to fetch build context: ${res.status}`);
+            }
+
             return res.json();
           })
           .then((ctx: any) => {
@@ -455,7 +457,9 @@ export const ChatImpl = memo(
               '',
               '## Available Assets',
               ...(ctx.assets || []).map((a: any) => `- ${a.name} — ${a.url}`),
-            ].filter(Boolean).join('\n');
+            ]
+              .filter(Boolean)
+              .join('\n');
 
             // Show brief as context, then auto-submit generation prompt
             const assetList = (ctx.assets || [])
@@ -464,9 +468,11 @@ export const ChatImpl = memo(
               .join('\n');
 
             runAnimation();
+
             if (isEmbedded) {
               postToParent({ type: 'PS_GENERATION_STATUS', status: 'generating', correlationId: 'auto' });
             }
+
             append({
               role: 'user',
               content: [

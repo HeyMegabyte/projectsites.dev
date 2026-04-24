@@ -1,8 +1,8 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, type OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { AdminStateService } from '../admin-state.service';
-import { ApiService, LogEntry } from '../../../services/api.service';
+import { ApiService, type LogEntry } from '../../../services/api.service';
 
 @Component({
   selector: 'app-admin-dashboard',

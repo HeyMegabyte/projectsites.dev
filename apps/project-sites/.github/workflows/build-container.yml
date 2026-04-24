@@ -1,0 +1,24 @@
+name: Build Container Image
+on:
+  push:
+    paths: ['apps/project-sites/container/**']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: apps/project-sites/container
+          push: true
+          tags: ghcr.io/heymegabyte/ps-builder:latest

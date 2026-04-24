@@ -1,7 +1,7 @@
-import { Component, inject, signal, OnInit, OnDestroy } from '@angular/core';
+import { Component, inject, signal, type OnInit, type OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AdminStateService } from '../admin-state.service';
-import { ApiService, LogEntry } from '../../../services/api.service';
+import { ApiService, type LogEntry } from '../../../services/api.service';
 import { ToastService } from '../../../services/toast.service';
 
 @Component({

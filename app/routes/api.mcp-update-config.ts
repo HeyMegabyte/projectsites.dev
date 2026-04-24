@@ -13,9 +13,11 @@ export async function action({ request }: ActionFunctionArgs) {
     }
 
     try {
+      // eslint-disable-next-line @typescript-eslint/naming-convention
       const { MCPService } = await import('~/lib/services/mcpService');
       const mcpService = MCPService.getInstance();
       const serverTools = await mcpService.updateConfig(mcpConfig);
+
       return Response.json(serverTools);
     } catch {
       return Response.json({});

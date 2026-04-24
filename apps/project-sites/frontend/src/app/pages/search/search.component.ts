@@ -1,8 +1,8 @@
-import { Component, OnInit, OnDestroy, inject, signal, ElementRef, ViewChild } from '@angular/core';
+import { Component, type OnInit, type OnDestroy, inject, signal, ElementRef, ViewChild } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Subject, debounceTime, distinctUntilChanged, switchMap, forkJoin, of, takeUntil } from 'rxjs';
-import { ApiService, BusinessResult, PreBuiltSite } from '../../services/api.service';
+import { ApiService, type BusinessResult, type PreBuiltSite } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { GeolocationService } from '../../services/geolocation.service';
 import { ToastService } from '../../services/toast.service';

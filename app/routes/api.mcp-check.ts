@@ -1,9 +1,6 @@
-import { createScopedLogger } from '~/utils/logger';
-
-const logger = createScopedLogger('api.mcp-check');
-
 export async function loader() {
   try {
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     const { MCPService } = await import('~/lib/services/mcpService');
     const mcpService = MCPService.getInstance();
     const serverTools = await mcpService.checkServersAvailabilities();

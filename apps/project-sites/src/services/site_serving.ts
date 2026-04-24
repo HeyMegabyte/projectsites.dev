@@ -619,6 +619,57 @@ export async function serveSiteFromR2(
 }
 
 /**
+ * Generate Google Tag Manager container snippet (head portion).
+ *
+ * @param containerId - GTM Container ID (e.g., GTM-XXXXXXX).
+ * @returns HTML `<script>` block to inject before `</head>`.
+ */
+function generateGtmHeadSnippet(containerId: string): string {
+  return `<!-- Google Tag Manager -->
+<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','${containerId}');</script>`;
+}
+
+/**
+ * Generate Google Tag Manager noscript snippet (body portion).
+ *
+ * @param containerId - GTM Container ID (e.g., GTM-XXXXXXX).
+ * @returns HTML `<noscript>` block to inject after `<body>`.
+ */
+function generateGtmBodySnippet(containerId: string): string {
+  return `<!-- Google Tag Manager (noscript) -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=${containerId}"
+height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>`;
+}
+
+/**
+ * Generate Google Analytics 4 (gtag.js) tracking snippet.
+ *
+ * Injects the GA4 global site tag with site_slug as a custom dimension
+ * for per-site segmentation across a single GA4 property.
+ *
+ * @param measurementId - GA4 Measurement ID (e.g., G-XXXXXXXX).
+ * @param slug          - Site slug for custom dimension enrichment.
+ * @returns HTML `<script>` block to inject before `</head>`.
+ */
+function generateGa4Snippet(measurementId: string, slug: string): string {
+  return `<!-- Google Analytics 4 -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=${measurementId}"></script>
+<script>
+window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}
+gtag('js',new Date());
+gtag('config','${measurementId}',{
+  send_page_view:true,
+  custom_map:{'dimension1':'site_slug'},
+  site_slug:'${slug}'
+});
+</script>`;
+}
+
+/**
  * Generate the PostHog client-side tracking snippet.
  *
  * Injects the PostHog JS SDK loader and initializes it with the project API key.
@@ -694,9 +745,19 @@ async function buildSiteResponse(
   if (contentType.startsWith('text/html')) {
     let html = await object.text();
 
-    // Inject PostHog + Sentry tracking before </head> (for all sites, paid and free)
+    // Inject analytics + error tracking before </head> (for all sites, paid and free)
     if (env) {
       let headInjection = '';
+
+      // Google Tag Manager (head script)
+      if (env.GTM_CONTAINER_ID) {
+        headInjection += generateGtmHeadSnippet(env.GTM_CONTAINER_ID);
+      }
+
+      // Google Analytics 4
+      if (env.GA4_MEASUREMENT_ID) {
+        headInjection += generateGa4Snippet(env.GA4_MEASUREMENT_ID, site.slug);
+      }
 
       if (env.POSTHOG_API_KEY) {
         headInjection += generatePostHogSnippet(env.POSTHOG_API_KEY, site.slug);
@@ -711,10 +772,16 @@ async function buildSiteResponse(
       }
     }
 
-    // Inject top bar after <body> if unpaid
+    // Inject GTM noscript + top bar after <body>
+    let bodyInjection = '';
+    if (env?.GTM_CONTAINER_ID) {
+      bodyInjection += generateGtmBodySnippet(env.GTM_CONTAINER_ID);
+    }
     if (site.plan !== 'paid') {
-      const topBar = generateTopBar(site.slug);
-      html = html.replace(/(<body[^>]*>)/i, `$1\n${topBar}\n`);
+      bodyInjection += generateTopBar(site.slug);
+    }
+    if (bodyInjection) {
+      html = html.replace(/(<body[^>]*>)/i, `$1\n${bodyInjection}\n`);
     }
 
     return new Response(html, { status: 200, headers });

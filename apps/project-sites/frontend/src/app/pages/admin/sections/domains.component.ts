@@ -1,8 +1,8 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, type OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AdminStateService } from '../admin-state.service';
-import { ApiService, Hostname } from '../../../services/api.service';
+import { ApiService, type Hostname } from '../../../services/api.service';
 import { ToastService } from '../../../services/toast.service';
 
 @Component({

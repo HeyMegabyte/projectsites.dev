@@ -80,7 +80,7 @@ async function llmCallAction({ context, request }: ActionFunctionArgs) {
     model = body.model;
     provider = body.provider;
     streamOutput = body.streamOutput;
-  } catch (e) {
+  } catch {
     return new Response(JSON.stringify({ error: true, message: 'Invalid request body' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },

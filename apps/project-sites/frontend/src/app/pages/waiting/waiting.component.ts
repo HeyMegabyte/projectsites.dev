@@ -1,7 +1,7 @@
-import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
+import { Component, type OnInit, type OnDestroy, inject, signal, computed } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { interval, takeWhile, switchMap, forkJoin, of } from 'rxjs';
-import { ApiService, LogEntry } from '../../services/api.service';
+import { ApiService, type LogEntry } from '../../services/api.service';
 import { ToastService } from '../../services/toast.service';
 
 /** Ordered pipeline steps for progress display */

@@ -103,6 +103,7 @@ html { scroll-behavior: smooth; height: 100%; }
   pointer-events: none;
   z-index: 99999;
   transform: translate(-50%, -50%);
+  will-change: transform, width, height;
   transition: width 0.15s ease, height 0.15s ease, background 0.15s ease, opacity 0.15s ease;
   opacity: 0;
   mix-blend-mode: screen;
@@ -122,5 +123,58 @@ html { scroll-behavior: smooth; height: 100%; }
 
 @media (hover: none) { .cursor-follower { display: none; } }
 
+// Skip-to-main-content link (a11y)
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: #00E5FF;
+  color: #060610;
+  padding: 8px 16px;
+  z-index: 100000;
+  font-weight: 600;
+  font-family: 'Sora', sans-serif;
+  text-decoration: none;
+  border-radius: 0 0 8px 0;
+  transition: top 0.2s ease;
+  &:focus {
+    top: 0;
+  }
+}
+
 // Search input z-index override
 #homepage-search { position: relative; z-index: 99999; }
+
+// Utility: animate only transform/opacity (compositor-only)
+.gpu-accelerated {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+}
+
+// Utility: focus ring for keyboard nav
+.focus-ring:focus-visible {
+  outline: 2px solid #00E5FF;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+// Utility: truncate text
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// Utility: line clamp
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

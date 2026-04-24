@@ -1,12 +1,17 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { HttpClient, HttpHeaders, type HttpErrorResponse } from '@angular/common/http';
+import { Observable, throwError } from 'rxjs';
+import { catchError } from 'rxjs/operators';
+import { Router } from '@angular/router';
 import { AuthService } from './auth.service';
+import { ToastService } from './toast.service';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   private http = inject(HttpClient);
   private auth = inject(AuthService);
+  private toast = inject(ToastService);
+  private router = inject(Router);
 
   private headers(): HttpHeaders {
     let headers = new HttpHeaders({ 'Content-Type': 'application/json' });
@@ -17,24 +22,65 @@ export class ApiService {
     return headers;
   }
 
+  /**
+   * Handles HTTP errors with user-friendly toast messages.
+   * Re-throws the error so callers can implement additional handling.
+   */
+  private handleError<T>(): (source: Observable<T>) => Observable<T> {
+    return (source: Observable<T>) =>
+      source.pipe(
+        catchError((error: HttpErrorResponse) => {
+          const message = this.getErrorMessage(error);
+          this.toast.error(message);
+
+          if (error.status === 401) {
+            this.auth.clearSession();
+            this.router.navigate(['/signin']);
+          }
+
+          return throwError(() => error);
+        }),
+      );
+  }
+
+  private getErrorMessage(error: HttpErrorResponse): string {
+    if (error.status === 0 || error.statusText === 'Unknown Error') {
+      return "Can't reach the server. Check your connection.";
+    }
+    switch (error.status) {
+      case 401:
+        return 'Your session expired. Please sign in again.';
+      case 403:
+        return "You don't have permission to do that.";
+      case 404:
+        return "That resource wasn't found.";
+      case 429:
+        return 'Too many requests. Please wait a moment.';
+      default:
+        return error.status >= 500
+          ? "Something went wrong. We're looking into it."
+          : 'An unexpected error occurred. Please try again.';
+    }
+  }
+
   get<T>(path: string, params?: Record<string, string>): Observable<T> {
-    return this.http.get<T>(`/api${path}`, { headers: this.headers(), params });
+    return this.http.get<T>(`/api${path}`, { headers: this.headers(), params }).pipe(this.handleError());
   }
 
   post<T>(path: string, body?: unknown): Observable<T> {
-    return this.http.post<T>(`/api${path}`, body, { headers: this.headers() });
+    return this.http.post<T>(`/api${path}`, body, { headers: this.headers() }).pipe(this.handleError());
   }
 
   put<T>(path: string, body?: unknown): Observable<T> {
-    return this.http.put<T>(`/api${path}`, body, { headers: this.headers() });
+    return this.http.put<T>(`/api${path}`, body, { headers: this.headers() }).pipe(this.handleError());
   }
 
   patch<T>(path: string, body?: unknown): Observable<T> {
-    return this.http.patch<T>(`/api${path}`, body, { headers: this.headers() });
+    return this.http.patch<T>(`/api${path}`, body, { headers: this.headers() }).pipe(this.handleError());
   }
 
   delete<T>(path: string): Observable<T> {
-    return this.http.delete<T>(`/api${path}`, { headers: this.headers() });
+    return this.http.delete<T>(`/api${path}`, { headers: this.headers() }).pipe(this.handleError());
   }
 
   postFormData<T>(path: string, formData: FormData): Observable<T> {
@@ -43,7 +89,7 @@ export class ApiService {
     if (token) {
       headers = headers.set('Authorization', `Bearer ${token}`);
     }
-    return this.http.post<T>(`/api${path}`, formData, { headers });
+    return this.http.post<T>(`/api${path}`, formData, { headers }).pipe(this.handleError());
   }
 
   /** Search businesses via Google Places proxy */
@@ -221,7 +267,7 @@ export class ApiService {
     return this.http.request<void>('DELETE', `/api/sites/${id}`, {
       headers: this.headers(),
       body: { cancel_subscription: cancelSubscription },
-    });
+    }).pipe(this.handleError());
   }
 
   /** Get entitlements */
@@ -259,6 +305,11 @@ export class ApiService {
     return this.get(`/sites/${siteId}/build-assets`);
   }
 
+  /** Revert a site to a previous snapshot version */
+  revertSnapshot(siteId: string, snapshotId: string): Observable<{ data: { message: string; snapshot_name: string } }> {
+    return this.post(`/sites/${siteId}/snapshots/revert`, { snapshot_id: snapshotId });
+  }
+
   /** Publish files + chat from bolt.diy to a site */
   publishFromBolt(
     siteId: string,
@@ -273,7 +324,12 @@ export class ApiService {
   getChatExport(slug: string): Observable<{ messages: unknown[]; description?: string; exportDate?: string }> {
     return this.http.get<{ messages: unknown[]; description?: string; exportDate?: string }>(
       `/api/sites/by-slug/${slug}/chat`,
-    );
+    ).pipe(this.handleError());
+  }
+
+  /** Get GA4 analytics data for a site */
+  getAnalytics(siteId: string, period = '7'): Observable<{ data: AnalyticsData }> {
+    return this.get(`/analytics/${siteId}`, { period });
   }
 }
 
@@ -440,4 +496,38 @@ export interface DiscoveredVideo {
 export interface DiscoveredVideos {
   videos: DiscoveredVideo[];
   attribution: { author: string; license: string; source_url: string }[];
+}
+
+export interface AnalyticsStats {
+  pageViews: number;
+  uniqueVisitors: number;
+  avgSessionDuration: string;
+  bounceRate: number;
+}
+
+export interface AnalyticsChartPoint {
+  date: string;
+  views: number;
+}
+
+export interface AnalyticsTrafficSource {
+  name: string;
+  percent: number;
+}
+
+export interface AnalyticsTopPage {
+  path: string;
+  views: number;
+}
+
+export interface AnalyticsData {
+  period: number;
+  slug?: string;
+  ga4_connected: boolean;
+  ga4_measurement_id?: string | null;
+  gtm_container_id?: string | null;
+  stats: AnalyticsStats;
+  chartData: AnalyticsChartPoint[];
+  trafficSources: AnalyticsTrafficSource[];
+  topPages: AnalyticsTopPage[];
 }
