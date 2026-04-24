@@ -1,0 +1,157 @@
+name: Frontend E2E (Distributed)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/project-sites/frontend/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/project-sites/frontend/**'
+  workflow_dispatch:
+    inputs:
+      shard_count:
+        description: 'Number of parallel shards (1-10)'
+        required: false
+        default: '5'
+
+env:
+  NODE_VERSION: '20.18.0'
+  SHARD_COUNT: ${{ github.event.inputs.shard_count || '5' }}
+
+jobs:
+  # ─── Shard E2E tests across N parallel runners ─────────────
+  e2e-shard:
+    name: 'E2E Shard ${{ matrix.shard }}/${{ github.event.inputs.shard_count || 5 }}'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5]
+    env:
+      SHARD_TOTAL: ${{ github.event.inputs.shard_count || '5' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/project-sites/frontend/package-lock.json
+
+      - name: Install deps
+        working-directory: apps/project-sites/frontend
+        run: npm ci --legacy-peer-deps
+
+      - name: Install Playwright Chromium
+        working-directory: apps/project-sites/frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E shard ${{ matrix.shard }}
+        working-directory: apps/project-sites/frontend
+        run: npx playwright test --shard=${{ matrix.shard }}/${{ env.SHARD_COUNT }}
+
+      - name: Upload blob report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: blob-report-${{ matrix.shard }}
+          path: apps/project-sites/frontend/blob-report/
+          retention-days: 7
+
+      - name: Upload test results on failure
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-results-shard-${{ matrix.shard }}
+          path: apps/project-sites/frontend/test-results/
+          retention-days: 7
+
+  # ─── Merge all shard reports into one HTML report ──────────
+  merge-reports:
+    name: Merge E2E Reports
+    needs: [e2e-shard]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Playwright
+        working-directory: apps/project-sites/frontend
+        run: npm ci --legacy-peer-deps
+
+      - name: Download all blob reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: blob-report-*
+          path: apps/project-sites/frontend/all-blob-reports
+          merge-multiple: true
+
+      - name: Merge into HTML report
+        working-directory: apps/project-sites/frontend
+        run: npx playwright merge-reports --reporter=html ./all-blob-reports
+
+      - name: Upload merged HTML report
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report-merged
+          path: apps/project-sites/frontend/playwright-report/
+          retention-days: 30
+
+      # ─── Upload report to R2 for persistent access ──────────
+      - name: Upload report to R2
+        if: github.ref == 'refs/heads/main'
+        working-directory: apps/project-sites/frontend
+        run: |
+          REPORT_DIR="playwright-report"
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          COMMIT_SHA="${GITHUB_SHA::8}"
+
+          # Upload each file in the report directory
+          find "$REPORT_DIR" -type f | while read -r file; do
+            relative="${file#$REPORT_DIR/}"
+            # Detect content type
+            case "$file" in
+              *.html) CT="text/html" ;;
+              *.js)   CT="application/javascript" ;;
+              *.css)  CT="text/css" ;;
+              *.png)  CT="image/png" ;;
+              *.jpg)  CT="image/jpeg" ;;
+              *.svg)  CT="image/svg+xml" ;;
+              *.json) CT="application/json" ;;
+              *.zip)  CT="application/zip" ;;
+              *)      CT="application/octet-stream" ;;
+            esac
+
+            # Upload to both latest/ and timestamped path
+            npx wrangler r2 object put \
+              "project-sites-production/test-reports/latest/${relative}" \
+              --file "$file" --content-type "$CT" --remote
+
+            npx wrangler r2 object put \
+              "project-sites-production/test-reports/${TIMESTAMP}-${COMMIT_SHA}/${relative}" \
+              --file "$file" --content-type "$CT" --remote
+          done
+
+          echo "### E2E Report uploaded to R2" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Latest: \`test-reports/latest/index.html\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Archive: \`test-reports/${TIMESTAMP}-${COMMIT_SHA}/index.html\`" >> "$GITHUB_STEP_SUMMARY"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+
+      # ─── Summary ────────────────────────────────────────────
+      - name: Report summary
+        if: always()
+        run: |
+          echo "### Distributed E2E Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Metric | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Shards | ${{ env.SHARD_COUNT }} parallel runners |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Report | [Download](../artifacts/e2e-report-merged) |" >> "$GITHUB_STEP_SUMMARY"

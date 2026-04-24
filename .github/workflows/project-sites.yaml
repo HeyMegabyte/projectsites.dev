@@ -129,13 +129,18 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
 
-  # ─── Stage 4: Playwright E2E on Staging ───────────────────
+  # ─── Stage 4: Playwright E2E on Staging (3 shards) ─────────
   e2e-staging:
-    name: E2E Tests (Staging)
+    name: 'E2E Staging ${{ matrix.shard }}/3'
     needs: [deploy-staging]
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     env:
       BASE_URL: https://sites-staging.megabyte.space
+      SHARD_TOTAL: '3'
     steps:
       - uses: actions/checkout@v4
 
@@ -151,9 +156,9 @@ jobs:
         working-directory: apps/project-sites
         run: npx playwright install --with-deps chromium
 
-      - name: Run Playwright E2E on staging
+      - name: Run E2E shard ${{ matrix.shard }}/3
         working-directory: apps/project-sites
-        run: npx playwright test
+        run: npx playwright test --shard=${{ matrix.shard }}/3
         env:
           BASE_URL: ${{ env.BASE_URL }}
 
@@ -161,7 +166,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-results-staging
+          name: playwright-results-staging-${{ matrix.shard }}
           path: apps/project-sites/test-results
 
   # ─── Stage 5: Deploy to Production ─────────────────────────
@@ -188,13 +193,18 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
 
-  # ─── Stage 6: Post-deploy E2E on Production ────────────────
+  # ─── Stage 6: Post-deploy E2E on Production (3 shards) ──────
   e2e-production:
-    name: Post-Deploy E2E (Production)
+    name: 'E2E Production ${{ matrix.shard }}/3'
     needs: [deploy-production]
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     env:
       BASE_URL: https://projectsites.dev
+      SHARD_TOTAL: '3'
     steps:
       - uses: actions/checkout@v4
 
@@ -210,9 +220,9 @@ jobs:
         working-directory: apps/project-sites
         run: npx playwright install --with-deps chromium
 
-      - name: Run production smoke tests
+      - name: Run E2E shard ${{ matrix.shard }}/3
         working-directory: apps/project-sites
-        run: npx playwright test
+        run: npx playwright test --shard=${{ matrix.shard }}/3
         env:
           BASE_URL: ${{ env.BASE_URL }}
 
@@ -220,15 +230,15 @@ jobs:
         uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-results-production
+          name: playwright-results-production-${{ matrix.shard }}
           path: apps/project-sites/test-results
 
-      # ─── Rollback if E2E fails ──────────────────────────────
+      # ─── Rollback if ANY shard fails ────────────────────────
       - name: Rollback on failure
         if: failure()
         working-directory: apps/project-sites
         run: |
-          echo "::error::Production E2E failed - triggering rollback"
-          npx wrangler rollback --env production --message "Automated rollback: E2E failed"
+          echo "::error::Production E2E shard ${{ matrix.shard }} failed - triggering rollback"
+          npx wrangler rollback --env production --message "Automated rollback: E2E shard ${{ matrix.shard }} failed"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}

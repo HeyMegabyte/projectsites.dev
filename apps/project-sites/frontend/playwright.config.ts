@@ -1,12 +1,19 @@
-import { defineConfig } from '@playwright/test';
+import { defineConfig, devices } from '@playwright/test';
+
+const isCI = !!process.env['CI'];
+const isShard = !!process.env['SHARD_TOTAL'];
 
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
-  forbidOnly: !!process.env['CI'],
-  retries: process.env['CI'] ? 2 : 0,
-  workers: process.env['CI'] ? 1 : undefined,
-  reporter: 'html',
+  forbidOnly: isCI,
+  retries: isCI ? 2 : 0,
+  workers: isCI ? (isShard ? 4 : 1) : undefined,
+  reporter: isCI
+    ? isShard
+      ? [['blob', { outputDir: './blob-report' }], ['github']]
+      : [['html', { open: 'never' }], ['github']]
+    : 'html',
   timeout: 30000,
   use: {
     baseURL: 'http://localhost:4300',
@@ -16,13 +23,13 @@ export default defineConfig({
   webServer: {
     command: 'node scripts/e2e_server.cjs 4300',
     port: 4300,
-    reuseExistingServer: !process.env['CI'],
+    reuseExistingServer: !isCI,
     timeout: 10000,
   },
   projects: [
     {
       name: 'chromium',
-      use: { browserName: 'chromium' },
+      use: { ...devices['Desktop Chrome'] },
     },
   ],
 });
