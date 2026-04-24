@@ -5,8 +5,8 @@ import type { Env } from './types/env.js';
  * SiteBuilderContainer — Stateless Claude Code executor
  *
  * Architecture:
- * 1. Entrypoint installs Claude Code CLI, creates non-root user `cuser`
- * 2. HTTP server on :8080 accepts POST requests
+ * 1. Dockerfile pre-bakes: Claude Code CLI, git, non-root `cuser`, skills repo, template repo, CLAUDE.md
+ * 2. Entrypoint runs `git pull` on skills + template repos, then starts HTTP server on :8080
  * 3. Each POST contains: prompt text + optional existing files
  * 4. Container runs `claude -p` as `cuser`, returns all generated/modified files
  * 5. Container does NOT touch D1 or R2 — workflow handles storage
@@ -21,14 +21,15 @@ export class SiteBuilderContainer extends Container<Env> {
   entrypoint = ['node', '-e',
     'const{execSync:x}=require("child_process"),fs=require("fs"),path=require("path"),http=require("http");' +
     'const NL=String.fromCharCode(10);' +
-    // Install Claude Code CLI at startup
-    'console.log("[boot] Installing Claude Code...");' +
-    'try{x("which claude",{stdio:"pipe"})}' +
-    'catch(e){x("npm i -g @anthropic-ai/claude-code",{stdio:"inherit",timeout:180000})}' +
+    // All pre-baked in Dockerfile: Claude Code, git, cuser, skills, template, CLAUDE.md
+    // Boot only does git pull to get latest changes
     'var CP=x("which claude",{encoding:"utf-8"}).trim();' +
     'console.log("[boot] Claude at:",CP);' +
-    // Create non-root user
-    'try{x("id cuser 2>/dev/null||useradd -m cuser",{stdio:"pipe",shell:true})}catch(e){}' +
+    'var CUSER_HOME="/home/cuser";' +
+    'var SKILLS_DIR=CUSER_HOME+"/.agentskills";' +
+    'var TEMPLATE_DIR=CUSER_HOME+"/template";' +
+    'try{x("cd "+SKILLS_DIR+" && git pull origin main 2>&1",{timeout:30000,shell:true,encoding:"utf-8"});console.log("[boot] Skills updated")}catch(e){console.warn("[boot] Skills pull failed:",e.message.slice(0,100))}' +
+    'try{x("cd "+TEMPLATE_DIR+" && git pull origin main 2>&1",{timeout:30000,shell:true,encoding:"utf-8"});console.log("[boot] Template updated")}catch(e){console.warn("[boot] Template pull failed:",e.message.slice(0,100))}' +
     // runClaude: write prompt to file, run as cuser, return success
     'function runClaude(dir,prompt,label,timeoutMin){' +
       'var pf=path.join(dir,"_prompt_"+label+".txt");' +
@@ -112,6 +113,13 @@ export class SiteBuilderContainer extends Container<Env> {
           'if(P._anthropicKey)process.env.ANTHROPIC_API_KEY=P._anthropicKey;' +
           'var dir="/tmp/build-"+(P.slug||"site")+"-"+Date.now();' +
           'fs.mkdirSync(dir,{recursive:true});' +
+          // If no existing files provided (Stage A), copy template as starting point
+          'var hasExisting=P.existingFiles&&Array.isArray(P.existingFiles)&&P.existingFiles.length>0;' +
+          'if(!hasExisting&&fs.existsSync(TEMPLATE_DIR+"/package.json")){' +
+            'console.log("[container] Copying template into build dir...");' +
+            'try{x("cp -r "+TEMPLATE_DIR+"/* "+dir+"/ 2>/dev/null; cp -r "+TEMPLATE_DIR+"/.[!.]* "+dir+"/ 2>/dev/null; true",{shell:true,stdio:"pipe"});' +
+            'console.log("[container] Template copied")}catch(e){console.warn("[container] Template copy failed:",e.message.slice(0,100))}' +
+          '}' +
           // Write existing files to dir (from previous stage) — create subdirs as needed
           'if(P.existingFiles&&Array.isArray(P.existingFiles)){' +
             'for(var f of P.existingFiles){' +
@@ -138,7 +146,20 @@ export class SiteBuilderContainer extends Container<Env> {
             'var ok=runClaude(dir,p.text,p.label||("step-"+i),p.timeoutMin||10);' +
             'results.push({label:p.label||("step-"+i),success:ok})' +
           '}' +
-          // Collect all output files
+          // If package.json exists, run npm install + build to produce dist/
+          'var hasPackageJson=fs.existsSync(path.join(dir,"package.json"));' +
+          'if(hasPackageJson){' +
+            'console.log("[container] Vite project detected — running npm install + build...");' +
+            'try{' +
+              'x("cd "+dir+" && npm install --legacy-peer-deps 2>&1",{timeout:120000,maxBuffer:50*1024*1024,shell:true,encoding:"utf-8"});' +
+              'console.log("[container] npm install done");' +
+              'x("cd "+dir+" && npm run build 2>&1",{timeout:120000,maxBuffer:50*1024*1024,shell:true,encoding:"utf-8"});' +
+              'console.log("[container] npm run build done");' +
+            '}catch(buildErr){' +
+              'console.warn("[container] Build failed:",buildErr.message.slice(0,200));' +
+            '}' +
+          '}' +
+          // Collect all output files (source + dist if built)
           'var files=collectFiles(dir);' +
           'console.log("[container] Generated "+files.length+" files from "+prompts.length+" prompts");' +
           // Add diagnostic info

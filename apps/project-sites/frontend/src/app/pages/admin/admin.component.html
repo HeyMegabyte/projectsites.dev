@@ -73,17 +73,35 @@
       </button>
 
       @if (siteDropdownOpen()) {
-        <div class="absolute left-3 right-3 top-[calc(100%+4px)] bg-[rgba(10,10,30,0.98)] border border-primary/[0.12] rounded-[10px] p-1.5 z-[200] shadow-[0_12px_40px_rgba(0,0,0,0.6),0_0_30px_rgba(0,229,255,0.04)] site-dropdown-anim max-h-[300px] overflow-y-auto">
-          @for (site of state.sites(); track site.id) {
-            <button
-              class="flex items-center gap-2 w-full py-2 px-2.5 border-none bg-transparent text-text-secondary text-[0.78rem] font-sans cursor-pointer rounded-[7px] transition-all duration-150 text-left hover:bg-primary/[0.06] hover:text-white"
-              [class.file-active]="state.selectedSite()?.id === site.id"
-              (click)="selectSite(site)">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/></svg>
-              <span class="flex-1 truncate">{{ site.business_name || 'Unnamed' }}</span>
-              <span class="text-[0.58rem] font-bold uppercase" [class]="state.getStatusTextClass(site.status)">{{ state.getStatusLabel(site.status) }}</span>
-            </button>
-          }
+        <div class="absolute left-3 right-3 top-[calc(100%+4px)] bg-[rgba(10,10,30,0.98)] border border-primary/[0.12] rounded-[10px] p-1.5 z-[200] shadow-[0_12px_40px_rgba(0,0,0,0.6),0_0_30px_rgba(0,229,255,0.04)] site-dropdown-anim max-h-[360px] flex flex-col">
+          <!-- Search input -->
+          <div class="px-1.5 pb-1.5">
+            <div class="relative">
+              <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              <input
+                type="text"
+                placeholder="Search sites..."
+                class="w-full pl-8 pr-3 py-1.5 bg-white/[0.04] border border-white/[0.08] rounded-lg text-[0.78rem] text-white placeholder:text-text-secondary/60 outline-none focus:border-primary/30 focus:bg-primary/[0.02] transition-colors"
+                [ngModel]="siteSearchQuery()"
+                (ngModelChange)="siteSearchQuery.set($event)"
+                (click)="$event.stopPropagation()" />
+            </div>
+          </div>
+          <div class="overflow-y-auto flex-1">
+            @for (site of filteredSites; track site.id) {
+              <button
+                class="flex items-center gap-2 w-full py-2 px-2.5 border-none bg-transparent text-text-secondary text-[0.78rem] font-sans cursor-pointer rounded-[7px] transition-all duration-150 text-left hover:bg-primary/[0.06] hover:text-white"
+                [class.file-active]="state.selectedSite()?.id === site.id"
+                (click)="selectSite(site)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/></svg>
+                <span class="flex-1 truncate">{{ site.business_name || 'Unnamed' }}</span>
+                <span class="text-[0.58rem] font-bold uppercase" [class]="state.getStatusTextClass(site.status)">{{ state.getStatusLabel(site.status) }}</span>
+              </button>
+            }
+            @if (filteredSites.length === 0 && siteSearchQuery()) {
+              <div class="text-center text-text-secondary/60 text-[0.75rem] py-3">No matches</div>
+            }
+          </div>
           <div class="h-px mx-2 my-1 bg-white/[0.06]"></div>
           <button
             class="flex items-center gap-2 w-full py-2 px-2.5 border-none bg-transparent text-primary text-[0.78rem] font-sans cursor-pointer rounded-[7px] transition-all duration-150 text-left hover:bg-primary/[0.12]"

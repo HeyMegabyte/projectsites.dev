@@ -711,19 +711,24 @@ async function handleAPI(req, res, urlPath) {
   }
 
   // Dynamic chat export by slug — mirrors the real endpoint that reads files from R2
+  // Includes realistic file types (text-only, binary files filtered out — matching production behavior)
   const chatBySlugMatch = urlPath.match(/^\/api\/sites\/by-slug\/([^/]+)\/chat$/);
   if (chatBySlugMatch && method === 'GET') {
     const chatSlug = chatBySlugMatch[1];
     const businessName = chatSlug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
     const now = new Date().toISOString();
 
-    // Simulate reading all files and constructing boltArtifact content
+    // Realistic mock files — text-only (binary files like .mp4, .png, .jpg are filtered by production endpoint)
     const mockFiles = [
-      { path: 'index.html', content: '<!DOCTYPE html>\n<html>\n<head><title>' + businessName + '</title><script src="https://cdn.tailwindcss.com"></script></head>\n<body class="bg-gray-900 text-white">\n<nav class="fixed top-0 w-full bg-black/80 p-4"><a href="index.html">' + businessName + '</a></nav>\n<main class="pt-20"><section class="min-h-screen flex items-center justify-center"><h1 class="text-5xl font-bold">' + businessName + '</h1></section></main>\n<footer class="p-8 text-center text-gray-500">&copy; 2026 ' + businessName + '</footer>\n</body>\n</html>' },
-      { path: 'about.html', content: '<!DOCTYPE html>\n<html><head><title>About - ' + businessName + '</title><script src="https://cdn.tailwindcss.com"></script></head><body class="bg-gray-900 text-white"><h1>About ' + businessName + '</h1></body></html>' },
-      { path: 'contact.html', content: '<!DOCTYPE html>\n<html><head><title>Contact - ' + businessName + '</title><script src="https://cdn.tailwindcss.com"></script></head><body class="bg-gray-900 text-white"><h1>Contact</h1><form action="/api/contact" method="POST"><input name="name" placeholder="Name"><textarea name="message"></textarea><button type="submit">Send</button></form></body></html>' },
+      { path: 'index.html', content: '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>' + businessName + '</title>\n<link rel="stylesheet" href="styles.css">\n</head>\n<body class="bg-gray-900 text-white">\n<nav class="fixed top-0 w-full bg-black/80 p-4">\n<a href="index.html">' + businessName + '</a>\n<a href="about.html">About</a>\n<a href="services.html">Services</a>\n<a href="contact.html">Contact</a>\n</nav>\n<main class="pt-20">\n<section class="min-h-screen flex items-center justify-center">\n<h1 class="text-5xl font-bold">' + businessName + '</h1>\n<p>Welcome to our website</p>\n</section>\n</main>\n<footer class="p-8 text-center text-gray-500">&copy; 2026 ' + businessName + '</footer>\n<script src="main.js"></script>\n</body>\n</html>' },
+      { path: 'about.html', content: '<!DOCTYPE html>\n<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>About - ' + businessName + '</title><link rel="stylesheet" href="styles.css"></head><body class="bg-gray-900 text-white"><h1>About ' + businessName + '</h1><p>Learn more about our story.</p></body></html>' },
+      { path: 'services.html', content: '<!DOCTYPE html>\n<html lang="en"><head><meta charset="UTF-8"><title>Services - ' + businessName + '</title><link rel="stylesheet" href="styles.css"></head><body class="bg-gray-900 text-white"><h1>Our Services</h1><ul><li>Service 1</li><li>Service 2</li></ul></body></html>' },
+      { path: 'contact.html', content: '<!DOCTYPE html>\n<html lang="en"><head><meta charset="UTF-8"><title>Contact - ' + businessName + '</title><link rel="stylesheet" href="styles.css"></head><body class="bg-gray-900 text-white"><h1>Contact</h1><form action="/api/contact" method="POST"><input name="name" placeholder="Name" required><input name="email" type="email" placeholder="Email" required><textarea name="message" placeholder="Message" required></textarea><button type="submit">Send</button></form></body></html>' },
+      { path: 'styles.css', content: ':root {\n  --bg-primary: #0a0a1a;\n  --accent: #64ffda;\n  --text: #e0e0e0;\n}\nbody { font-family: Inter, sans-serif; background: var(--bg-primary); color: var(--text); margin: 0; }\nnav { display: flex; gap: 1rem; }\nnav a { color: var(--accent); text-decoration: none; }\nfooter { border-top: 1px solid rgba(100,255,218,0.1); }' },
+      { path: 'main.js', content: '// ' + businessName + ' website scripts\ndocument.addEventListener("DOMContentLoaded", () => {\n  console.log("' + businessName + ' loaded");\n});' },
       { path: 'robots.txt', content: 'User-agent: *\nAllow: /\n\nSitemap: https://' + chatSlug + '.projectsites.dev/sitemap.xml' },
-      { path: 'sitemap.xml', content: '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n<url><loc>https://' + chatSlug + '.projectsites.dev/</loc></url>\n<url><loc>https://' + chatSlug + '.projectsites.dev/about.html</loc></url>\n<url><loc>https://' + chatSlug + '.projectsites.dev/contact.html</loc></url>\n</urlset>' },
+      { path: 'sitemap.xml', content: '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n<url><loc>https://' + chatSlug + '.projectsites.dev/</loc></url>\n<url><loc>https://' + chatSlug + '.projectsites.dev/about.html</loc></url>\n<url><loc>https://' + chatSlug + '.projectsites.dev/services.html</loc></url>\n<url><loc>https://' + chatSlug + '.projectsites.dev/contact.html</loc></url>\n</urlset>' },
+      { path: 'package.json', content: '{"name":"' + chatSlug + '","version":"1.0.0","private":true}' },
     ];
 
     const fileActions = mockFiles.map((f) =>
@@ -748,6 +753,32 @@ async function handleAPI(req, res, urlPath) {
       description: businessName + ' Website',
       exportDate: now,
     }));
+  }
+
+  // File listing endpoint — returns metadata without content
+  const filesBySlugMatch = urlPath.match(/^\/api\/sites\/by-slug\/([^/]+)\/files$/);
+  if (filesBySlugMatch && method === 'GET') {
+    const fileSlug = filesBySlugMatch[1];
+    const mockFileList = [
+      { path: 'index.html', size: 1024, etag: '"abc123"', extension: '.html' },
+      { path: 'about.html', size: 512, etag: '"abc124"', extension: '.html' },
+      { path: 'services.html', size: 480, etag: '"abc125"', extension: '.html' },
+      { path: 'contact.html', size: 620, etag: '"abc126"', extension: '.html' },
+      { path: 'styles.css', size: 340, etag: '"abc127"', extension: '.css' },
+      { path: 'main.js', size: 128, etag: '"abc128"', extension: '.js' },
+      { path: 'robots.txt', size: 80, etag: '"abc129"', extension: '.txt' },
+      { path: 'sitemap.xml', size: 420, etag: '"abc130"', extension: '.xml' },
+      { path: 'package.json', size: 64, etag: '"abc131"', extension: '.json' },
+      { path: 'images/hero.jpg', size: 245000, etag: '"img001"', extension: '.jpg' },
+      { path: 'images/logo.png', size: 32000, etag: '"img002"', extension: '.png' },
+      { path: 'videos/intro.mp4', size: 5200000, etag: '"vid001"', extension: '.mp4' },
+    ];
+    return json(res, {
+      slug: fileSlug,
+      version: 'v1-mock',
+      fileCount: mockFileList.length,
+      files: mockFileList,
+    });
   }
 
   // Generate prompt (AI research pipeline)

@@ -1312,20 +1312,61 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
     /** Helper: upload files to R2 */
     async function uploadToR2(files: { name: string; content: string }[], isInterim: boolean): Promise<string> {
       const version = new Date().toISOString().replace(/[:.]/g, '-') + (isInterim ? '-interim' : '');
+
+      // Detect Vite project: if dist/ files exist, serve those as the live site
+      const hasDistFiles = files.some(f => f.name.startsWith('dist/'));
+      const hasPackageJson = files.some(f => f.name === 'package.json');
+
+      const contentTypeMap: Record<string, string> = {
+        html: 'text/html', xml: 'application/xml', json: 'application/json',
+        svg: 'image/svg+xml', css: 'text/css', js: 'application/javascript',
+        ts: 'text/plain', tsx: 'text/plain', jsx: 'text/plain',
+        png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif',
+        webp: 'image/webp', ico: 'image/x-icon', txt: 'text/plain',
+      };
+
       for (const f of files) {
         const ext = f.name.split('.').pop()?.toLowerCase() || '';
-        const ct = { html: 'text/html', xml: 'application/xml', json: 'application/json',
-          svg: 'image/svg+xml', css: 'text/css', js: 'application/javascript',
-          ts: 'text/plain', tsx: 'text/plain', jsx: 'text/plain',
-          png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif',
-          webp: 'image/webp', ico: 'image/x-icon', txt: 'text/plain',
-        }[ext] || 'text/plain';
-        await env.SITES_BUCKET.put(`sites/${params.slug}/${version}/${f.name}`, f.content, {
-          httpMetadata: { contentType: ct },
-        });
+        const ct = contentTypeMap[ext] || 'text/plain';
+
+        if (hasDistFiles) {
+          // For Vite projects: upload dist/ files at root level for live serving
+          if (f.name.startsWith('dist/')) {
+            const servingPath = f.name.replace(/^dist\//, '');
+            await env.SITES_BUCKET.put(`sites/${params.slug}/${version}/${servingPath}`, f.content, {
+              httpMetadata: { contentType: ct },
+            });
+          }
+          // Upload ALL source files under _src/ for the bolt.diy editor
+          if (!f.name.startsWith('dist/')) {
+            await env.SITES_BUCKET.put(`sites/${params.slug}/${version}/_src/${f.name}`, f.content, {
+              httpMetadata: { contentType: ct },
+            });
+          }
+        } else {
+          // Legacy static HTML: upload files as-is
+          await env.SITES_BUCKET.put(`sites/${params.slug}/${version}/${f.name}`, f.content, {
+            httpMetadata: { contentType: ct },
+          });
+        }
       }
+
+      // Build manifest with source file list for editor
+      const sourceFiles = hasDistFiles
+        ? files.filter(f => !f.name.startsWith('dist/')).map(f => f.name)
+        : files.map(f => f.name);
+      const servingFiles = hasDistFiles
+        ? files.filter(f => f.name.startsWith('dist/')).map(f => f.name.replace(/^dist\//, ''))
+        : files.map(f => f.name);
+
       await env.SITES_BUCKET.put(`sites/${params.slug}/_manifest.json`,
-        JSON.stringify({ current_version: version, files: files.map(f => f.name), building: isInterim }),
+        JSON.stringify({
+          current_version: version,
+          files: servingFiles,
+          source_files: sourceFiles,
+          is_vite_project: hasPackageJson,
+          building: isInterim,
+        }),
         { httpMetadata: { contentType: 'application/json' } });
       await env.DB.prepare(
         isInterim
@@ -1384,6 +1425,61 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           `You are RECREATING the website for "${safeName}" as a SUPED-UP CLONE — same brand identity, same content, but DRAMATICALLY more beautiful.`,
           'IMPORTANT: You MUST use the Write tool to create files in the current directory.',
           'Read ALL _ prefixed files for full research context.',
+          '',
+          '=== PROJECT STRUCTURE (Vite + React + Tailwind — MANDATORY) ===',
+          'You MUST generate a Vite + React + Tailwind CSS project (NOT static HTML files).',
+          'This project will be loaded into a WebContainer-based code editor for live preview.',
+          '',
+          'REQUIRED FILES (create these FIRST):',
+          '1. package.json — with these exact dependencies:',
+          '   {',
+          '     "name": "' + params.slug + '",',
+          '     "private": true,',
+          '     "version": "1.0.0",',
+          '     "type": "module",',
+          '     "scripts": {',
+          '       "dev": "vite",',
+          '       "build": "vite build",',
+          '       "preview": "vite preview"',
+          '     },',
+          '     "dependencies": {',
+          '       "react": "^18.3.1",',
+          '       "react-dom": "^18.3.1",',
+          '       "react-router-dom": "^6.23.0"',
+          '     },',
+          '     "devDependencies": {',
+          '       "@types/react": "^18.3.3",',
+          '       "@types/react-dom": "^18.3.0",',
+          '       "@vitejs/plugin-react": "^4.3.1",',
+          '       "autoprefixer": "^10.4.19",',
+          '       "postcss": "^8.4.38",',
+          '       "tailwindcss": "^3.4.4",',
+          '       "vite": "^5.3.1"',
+          '     }',
+          '   }',
+          '2. vite.config.ts — with @vitejs/plugin-react',
+          '3. tailwind.config.ts — with content paths for src/**/*.{ts,tsx}',
+          '4. postcss.config.js — with tailwindcss and autoprefixer plugins',
+          '5. tsconfig.json — standard React TS config with baseUrl "." and paths "@/*": ["./src/*"]',
+          '6. index.html — Vite entry point: <div id="root"></div> + <script type="module" src="/src/main.tsx"></script>',
+          '7. src/main.tsx — React root render with BrowserRouter',
+          '8. src/index.css — @tailwind base/components/utilities + custom CSS animations',
+          '9. src/App.tsx — React Router with routes for all pages',
+          '10. src/pages/ — One component per page (Home.tsx, About.tsx, Services.tsx, Contact.tsx, etc.)',
+          '11. src/components/ — Shared components (Header.tsx, Footer.tsx, Hero.tsx, etc.)',
+          '',
+          'ROUTING: Use react-router-dom with <BrowserRouter> and <Routes>/<Route>.',
+          'Internal links use <Link to="/about"> not <a href="about.html">.',
+          'Each page is a React component in src/pages/.',
+          '',
+          'STYLING: Use Tailwind CSS utility classes directly in JSX.',
+          'Custom animations go in src/index.css with @keyframes.',
+          'Brand colors configured in tailwind.config.ts extend.colors.',
+          '',
+          'SEO: For each page, set document.title and meta tags via useEffect or a custom hook.',
+          'JSON-LD scripts rendered inline via dangerouslySetInnerHTML.',
+          'Generate public/robots.txt and public/sitemap.xml as static files.',
+          '',
           '',
           '=== BRAND IDENTITY (CRITICAL — use REAL brand from the original site) ===',
           `Name: ${safeName}`,
@@ -1493,14 +1589,18 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           `Address: ${params.businessAddress || ''}`,
           `Link address text to: https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(params.businessAddress || safeName)}`,
           '',
-          'OUTPUT: Write index.html + all sub-pages + robots.txt + sitemap.xml.',
-          'URL STRUCTURE:',
-          '- Use directory-style URLs: /about/ not about.html',
-          '- Each page should be in its own directory: about/index.html',
-          '- Internal links should use /page-name/ format (trailing slash)',
-          '- ALL asset paths must be ABSOLUTE (start with /): use /assets/style.css NOT assets/style.css',
-          '- CSS, JS, and image references must use absolute paths from root so they work on sub-pages',
-          '- Create a _redirects file mapping old .html URLs to clean URLs',
+          'OUTPUT: Write the COMPLETE Vite+React+Tailwind project.',
+          'FILE ORDER (write in this order):',
+          '1. package.json (FIRST — so dependencies install immediately)',
+          '2. vite.config.ts, tailwind.config.ts, postcss.config.js, tsconfig.json',
+          '3. index.html (Vite entry point)',
+          '4. src/main.tsx, src/index.css, src/App.tsx',
+          '5. src/components/ (Header, Footer, shared components)',
+          '6. src/pages/ (Home, About, Services, Contact, etc.)',
+          '7. public/robots.txt, public/sitemap.xml',
+          '',
+          'ROUTING: Use react-router-dom. Internal links use <Link to="/path">.',
+          'ALL image URLs must be absolute https:// URLs (not relative paths).',
           'Every file must be production-ready. No placeholders. No lorem ipsum.',
           scrapedNote,
           params.additionalContext ? `\nADDITIONAL CONTEXT: ${params.additionalContext}` : '',
@@ -1565,13 +1665,13 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
       }
 
       // ── STAGE B: Enhancement (individual steps to avoid timeout) ──
-      if (currentFiles.some(f => f.name === 'index.html')) {
+      if (currentFiles.some(f => f.name === 'package.json' || f.name === 'index.html')) {
         const b1 = await step.do('stage-b1-beauty', {
           retries: { limit: 1, delay: '10 seconds', backoff: 'exponential' },
           timeout: '15 minutes',
         }, async () => {
           return callContainer([
-            { label: 'B1-beauty', timeoutMin: 10, text: 'Make ALL pages MORE BEAUTIFUL. Do NOT rewrite from scratch — enhance what exists.\n\nFor ALL HTML files:\n- 10+ @keyframes animations (fadeInUp, slideInLeft, scaleIn, subtleFloat, gradientShift, glowPulse)\n- IntersectionObserver: sections start opacity:0 translateY:30px, animate to visible on scroll\n- Glassmorphism on cards (backdrop-filter:blur(20px))\n- Use the BRAND COLORS from the original site (check _research.json for extracted colors)\n- Gradient text on hero headings using brand primary color\n- Smooth hover transforms on cards (translateY -4px + shadow)\n- @media prefers-reduced-motion\n- Check every image: is it RELEVANT to its section? Is it duplicated on another page? Fix any mismatches.\n- Scan every image: does it have baked-in text, white borders, or montage styling? If so, remove it or replace with a clean photo.\n- Every section should have 3-5 images minimum, arranged in grids or galleries.\n- Fill any empty image placeholders with relevant Unsplash photos.\n- ALL asset paths must be ABSOLUTE (start with /) so they work on sub-pages\n- Replace ALL generic SVG icons with relevant stock photos or DALL-E-generated images\n- Add image galleries (3-4 photos) to sections that only have 1 image\n- Use <picture> with WebP source for all images\n- SELF-PROMPT: Look at each page critically. What would make it more stunning? Do it.\n\nMULTIMEDIA ENHANCEMENT:\n- Replace SVG icons with relevant stock photos\n- Add image galleries (3-5 photos per section)\n- Ensure hero has background video (muted, autoplay, loop)\n- Use <picture> with WebP sources where possible\n- Crop images with baked-in text — extract just the photo\n- Every section should have multiple high-quality images\n- Match images to content context (people photos near names, building photos in location sections)\n- NEVER reuse the same image on multiple pages\n- TEXT OVER IMAGES: position text in low-complexity areas, use gradient overlays\n- For gaps, use DALL-E: ultra-realistic, matching business category and brand colors' + (visualCritique ? '\n\nAI VISUAL INSPECTION FOUND THESE ISSUES (fix ALL of them):\n' + visualCritique : '') },
+            { label: 'B1-beauty', timeoutMin: 10, text: 'Make ALL React pages/components MORE BEAUTIFUL. Do NOT rewrite from scratch — enhance what exists.\n\nThis is a Vite + React + Tailwind project. Edit .tsx files in src/pages/ and src/components/.\n\nFor ALL page components:\n- 10+ @keyframes animations in src/index.css (fadeInUp, slideInLeft, scaleIn, subtleFloat, gradientShift, glowPulse)\n- IntersectionObserver: sections start opacity-0 translate-y-8, animate to visible on scroll (use a useInView hook)\n- Glassmorphism on cards (backdrop-blur-xl bg-white/10)\n- Use the BRAND COLORS from the original site (check _research.json for extracted colors)\n- Gradient text on hero headings using brand primary color (bg-gradient-to-r bg-clip-text text-transparent)\n- Smooth hover transforms on cards (hover:-translate-y-1 hover:shadow-xl transition-all)\n- Check every image: is it RELEVANT to its section? Is it duplicated on another page? Fix any mismatches.\n- Every section should have 3-5 images minimum, arranged in grids or galleries.\n- Fill any empty image placeholders with relevant Unsplash photos.\n- All image URLs must be absolute https:// URLs\n- Replace generic SVG icons with relevant stock photos\n- Add image galleries (3-4 photos) to sections that only have 1 image\n- SELF-PROMPT: Look at each page critically. What would make it more stunning? Do it.\n\nMULTIMEDIA ENHANCEMENT:\n- Ensure hero has background video (muted, autoplay, loop) or stunning gradient\n- Every section should have multiple high-quality images\n- Match images to content context\n- NEVER reuse the same image on multiple pages\n- TEXT OVER IMAGES: use gradient overlays (bg-gradient-to-t from-black/60)\n- For gaps, use Unsplash: https://images.unsplash.com/photo-{ID}?w={W}&h={H}&fit=crop' + (visualCritique ? '\n\nAI VISUAL INSPECTION FOUND THESE ISSUES (fix ALL of them):\n' + visualCritique : '') },
           ], currentFiles, 'stage-b1');
         });
         const b1Arr = b1 as { name: string; content: string }[];
@@ -1582,7 +1682,7 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           timeout: '15 minutes',
         }, async () => {
           return callContainer([
-            { label: 'B2-seo-content', timeoutMin: 10, text: 'SEO + content audit on ALL HTML files. Do NOT rewrite from scratch.\n\n1. SEO: Verify meta description, og tags, canonical URL, heading hierarchy on every page. JSON-LD LocalBusiness on index.html. FAQPage schema. Internal links between ALL pages. robots.txt + sitemap.xml listing ALL pages.\n2. CONTENT: Read _scraped.txt and _research.json. Ensure ALL original website content is present. If any services, programs, team members, or details are missing — add them. Every page should have images. No empty background-image. loading=lazy. Alt text with keywords.\n3. IMAGE COMPLETENESS: Count images per page — if any page has fewer than 15, add more from Unsplash/Pexels. Verify no image appears on more than one page.' },
+            { label: 'B2-seo-content', timeoutMin: 10, text: 'SEO + content audit on ALL React page components. Do NOT rewrite from scratch.\n\nThis is a Vite + React + Tailwind project. Edit .tsx files in src/pages/.\n\n1. SEO: Each page component should set document.title and meta tags via useEffect. Add JSON-LD LocalBusiness schema on Home page (rendered via dangerouslySetInnerHTML in a <script> tag). FAQPage schema. Internal links between ALL pages using <Link> from react-router-dom. Verify public/robots.txt + public/sitemap.xml list all routes.\n2. CONTENT: Read _scraped.txt and _research.json. Ensure ALL original website content is present. If any services, programs, team members, or details are missing — add them. Every page should have images with alt text.\n3. IMAGE COMPLETENESS: Count images per page — if any page has fewer than 15, add more from Unsplash/Pexels. Verify no image appears on more than one page.' },
           ], currentFiles, 'stage-b2');
         });
         const b2Arr = b2 as { name: string; content: string }[];
@@ -1596,8 +1696,8 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
       }
 
       // ── STAGE C: Quality (3 prompts, ~10 min) ──
-      if (currentFiles.some(f => f.name === 'index.html')) {
-        let domainPrompt = 'Add domain-specific features to index.html. ';
+      if (currentFiles.some(f => f.name === 'package.json' || f.name === 'index.html')) {
+        let domainPrompt = 'Add domain-specific features to the React page components in src/pages/. This is a Vite + React + Tailwind project. ';
         const catLower = category.toLowerCase();
         if (catLower.includes('non-profit') || catLower.includes('community') || catLower.includes('church') || catLower.includes('soup')) {
           domainPrompt += 'NON-PROFIT: Add prominent donation CTA (gradient button), impact counters (meals served, volunteers, years active), volunteer signup section. Warm, dignified tone.';

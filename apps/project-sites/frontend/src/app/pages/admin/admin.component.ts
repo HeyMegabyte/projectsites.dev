@@ -22,6 +22,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   private toast = inject(ToastService);
 
   siteDropdownOpen = signal(false);
+  siteSearchQuery = signal('');
   sidebarCollapsed = signal(false);
   isEditorRoute = signal(false);
   editorSaving = signal(false);
@@ -103,6 +104,18 @@ export class AdminComponent implements OnInit, OnDestroy {
   toggleSiteDropdown(event: MouseEvent): void {
     event.stopPropagation();
     this.siteDropdownOpen.update(v => !v);
+    if (!this.siteDropdownOpen()) {
+      this.siteSearchQuery.set('');
+    }
+  }
+
+  get filteredSites(): Site[] {
+    const q = this.siteSearchQuery().toLowerCase().trim();
+    if (!q) return this.state.sites();
+    return this.state.sites().filter(s =>
+      (s.business_name || '').toLowerCase().includes(q) ||
+      (s.slug || '').toLowerCase().includes(q)
+    );
   }
 
   closeSiteDropdown(): void {
@@ -115,6 +128,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   closeDropdowns(): void {
     this.siteDropdownOpen.set(false);
+    this.siteSearchQuery.set('');
   }
 
   selectSite(site: Site): void {

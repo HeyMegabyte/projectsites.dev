@@ -1326,6 +1326,8 @@ api.get('/api/sites/by-slug/:slug/chat', async (c) => {
   const manifestData = (await manifest.json()) as {
     current_version: string;
     files?: string[];
+    source_files?: string[];
+    is_vite_project?: boolean;
   };
 
   if (!manifestData.current_version) {
@@ -1333,10 +1335,31 @@ api.get('/api/sites/by-slug/:slug/chat', async (c) => {
   }
 
   const version = manifestData.current_version;
-  const prefix = `sites/${slug}/${version}/`;
+  const isVite = manifestData.is_vite_project === true;
+
+  // For Vite projects, serve source files from _src/ so the editor can run the dev server
+  const prefix = isVite
+    ? `sites/${slug}/${version}/_src/`
+    : `sites/${slug}/${version}/`;
+
+  // Extensions safe to read as text and embed in boltArtifact
+  const TEXT_EXTENSIONS = new Set([
+    '.html', '.htm', '.css', '.js', '.mjs', '.cjs', '.ts', '.tsx', '.jsx',
+    '.json', '.xml', '.txt', '.svg', '.md', '.mdx', '.yaml', '.yml',
+    '.toml', '.env', '.gitignore', '.npmrc', '.prettierrc', '.eslintrc',
+    '.map', '.webmanifest', '.csv', '.tsv', '.graphql', '.gql',
+  ]);
+
+  const isTextFile = (filePath: string): boolean => {
+    // Files without extensions (LICENSE, Makefile, etc.) are treated as text
+    const lastDot = filePath.lastIndexOf('.');
+    if (lastDot === -1 || lastDot < filePath.lastIndexOf('/')) return true;
+    return TEXT_EXTENSIONS.has(filePath.slice(lastDot).toLowerCase());
+  };
 
   // Determine which files to include — from manifest or R2 listing
-  let filePaths: string[] = manifestData.files ?? [];
+  // For Vite projects, prefer source_files (editor needs source, not built output)
+  let filePaths: string[] = (isVite ? manifestData.source_files : manifestData.files) ?? [];
 
   // If manifest doesn't list files, list the R2 prefix
   if (filePaths.length === 0) {
@@ -1348,6 +1371,9 @@ api.get('/api/sites/by-slug/:slug/chat', async (c) => {
     // Filter out non-site files
     filePaths = filePaths.filter((p) => !p.startsWith('_meta/') && p !== 'research.json');
   }
+
+  // Filter out binary files — reading them as .text() corrupts the content
+  filePaths = filePaths.filter(isTextFile);
 
   // Read all file contents in parallel
   const fileReads = filePaths.map(async (filePath) => {
@@ -1378,14 +1404,30 @@ api.get('/api/sites/by-slug/:slug/chat', async (c) => {
   }
 
   // Build bolt.diy-compatible boltArtifact content
-  const fileActions = files.map((f) =>
+  // Sort files: package.json first (triggers auto-install in bolt.diy)
+  const sortedFiles = [...files].sort((a, b) => {
+    if (a.path === 'package.json') return -1;
+    if (b.path === 'package.json') return 1;
+    return a.path.localeCompare(b.path);
+  });
+
+  const fileActions = sortedFiles.map((f) =>
     `<boltAction type="file" filePath="${f.path}">\n${f.content}\n</boltAction>`,
   );
+
+  // For Vite projects, add install + start actions so the dev server starts
+  const postFileActions = isVite
+    ? [
+        '<boltAction type="shell">npm install --legacy-peer-deps</boltAction>',
+        '<boltAction type="start">npm run dev</boltAction>',
+      ]
+    : [];
 
   const assistantContent = [
     `I've built a professional website for ${businessName} with ${files.length} files.\n`,
     `<boltArtifact id="site-${slug}" title="${businessName} Website">`,
     ...fileActions,
+    ...postFileActions,
     '</boltArtifact>',
   ].join('\n');
 
@@ -1417,6 +1459,64 @@ api.get('/api/sites/by-slug/:slug/chat', async (c) => {
       'Cache-Control': 'no-cache, no-store, must-revalidate',
       'Access-Control-Allow-Origin': '*',
     },
+  });
+});
+
+// ─── File listing (metadata only, no content) ──────────────
+
+api.get('/api/sites/by-slug/:slug/files', async (c) => {
+  const slug = c.req.param('slug');
+
+  const manifest = await c.env.SITES_BUCKET.get(`sites/${slug}/_manifest.json`);
+  if (!manifest) {
+    throw notFound('Site not found or no version published');
+  }
+
+  const manifestData = (await manifest.json()) as {
+    current_version: string;
+    files?: string[];
+    source_files?: string[];
+    is_vite_project?: boolean;
+  };
+
+  if (!manifestData.current_version) {
+    throw notFound('No published version found');
+  }
+
+  const version = manifestData.current_version;
+  const isVite = manifestData.is_vite_project === true;
+
+  // For Vite projects, list source files from _src/ prefix (for the editor)
+  // For legacy static sites, list the serving files directly
+  const prefix = isVite
+    ? `sites/${slug}/${version}/_src/`
+    : `sites/${slug}/${version}/`;
+
+  // List all files from R2
+  const listed = await c.env.SITES_BUCKET.list({ prefix, limit: 500 });
+  const files = listed.objects
+    .filter((obj) => {
+      const rel = obj.key.replace(prefix, '');
+      return !rel.startsWith('_meta/') && rel !== 'research.json' && rel !== '_manifest.json';
+    })
+    .map((obj) => {
+      const path = obj.key.replace(prefix, '');
+      const ext = path.includes('.') ? path.slice(path.lastIndexOf('.')) : '';
+      return {
+        path,
+        size: obj.size,
+        etag: obj.etag,
+        httpMetadata: obj.httpMetadata,
+        extension: ext,
+      };
+    });
+
+  return c.json({
+    slug,
+    version,
+    fileCount: files.length,
+    files,
+    is_vite_project: isVite,
   });
 });
 

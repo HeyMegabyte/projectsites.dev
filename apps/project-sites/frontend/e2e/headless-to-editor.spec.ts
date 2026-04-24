@@ -41,33 +41,56 @@ test.describe('Dynamic Chat JSON Endpoint', () => {
     expect(data.exportDate).toBeTruthy();
   });
 
-  test('chat endpoint contains boltAction file tags for each file', async ({ authedPage: page }) => {
+  test('chat endpoint contains boltAction file tags for each text file', async ({ authedPage: page }) => {
     const response = await page.request.get('/api/sites/by-slug/vitos-mens-salon/chat');
     const data = await response.json();
     const content = data.messages[1].content;
 
-    // Must contain file actions
+    // Must contain file actions for text files
     expect(content).toContain('<boltAction type="file" filePath="index.html">');
     expect(content).toContain('<boltAction type="file" filePath="about.html">');
     expect(content).toContain('<boltAction type="file" filePath="contact.html">');
+    expect(content).toContain('<boltAction type="file" filePath="styles.css">');
+    expect(content).toContain('<boltAction type="file" filePath="main.js">');
     expect(content).toContain('<boltAction type="file" filePath="robots.txt">');
     expect(content).toContain('<boltAction type="file" filePath="sitemap.xml">');
+    expect(content).toContain('<boltAction type="file" filePath="package.json">');
 
     // Each boltAction must have closing tag
     const openTags = (content.match(/<boltAction/g) || []).length;
     const closeTags = (content.match(/<\/boltAction>/g) || []).length;
     expect(openTags).toBe(closeTags);
-    expect(openTags).toBeGreaterThanOrEqual(3);
+    expect(openTags).toBeGreaterThanOrEqual(7);
   });
 
-  test('chat endpoint file content includes actual HTML', async ({ authedPage: page }) => {
+  test('chat endpoint excludes binary files (no .jpg, .png, .mp4)', async ({ authedPage: page }) => {
+    const response = await page.request.get('/api/sites/by-slug/vitos-mens-salon/chat');
+    const data = await response.json();
+    const content = data.messages[1].content;
+
+    // Binary file extensions must NOT appear as boltAction filePaths
+    // Production endpoint filters these out to prevent corruption
+    expect(content).not.toMatch(/filePath="[^"]*\.jpg"/);
+    expect(content).not.toMatch(/filePath="[^"]*\.png"/);
+    expect(content).not.toMatch(/filePath="[^"]*\.mp4"/);
+    expect(content).not.toMatch(/filePath="[^"]*\.gif"/);
+    expect(content).not.toMatch(/filePath="[^"]*\.webp"/);
+    expect(content).not.toMatch(/filePath="[^"]*\.woff2?"/);
+    expect(content).not.toMatch(/filePath="[^"]*\.ico"/);
+  });
+
+  test('chat endpoint file content includes actual HTML and CSS', async ({ authedPage: page }) => {
     const response = await page.request.get('/api/sites/by-slug/vitos-mens-salon/chat');
     const data = await response.json();
     const content = data.messages[1].content;
 
     // index.html should contain real HTML structure
     expect(content).toContain('<!DOCTYPE html>');
-    expect(content).toContain('tailwindcss');
+    expect(content).toContain('<nav');
+
+    // styles.css should contain CSS rules
+    expect(content).toContain(':root');
+    expect(content).toContain('font-family');
 
     // robots.txt should contain standard content
     expect(content).toContain('User-agent');
@@ -76,6 +99,9 @@ test.describe('Dynamic Chat JSON Endpoint', () => {
     // sitemap.xml should contain valid XML
     expect(content).toContain('urlset');
     expect(content).toContain('projectsites.dev');
+
+    // package.json should be valid JSON content
+    expect(content).toContain('"name"');
   });
 
   test('chat endpoint returns no-cache headers', async ({ authedPage: page }) => {
@@ -234,5 +260,49 @@ test.describe('Full Headless → Edit Flow (No Browser Generation)', () => {
     expect(data2.exportDate).toBeTruthy();
     expect(typeof data1.exportDate).toBe('string');
     expect(typeof data2.exportDate).toBe('string');
+  });
+});
+
+test.describe('File Listing Endpoint', () => {
+
+  test('files endpoint returns metadata for all files including binary', async ({ authedPage: page }) => {
+    const response = await page.request.get('/api/sites/by-slug/vitos-mens-salon/files');
+    expect(response.status()).toBe(200);
+
+    const data = await response.json();
+    expect(data.slug).toBe('vitos-mens-salon');
+    expect(data.version).toBeTruthy();
+    expect(data.fileCount).toBeGreaterThan(0);
+    expect(Array.isArray(data.files)).toBe(true);
+  });
+
+  test('files endpoint includes both text and binary file metadata', async ({ authedPage: page }) => {
+    const response = await page.request.get('/api/sites/by-slug/vitos-mens-salon/files');
+    const data = await response.json();
+
+    const extensions = data.files.map((f: { extension: string }) => f.extension);
+
+    // Text files present
+    expect(extensions).toContain('.html');
+    expect(extensions).toContain('.css');
+    expect(extensions).toContain('.js');
+
+    // Binary files also present in metadata (unlike /chat which filters them)
+    expect(extensions).toContain('.jpg');
+    expect(extensions).toContain('.png');
+    expect(extensions).toContain('.mp4');
+  });
+
+  test('files endpoint returns size and etag for each file', async ({ authedPage: page }) => {
+    const response = await page.request.get('/api/sites/by-slug/vitos-mens-salon/files');
+    const data = await response.json();
+
+    for (const file of data.files) {
+      expect(file.path).toBeTruthy();
+      expect(typeof file.size).toBe('number');
+      expect(file.size).toBeGreaterThan(0);
+      expect(file.etag).toBeTruthy();
+      expect(file.extension).toBeDefined();
+    }
   });
 });

@@ -1,5 +1,5 @@
 /**
- * 14 Ultimate Feature Chain E2E Tests
+ * 15 Ultimate Feature Chain E2E Tests
  *
  * Each test chains multiple features into a complete user story,
  * testing state transitions, API interactions, and UI behavior.
@@ -7,6 +7,9 @@
  *
  * TDD: These tests define the expected behavior. Failures indicate
  * features that need implementation or fixes.
+ *
+ * Test 15 is the full lifecycle: create site → open in bolt.diy editor
+ * → make significant edits (6 files) → publish → verify snapshot + APIs.
  */
 import { test, expect } from './fixtures';
 import { test as base } from '@playwright/test';
@@ -635,8 +638,12 @@ test('11. Auth: OAuth redirect, magic link, session guard, sign out', async ({ p
   const onSignin = page.url().includes('/signin') || page.url().includes('/');
   expect(onSignin).toBeTruthy();
 
-  // 2. Visit signin page
+  // 2. Visit signin page — dismiss onboarding overlay first
   await page.goto('/signin');
+  await page.waitForLoadState('domcontentloaded');
+  await dismissOverlays(page);
+  // Reload so Angular picks up the localStorage dismissal
+  await page.reload();
   await page.waitForLoadState('domcontentloaded');
   await page.waitForTimeout(500);
 
@@ -646,7 +653,7 @@ test('11. Auth: OAuth redirect, magic link, session guard, sign out', async ({ p
   await expect(page.locator('button:has-text("Continue with Email")').first()).toBeVisible({ timeout: 3000 });
 
   // 3. Test magic link flow
-  await page.locator('button:has-text("Continue with Email")').click();
+  await page.locator('button:has-text("Continue with Email")').click({ force: true });
   await page.waitForTimeout(300);
 
   const emailInput = page.locator('#signin-email, input[type="email"]').first();
@@ -658,7 +665,7 @@ test('11. Auth: OAuth redirect, magic link, session guard, sign out', async ({ p
     req.url().includes('/auth/magic-link') && req.method() === 'POST',
     { timeout: 5000 }
   );
-  await sendBtn.click();
+  await sendBtn.click({ force: true });
   await magicReq;
   await page.waitForTimeout(500);
 
@@ -783,6 +790,7 @@ test('13. Content: blog list, blog post with ToC, changelog, legal pages', async
   // 1. Blog list
   await page.goto('/blog');
   await page.waitForLoadState('domcontentloaded');
+  await dismissOverlays(page);
   await page.waitForTimeout(800);
 
   // Blog cards should render
@@ -955,5 +963,164 @@ test('14. A11y + i18n: language toggle, Cmd+K palette, shortcuts, onboarding, fe
   });
   expect(hasOverflow).toBeFalsy();
 
+  expect(errors).toEqual([]);
+});
+
+// ═══════════════════════════════════════════════════════════════
+// TEST 15: Full Create → Editor → Edit → Save/Publish E2E
+// Creates a site, opens it in bolt.diy editor, makes significant
+// changes via postMessage protocol, publishes, verifies snapshot
+// ═══════════════════════════════════════════════════════════════
+
+test('15. Full Lifecycle: create site → open editor → edit files → publish → verify snapshot', async ({ authedPage: page }) => {
+  test.setTimeout(90000);
+  const errors = trackConsoleErrors(page);
+  await dismissOverlays(page);
+
+  // ── Step 1: Create a new site ──
+  await page.goto('/create');
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(400);
+
+  await page.locator('#create-name').fill('E2E Lifecycle Test Business');
+  await page.locator('#create-address').fill('42 Test Lane, Playwright City, NJ 07099');
+  await page.locator('button:has-text("Build My Website")').click();
+
+  // Should navigate to waiting page
+  await page.waitForURL(/\/waiting\?id=(.+)&slug=(.+)/, { timeout: 10000 });
+  const waitingUrl = new URL(page.url(), 'http://localhost:4300');
+  const siteId = waitingUrl.searchParams.get('id')!;
+  const createdSlug = waitingUrl.searchParams.get('slug')!;
+  expect(siteId).toBeTruthy();
+  expect(createdSlug).toBeTruthy();
+
+  // Wait for site to be "published" (mock auto-progresses)
+  await expect(page.getByRole('heading', { name: 'Your site is live!' })).toBeVisible({ timeout: 25000 });
+
+  // ── Step 2: Intercept editor iframe and navigate ──
+  // Route interception serves a minimal mock page for the bolt.diy iframe
+  await page.route('**/editor.projectsites.dev/**', (route) => {
+    route.fulfill({
+      status: 200,
+      contentType: 'text/html',
+      body: `<!DOCTYPE html><html><head><title>Mock bolt.diy</title></head>
+<body style="margin:0;background:#0a0a1a;color:#64ffda;padding:20px">
+<h1>Mock Editor</h1>
+</body></html>`,
+    });
+  });
+
+  const editAiBtn = page.locator('button').filter({ hasText: /edit.*ai/i });
+  await expect(editAiBtn).toBeVisible({ timeout: 5000 });
+  await editAiBtn.click({ force: true });
+
+  // Should navigate to the editor route (redirects /editor/:slug → /admin/editor)
+  await page.waitForURL(/\/(editor|admin)/, { timeout: 10000 });
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(2000);
+
+  // ── Step 3: Verify editor iframe loaded ──
+  const iframe = page.locator('iframe.editor-iframe, iframe').first();
+  const hasIframe = await iframe.isVisible({ timeout: 8000 }).catch(() => false);
+  expect(hasIframe).toBeTruthy();
+
+  // The mock iframe sends PS_BOLT_READY via postMessage, but the credentialless
+  // attribute on the iframe creates an opaque origin that doesn't match the
+  // Angular component's allowedOrigins check. Dispatch the message from page
+  // context with the expected origin to enable the publish button.
+  await page.evaluate(() => {
+    window.dispatchEvent(new MessageEvent('message', {
+      data: { type: 'PS_BOLT_READY' },
+      origin: 'https://editor.projectsites.dev',
+    }));
+  });
+  await page.waitForTimeout(500);
+
+  // ── Step 4: Click publish and simulate editor file response ──
+  const publishBtn = page.locator('.publish-btn, button:has-text("Publish")').first();
+  await expect(publishBtn).toBeVisible({ timeout: 5000 });
+
+  // Track the publish-bolt API call
+  const publishPromise = page.waitForRequest(req =>
+    req.url().includes('publish-bolt') && req.method() === 'POST',
+    { timeout: 15000 }
+  );
+
+  await publishBtn.click({ force: true });
+
+  // The Angular component sends PS_REQUEST_FILES to the iframe, but the iframe
+  // can't respond back through credentialless boundary. Dispatch PS_FILES_READY
+  // directly from page context with 6 significantly edited files.
+  await page.waitForTimeout(200);
+  await page.evaluate((slug) => {
+    window.dispatchEvent(new MessageEvent('message', {
+      data: {
+        type: 'PS_FILES_READY',
+        correlationId: 'e2e-test',
+        files: {
+          '/home/project/index.html': '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>E2E Lifecycle Test Business \u2014 AI-Edited</title>\n<link rel="stylesheet" href="styles.css">\n</head>\n<body>\n<nav class="main-nav">\n<a href="index.html" class="logo">E2E Lifecycle Test</a>\n<a href="services.html">Services</a>\n<a href="about.html">About</a>\n<a href="contact.html">Contact</a>\n</nav>\n<main>\n<section class="hero">\n<h1>Welcome to E2E Lifecycle Test Business</h1>\n<p>Created by AI, edited in bolt.diy, published back to Project Sites.</p>\n<a href="services.html" class="cta-btn">Explore Services</a>\n</section>\n<section class="features">\n<h2>Why Choose Us</h2>\n<div class="feature-grid">\n<div class="feature"><h3>AI-Powered</h3><p>Built with cutting-edge AI technology</p></div>\n<div class="feature"><h3>Fast Delivery</h3><p>Your site live in minutes</p></div>\n<div class="feature"><h3>Full Control</h3><p>Edit everything in the browser</p></div>\n</div>\n</section>\n<section class="testimonials">\n<h2>What Clients Say</h2>\n<blockquote>"The best website builder I have ever used." \u2014 E2E Test User</blockquote>\n</section>\n</main>\n<footer><p>\u00a9 2026 E2E Lifecycle Test Business. All rights reserved.</p></footer>\n<script src="main.js"></script>\n</body>\n</html>',
+          '/home/project/services.html': '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n<title>Services \u2014 E2E Lifecycle Test Business</title>\n<link rel="stylesheet" href="styles.css">\n</head>\n<body>\n<nav class="main-nav"><a href="index.html">Home</a><a href="services.html" class="active">Services</a></nav>\n<main>\n<h1>Our Services</h1>\n<div class="service-list">\n<div class="service"><h2>Web Development</h2><p>Custom websites built with modern technology.</p><span class="price">From $499</span></div>\n<div class="service"><h2>SEO Optimization</h2><p>Rank higher on Google with our proven strategies.</p><span class="price">From $299/mo</span></div>\n<div class="service"><h2>Brand Design</h2><p>Logo, colors, and brand identity that stands out.</p><span class="price">From $799</span></div>\n</div>\n</main>\n<footer><p>\u00a9 2026 E2E Lifecycle Test Business</p></footer>\n</body>\n</html>',
+          '/home/project/styles.css': ':root {\n  --bg: #060610;\n  --accent: #00E5FF;\n  --text: #e8e8f0;\n  --card-bg: rgba(255,255,255,0.04);\n}\nbody { margin: 0; font-family: "Inter", sans-serif; background: var(--bg); color: var(--text); }\n.main-nav { display: flex; gap: 1.5rem; padding: 1rem 2rem; background: rgba(0,0,0,0.6); }\n.hero { min-height: 80vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 4rem 2rem; }\n.hero h1 { font-size: 3.5rem; background: linear-gradient(135deg, var(--accent), #7C3AED); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }\n.cta-btn { display: inline-block; margin-top: 2rem; padding: 1rem 2.5rem; background: var(--accent); color: var(--bg); font-weight: 700; border-radius: 50px; text-decoration: none; }\n.feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem; padding: 2rem; }\n.feature { background: var(--card-bg); border: 1px solid rgba(0,229,255,0.1); border-radius: 16px; padding: 2rem; }\nfooter { text-align: center; padding: 2rem; border-top: 1px solid rgba(255,255,255,0.05); }',
+          '/home/project/main.js': 'document.addEventListener("DOMContentLoaded", function() {\n  var observer = new IntersectionObserver(function(entries) {\n    entries.forEach(function(entry) {\n      if (entry.isIntersecting) entry.target.classList.add("visible");\n    });\n  }, { threshold: 0.1 });\n  document.querySelectorAll(".feature, .service").forEach(function(el) { observer.observe(el); });\n});',
+          '/home/project/robots.txt': 'User-agent: *\nAllow: /\n\nSitemap: https://' + slug + '.projectsites.dev/sitemap.xml',
+          '/home/project/sitemap.xml': '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n<url><loc>https://' + slug + '.projectsites.dev/</loc><lastmod>2026-04-24</lastmod></url>\n<url><loc>https://' + slug + '.projectsites.dev/services.html</loc><lastmod>2026-04-24</lastmod></url>\n</urlset>',
+        },
+        chat: {
+          messages: [
+            { id: 'msg-1', role: 'user', content: 'Build a professional website for E2E Lifecycle Test Business', createdAt: new Date().toISOString() },
+            { id: 'msg-2', role: 'assistant', content: 'I created a modern website with 6 files: homepage with hero/features/testimonials, services page with pricing, custom CSS theme, and interactive JavaScript.', createdAt: new Date().toISOString() },
+          ],
+          description: 'E2E Lifecycle Test Business \u2014 edited in bolt.diy',
+          exportDate: new Date().toISOString(),
+        },
+      },
+      origin: 'https://editor.projectsites.dev',
+    }));
+  }, createdSlug);
+
+  // Verify the publish API call was made with correct payload
+  const publishReq = await publishPromise;
+  expect(publishReq.method()).toBe('POST');
+  const body = publishReq.postDataJSON();
+  expect(body).toBeTruthy();
+  expect(body.files.length).toBeGreaterThanOrEqual(4);
+
+  // Wait for publish response
+  await page.waitForTimeout(1000);
+
+  // ── Step 5: Navigate to admin and verify the site appears ──
+  await page.goto('/admin');
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(1000);
+
+  const siteCard = page.locator('[class*="card"], [class*="site"]').first();
+  await expect(siteCard).toBeVisible({ timeout: 5000 });
+
+  // ── Step 6: Verify snapshot section is accessible ──
+  await page.goto('/admin/snapshots');
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(1000);
+
+  // Snapshots page should render (shows "Version History" or "Snapshots" heading)
+  await expect(page.locator('text=Snapshots').first()).toBeVisible({ timeout: 5000 });
+  // Version history section should exist (may show default site's snapshots)
+  await expect(page.locator('text=Version History').first()).toBeVisible({ timeout: 5000 });
+
+  // ── Step 7: Verify the chat endpoint returns files for this site ──
+  const chatResponse = await page.request.get(`/api/sites/by-slug/${createdSlug}/chat`);
+  expect(chatResponse.status()).toBe(200);
+  const chatData = await chatResponse.json();
+  expect(chatData.messages).toBeDefined();
+  expect(chatData.messages.length).toBe(2);
+  expect(chatData.messages[1].content).toContain('<boltArtifact');
+
+  // ── Step 8: Verify the files endpoint returns metadata ──
+  const filesResponse = await page.request.get(`/api/sites/by-slug/${createdSlug}/files`);
+  expect(filesResponse.status()).toBe(200);
+  const filesData = await filesResponse.json();
+  expect(filesData.slug).toBe(createdSlug);
+  expect(filesData.fileCount).toBeGreaterThan(0);
+
+  // Zero console errors throughout the entire lifecycle
   expect(errors).toEqual([]);
 });

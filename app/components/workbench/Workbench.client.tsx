@@ -30,6 +30,7 @@ import { ExportChatButton } from '~/components/chat/chatExportAndImport/ExportCh
 import { useChatHistory } from '~/lib/persistence';
 import { streamingState } from '~/lib/stores/streaming';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import { isEmbedded } from '~/lib/embed/embedded-mode';
 
 interface WorkspaceProps {
   chatStarted?: boolean;
@@ -48,21 +49,29 @@ const sliderOptions: SliderOptions<WorkbenchViewType> = {
     value: 'code',
     text: 'Code',
   },
-  middle: {
-    value: 'diff',
-    text: 'Diff',
-  },
+  ...(isEmbedded
+    ? {}
+    : {
+        middle: {
+          value: 'diff' as WorkbenchViewType,
+          text: 'Diff',
+        },
+      }),
   right: {
     value: 'preview',
     text: 'Preview',
   },
-  extra: {
-    value: 'deploy',
-    text: 'Deploy',
-  },
+  ...(isEmbedded
+    ? {}
+    : {
+        extra: {
+          value: 'deploy' as WorkbenchViewType,
+          text: 'Deploy',
+        },
+      }),
 };
 
-const VIEW_ORDER: WorkbenchViewType[] = ['code', 'diff', 'preview', 'deploy'];
+const VIEW_ORDER: WorkbenchViewType[] = isEmbedded ? ['code', 'preview'] : ['code', 'diff', 'preview', 'deploy'];
 
 function getViewX(view: WorkbenchViewType, selectedView: WorkbenchViewType): string {
   const viewIndex = VIEW_ORDER.indexOf(view);

@@ -50,8 +50,10 @@ export const useMCPStore = create<Store & Actions>((set, get) => ({
           const serverTools = await updateServerConfig(settings.mcpConfig);
           set(() => ({ settings, serverTools }));
         } catch {
-          // MCP config update failed (expected on Cloudflare Pages — no Node.js).
-          // Silently continue with defaults.
+          /*
+           * MCP config update failed (expected on Cloudflare Pages — no Node.js).
+           * Silently continue with defaults.
+           */
           try {
             const settings = JSON.parse(savedConfig) as MCPSettings;
             set(() => ({ settings }));
