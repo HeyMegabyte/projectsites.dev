@@ -1522,41 +1522,51 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
         params.additionalContext ? `\nADDITIONAL CONTEXT: ${params.additionalContext}` : '',
       ].filter(Boolean).join('\n');
 
-      // Single step: build + upload. We do R2 upload inside the step because
-      // Cloudflare Workflows has a step output size limit (~1MB) and the full
-      // file contents from a Vite+React project easily exceed that.
-      await step.do('stage-full-build', {
+      // ── STEP A: Foundation + GPT-4o inspection (one container call) ──
+      // Split into 2 steps because Cloudflare Workflows has ~30min internal
+      // execution limit per step. Foundation (15min) + inspection fits in one.
+      // R2 upload inside step to avoid step output size limit (~1MB).
+      await step.do('stage-a-foundation', {
         retries: { limit: 0, delay: '1 second' },
-        timeout: '50 minutes',
+        timeout: '25 minutes',
       }, async () => {
         const files = await callContainer([
-          // Prompt 1: Foundation — generate the full project from template
           { label: 'A-foundation', timeoutMin: 15, text: foundationPrompt, inspectAfter: true },
-          // Prompt 2: Beauty + GPT-4o critique fixes (reads _visual_critique.txt)
-          { label: 'B1-beauty', timeoutMin: 8, text: 'Make ALL React pages/components MORE BEAUTIFUL. Do NOT rewrite from scratch — enhance what exists.\n\nThis is a Vite + React + Tailwind project. Edit .tsx files in src/pages/ and src/components/.\n\nCRITICAL: If _visual_critique.txt exists, read it FIRST. It contains GPT-4o design critique. Fix ALL issues listed.\n\nFor ALL page components:\n- 10+ @keyframes animations in src/index.css (fadeInUp, slideInLeft, scaleIn, subtleFloat, gradientShift, glowPulse)\n- Use AnimatedSection component for scroll reveals on all sections\n- Glassmorphism on cards (backdrop-blur-xl bg-white/10)\n- Use the BRAND COLORS from _research.json (not generic blue/cyan)\n- Gradient text on hero headings\n- Smooth hover transforms on cards\n- Every section: 3-5 images minimum in grids/galleries\n- Fill empty placeholders with Unsplash photos\n- All image URLs must be absolute https://\n- SELF-PROMPT: Look at each page critically. What would make it more stunning? Do it.\n\nMULTIMEDIA:\n- Hero: background video (muted, autoplay, loop) or stunning gradient\n- NEVER reuse same image across pages\n- Gradient overlays on text over images' },
-          // Prompt 3: SEO + content completeness
-          { label: 'B2-seo-content', timeoutMin: 8, text: 'SEO + content audit on ALL React page components. Do NOT rewrite from scratch.\n\n1. SEO: Use useSEO hook on every page. Add JSON-LD LocalBusiness + FAQPage schema on Home. Internal <Link> between all pages. Verify public/robots.txt + public/sitemap.xml.\n2. CONTENT: Read _scraped.txt and _research.json. Ensure ALL original content is present. Add any missing services, programs, team members.\n3. IMAGE COUNT: If any page has fewer than 15 images, add more from Unsplash. No duplicates across pages.' },
-          // Prompt 4: Visual quality audit
-          { label: 'C1-visual', timeoutMin: 5, text: 'Visual quality audit on ALL React components.\n\n1. Check image relevance — remove/replace irrelevant ones\n2. No duplicate images across pages\n3. Logo visible in header of every page\n4. Brand colors match original site\n5. Text contrast readable on all backgrounds\n6. Nav: max 5-7 top-level links\n7. Google Maps address links to directions URL\n8. Replace montage/collage images with clean photos\n9. Each page: 15+ images\n10. SELF-PROMPT: What else would make this more stunning? Do it.' },
-          // Prompt 5: Domain-specific features
-          { label: 'C2-domain', timeoutMin: 4, text: domainPrompt },
-          // Prompt 6: Production polish
-          { label: 'D1-production', timeoutMin: 4, text: 'Final production polish on ALL files.\n\n1. No console.log. Valid HTML. All URLs use HTTPS.\n2. Google Fonts preconnect + display=swap.\n3. Back-to-top button. Smooth scroll. Copyright ' + new Date().getFullYear() + '.\n4. Address links to Google Maps directions URL.\n5. Logo in header of EVERY page. Favicon set.\n6. Pixel-perfect at 1280px and 375px.\n7. SELF-PROMPT: Browse every page as a user. Fix anything incomplete or ugly.' },
-          // Prompt 7: Safety + SEO final check
-          { label: 'D2-safety', timeoutMin: 2, text: 'Safety + SEO final check.\n1. Privacy notice on contact/donation forms.\n2. Footer: Privacy + Terms links.\n3. External links: rel=noopener noreferrer.\n4. FAQ: Built by ProjectSites.dev.\n5. sitemap.xml lists ALL pages.\n6. robots.txt allows crawling.' },
-        ], [], 'full-build');
+        ], [], 'foundation');
         currentFiles = files || [];
 
-        // Upload to R2 inside the same step to avoid step output size limits
+        if (currentFiles.length > 0) {
+          await uploadToR2(currentFiles, true);
+        }
+        return { fileCount: currentFiles.length, fileNames: currentFiles.map(f => f.name).slice(0, 50) };
+      });
+
+      // ── STEP B: Enhancements (6 prompts in one container call) ──
+      // Passes foundation files as existingFiles so enhancements build on them.
+      // GPT-4o critique from step A is in _visual_critique.txt (persisted in container).
+      // Note: since this is a NEW container, we pass existingFiles. The critique
+      // won't persist, but B1-beauty prompt still reads _visual_critique.txt if present.
+      await step.do('stage-b-enhancements', {
+        retries: { limit: 0, delay: '1 second' },
+        timeout: '30 minutes',
+      }, async () => {
+        const files = await callContainer([
+          { label: 'B1-beauty', timeoutMin: 8, text: 'Make ALL React pages/components MORE BEAUTIFUL. Do NOT rewrite from scratch — enhance what exists.\n\nThis is a Vite + React + Tailwind project. Edit .tsx files in src/pages/ and src/components/.\n\nCRITICAL: If _visual_critique.txt exists, read it FIRST. It contains GPT-4o design critique. Fix ALL issues listed.\n\nFor ALL page components:\n- 10+ @keyframes animations in src/index.css (fadeInUp, slideInLeft, scaleIn, subtleFloat, gradientShift, glowPulse)\n- Use AnimatedSection component for scroll reveals on all sections\n- Glassmorphism on cards (backdrop-blur-xl bg-white/10)\n- Use the BRAND COLORS from _research.json (not generic blue/cyan)\n- Gradient text on hero headings\n- Smooth hover transforms on cards\n- Every section: 3-5 images minimum in grids/galleries\n- Fill empty placeholders with Unsplash photos\n- All image URLs must be absolute https://\n- SELF-PROMPT: Look at each page critically. What would make it more stunning? Do it.\n\nMULTIMEDIA:\n- Hero: background video (muted, autoplay, loop) or stunning gradient\n- NEVER reuse same image across pages\n- Gradient overlays on text over images' },
+          { label: 'B2-seo-content', timeoutMin: 8, text: 'SEO + content audit on ALL React page components. Do NOT rewrite from scratch.\n\n1. SEO: Use useSEO hook on every page. Add JSON-LD LocalBusiness + FAQPage schema on Home. Internal <Link> between all pages. Verify public/robots.txt + public/sitemap.xml.\n2. CONTENT: Read _scraped.txt and _research.json. Ensure ALL original content is present. Add any missing services, programs, team members.\n3. IMAGE COUNT: If any page has fewer than 15 images, add more from Unsplash. No duplicates across pages.' },
+          { label: 'C1-visual', timeoutMin: 5, text: 'Visual quality audit on ALL React components.\n\n1. Check image relevance — remove/replace irrelevant ones\n2. No duplicate images across pages\n3. Logo visible in header of every page\n4. Brand colors match original site\n5. Text contrast readable on all backgrounds\n6. Nav: max 5-7 top-level links\n7. Google Maps address links to directions URL\n8. Replace montage/collage images with clean photos\n9. Each page: 15+ images\n10. SELF-PROMPT: What else would make this more stunning? Do it.' },
+          { label: 'C2-domain', timeoutMin: 4, text: domainPrompt },
+          { label: 'D1-production', timeoutMin: 4, text: 'Final production polish on ALL files.\n\n1. No console.log. Valid HTML. All URLs use HTTPS.\n2. Google Fonts preconnect + display=swap.\n3. Back-to-top button. Smooth scroll. Copyright ' + new Date().getFullYear() + '.\n4. Address links to Google Maps directions URL.\n5. Logo in header of EVERY page. Favicon set.\n6. Pixel-perfect at 1280px and 375px.\n7. SELF-PROMPT: Browse every page as a user. Fix anything incomplete or ugly.' },
+          { label: 'D2-safety', timeoutMin: 2, text: 'Safety + SEO final check.\n1. Privacy notice on contact/donation forms.\n2. Footer: Privacy + Terms links.\n3. External links: rel=noopener noreferrer.\n4. FAQ: Built by ProjectSites.dev.\n5. sitemap.xml lists ALL pages.\n6. robots.txt allows crawling.' },
+        ], currentFiles, 'enhancements');
+        currentFiles = files || [];
+
         if (currentFiles.length > 0) {
           const version = await uploadToR2(currentFiles, false);
           await env.DB.prepare(
             "INSERT OR IGNORE INTO site_snapshots (id, site_id, snapshot_name, build_version, description) VALUES (?, ?, 'initial', ?, 'First published version')",
           ).bind(crypto.randomUUID(), params.siteId, version).run();
         }
-
-        // Return only metadata (not full file contents) to stay under step output limit
-        return { fileCount: currentFiles.length, fileNames: currentFiles.map(f => f.name) };
+        return { fileCount: currentFiles.length, fileNames: currentFiles.map(f => f.name).slice(0, 50) };
       });
 
       // ── Final GPT-4o visual inspection via screenshot (non-blocking) ──
