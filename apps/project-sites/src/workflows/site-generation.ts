@@ -1257,13 +1257,14 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
 
     /** Helper: call container with prompts, return files */
     async function callContainer(
-      prompts: { text: string; label: string; timeoutMin: number }[],
+      prompts: { text: string; label: string; timeoutMin: number; inspectAfter?: boolean }[],
       existingFiles: { name: string; content: string }[],
       stepLabel: string,
     ): Promise<{ name: string; content: string }[]> {
       const payload = {
         slug: params.slug,
         _anthropicKey: env.ANTHROPIC_API_KEY || '',
+        _openaiKey: env.OPENAI_API_KEY || '',
         contextFiles,
         existingFiles,
         prompts,
@@ -1410,303 +1411,139 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
     let currentFiles: { name: string; content: string }[] = [];
 
     try {
-      // ── Helper: GPT-4o visual inspection via screenshot ──
-      async function visualInspect(label: string): Promise<string> {
-        if (!env.OPENAI_API_KEY) return '';
-        try {
-          const ssUrl = `https://api.microlink.io/?url=https://${params.slug}.${DOMAINS.SITES_SUFFIX}&screenshot=true&meta=false&embed=screenshot.url`;
-          const ssRes = await fetch(ssUrl);
-          if (!ssRes.ok) return '';
-          const ssData = await ssRes.json() as any;
-          const imageUrl = ssData?.data?.screenshot?.url;
-          if (!imageUrl) return '';
-
-          const critiqueRes = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              model: 'gpt-4o',
-              messages: [{
-                role: 'user',
-                content: [
-                  { type: 'text', text: 'You are a senior web designer reviewing this website screenshot. Provide:\n1. Overall visual quality (1-10)\n2. Top 5 specific visual/design issues to fix (be specific about CSS/layout changes)\n3. Color consistency with brand\n4. Typography quality\n5. Image placement and relevance\n6. Is the logo visible and properly placed?\nReturn JSON: { score: number, issues: string[], logo_visible: boolean, brand_colors_correct: boolean, recommendations: string[] }' },
-                  { type: 'image_url', image_url: { url: imageUrl, detail: 'high' } },
-                ],
-              }],
-              max_tokens: 600,
-              temperature: 0.2,
-            }),
-          });
-          if (!critiqueRes.ok) return '';
-          const critiqueData = await critiqueRes.json() as any;
-          const raw = critiqueData.choices?.[0]?.message?.content || '';
-
-          await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.visual_critique', {
-            stage: label, critique: raw.slice(0, 800), screenshot_url: imageUrl,
-            message: `AI visual critique (${label}): ${raw.slice(0, 200)}`,
-          });
-          return raw;
-        } catch { return ''; }
-      }
-
-      // ── CALL 1: Foundation (single prompt, ~15 min) ──
+      // ── SINGLE CONTAINER CALL: Foundation + GPT-4o inspection + Enhancements ──
+      // All 7 prompts run in one container. After the foundation prompt, the container
+      // does an intermediate build + GPT-4o HTML critique (via inspect.js). The critique
+      // is saved as _visual_critique.txt for enhancement prompts to read.
       startTimer('container-build');
-      const stageAResult = await step.do('stage-a-foundation', {
-        retries: { limit: 1, delay: '10 seconds', backoff: 'exponential' },
-        timeout: '20 minutes',
+
+      const brandLogo = (brand.logo || {}) as Record<string, any>;
+      const logoUrl = brandLogo.found_online ? (brandLogo.url || '') : '';
+      const allAssets = (assetManifest || []).map((key: string) => `https://${params.slug}.${DOMAINS.SITES_SUFFIX}/assets/${key.split('/').pop()}`);
+
+      // Build domain-specific prompt
+      let domainPrompt = 'Add domain-specific features to the React page components in src/pages/. This is a Vite + React + Tailwind project. ';
+      const catLower = category.toLowerCase();
+      if (catLower.includes('non-profit') || catLower.includes('community') || catLower.includes('church') || catLower.includes('soup')) {
+        domainPrompt += 'NON-PROFIT: Add prominent donation CTA (gradient button), impact counters (meals served, volunteers, years active), volunteer signup section. Warm, dignified tone.';
+      } else if (catLower.includes('restaurant') || catLower.includes('food')) {
+        domainPrompt += 'RESTAURANT: Add menu section, hours widget, reservation/order CTA.';
+      } else if (catLower.includes('salon') || catLower.includes('spa')) {
+        domainPrompt += 'SALON: Add services+prices, staff profiles, booking CTA.';
+      } else {
+        domainPrompt += 'Add appropriate features for this business type.';
+      }
+
+      const foundationPrompt = [
+        `You are RECREATING the website for "${safeName}" as a SUPED-UP CLONE — same brand identity, same content, but DRAMATICALLY more beautiful.`,
+        'IMPORTANT: You MUST use the Write tool to create files in the current directory.',
+        'Read ALL _ prefixed files for full research context.',
+        '',
+        '=== WEB RESEARCH (VERIFY FACTS) ===',
+        'You have internet access via curl. Before using any fact from _research.json, cross-check:',
+        '- Business hours: curl the original website or Google Maps',
+        '- Address/phone: verify against _scraped.txt content',
+        '- Services offered: confirm from scraped pages',
+        'If research data conflicts with scraped content, prefer scraped content.',
+        'Add any NEW facts you discover that are missing from research.',
+        '',
+        '=== PROJECT STRUCTURE (Vite + React + Tailwind — MANDATORY) ===',
+        'The template repo has been copied into this directory. It includes:',
+        '- package.json with React, Tailwind, Radix UI, lucide-react, clsx, tailwind-merge',
+        '- Pre-built components: Layout, Nav, Footer, ScrollToTop, PageTransition, AnimatedSection',
+        '- Hooks: useInView (IntersectionObserver), useSEO (document.title + meta)',
+        '- Utility: cn() (clsx + tailwind-merge)',
+        '- Animation keyframes in index.css (fadeInUp, slideInLeft, scaleIn, etc.)',
+        '',
+        'CUSTOMIZE the template — do NOT create from scratch. Edit existing files and add new pages.',
+        'The template handles routing, scroll animations, SEO meta tags, and responsive layout.',
+        '',
+        '=== BRAND IDENTITY (CRITICAL — use REAL brand from the original site) ===',
+        `Name: ${safeName}`,
+        `Category: ${category || 'general business'}`,
+        `Brand Colors (extracted from original site via AI vision): primary:${primary}; secondary:${secondary}; accent:${accent}`,
+        'IMPORTANT: These colors were extracted from the original website. USE THEM as the primary palette.',
+        'Update tailwind.config to use these brand colors.',
+        'THEME DECISION: Look at the original site background. If it uses white/light backgrounds, use a LIGHT theme.',
+        'Let the logo\'s visual style (colors, shapes, mood) guide the ENTIRE design direction.',
+        '',
+        scrapedLogoUrl ? `LOGO (MUST USE — downloaded from original site): ${scrapedLogoUrl}` : logoUrl ? `Logo URL: ${logoUrl} — Download and embed this logo.` : '',
+        scrapedLogoUrl || logoUrl ? 'Use <img> tag with the logo URL. Do NOT create a generic SVG when a real logo exists.' : 'No logo found — create a professional inline SVG using brand colors.',
+        `Brand personality: ${brand.brand_personality || 'professional, warm, approachable'}`,
+        scrapedDesignSpirit ? `Design spirit (from AI analysis of original site): ${scrapedDesignSpirit}` : '',
+        '',
+        '=== MULTI-PAGE ARCHITECTURE ===',
+        'Create page components in src/pages/ and register routes in src/App.tsx:',
+        scrapedPages.length > 0
+          ? (() => {
+              const pageList = scrapedPages.map((p: any, i: number) => {
+                const pageName = p.url.replace(/^https?:\/\/[^/]+/, '').replace(/\/$/, '') || '/';
+                return `${i + 1}. "${p.title || pageName}" (original: ${p.url})`;
+              });
+              return pageList.join('\n');
+            })()
+          : structurePlan.pages ? structurePlan.pages.map((p: any, i: number) => `${i + 1}. ${p.path} — ${p.title}: ${p.purpose}`).join('\n') : 'Home, About, Services, Contact',
+        '',
+        'RULES: Combine thin pages. Max 5-6 nav items. Unique images per page.',
+        'Each page must be a COMPELLING MULTIMEDIA EXPERIENCE.',
+        '',
+        discoveredVideos.length > 0 ? `Discovered videos:\n${discoveredVideos.map((v: any) => v.url || v.embed_url || JSON.stringify(v)).join('\n')}` : '',
+        '',
+        '=== DESIGN (Stripe / Linear / Vercel quality) ===',
+        '- Use AnimatedSection component for scroll reveals on ALL sections',
+        '- 10+ @keyframes animations. Glassmorphism on cards. Gradient text on headings.',
+        '- Font: Inter or Satoshi (Google Fonts, display=swap)',
+        '- Every page must be BREATHTAKINGLY GORGEOUS and masterfully animated',
+        '',
+        '=== CONTENT (use ALL original website content) ===',
+        'The _scraped.txt file contains the COMPLETE content from the original website.',
+        'You MUST use this real content — do NOT make up placeholder text.',
+        '',
+        '=== IMAGES ===',
+        'Use images from _research.json. 15+ images per page.',
+        scrapedImageProfiles.length > 0
+          ? `Images from original site:\n${scrapedImageProfiles.map((img, i) => `${i + 1}. ${img.url} — "${img.context}"`).join('\n')}`
+          : scrapedAllImages.length > 0 ? `Images scraped:\n${scrapedAllImages.slice(0, 40).join('\n')}` : '',
+        allAssets.length > 0 ? `Additional assets:\n${allAssets.slice(0, 20).join('\n')}` : '',
+        'Use Unsplash for gaps. ALL paths absolute https://. Alt text on every image.',
+        '',
+        '=== SEO ===',
+        `<title>: ${safeName} — primary keyword + location`,
+        `canonical: https://${params.slug}.${DOMAINS.SITES_SUFFIX}/`,
+        'Use the useSEO hook on every page. JSON-LD LocalBusiness. FAQPage schema.',
+        '',
+        `=== GOOGLE MAPS ===`,
+        `Address: ${params.businessAddress || ''}`,
+        `Directions: https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(params.businessAddress || safeName)}`,
+        '',
+        'OUTPUT: Customize the template project. Write complete, production-ready files.',
+        'Every file must be production-ready. No placeholders. No lorem ipsum.',
+        scrapedNote,
+        params.additionalContext ? `\nADDITIONAL CONTEXT: ${params.additionalContext}` : '',
+      ].filter(Boolean).join('\n');
+
+      const buildResult = await step.do('stage-full-build', {
+        retries: { limit: 0, delay: '1 second' },
+        timeout: '50 minutes',
       }, async () => {
-        const brandLogo = (brand.logo || {}) as Record<string, any>;
-        const logoUrl = brandLogo.found_online ? (brandLogo.url || '') : '';
-        const allAssets = (assetManifest || []).map((key: string) => `https://${params.slug}.${DOMAINS.SITES_SUFFIX}/assets/${key.split('/').pop()}`);
-
-        const foundationPrompt = [
-          `You are RECREATING the website for "${safeName}" as a SUPED-UP CLONE — same brand identity, same content, but DRAMATICALLY more beautiful.`,
-          'IMPORTANT: You MUST use the Write tool to create files in the current directory.',
-          'Read ALL _ prefixed files for full research context.',
-          '',
-          '=== PROJECT STRUCTURE (Vite + React + Tailwind — MANDATORY) ===',
-          'You MUST generate a Vite + React + Tailwind CSS project (NOT static HTML files).',
-          'This project will be loaded into a WebContainer-based code editor for live preview.',
-          '',
-          'REQUIRED FILES (create these FIRST):',
-          '1. package.json — with these exact dependencies:',
-          '   {',
-          '     "name": "' + params.slug + '",',
-          '     "private": true,',
-          '     "version": "1.0.0",',
-          '     "type": "module",',
-          '     "scripts": {',
-          '       "dev": "vite",',
-          '       "build": "vite build",',
-          '       "preview": "vite preview"',
-          '     },',
-          '     "dependencies": {',
-          '       "react": "^18.3.1",',
-          '       "react-dom": "^18.3.1",',
-          '       "react-router-dom": "^6.23.0"',
-          '     },',
-          '     "devDependencies": {',
-          '       "@types/react": "^18.3.3",',
-          '       "@types/react-dom": "^18.3.0",',
-          '       "@vitejs/plugin-react": "^4.3.1",',
-          '       "autoprefixer": "^10.4.19",',
-          '       "postcss": "^8.4.38",',
-          '       "tailwindcss": "^3.4.4",',
-          '       "vite": "^5.3.1"',
-          '     }',
-          '   }',
-          '2. vite.config.ts — with @vitejs/plugin-react',
-          '3. tailwind.config.ts — with content paths for src/**/*.{ts,tsx}',
-          '4. postcss.config.js — with tailwindcss and autoprefixer plugins',
-          '5. tsconfig.json — standard React TS config with baseUrl "." and paths "@/*": ["./src/*"]',
-          '6. index.html — Vite entry point: <div id="root"></div> + <script type="module" src="/src/main.tsx"></script>',
-          '7. src/main.tsx — React root render with BrowserRouter',
-          '8. src/index.css — @tailwind base/components/utilities + custom CSS animations',
-          '9. src/App.tsx — React Router with routes for all pages',
-          '10. src/pages/ — One component per page (Home.tsx, About.tsx, Services.tsx, Contact.tsx, etc.)',
-          '11. src/components/ — Shared components (Header.tsx, Footer.tsx, Hero.tsx, etc.)',
-          '',
-          'ROUTING: Use react-router-dom with <BrowserRouter> and <Routes>/<Route>.',
-          'Internal links use <Link to="/about"> not <a href="about.html">.',
-          'Each page is a React component in src/pages/.',
-          '',
-          'STYLING: Use Tailwind CSS utility classes directly in JSX.',
-          'Custom animations go in src/index.css with @keyframes.',
-          'Brand colors configured in tailwind.config.ts extend.colors.',
-          '',
-          'SEO: For each page, set document.title and meta tags via useEffect or a custom hook.',
-          'JSON-LD scripts rendered inline via dangerouslySetInnerHTML.',
-          'Generate public/robots.txt and public/sitemap.xml as static files.',
-          '',
-          '',
-          '=== BRAND IDENTITY (CRITICAL — use REAL brand from the original site) ===',
-          `Name: ${safeName}`,
-          `Category: ${category || 'general business'}`,
-          `Brand Colors (extracted from original site via AI vision): primary:${primary}; secondary:${secondary}; accent:${accent}`,
-          'IMPORTANT: These colors were extracted from the original website. USE THEM as the primary palette.',
-          'THEME DECISION: Look at the original site background. If it uses white/light backgrounds (like njsk.org), use a LIGHT theme:',
-          '- White (#FFFFFF) or off-white (#F8F9FA) main background',
-          '- Dark text (#1A1A2E) for body copy',
-          '- Brand primary color for accents, buttons, headings',
-          '- Dark header/footer with white logo version',
-          '- This creates the best brand continuity with the original site',
-          'Let the logo\'s visual style (colors, shapes, mood) guide the ENTIRE design direction.',
-          '',
-          scrapedLogoUrl ? `LOGO (MUST USE — downloaded from original site): ${scrapedLogoUrl}` : logoUrl ? `Logo URL: ${logoUrl} — Download and embed this logo.` : '',
-          scrapedLogoUrl || logoUrl ? 'Use <img> tag with the logo URL. Do NOT create a generic SVG when a real logo exists.' : 'No logo found — create a professional inline SVG using brand colors.',
-          'LOGO HANDLING:',
-          '- Download the original logo and use it as-is for the primary version',
-          '- Create a white-only version (all elements white, transparent bg) for dark headers/footers',
-          '- Create a dark version for light backgrounds if the site uses a light theme',
-          '- The logo should appear in the header of EVERY page',
-          '- Derive a favicon/app icon from the logo (monogram or key symbol)',
-          `Brand personality: ${brand.brand_personality || 'professional, warm, approachable'}`,
-          scrapedDesignSpirit ? `Design spirit (from AI analysis of original site): ${scrapedDesignSpirit}` : '',
-          '',
-          '=== MULTI-PAGE ARCHITECTURE ===',
-          'Create MULTIPLE HTML files with CLEAN URLs (use descriptive filenames):',
-          scrapedPages.length > 0
-            ? (() => {
-                const pageList = scrapedPages.map((p: any, i: number) => {
-                  const pageName = p.url.replace(/^https?:\/\/[^/]+/, '').replace(/\/$/, '') || '/';
-                  const fileName = pageName === '/' ? 'index.html' : pageName.replace(/^\//, '').replace(/\//g, '-').replace(/[^a-z0-9-]/gi, '') + '.html';
-                  return `${i + 1}. ${fileName} — "${p.title || pageName}" (original: ${p.url})`;
-                });
-                return pageList.join('\n');
-              })()
-            : structurePlan.pages ? structurePlan.pages.map((p: any, i: number) => `${i + 1}. ${p.path} — ${p.title}: ${p.purpose}`).join('\n') : 'index.html, about.html, services.html, contact.html',
-          '',
-          'RULES for page organization:',
-          '- Combine thin pages into richer, more comprehensive pages',
-          'NAVIGATION (max 5-6 top-level items):',
-          '- Home, About, Services, Get Involved, Blog, Contact',
-          '- Use dropdown menus for sub-sections under Services and Get Involved',
-          '- Don\'t list every page in the top nav — keep it clean and scannable',
-          '- You have FULL CREATIVITY to reorganize URLs for better keywords',
-          '- Every page must have unique images — NEVER reuse the same image across pages',
-          '- Each page must be a COMPELLING MULTIMEDIA EXPERIENCE',
-          '- Consistent header (logo + nav) and footer across all pages',
-          '',
-          'Hero: use a background video (muted autoplay loop) with dark overlay. Fallback to image.',
-          discoveredVideos.length > 0 ? `Discovered videos:\n${discoveredVideos.map((v: any) => v.url || v.embed_url || JSON.stringify(v)).join('\n')}` : '',
-          '',
-          '=== DESIGN (Stripe / Linear / Vercel quality) ===',
-          '- Dark theme preferred with vibrant brand accent colors',
-          '- Font: Inter or Satoshi (Google Fonts, display=swap)',
-          '- Typography: 48-64px hero, 24-32px sections, 16px body',
-          '- 10+ @keyframes animations per page. Glassmorphism. Gradient text.',
-          '- IntersectionObserver scroll reveals on ALL sections',
-          '- Every page must be BREATHTAKINGLY GORGEOUS and masterfully animated',
-          '',
-          '=== HOMEPAGE SECTIONS ===',
-          '1. Sticky header: real logo (or SVG) + nav to all pages',
-          '2. Full-viewport hero: stunning gradient overlay on high-res image, compelling headline, primary CTA',
-          '3. Mission/value proposition (brief, compelling)',
-          '4. Services/programs overview (cards with images, linking to detail pages)',
-          '5. Impact section (counters, stats, testimonials)',
-          '6. Latest news/blog preview (if source has blog content)',
-          '7. Call to action (donate/volunteer/contact based on category)',
-          '8. Footer: full business info, nav links, social, "Built by ProjectSites.dev"',
-          '',
-          '=== DONATION PAGE (for non-profits and causes) ===',
-          'If this is a non-profit or organization that accepts donations, create a donate.html page:',
-          '- Full-screen split layout at desktop (two panes side by side)',
-          '- LEFT PANE: Large compelling cause photo + description of why donations matter + vivid animations',
-          '- RIGHT PANE: Simple donation form like givedirectly.org — monthly by default, $50/month default',
-          '- Amount options: $25, $50, $100, $250, Custom',
-          '- Monthly/One-time toggle (monthly selected by default)',
-          '- Simple name + email fields, then "Donate Now" button',
-          '- Button links to Stripe checkout (use data attributes for JS integration)',
-          '- Below the form: "Recent donors" section (placeholder for last 50 anonymous donations)',
-          '- The whole page should be emotionally compelling with stunning imagery and animation',
-          '',
-          '=== CONTENT (use ALL original website content) ===',
-          'The _scraped.txt file contains the COMPLETE content from the original website.',
-          'You MUST use this real content — do NOT make up placeholder text.',
-          'Include ALL programs, services, team members, history, and details from the original.',
-          'Augment with researched facts about affiliated organizations.',
-          '',
-          '=== IMAGES ===',
-          'Use images from _research.json image_profiles. 15+ images per page.',
-          scrapedImageProfiles.length > 0
-            ? `Images from original site (with context for correct placement):\n${scrapedImageProfiles.map((img, i) => `${i + 1}. ${img.url} — From page "${img.source_title || img.source_page}", context: "${img.context}"`).join('\n')}`
-            : scrapedAllImages.length > 0 ? `Images scraped from original website (USE THESE FIRST):\n${scrapedAllImages.slice(0, 40).join('\n')}` : '',
-          allAssets.length > 0 ? `Additional discovered/generated assets:\n${allAssets.slice(0, 20).join('\n')}` : '',
-          'Use Unsplash for gaps: https://images.unsplash.com/photo-{ID}?w={W}&h={H}&fit=crop',
-          'Hero: use background video if available (check _research.json for video URLs).',
-          'ALL paths absolute (start with /). Alt text on every image. loading=lazy below fold.',
-          '',
-          '=== SEO ===',
-          `<title>: ${safeName} — primary keyword + location`,
-          `canonical: https://${params.slug}.${DOMAINS.SITES_SUFFIX}/`,
-          'JSON-LD LocalBusiness with geo, hours, sameAs. og tags. FAQPage schema.',
-          'Semantic HTML. robots.txt. sitemap.xml listing ALL pages.',
-          '',
-          `=== GOOGLE MAPS ===`,
-          `Address: ${params.businessAddress || ''}`,
-          `Link address text to: https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(params.businessAddress || safeName)}`,
-          '',
-          'OUTPUT: Write the COMPLETE Vite+React+Tailwind project.',
-          'FILE ORDER (write in this order):',
-          '1. package.json (FIRST — so dependencies install immediately)',
-          '2. vite.config.ts, tailwind.config.ts, postcss.config.js, tsconfig.json',
-          '3. index.html (Vite entry point)',
-          '4. src/main.tsx, src/index.css, src/App.tsx',
-          '5. src/components/ (Header, Footer, shared components)',
-          '6. src/pages/ (Home, About, Services, Contact, etc.)',
-          '7. public/robots.txt, public/sitemap.xml',
-          '',
-          'ROUTING: Use react-router-dom. Internal links use <Link to="/path">.',
-          'ALL image URLs must be absolute https:// URLs (not relative paths).',
-          'Every file must be production-ready. No placeholders. No lorem ipsum.',
-          scrapedNote,
-          params.additionalContext ? `\nADDITIONAL CONTEXT: ${params.additionalContext}` : '',
-        ].filter(Boolean).join('\n');
-
-        return callContainer([{
-          label: 'A-foundation',
-          timeoutMin: 15,
-          text: foundationPrompt,
-        }], [], 'stage-a');
+        return callContainer([
+          // Prompt 1: Foundation — generate the full project from template
+          { label: 'A-foundation', timeoutMin: 15, text: foundationPrompt, inspectAfter: true },
+          // Prompt 2: Beauty + GPT-4o critique fixes (reads _visual_critique.txt)
+          { label: 'B1-beauty', timeoutMin: 8, text: 'Make ALL React pages/components MORE BEAUTIFUL. Do NOT rewrite from scratch — enhance what exists.\n\nThis is a Vite + React + Tailwind project. Edit .tsx files in src/pages/ and src/components/.\n\nCRITICAL: If _visual_critique.txt exists, read it FIRST. It contains GPT-4o design critique. Fix ALL issues listed.\n\nFor ALL page components:\n- 10+ @keyframes animations in src/index.css (fadeInUp, slideInLeft, scaleIn, subtleFloat, gradientShift, glowPulse)\n- Use AnimatedSection component for scroll reveals on all sections\n- Glassmorphism on cards (backdrop-blur-xl bg-white/10)\n- Use the BRAND COLORS from _research.json (not generic blue/cyan)\n- Gradient text on hero headings\n- Smooth hover transforms on cards\n- Every section: 3-5 images minimum in grids/galleries\n- Fill empty placeholders with Unsplash photos\n- All image URLs must be absolute https://\n- SELF-PROMPT: Look at each page critically. What would make it more stunning? Do it.\n\nMULTIMEDIA:\n- Hero: background video (muted, autoplay, loop) or stunning gradient\n- NEVER reuse same image across pages\n- Gradient overlays on text over images' },
+          // Prompt 3: SEO + content completeness
+          { label: 'B2-seo-content', timeoutMin: 8, text: 'SEO + content audit on ALL React page components. Do NOT rewrite from scratch.\n\n1. SEO: Use useSEO hook on every page. Add JSON-LD LocalBusiness + FAQPage schema on Home. Internal <Link> between all pages. Verify public/robots.txt + public/sitemap.xml.\n2. CONTENT: Read _scraped.txt and _research.json. Ensure ALL original content is present. Add any missing services, programs, team members.\n3. IMAGE COUNT: If any page has fewer than 15 images, add more from Unsplash. No duplicates across pages.' },
+          // Prompt 4: Visual quality audit
+          { label: 'C1-visual', timeoutMin: 5, text: 'Visual quality audit on ALL React components.\n\n1. Check image relevance — remove/replace irrelevant ones\n2. No duplicate images across pages\n3. Logo visible in header of every page\n4. Brand colors match original site\n5. Text contrast readable on all backgrounds\n6. Nav: max 5-7 top-level links\n7. Google Maps address links to directions URL\n8. Replace montage/collage images with clean photos\n9. Each page: 15+ images\n10. SELF-PROMPT: What else would make this more stunning? Do it.' },
+          // Prompt 5: Domain-specific features
+          { label: 'C2-domain', timeoutMin: 4, text: domainPrompt },
+          // Prompt 6: Production polish
+          { label: 'D1-production', timeoutMin: 4, text: 'Final production polish on ALL files.\n\n1. No console.log. Valid HTML. All URLs use HTTPS.\n2. Google Fonts preconnect + display=swap.\n3. Back-to-top button. Smooth scroll. Copyright ' + new Date().getFullYear() + '.\n4. Address links to Google Maps directions URL.\n5. Logo in header of EVERY page. Favicon set.\n6. Pixel-perfect at 1280px and 375px.\n7. SELF-PROMPT: Browse every page as a user. Fix anything incomplete or ugly.' },
+          // Prompt 7: Safety + SEO final check
+          { label: 'D2-safety', timeoutMin: 2, text: 'Safety + SEO final check.\n1. Privacy notice on contact/donation forms.\n2. Footer: Privacy + Terms links.\n3. External links: rel=noopener noreferrer.\n4. FAQ: Built by ProjectSites.dev.\n5. sitemap.xml lists ALL pages.\n6. robots.txt allows crawling.' },
+        ], [], 'full-build');
       });
-      currentFiles = (stageAResult as { name: string; content: string }[]) || [];
-
-      // Upload interim v1 so GPT-4o can screenshot it
-      if (currentFiles.length > 0) {
-        await step.do('upload-interim-v1', RETRY_3, async () => {
-          await uploadToR2(currentFiles, true);
-          return 'uploaded';
-        });
-      }
-
-      // ── GPT-4o visual inspection after foundation ──
-      let visualCritique = '';
-      if (currentFiles.length > 0) {
-        const inspectResult = await step.do('inspect-after-foundation', RETRY_3, async () => {
-          return visualInspect('after-foundation');
-        });
-        visualCritique = (inspectResult as string) || '';
-      }
-
-      // ── CALL 2: All enhancements in a single container (6 prompts, ~25 min) ──
-      // All 6 prompts run sequentially in the same directory — files persist between prompts.
-      // Visual critique from GPT-4o is injected into the first enhancement prompt.
-      if (currentFiles.some(f => f.name === 'package.json' || f.name === 'index.html')) {
-        // Build domain-specific prompt
-        let domainPrompt = 'Add domain-specific features to the React page components in src/pages/. This is a Vite + React + Tailwind project. ';
-        const catLower = category.toLowerCase();
-        if (catLower.includes('non-profit') || catLower.includes('community') || catLower.includes('church') || catLower.includes('soup')) {
-          domainPrompt += 'NON-PROFIT: Add prominent donation CTA (gradient button), impact counters (meals served, volunteers, years active), volunteer signup section. Warm, dignified tone.';
-        } else if (catLower.includes('restaurant') || catLower.includes('food')) {
-          domainPrompt += 'RESTAURANT: Add menu section, hours widget, reservation/order CTA.';
-        } else if (catLower.includes('salon') || catLower.includes('spa')) {
-          domainPrompt += 'SALON: Add services+prices, staff profiles, booking CTA.';
-        } else {
-          domainPrompt += 'Add appropriate features for this business type.';
-        }
-
-        const enhancementResult = await step.do('stage-b-enhancements', {
-          retries: { limit: 1, delay: '10 seconds', backoff: 'exponential' },
-          timeout: '25 minutes',
-        }, async () => {
-          return callContainer([
-            // Prompt 1: Beauty + visual critique fixes
-            { label: 'B1-beauty', timeoutMin: 8, text: 'Make ALL React pages/components MORE BEAUTIFUL. Do NOT rewrite from scratch — enhance what exists.\n\nThis is a Vite + React + Tailwind project. Edit .tsx files in src/pages/ and src/components/.\n\nFor ALL page components:\n- 10+ @keyframes animations in src/index.css (fadeInUp, slideInLeft, scaleIn, subtleFloat, gradientShift, glowPulse)\n- IntersectionObserver: sections start opacity-0 translate-y-8, animate to visible on scroll (use a useInView hook)\n- Glassmorphism on cards (backdrop-blur-xl bg-white/10)\n- Use the BRAND COLORS from the original site (check _research.json for extracted colors)\n- Gradient text on hero headings using brand primary color (bg-gradient-to-r bg-clip-text text-transparent)\n- Smooth hover transforms on cards (hover:-translate-y-1 hover:shadow-xl transition-all)\n- Check every image: is it RELEVANT to its section? Is it duplicated on another page? Fix any mismatches.\n- Every section should have 3-5 images minimum, arranged in grids or galleries.\n- Fill any empty image placeholders with relevant Unsplash photos.\n- All image URLs must be absolute https:// URLs\n- Replace generic SVG icons with relevant stock photos\n- Add image galleries (3-4 photos) to sections that only have 1 image\n- SELF-PROMPT: Look at each page critically. What would make it more stunning? Do it.\n\nMULTIMEDIA ENHANCEMENT:\n- Ensure hero has background video (muted, autoplay, loop) or stunning gradient\n- Every section should have multiple high-quality images\n- Match images to content context\n- NEVER reuse the same image on multiple pages\n- TEXT OVER IMAGES: use gradient overlays (bg-gradient-to-t from-black/60)\n- For gaps, use Unsplash: https://images.unsplash.com/photo-{ID}?w={W}&h={H}&fit=crop' + (visualCritique ? '\n\nAI VISUAL INSPECTION FOUND THESE ISSUES (fix ALL of them):\n' + visualCritique : '') },
-            // Prompt 2: SEO + content completeness
-            { label: 'B2-seo-content', timeoutMin: 8, text: 'SEO + content audit on ALL React page components. Do NOT rewrite from scratch.\n\nThis is a Vite + React + Tailwind project. Edit .tsx files in src/pages/.\n\n1. SEO: Each page component should set document.title and meta tags via useEffect. Add JSON-LD LocalBusiness schema on Home page (rendered via dangerouslySetInnerHTML in a <script> tag). FAQPage schema. Internal links between ALL pages using <Link> from react-router-dom. Verify public/robots.txt + public/sitemap.xml list all routes.\n2. CONTENT: Read _scraped.txt and _research.json. Ensure ALL original website content is present. If any services, programs, team members, or details are missing — add them. Every page should have images with alt text.\n3. IMAGE COMPLETENESS: Count images per page — if any page has fewer than 15, add more from Unsplash/Pexels. Verify no image appears on more than one page.' },
-            // Prompt 3: Visual quality audit
-            { label: 'C1-visual', timeoutMin: 5, text: 'Visual quality audit on ALL React components.\n\n1. Check EVERY image: is it relevant to the section content? Remove/replace irrelevant ones.\n2. Check for DUPLICATE images across pages — each page must have unique imagery.\n3. Fill any empty image placeholders with relevant Unsplash photos.\n4. Ensure the LOGO from the original site is visible in the header of every page.\n5. Verify brand colors match the original site (not generic blue/cyan).\n6. Text contrast: readable on all backgrounds.\n7. Grid partial rows centered.\n8. Nav should have max 5-7 top-level links, use dropdowns for sub-pages.\n9. Google Maps address should link to directions URL.\n10. AUDIT every image: no white space, no text overlays, no borders, no montage styling.\n11. Replace any montage/collage images with clean individual photographs.\n12. Check that icons have been replaced with photos where appropriate.\n13. Each page should have 15+ images — add more if under that count.\n14. SELF-PROMPT: What else would make each page more stunning? Do it.' },
-            // Prompt 4: Domain-specific features
-            { label: 'C2-domain', timeoutMin: 4, text: domainPrompt },
-            // Prompt 5: Production polish
-            { label: 'D1-production', timeoutMin: 4, text: 'Final production polish on ALL files.\n\n1. No console.log. Valid HTML. All URLs use HTTPS.\n2. Google Fonts preconnect + display=swap.\n3. Back-to-top button. Smooth scroll. Copyright ' + new Date().getFullYear() + '.\n4. Address text links to Google Maps directions URL.\n5. Verify logo appears in header of EVERY page.\n6. Verify app icon/favicon is set.\n7. Every page must look pixel-perfect at 1280px and 375px.\n8. SELF-PROMPT: Browse every page as a user would. What feels incomplete or ugly? Fix it now.' },
-            // Prompt 6: Safety + SEO final check
-            { label: 'D2-safety', timeoutMin: 2, text: 'Safety + SEO final check.\n1. Privacy notice on contact/donation forms.\n2. Footer: Privacy + Terms links on every page.\n3. External links: rel=noopener noreferrer.\n4. FAQ last item: Built by ProjectSites.dev.\n5. Verify sitemap.xml lists ALL pages.\n6. Verify robots.txt allows crawling.' },
-          ], currentFiles, 'stage-b');
-        });
-        const enhancementArr = enhancementResult as { name: string; content: string }[];
-        if (enhancementArr?.length > 0) currentFiles = enhancementArr;
-      }
+      currentFiles = (buildResult as { name: string; content: string }[]) || [];
 
       // ── FINAL DEPLOY ──
       if (currentFiles.length > 0) {
@@ -1718,28 +1555,51 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           return version;
         });
 
-        // ── Final GPT-4o visual inspection (non-blocking) ──
+        // ── Final GPT-4o visual inspection via screenshot (non-blocking) ──
         await step.do('visual-inspection-final', RETRY_3, async () => {
-          const critique = await visualInspect('final');
-          if (!critique) return JSON.stringify({ skipped: true, reason: 'no_critique' });
-
-          // Parse and log structured results
+          if (!env.OPENAI_API_KEY) return JSON.stringify({ skipped: true, reason: 'no_openai_key' });
           try {
-            const cleaned = critique.replace(/```json\n?/g, '').replace(/```/g, '').trim();
+            const ssUrl = `https://api.microlink.io/?url=https://${params.slug}.${DOMAINS.SITES_SUFFIX}&screenshot=true&meta=false&embed=screenshot.url`;
+            const ssRes = await fetch(ssUrl);
+            if (!ssRes.ok) return JSON.stringify({ skipped: true, reason: 'screenshot_failed' });
+            const ssData = await ssRes.json() as any;
+            const imageUrl = ssData?.data?.screenshot?.url;
+            if (!imageUrl) return JSON.stringify({ skipped: true, reason: 'no_screenshot_url' });
+
+            const critiqueRes = await fetch('https://api.openai.com/v1/chat/completions', {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                model: 'gpt-4o',
+                messages: [{
+                  role: 'user',
+                  content: [
+                    { type: 'text', text: 'Score this website screenshot 1-10 on visual quality. List top 5 issues. Return JSON: { score: number, issues: string[], logo_visible: boolean, brand_colors_correct: boolean }' },
+                    { type: 'image_url', image_url: { url: imageUrl, detail: 'high' } },
+                  ],
+                }],
+                max_tokens: 500,
+                temperature: 0.2,
+              }),
+            });
+            if (!critiqueRes.ok) return JSON.stringify({ skipped: true, reason: 'gpt4o_failed' });
+            const critiqueData = await critiqueRes.json() as any;
+            const raw = critiqueData.choices?.[0]?.message?.content || '';
+
+            const cleaned = raw.replace(/```json\n?/g, '').replace(/```/g, '').trim();
             const parsed = JSON.parse(cleaned) as { score?: number; issues?: string[]; logo_visible?: boolean; brand_colors_correct?: boolean };
             const score = typeof parsed.score === 'number' ? parsed.score : 0;
             const issues = Array.isArray(parsed.issues) ? parsed.issues : [];
 
             await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.visual_inspection_complete', {
-              step: 'visual-inspection-final', score, issues,
+              step: 'visual-inspection-final', score, issues, screenshot_url: imageUrl,
               logo_visible: parsed.logo_visible ?? null,
               brand_colors_correct: parsed.brand_colors_correct ?? null,
-              needs_improvement: score < 7 || !parsed.logo_visible || !parsed.brand_colors_correct,
               message: `Final visual inspection: score=${score}/10, ${issues.length} issues`,
             });
             return JSON.stringify({ score, issues, logo_visible: parsed.logo_visible, brand_colors_correct: parsed.brand_colors_correct });
           } catch {
-            return JSON.stringify({ raw_critique: critique.slice(0, 1000), parse_error: true });
+            return JSON.stringify({ skipped: true, reason: 'error' });
           }
         });
       } else {

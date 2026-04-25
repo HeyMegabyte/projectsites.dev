@@ -5,14 +5,16 @@ import type { Env } from './types/env.js';
  * SiteBuilderContainer — Stateless Claude Code executor
  *
  * Architecture:
- * 1. Dockerfile pre-bakes: Claude Code CLI, git, non-root `cuser`, skills repo, template repo, CLAUDE.md
+ * 1. Dockerfile pre-bakes: Claude Code CLI, git, non-root `cuser`, skills repo, template repo, CLAUDE.md, inspect.js
  * 2. Entrypoint runs `git pull` on skills + template repos, then starts HTTP server on :8080
- * 3. Each POST contains: prompt text + optional existing files
- * 4. Container runs `claude -p` as `cuser`, returns all generated/modified files
- * 5. Container does NOT touch D1 or R2 — workflow handles storage
+ * 3. Each POST contains: prompts[] + optional existingFiles + contextFiles
+ * 4. Container runs `claude -p` as `cuser` for each prompt sequentially
+ * 5. Prompts with `inspectAfter: true` trigger intermediate build + GPT-4o design critique
+ * 6. Critique is saved as `_visual_critique.txt` for subsequent prompts to read
+ * 7. Container does NOT touch D1 or R2 — workflow handles storage
  *
- * The workflow calls the container multiple times (one per build stage).
- * Each call is under 20 minutes. Files are passed in and out via JSON.
+ * Single-call architecture: ALL prompts (foundation + enhancements) run in one container call.
+ * Files persist between prompts. GPT-4o inspection runs mid-build without leaving the container.
  */
 export class SiteBuilderContainer extends Container<Env> {
   defaultPort = 8080;
@@ -21,13 +23,14 @@ export class SiteBuilderContainer extends Container<Env> {
   entrypoint = ['node', '-e',
     'const{execSync:x}=require("child_process"),fs=require("fs"),path=require("path"),http=require("http");' +
     'const NL=String.fromCharCode(10);' +
-    // All pre-baked in Dockerfile: Claude Code, git, cuser, skills, template, CLAUDE.md
+    // All pre-baked in Dockerfile: Claude Code, git, cuser, skills, template, CLAUDE.md, inspect.js
     // Boot only does git pull to get latest changes
     'var CP=x("which claude",{encoding:"utf-8"}).trim();' +
     'console.log("[boot] Claude at:",CP);' +
     'var CUSER_HOME="/home/cuser";' +
     'var SKILLS_DIR=CUSER_HOME+"/.agentskills";' +
     'var TEMPLATE_DIR=CUSER_HOME+"/template";' +
+    'var INSPECT_SCRIPT=CUSER_HOME+"/inspect.js";' +
     'try{x("cd "+SKILLS_DIR+" && git pull origin main 2>&1",{timeout:30000,shell:true,encoding:"utf-8"});console.log("[boot] Skills updated")}catch(e){console.warn("[boot] Skills pull failed:",e.message.slice(0,100))}' +
     'try{x("cd "+TEMPLATE_DIR+" && git pull origin main 2>&1",{timeout:30000,shell:true,encoding:"utf-8"});console.log("[boot] Template updated")}catch(e){console.warn("[boot] Template pull failed:",e.message.slice(0,100))}' +
     // runClaude: write prompt to file, run as cuser, return success
@@ -42,17 +45,12 @@ export class SiteBuilderContainer extends Container<Env> {
       'try{' +
         'var out=x("su cuser -s /bin/sh -c \\"sh "+sf+"\\"",{timeout:to,maxBuffer:100*1024*1024,shell:true,encoding:"utf-8"});' +
         'console.log("["+label+"] Done in "+((Date.now()-t0)/1000|0)+"s, stdout: "+(out||"").length+"b");' +
-        // Check if Claude Code wrote files to disk
         'var diskFiles=[];try{diskFiles=fs.readdirSync(dir).filter(f=>!f.startsWith("_"))}catch(e){}' +
         'console.log("["+label+"] Files on disk: "+diskFiles.join(", "));' +
-        // If Claude Code output HTML to stdout (pipe mode behavior), save it
         'if(out&&out.length>100){' +
-          // Save ALL stdout as index.html if no index.html exists on disk
           'if(!fs.existsSync(path.join(dir,"index.html"))){' +
             'var htmlOut=out;' +
-            // Strip markdown fences if present
             'htmlOut=htmlOut.replace(/^```html\\n?/,"").replace(/^```\\n?/,"").replace(/\\n?```$/,"");' +
-            // Find the start of HTML
             'var docIdx=htmlOut.indexOf("<!DOCTYPE");' +
             'var htIdx=htmlOut.indexOf("<html");' +
             'var startIdx=docIdx>=0?docIdx:(htIdx>=0?htIdx:-1);' +
@@ -79,11 +77,35 @@ export class SiteBuilderContainer extends Container<Env> {
         'var errOut=(e.stderr||"").toString().slice(0,300);' +
         'var errStdout=(e.stdout||"").toString().slice(0,300);' +
         'console.warn("["+label+"] Failed "+((Date.now()-t0)/1000|0)+"s: "+errMsg+" stderr:"+errOut+" stdout:"+errStdout);' +
-        // Store error for diagnostics
         'if(!global._lastClaudeError)global._lastClaudeError={};' +
         'global._lastClaudeError[label]={msg:errMsg,stderr:errOut,stdout:errStdout};' +
         'return false' +
       '}' +
+    '}' +
+    // runInspection: intermediate build + GPT-4o critique between prompts
+    'function runInspection(dir,label){' +
+      'if(!process.env.OPENAI_API_KEY){console.log("[inspect] No OPENAI_API_KEY, skipping");return}' +
+      'console.log("[inspect] Running intermediate build + GPT-4o critique after "+label+"...");' +
+      // npm install + build to produce dist/index.html
+      'if(fs.existsSync(path.join(dir,"package.json"))){' +
+        'try{' +
+          'x("cd "+dir+" && npm install --legacy-peer-deps 2>&1",{timeout:120000,maxBuffer:50*1024*1024,shell:true,encoding:"utf-8"});' +
+          'x("cd "+dir+" && npm run build 2>&1",{timeout:120000,maxBuffer:50*1024*1024,shell:true,encoding:"utf-8"});' +
+          'console.log("[inspect] Intermediate build complete")' +
+        '}catch(be){console.warn("[inspect] Build:",be.message.slice(0,200))}' +
+      '}' +
+      // Find HTML to analyze (prefer dist/index.html, fallback to index.html)
+      'var hp=path.join(dir,"dist","index.html");' +
+      'if(!fs.existsSync(hp))hp=path.join(dir,"index.html");' +
+      'if(!fs.existsSync(hp)){console.warn("[inspect] No HTML to inspect");return}' +
+      // Call GPT-4o via pre-baked inspect.js script
+      'try{' +
+        'var critique=x("node "+INSPECT_SCRIPT+" "+JSON.stringify(hp),{timeout:30000,encoding:"utf-8",maxBuffer:10*1024*1024,shell:true});' +
+        'if(critique&&critique.length>10){' +
+          'fs.writeFileSync(path.join(dir,"_visual_critique.txt"),critique);' +
+          'console.log("[inspect] GPT-4o critique saved ("+critique.length+"b)")' +
+        '}else{console.warn("[inspect] GPT-4o returned empty critique")}' +
+      '}catch(ie){console.warn("[inspect] GPT-4o failed:",ie.message.slice(0,200))}' +
     '}' +
     // collectFiles: recursively collect all non-underscore files from dir
     'function collectFiles(dir,base){' +
@@ -111,9 +133,10 @@ export class SiteBuilderContainer extends Container<Env> {
         'try{' +
           'var P=JSON.parse(b);' +
           'if(P._anthropicKey)process.env.ANTHROPIC_API_KEY=P._anthropicKey;' +
+          'if(P._openaiKey)process.env.OPENAI_API_KEY=P._openaiKey;' +
           'var dir="/tmp/build-"+(P.slug||"site")+"-"+Date.now();' +
           'fs.mkdirSync(dir,{recursive:true});' +
-          // If no existing files provided (Stage A), copy template as starting point
+          // If no existing files provided, copy template as starting point
           'var hasExisting=P.existingFiles&&Array.isArray(P.existingFiles)&&P.existingFiles.length>0;' +
           'if(!hasExisting&&fs.existsSync(TEMPLATE_DIR+"/package.json")){' +
             'console.log("[container] Copying template into build dir...");' +
@@ -138,21 +161,26 @@ export class SiteBuilderContainer extends Container<Env> {
           '}' +
           // Make build dir owned by cuser so Claude Code can write files
           'try{x("chown -R cuser:cuser "+dir,{stdio:"pipe",shell:true})}catch(e){console.warn("[chown]",e.message)}' +
-          // Run prompts sequentially
+          // Run prompts sequentially with optional inspection between them
           'var prompts=P.prompts||[];' +
           'var results=[];' +
+          'var depsInstalled=false;' +
           'for(var i=0;i<prompts.length;i++){' +
             'var p=prompts[i];' +
             'var ok=runClaude(dir,p.text,p.label||("step-"+i),p.timeoutMin||10);' +
-            'results.push({label:p.label||("step-"+i),success:ok})' +
+            'results.push({label:p.label||("step-"+i),success:ok});' +
+            // If prompt has inspectAfter flag, run intermediate build + GPT-4o
+            'if(p.inspectAfter){' +
+              'runInspection(dir,p.label||("step-"+i));' +
+              'depsInstalled=true' +
+            '}' +
           '}' +
-          // If package.json exists, run npm install + build to produce dist/
+          // Final build: npm install + build to produce dist/
           'var hasPackageJson=fs.existsSync(path.join(dir,"package.json"));' +
           'if(hasPackageJson){' +
-            'console.log("[container] Vite project detected — running npm install + build...");' +
+            'console.log("[container] Final build...");' +
             'try{' +
-              'x("cd "+dir+" && npm install --legacy-peer-deps 2>&1",{timeout:120000,maxBuffer:50*1024*1024,shell:true,encoding:"utf-8"});' +
-              'console.log("[container] npm install done");' +
+              'if(!depsInstalled){x("cd "+dir+" && npm install --legacy-peer-deps 2>&1",{timeout:120000,maxBuffer:50*1024*1024,shell:true,encoding:"utf-8"});console.log("[container] npm install done")}' +
               'x("cd "+dir+" && npm run build 2>&1",{timeout:120000,maxBuffer:50*1024*1024,shell:true,encoding:"utf-8"});' +
               'console.log("[container] npm run build done");' +
             '}catch(buildErr){' +
@@ -163,9 +191,11 @@ export class SiteBuilderContainer extends Container<Env> {
           'var files=collectFiles(dir);' +
           'console.log("[container] Generated "+files.length+" files from "+prompts.length+" prompts");' +
           // Add diagnostic info
-          'var diag={apiKeySet:!!process.env.ANTHROPIC_API_KEY,apiKeyLen:(process.env.ANTHROPIC_API_KEY||"").length,claudeInstalled:false,promptCount:prompts.length,filesOnDisk:[],results:results,errors:global._lastClaudeError||{}};' +
+          'var diag={apiKeySet:!!process.env.ANTHROPIC_API_KEY,apiKeyLen:(process.env.ANTHROPIC_API_KEY||"").length,openaiKeySet:!!process.env.OPENAI_API_KEY,claudeInstalled:false,promptCount:prompts.length,filesOnDisk:[],results:results,errors:global._lastClaudeError||{}};' +
           'try{diag.claudeInstalled=!!x("which claude",{encoding:"utf-8",stdio:"pipe"}).trim()}catch(e){}' +
           'try{diag.filesOnDisk=fs.readdirSync(dir)}catch(e){}' +
+          // Check if _visual_critique.txt was generated
+          'try{if(fs.existsSync(path.join(dir,"_visual_critique.txt"))){diag.visualCritique=fs.readFileSync(path.join(dir,"_visual_critique.txt"),"utf-8").slice(0,500)}}catch(e){}' +
           // Cleanup
           'try{fs.rmSync(dir,{recursive:true,force:true})}catch(e){}' +
           // Return result with diagnostics
