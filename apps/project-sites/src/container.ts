@@ -2,210 +2,171 @@ import { Container } from '@cloudflare/containers';
 import type { Env } from './types/env.js';
 
 /**
- * SiteBuilderContainer — Stateless Claude Code executor
+ * SiteBuilderContainer — Async Claude Code executor with heartbeat polling
  *
  * Architecture:
- * 1. Dockerfile pre-bakes: Claude Code CLI, git, non-root `cuser`, skills repo, template repo, CLAUDE.md, inspect.js
- * 2. Entrypoint runs `git pull` on skills + template repos, then starts HTTP server on :8080
- * 3. Each POST contains: prompts[] + optional existingFiles + contextFiles
- * 4. Container runs `claude -p` as `cuser` for each prompt sequentially
- * 5. Prompts with `inspectAfter: true` trigger intermediate build + GPT-4o design critique
- * 6. Critique is saved as `_visual_critique.txt` for subsequent prompts to read
+ * 1. Dockerfile pre-bakes: Claude Code CLI, git, cuser, skills repo, template repo, inspect.js
+ * 2. Entrypoint starts HTTP server on :8080
+ * 3. POST /build → starts Claude Code async, returns { jobId } immediately
+ * 4. GET /status?jobId=X → returns { status, elapsed, step } for heartbeat polling
+ * 5. GET /result?jobId=X → returns { files[] } when complete
+ * 6. Single `claude -p` run handles: research, logo, building, GPT-4o self-inspection, fixes
  * 7. Container does NOT touch D1 or R2 — workflow handles storage
- *
- * Single-call architecture: ALL prompts (foundation + enhancements) run in one container call.
- * Files persist between prompts. GPT-4o inspection runs mid-build without leaving the container.
  */
 export class SiteBuilderContainer extends Container<Env> {
   defaultPort = 8080;
   enableInternet = true;
 
   entrypoint = ['node', '-e',
-    'const{execSync:x}=require("child_process"),fs=require("fs"),path=require("path"),http=require("http");' +
+    'const{execSync:x,spawn:sp}=require("child_process"),fs=require("fs"),path=require("path"),http=require("http");' +
     'const NL=String.fromCharCode(10);' +
-    // All pre-baked in Dockerfile: Claude Code, git, cuser, skills, template, CLAUDE.md, inspect.js
-    // Boot only does git pull to get latest changes
     'var CP=x("which claude",{encoding:"utf-8"}).trim();' +
     'console.log("[boot] Claude at:",CP);' +
     'var CUSER_HOME="/home/cuser";' +
     'var SKILLS_DIR=CUSER_HOME+"/.agentskills";' +
     'var TEMPLATE_DIR=CUSER_HOME+"/template";' +
-    'var INSPECT_SCRIPT=CUSER_HOME+"/inspect.js";' +
+    // Git pull skills + template at boot
     'try{x("cd "+SKILLS_DIR+" && git pull origin main 2>&1",{timeout:30000,shell:true,encoding:"utf-8"});console.log("[boot] Skills updated")}catch(e){console.warn("[boot] Skills pull failed:",e.message.slice(0,100))}' +
     'try{x("cd "+TEMPLATE_DIR+" && git pull origin main 2>&1",{timeout:30000,shell:true,encoding:"utf-8"});console.log("[boot] Template updated")}catch(e){console.warn("[boot] Template pull failed:",e.message.slice(0,100))}' +
-    // runClaude: write prompt to file, run as cuser, return success
-    'function runClaude(dir,prompt,label,timeoutMin){' +
-      'var pf=path.join(dir,"_prompt_"+label+".txt");' +
-      'fs.writeFileSync(pf,prompt);' +
-      'var sh=["#!/bin/sh","export ANTHROPIC_API_KEY="+process.env.ANTHROPIC_API_KEY,"export HOME=/home/cuser","cd "+dir,CP+" --dangerously-skip-permissions -p < "+pf].join(NL);' +
-      'var sf="/tmp/run_"+label+".sh";' +
-      'fs.writeFileSync(sf,sh);x("chmod +x "+sf,{stdio:"pipe"});' +
-      'var t0=Date.now(),to=(timeoutMin||10)*60000;' +
-      'console.log("["+label+"] Start ("+Math.round(prompt.length/1024)+"KB, "+timeoutMin+"min)");' +
-      'try{' +
-        'var out=x("su cuser -s /bin/sh -c \\"sh "+sf+"\\"",{timeout:to,maxBuffer:100*1024*1024,shell:true,encoding:"utf-8"});' +
-        'console.log("["+label+"] Done in "+((Date.now()-t0)/1000|0)+"s, stdout: "+(out||"").length+"b");' +
-        'var diskFiles=[];try{diskFiles=fs.readdirSync(dir).filter(f=>!f.startsWith("_"))}catch(e){}' +
-        'console.log("["+label+"] Files on disk: "+diskFiles.join(", "));' +
-        'if(out&&out.length>100){' +
-          'if(!fs.existsSync(path.join(dir,"index.html"))){' +
-            'var htmlOut=out;' +
-            'htmlOut=htmlOut.replace(/^```html\\n?/,"").replace(/^```\\n?/,"").replace(/\\n?```$/,"");' +
-            'var docIdx=htmlOut.indexOf("<!DOCTYPE");' +
-            'var htIdx=htmlOut.indexOf("<html");' +
-            'var startIdx=docIdx>=0?docIdx:(htIdx>=0?htIdx:-1);' +
-            'if(startIdx>0)htmlOut=htmlOut.substring(startIdx);' +
-            'if(htmlOut.length>200){' +
-              'fs.writeFileSync(path.join(dir,"index.html"),htmlOut);' +
-              'console.log("["+label+"] Saved stdout to index.html ("+htmlOut.length+"b)")' +
-            '}' +
-          '}' +
-        '}' +
-        'return true' +
-      '}catch(e){' +
-        'var eOut=e.stdout||"";' +
-        'console.log("["+label+"] Error stdout: "+(eOut||"").length+"b");' +
-        'if(eOut&&eOut.length>200&&!fs.existsSync(path.join(dir,"index.html"))){' +
-          'var h=eOut.replace(/^```html\\n?/,"").replace(/\\n?```$/,"");' +
-          'var di=h.indexOf("<!DOCTYPE");var hi=h.indexOf("<html");' +
-          'var si=di>=0?di:(hi>=0?hi:0);' +
-          'if(si>0)h=h.substring(si);' +
-          'fs.writeFileSync(path.join(dir,"index.html"),h);' +
-          'console.log("["+label+"] Saved error stdout to index.html")' +
-        '}' +
-        'var errMsg=(e.message||"").slice(0,300);' +
-        'var errOut=(e.stderr||"").toString().slice(0,300);' +
-        'var errStdout=(e.stdout||"").toString().slice(0,300);' +
-        'console.warn("["+label+"] Failed "+((Date.now()-t0)/1000|0)+"s: "+errMsg+" stderr:"+errOut+" stdout:"+errStdout);' +
-        'if(!global._lastClaudeError)global._lastClaudeError={};' +
-        'global._lastClaudeError[label]={msg:errMsg,stderr:errOut,stdout:errStdout};' +
-        'return false' +
-      '}' +
-    '}' +
-    // runInspection: intermediate build + GPT-4o critique between prompts
-    'function runInspection(dir,label){' +
-      'if(!process.env.OPENAI_API_KEY){console.log("[inspect] No OPENAI_API_KEY, skipping");return}' +
-      'console.log("[inspect] Running intermediate build + GPT-4o critique after "+label+"...");' +
-      // npm install + build to produce dist/index.html
-      'if(fs.existsSync(path.join(dir,"package.json"))){' +
-        'try{' +
-          'x("cd "+dir+" && npm install --legacy-peer-deps 2>&1",{timeout:120000,maxBuffer:50*1024*1024,shell:true,encoding:"utf-8"});' +
-          'x("cd "+dir+" && npm run build 2>&1",{timeout:120000,maxBuffer:50*1024*1024,shell:true,encoding:"utf-8"});' +
-          'console.log("[inspect] Intermediate build complete")' +
-        '}catch(be){console.warn("[inspect] Build:",be.message.slice(0,200))}' +
-      '}' +
-      // Find HTML to analyze (prefer dist/index.html, fallback to index.html)
-      'var hp=path.join(dir,"dist","index.html");' +
-      'if(!fs.existsSync(hp))hp=path.join(dir,"index.html");' +
-      'if(!fs.existsSync(hp)){console.warn("[inspect] No HTML to inspect");return}' +
-      // Call GPT-4o via pre-baked inspect.js script
-      'try{' +
-        'var critique=x("node "+INSPECT_SCRIPT+" "+JSON.stringify(hp),{timeout:30000,encoding:"utf-8",maxBuffer:10*1024*1024,shell:true});' +
-        'if(critique&&critique.length>10){' +
-          'fs.writeFileSync(path.join(dir,"_visual_critique.txt"),critique);' +
-          'console.log("[inspect] GPT-4o critique saved ("+critique.length+"b)")' +
-        '}else{console.warn("[inspect] GPT-4o returned empty critique")}' +
-      '}catch(ie){console.warn("[inspect] GPT-4o failed:",ie.message.slice(0,200))}' +
-    '}' +
+    // Job store: { [jobId]: { status, dir, startTime, step, error, files } }
+    'var jobs={};' +
     // collectFiles: recursively collect all non-underscore files from dir
     'function collectFiles(dir,base){' +
-      'base=base||"";' +
-      'var files=[];' +
-      'try{' +
-        'for(var f of fs.readdirSync(dir)){' +
-          'if(f.startsWith("_")||f==="node_modules"||f===".git")continue;' +
-          'var fp=path.join(dir,f);' +
-          'var rel=base?base+"/"+f:f;' +
-          'var st=fs.statSync(fp);' +
-          'if(st.isDirectory()){files=files.concat(collectFiles(fp,rel))}' +
-          'else if(st.isFile()&&st.size<500000&&st.size>0){' +
-            'try{files.push({name:rel,content:fs.readFileSync(fp,"utf-8")})}catch(e){}' +
-          '}' +
+      'base=base||"";var files=[];' +
+      'try{for(var f of fs.readdirSync(dir)){' +
+        'if(f.startsWith("_")||f==="node_modules"||f===".git"||f===".claude")continue;' +
+        'var fp=path.join(dir,f),rel=base?base+"/"+f:f,st=fs.statSync(fp);' +
+        'if(st.isDirectory()){files=files.concat(collectFiles(fp,rel))}' +
+        'else if(st.isFile()&&st.size<500000&&st.size>0){' +
+          'try{files.push({name:rel,content:fs.readFileSync(fp,"utf-8")})}catch(e){}' +
         '}' +
-      '}catch(e){console.warn("[collect] Error:",e.message)}' +
-      'return files' +
+      '}}catch(e){}return files' +
     '}' +
-    // HTTP server
+    // runJob: async job execution — runs Claude Code in background
+    'function runJob(jobId,dir,prompt,envVars,timeoutMin){' +
+      'jobs[jobId]={status:"running",dir:dir,startTime:Date.now(),step:"claude-code",error:null,files:null};' +
+      // Write prompt to file
+      'var pf=path.join(dir,"_prompt.txt");' +
+      'fs.writeFileSync(pf,prompt);' +
+      // Build shell script with all env vars
+      'var envLines=["#!/bin/sh"];' +
+      'for(var k in envVars){if(envVars[k])envLines.push("export "+k+"="+JSON.stringify(envVars[k]))}' +
+      'envLines.push("export HOME=/home/cuser");' +
+      'envLines.push("cd "+dir);' +
+      'envLines.push(CP+" --dangerously-skip-permissions -p < "+pf);' +
+      'var sf="/tmp/run_"+jobId+".sh";' +
+      'fs.writeFileSync(sf,envLines.join(NL));' +
+      'x("chmod +x "+sf,{stdio:"pipe"});' +
+      'var to=(timeoutMin||45)*60000;' +
+      'console.log("["+jobId+"] Starting Claude Code ("+Math.round(prompt.length/1024)+"KB prompt, "+timeoutMin+"min timeout)");' +
+      // Run async
+      'var child=sp("su",["cuser","-s","/bin/sh","-c","sh "+sf],{' +
+        'timeout:to,shell:true,stdio:["pipe","pipe","pipe"],maxBuffer:100*1024*1024' +
+      '});' +
+      'var stdout="",stderr="";' +
+      'child.stdout.on("data",function(d){stdout+=d.toString()});' +
+      'child.stderr.on("data",function(d){stderr+=d.toString()});' +
+      'child.on("close",function(code){' +
+        'console.log("["+jobId+"] Claude Code exited code="+code+" stdout="+stdout.length+"b stderr="+stderr.length+"b elapsed="+((Date.now()-jobs[jobId].startTime)/1000|0)+"s");' +
+        // Run npm build after Claude Code finishes
+        'jobs[jobId].step="npm-build";' +
+        'if(fs.existsSync(path.join(dir,"package.json"))){' +
+          'try{' +
+            'x("cd "+dir+" && npm install --legacy-peer-deps 2>&1",{timeout:120000,maxBuffer:50*1024*1024,shell:true,encoding:"utf-8"});' +
+            'x("cd "+dir+" && npm run build 2>&1",{timeout:120000,maxBuffer:50*1024*1024,shell:true,encoding:"utf-8"});' +
+            'console.log("["+jobId+"] npm build done")' +
+          '}catch(be){console.warn("["+jobId+"] Build error:",be.message.slice(0,200))}' +
+        '}' +
+        // Upload to R2 via upload script (uses CF_API_TOKEN etc. from env vars)
+        'jobs[jobId].step="r2-upload";' +
+        'try{' +
+          'var uploadOut=x("cd "+dir+" && node /home/cuser/upload-to-r2.mjs 2>&1",{timeout:120000,maxBuffer:10*1024*1024,shell:true,encoding:"utf-8"});' +
+          'console.log("["+jobId+"] R2 upload done:",uploadOut.slice(0,200));' +
+          'try{jobs[jobId].uploadResult=JSON.parse(fs.readFileSync(path.join(dir,"_upload_result.json"),"utf-8"))}catch(e){}' +
+        '}catch(ue){console.warn("["+jobId+"] R2 upload error:",ue.message.slice(0,200))}' +
+        // Collect files
+        'jobs[jobId].step="collecting";' +
+        'var files=collectFiles(dir);' +
+        'console.log("["+jobId+"] Collected "+files.length+" files");' +
+        'jobs[jobId].files=files;' +
+        'jobs[jobId].status=code===0?"complete":"complete";' + // complete even on non-zero if files exist
+        'jobs[jobId].step="done";' +
+        'if(files.length===0){' +
+          'jobs[jobId].status="error";' +
+          'jobs[jobId].error="No files generated. stdout="+stdout.length+"b stderr="+stderr.slice(0,500)' +
+        '}' +
+      '});' +
+      'child.on("error",function(e){' +
+        'console.error("["+jobId+"] Process error:",e.message);' +
+        // Still try to collect files — Claude Code may have written some before crashing
+        'var files=collectFiles(dir);' +
+        'jobs[jobId].files=files;' +
+        'jobs[jobId].status=files.length>0?"complete":"error";' +
+        'jobs[jobId].error=e.message;' +
+        'jobs[jobId].step="done"' +
+      '});' +
+    '}' +
+    // HTTP server with 3 endpoints
     'http.createServer((q,r)=>{' +
       'r.setHeader("Content-Type","application/json");' +
-      'if(q.method==="GET")return r.end(JSON.stringify({ok:true}));' +
-      'var b="";q.on("data",c=>b+=c);q.on("end",()=>{' +
-        'try{' +
-          'var P=JSON.parse(b);' +
-          'if(P._anthropicKey)process.env.ANTHROPIC_API_KEY=P._anthropicKey;' +
-          'if(P._openaiKey)process.env.OPENAI_API_KEY=P._openaiKey;' +
-          'var dir="/tmp/build-"+(P.slug||"site")+"-"+Date.now();' +
-          'fs.mkdirSync(dir,{recursive:true});' +
-          // If no existing files provided, copy template as starting point
-          'var hasExisting=P.existingFiles&&Array.isArray(P.existingFiles)&&P.existingFiles.length>0;' +
-          'if(!hasExisting&&fs.existsSync(TEMPLATE_DIR+"/package.json")){' +
-            'console.log("[container] Copying template into build dir...");' +
-            'try{x("cp -r "+TEMPLATE_DIR+"/* "+dir+"/ 2>/dev/null; cp -r "+TEMPLATE_DIR+"/.[!.]* "+dir+"/ 2>/dev/null; true",{shell:true,stdio:"pipe"});' +
-            'console.log("[container] Template copied")}catch(e){console.warn("[container] Template copy failed:",e.message.slice(0,100))}' +
-          '}' +
-          // Write existing files to dir (from previous stage) — create subdirs as needed
-          'if(P.existingFiles&&Array.isArray(P.existingFiles)){' +
-            'for(var f of P.existingFiles){' +
-              'var fp=path.join(dir,f.name);' +
-              'var fd=path.dirname(fp);' +
-              'if(fd!==dir)fs.mkdirSync(fd,{recursive:true});' +
-              'fs.writeFileSync(fp,f.content)' +
+      'var url=new URL(q.url,"http://localhost");' +
+      // GET /health
+      'if(q.method==="GET"&&url.pathname==="/health"){return r.end(JSON.stringify({ok:true,jobs:Object.keys(jobs).length}))}' +
+      // GET /status — heartbeat polling
+      'if(q.method==="GET"&&url.pathname==="/status"){' +
+        'var jid=url.searchParams.get("jobId");' +
+        'if(!jid||!jobs[jid])return r.end(JSON.stringify({error:"unknown job"}));' +
+        'var j=jobs[jid];' +
+        'return r.end(JSON.stringify({status:j.status,step:j.step,elapsed:((Date.now()-j.startTime)/1000|0),fileCount:j.files?j.files.length:0,error:j.error?j.error.slice(0,500):null,uploadResult:j.uploadResult||null}))' +
+      '}' +
+      // GET /result — get files when complete
+      'if(q.method==="GET"&&url.pathname==="/result"){' +
+        'var jid=url.searchParams.get("jobId");' +
+        'if(!jid||!jobs[jid])return r.end(JSON.stringify({error:"unknown job"}));' +
+        'var j=jobs[jid];' +
+        'if(j.status==="running")return r.end(JSON.stringify({error:"still running",status:j.status,step:j.step}));' +
+        // Clean up build dir after result is fetched
+        'try{if(j.dir)fs.rmSync(j.dir,{recursive:true,force:true})}catch(e){}' +
+        'var result={status:j.status,files:j.files||[],error:j.error};' +
+        'delete jobs[jid];' + // Free memory
+        'return r.end(JSON.stringify(result))' +
+      '}' +
+      // POST /build — start async build
+      'if(q.method==="POST"&&url.pathname==="/build"){' +
+        'var b="";q.on("data",function(c){b+=c});q.on("end",function(){' +
+          'try{' +
+            'var P=JSON.parse(b);' +
+            'var jobId="job-"+Date.now()+"-"+Math.random().toString(36).slice(2,8);' +
+            'var dir="/tmp/build-"+(P.slug||"site")+"-"+Date.now();' +
+            'fs.mkdirSync(dir,{recursive:true});' +
+            // Copy template as starting point
+            'if(fs.existsSync(TEMPLATE_DIR+"/package.json")){' +
+              'try{x("cp -r "+TEMPLATE_DIR+"/* "+dir+"/ 2>/dev/null; cp -r "+TEMPLATE_DIR+"/.[!.]* "+dir+"/ 2>/dev/null; true",{shell:true,stdio:"pipe"});' +
+              'console.log("["+jobId+"] Template copied")}catch(e){}' +
             '}' +
-            'console.log("[container] Restored "+P.existingFiles.length+" existing files")' +
-          '}' +
-          // Write context files (research data etc)
-          'if(P.contextFiles&&typeof P.contextFiles==="object"){' +
-            'for(var k in P.contextFiles){' +
-              'fs.writeFileSync(path.join(dir,"_"+k),typeof P.contextFiles[k]==="string"?P.contextFiles[k]:JSON.stringify(P.contextFiles[k],null,2))' +
+            // Write context files (research data, scraped content, etc.)
+            'if(P.contextFiles&&typeof P.contextFiles==="object"){' +
+              'for(var k in P.contextFiles){' +
+                'fs.writeFileSync(path.join(dir,"_"+k),typeof P.contextFiles[k]==="string"?P.contextFiles[k]:JSON.stringify(P.contextFiles[k],null,2))' +
+              '}' +
             '}' +
+            // Write CLAUDE.md into the build dir for Claude Code to read
+            'if(P.claudeMd){fs.writeFileSync(path.join(dir,"CLAUDE.md"),P.claudeMd)}' +
+            // Own by cuser
+            'try{x("chown -R cuser:cuser "+dir,{stdio:"pipe",shell:true})}catch(e){}' +
+            // Build env vars object with all API keys
+            'var envVars={ANTHROPIC_API_KEY:P._anthropicKey||""};' +
+            'if(P.envVars&&typeof P.envVars==="object"){for(var ek in P.envVars){envVars[ek]=P.envVars[ek]}}' +
+            // Start async job
+            'runJob(jobId,dir,P.prompt||"",envVars,P.timeoutMin||45);' +
+            'r.writeHead(200);r.end(JSON.stringify({jobId:jobId,status:"started"}))' +
+          '}catch(e){' +
+            'r.writeHead(200);r.end(JSON.stringify({error:e.message}))' +
           '}' +
-          // Make build dir owned by cuser so Claude Code can write files
-          'try{x("chown -R cuser:cuser "+dir,{stdio:"pipe",shell:true})}catch(e){console.warn("[chown]",e.message)}' +
-          // Run prompts sequentially with optional inspection between them
-          'var prompts=P.prompts||[];' +
-          'var results=[];' +
-          'var depsInstalled=false;' +
-          'for(var i=0;i<prompts.length;i++){' +
-            'var p=prompts[i];' +
-            'var ok=runClaude(dir,p.text,p.label||("step-"+i),p.timeoutMin||10);' +
-            'results.push({label:p.label||("step-"+i),success:ok});' +
-            // If prompt has inspectAfter flag, run intermediate build + GPT-4o
-            'if(p.inspectAfter){' +
-              'runInspection(dir,p.label||("step-"+i));' +
-              'depsInstalled=true' +
-            '}' +
-          '}' +
-          // Final build: npm install + build to produce dist/
-          'var hasPackageJson=fs.existsSync(path.join(dir,"package.json"));' +
-          'if(hasPackageJson){' +
-            'console.log("[container] Final build...");' +
-            'try{' +
-              'if(!depsInstalled){x("cd "+dir+" && npm install --legacy-peer-deps 2>&1",{timeout:120000,maxBuffer:50*1024*1024,shell:true,encoding:"utf-8"});console.log("[container] npm install done")}' +
-              'x("cd "+dir+" && npm run build 2>&1",{timeout:120000,maxBuffer:50*1024*1024,shell:true,encoding:"utf-8"});' +
-              'console.log("[container] npm run build done");' +
-            '}catch(buildErr){' +
-              'console.warn("[container] Build failed:",buildErr.message.slice(0,200));' +
-            '}' +
-          '}' +
-          // Collect all output files (source + dist if built)
-          'var files=collectFiles(dir);' +
-          'console.log("[container] Generated "+files.length+" files from "+prompts.length+" prompts");' +
-          // Add diagnostic info
-          'var diag={apiKeySet:!!process.env.ANTHROPIC_API_KEY,apiKeyLen:(process.env.ANTHROPIC_API_KEY||"").length,openaiKeySet:!!process.env.OPENAI_API_KEY,claudeInstalled:false,promptCount:prompts.length,filesOnDisk:[],results:results,errors:global._lastClaudeError||{}};' +
-          'try{diag.claudeInstalled=!!x("which claude",{encoding:"utf-8",stdio:"pipe"}).trim()}catch(e){}' +
-          'try{diag.filesOnDisk=fs.readdirSync(dir)}catch(e){}' +
-          // Check if _visual_critique.txt was generated
-          'try{if(fs.existsSync(path.join(dir,"_visual_critique.txt"))){diag.visualCritique=fs.readFileSync(path.join(dir,"_visual_critique.txt"),"utf-8").slice(0,500)}}catch(e){}' +
-          // Cleanup
-          'try{fs.rmSync(dir,{recursive:true,force:true})}catch(e){}' +
-          // Return result with diagnostics
-          'r.writeHead(200);r.end(JSON.stringify({status:"ok",files:files,results:results,diag:diag}))' +
-        '}catch(e){' +
-          'console.error("[container] Error:",e.message);' +
-          'r.writeHead(200);r.end(JSON.stringify({status:"error",error:e.message,files:[]}))' +
-        '}' +
-      '})' +
-    '}).listen(8080,()=>console.log("[container] Ready on :8080"))'
+        '});return' +
+      '}' +
+      'r.writeHead(404);r.end(JSON.stringify({error:"not found"}))' +
+    '}).listen(8080,function(){console.log("[container] Ready on :8080")})'
   ];
 
   override async fetch(request: Request): Promise<Response> {
