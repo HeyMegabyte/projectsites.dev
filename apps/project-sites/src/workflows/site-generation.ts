@@ -1522,11 +1522,14 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
         params.additionalContext ? `\nADDITIONAL CONTEXT: ${params.additionalContext}` : '',
       ].filter(Boolean).join('\n');
 
-      const buildResult = await step.do('stage-full-build', {
+      // Single step: build + upload. We do R2 upload inside the step because
+      // Cloudflare Workflows has a step output size limit (~1MB) and the full
+      // file contents from a Vite+React project easily exceed that.
+      await step.do('stage-full-build', {
         retries: { limit: 0, delay: '1 second' },
         timeout: '50 minutes',
       }, async () => {
-        return callContainer([
+        const files = await callContainer([
           // Prompt 1: Foundation — generate the full project from template
           { label: 'A-foundation', timeoutMin: 15, text: foundationPrompt, inspectAfter: true },
           // Prompt 2: Beauty + GPT-4o critique fixes (reads _visual_critique.txt)
@@ -1542,69 +1545,67 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           // Prompt 7: Safety + SEO final check
           { label: 'D2-safety', timeoutMin: 2, text: 'Safety + SEO final check.\n1. Privacy notice on contact/donation forms.\n2. Footer: Privacy + Terms links.\n3. External links: rel=noopener noreferrer.\n4. FAQ: Built by ProjectSites.dev.\n5. sitemap.xml lists ALL pages.\n6. robots.txt allows crawling.' },
         ], [], 'full-build');
-      });
-      currentFiles = (buildResult as { name: string; content: string }[]) || [];
+        currentFiles = files || [];
 
-      // ── FINAL DEPLOY ──
-      if (currentFiles.length > 0) {
-        await step.do('upload-final', RETRY_3, async () => {
+        // Upload to R2 inside the same step to avoid step output size limits
+        if (currentFiles.length > 0) {
           const version = await uploadToR2(currentFiles, false);
           await env.DB.prepare(
             "INSERT OR IGNORE INTO site_snapshots (id, site_id, snapshot_name, build_version, description) VALUES (?, ?, 'initial', ?, 'First published version')",
           ).bind(crypto.randomUUID(), params.siteId, version).run();
-          return version;
-        });
+        }
 
-        // ── Final GPT-4o visual inspection via screenshot (non-blocking) ──
-        await step.do('visual-inspection-final', RETRY_3, async () => {
-          if (!env.OPENAI_API_KEY) return JSON.stringify({ skipped: true, reason: 'no_openai_key' });
-          try {
-            const ssUrl = `https://api.microlink.io/?url=https://${params.slug}.${DOMAINS.SITES_SUFFIX}&screenshot=true&meta=false&embed=screenshot.url`;
-            const ssRes = await fetch(ssUrl);
-            if (!ssRes.ok) return JSON.stringify({ skipped: true, reason: 'screenshot_failed' });
-            const ssData = await ssRes.json() as any;
-            const imageUrl = ssData?.data?.screenshot?.url;
-            if (!imageUrl) return JSON.stringify({ skipped: true, reason: 'no_screenshot_url' });
+        // Return only metadata (not full file contents) to stay under step output limit
+        return { fileCount: currentFiles.length, fileNames: currentFiles.map(f => f.name) };
+      });
 
-            const critiqueRes = await fetch('https://api.openai.com/v1/chat/completions', {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                model: 'gpt-4o',
-                messages: [{
-                  role: 'user',
-                  content: [
-                    { type: 'text', text: 'Score this website screenshot 1-10 on visual quality. List top 5 issues. Return JSON: { score: number, issues: string[], logo_visible: boolean, brand_colors_correct: boolean }' },
-                    { type: 'image_url', image_url: { url: imageUrl, detail: 'high' } },
-                  ],
-                }],
-                max_tokens: 500,
-                temperature: 0.2,
-              }),
-            });
-            if (!critiqueRes.ok) return JSON.stringify({ skipped: true, reason: 'gpt4o_failed' });
-            const critiqueData = await critiqueRes.json() as any;
-            const raw = critiqueData.choices?.[0]?.message?.content || '';
+      // ── Final GPT-4o visual inspection via screenshot (non-blocking) ──
+      await step.do('visual-inspection-final', RETRY_3, async () => {
+        if (!env.OPENAI_API_KEY) return JSON.stringify({ skipped: true, reason: 'no_openai_key' });
+        try {
+          const ssUrl = `https://api.microlink.io/?url=https://${params.slug}.${DOMAINS.SITES_SUFFIX}&screenshot=true&meta=false&embed=screenshot.url`;
+          const ssRes = await fetch(ssUrl);
+          if (!ssRes.ok) return JSON.stringify({ skipped: true, reason: 'screenshot_failed' });
+          const ssData = await ssRes.json() as any;
+          const imageUrl = ssData?.data?.screenshot?.url;
+          if (!imageUrl) return JSON.stringify({ skipped: true, reason: 'no_screenshot_url' });
 
-            const cleaned = raw.replace(/```json\n?/g, '').replace(/```/g, '').trim();
-            const parsed = JSON.parse(cleaned) as { score?: number; issues?: string[]; logo_visible?: boolean; brand_colors_correct?: boolean };
-            const score = typeof parsed.score === 'number' ? parsed.score : 0;
-            const issues = Array.isArray(parsed.issues) ? parsed.issues : [];
+          const critiqueRes = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: 'gpt-4o',
+              messages: [{
+                role: 'user',
+                content: [
+                  { type: 'text', text: 'Score this website screenshot 1-10 on visual quality. List top 5 issues. Return JSON: { score: number, issues: string[], logo_visible: boolean, brand_colors_correct: boolean }' },
+                  { type: 'image_url', image_url: { url: imageUrl, detail: 'high' } },
+                ],
+              }],
+              max_tokens: 500,
+              temperature: 0.2,
+            }),
+          });
+          if (!critiqueRes.ok) return JSON.stringify({ skipped: true, reason: 'gpt4o_failed' });
+          const critiqueData = await critiqueRes.json() as any;
+          const raw = critiqueData.choices?.[0]?.message?.content || '';
 
-            await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.visual_inspection_complete', {
-              step: 'visual-inspection-final', score, issues, screenshot_url: imageUrl,
-              logo_visible: parsed.logo_visible ?? null,
-              brand_colors_correct: parsed.brand_colors_correct ?? null,
-              message: `Final visual inspection: score=${score}/10, ${issues.length} issues`,
-            });
-            return JSON.stringify({ score, issues, logo_visible: parsed.logo_visible, brand_colors_correct: parsed.brand_colors_correct });
-          } catch {
-            return JSON.stringify({ skipped: true, reason: 'error' });
-          }
-        });
-      } else {
-        await updateSiteStatus(env.DB, params.siteId, 'error');
-      }
+          const cleaned = raw.replace(/```json\n?/g, '').replace(/```/g, '').trim();
+          const parsed = JSON.parse(cleaned) as { score?: number; issues?: string[]; logo_visible?: boolean; brand_colors_correct?: boolean };
+          const score = typeof parsed.score === 'number' ? parsed.score : 0;
+          const issues = Array.isArray(parsed.issues) ? parsed.issues : [];
+
+          await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.visual_inspection_complete', {
+            step: 'visual-inspection-final', score, issues, screenshot_url: imageUrl,
+            logo_visible: parsed.logo_visible ?? null,
+            brand_colors_correct: parsed.brand_colors_correct ?? null,
+            message: `Final visual inspection: score=${score}/10, ${issues.length} issues`,
+          });
+          return JSON.stringify({ score, issues, logo_visible: parsed.logo_visible, brand_colors_correct: parsed.brand_colors_correct });
+        } catch {
+          return JSON.stringify({ skipped: true, reason: 'error' });
+        }
+      });
 
 
     } catch (containerErr) {
