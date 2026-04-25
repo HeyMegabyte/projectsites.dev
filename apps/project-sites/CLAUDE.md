@@ -73,35 +73,34 @@ Workflow Step 1-3: Research (parallel)
   → All research runs on Workers AI (Llama 3.1) and external APIs
 
 Workflow Step 4a: stage-a-foundation (20 min timeout)
-  → Sends research data + foundation prompt to container
+  → Container call 1: single foundation prompt generates full Vite+React+Tailwind project
   → Container runs `claude -p` as non-root user `cuser`
-  → Claude Code generates a full Vite + React + Tailwind + shadcn/ui project:
-    - package.json (with shadcn/ui, Tailwind, React, Vite dependencies)
-    - vite.config.ts, tailwind.config.ts, tsconfig.json
-    - src/ with components, pages, layouts using shadcn/ui
-    - public/ with assets, robots.txt, sitemap.xml
-    - index.html (Vite entry point)
   → Returns ALL generated files to workflow
   → Workflow uploads to R2 as interim v1
 
-Workflow Step 4b: stage-b-enhancement (20 min timeout)
-  → Sends existing files + 3 enhancement prompts to container
-  → Container runs 3 sequential `claude -p` calls
-  → Returns updated files
-  → Workflow uploads to R2 as interim v2
+Workflow Step 4b: GPT-4o visual inspection
+  → Screenshots the interim site via microlink.io
+  → Sends screenshot to GPT-4o vision for design critique
+  → Returns issues list + recommendations
 
-Workflow Step 4c: stage-cd-quality-final (20 min timeout)
-  → Sends existing files + 5 quality/safety prompts to container
+Workflow Step 4c: stage-b-enhancements (25 min timeout)
+  → Container call 2: 6 sequential prompts in a single container
+  → B1-beauty (with GPT-4o visual critique injected), B2-seo-content,
+    C1-visual audit, C2-domain features, D1-production polish, D2-safety
+  → All prompts run in the same directory — files persist between prompts
   → Returns final files
   → Workflow uploads to R2 as final version
   → Workflow updates D1 status to 'published'
   → Workflow creates 'initial' snapshot
+
+Workflow Step 4d: Final GPT-4o visual inspection (non-blocking)
+  → Screenshots the published site, scores via GPT-4o vision
+  → Logs score/issues to D1 for future improvement
 ```
 
 **Container entrypoint** (`src/container.ts`): ~3KB inline Node.js that:
-1. Installs `@anthropic-ai/claude-code` globally
-2. Creates non-root user `cuser` (Claude blocks `--dangerously-skip-permissions` as root)
-3. Starts HTTP server on port 8080
+1. Runs `git pull` on pre-baked skills + template repos (Dockerfile pre-installs Claude Code, cuser, skills, template)
+2. Starts HTTP server on port 8080
 4. Accepts POST with `{ prompts, existingFiles, contextFiles }`
 5. Runs each prompt via `su cuser -s /bin/sh -c "sh /tmp/run.sh"`
 6. Returns all non-underscore files from the build directory
@@ -531,18 +530,20 @@ Step 2.5 (sequential): move-uploaded-assets      → move user uploads to R2
 Step 2.5b (optional): scrape-website             → deep-crawl existing site
 Step 2.6 (optional):  seed-site-data             → seed per-site D1 tables
 Step 3 (sequential):  structure-plan             → site structure plan (fast LLM)
-Steps 4-6 (container build — multi-stage):
-  stage-a-foundation   → Claude Code generates full Vite+React+Tailwind+shadcn/ui project
-  upload-interim-v1    → upload to R2
-  stage-b-enhancement  → 3 sequential enhancement prompts
-  stage-c-quality      → quality/polish prompts
-  stage-d-final        → final safety + SEO prompts
-  upload-final         → upload to R2, update D1 status to 'published'
+Steps 4-6 (container build — 2 calls + visual inspection):
+  stage-a-foundation     → Container call 1: foundation prompt (15min)
+  upload-interim-v1      → upload to R2
+  inspect-after-foundation → GPT-4o visual inspection → critique
+  stage-b-enhancements   → Container call 2: 6 prompts sequentially (25min)
+                           B1-beauty (+ visual critique), B2-seo, C1-visual,
+                           C2-domain, D1-production, D2-safety
+  upload-final           → upload to R2, update D1 status to 'published'
+  visual-inspection-final → GPT-4o final scoring (non-blocking)
 ```
 
 Each step has automatic retry (3x) with exponential backoff. Container builds use
-Cloudflare Containers (Durable Object `SITE_BUILDER`) running `node:22-slim` with
-Claude Code (`@anthropic-ai/claude-code`) installed at runtime.
+Cloudflare Containers (Durable Object `SITE_BUILDER`) with custom Dockerfile pre-baking
+Claude Code, skills, and template repos.
 
 ## Prompt Files (prompts/*.prompt.md)
 

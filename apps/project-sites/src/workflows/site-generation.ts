@@ -1410,13 +1410,51 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
     let currentFiles: { name: string; content: string }[] = [];
 
     try {
-      // ── STAGE A: Foundation (1 big prompt, ~15 min) ──
+      // ── Helper: GPT-4o visual inspection via screenshot ──
+      async function visualInspect(label: string): Promise<string> {
+        if (!env.OPENAI_API_KEY) return '';
+        try {
+          const ssUrl = `https://api.microlink.io/?url=https://${params.slug}.${DOMAINS.SITES_SUFFIX}&screenshot=true&meta=false&embed=screenshot.url`;
+          const ssRes = await fetch(ssUrl);
+          if (!ssRes.ok) return '';
+          const ssData = await ssRes.json() as any;
+          const imageUrl = ssData?.data?.screenshot?.url;
+          if (!imageUrl) return '';
+
+          const critiqueRes = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: 'gpt-4o',
+              messages: [{
+                role: 'user',
+                content: [
+                  { type: 'text', text: 'You are a senior web designer reviewing this website screenshot. Provide:\n1. Overall visual quality (1-10)\n2. Top 5 specific visual/design issues to fix (be specific about CSS/layout changes)\n3. Color consistency with brand\n4. Typography quality\n5. Image placement and relevance\n6. Is the logo visible and properly placed?\nReturn JSON: { score: number, issues: string[], logo_visible: boolean, brand_colors_correct: boolean, recommendations: string[] }' },
+                  { type: 'image_url', image_url: { url: imageUrl, detail: 'high' } },
+                ],
+              }],
+              max_tokens: 600,
+              temperature: 0.2,
+            }),
+          });
+          if (!critiqueRes.ok) return '';
+          const critiqueData = await critiqueRes.json() as any;
+          const raw = critiqueData.choices?.[0]?.message?.content || '';
+
+          await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.visual_critique', {
+            stage: label, critique: raw.slice(0, 800), screenshot_url: imageUrl,
+            message: `AI visual critique (${label}): ${raw.slice(0, 200)}`,
+          });
+          return raw;
+        } catch { return ''; }
+      }
+
+      // ── CALL 1: Foundation (single prompt, ~15 min) ──
       startTimer('container-build');
       const stageAResult = await step.do('stage-a-foundation', {
         retries: { limit: 1, delay: '10 seconds', backoff: 'exponential' },
         timeout: '20 minutes',
       }, async () => {
-        // Build a comprehensive prompt using ALL research data
         const brandLogo = (brand.logo || {}) as Record<string, any>;
         const logoUrl = brandLogo.found_online ? (brandLogo.url || '') : '';
         const allAssets = (assetManifest || []).map((key: string) => `https://${params.slug}.${DOMAINS.SITES_SUFFIX}/assets/${key.split('/').pop()}`);
@@ -1509,7 +1547,6 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           'Create MULTIPLE HTML files with CLEAN URLs (use descriptive filenames):',
           scrapedPages.length > 0
             ? (() => {
-                // Intelligently group pages — combine thin pages, keep substantial ones
                 const pageList = scrapedPages.map((p: any, i: number) => {
                   const pageName = p.url.replace(/^https?:\/\/[^/]+/, '').replace(/\/$/, '') || '/';
                   const fileName = pageName === '/' ? 'index.html' : pageName.replace(/^\//, '').replace(/\//g, '-').replace(/[^a-z0-9-]/gi, '') + '.html';
@@ -1581,7 +1618,7 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           '',
           '=== SEO ===',
           `<title>: ${safeName} — primary keyword + location`,
-          `canonical: https://${params.slug}.projectsites.dev/`,
+          `canonical: https://${params.slug}.${DOMAINS.SITES_SUFFIX}/`,
           'JSON-LD LocalBusiness with geo, hours, sameAs. og tags. FAQPage schema.',
           'Semantic HTML. robots.txt. sitemap.xml listing ALL pages.',
           '',
@@ -1614,7 +1651,7 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
       });
       currentFiles = (stageAResult as { name: string; content: string }[]) || [];
 
-      // Upload interim v1
+      // Upload interim v1 so GPT-4o can screenshot it
       if (currentFiles.length > 0) {
         await step.do('upload-interim-v1', RETRY_3, async () => {
           await uploadToR2(currentFiles, true);
@@ -1622,81 +1659,20 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
         });
       }
 
-      // Visual inspection after Stage A — feed critique into Stage B
+      // ── GPT-4o visual inspection after foundation ──
       let visualCritique = '';
-      if (env.OPENAI_API_KEY && currentFiles.length > 0) {
-        try {
-          const inspectResult = await step.do('inspect-after-a', RETRY_3, async () => {
-            const ssUrl = `https://api.microlink.io/?url=https://${params.slug}.${DOMAINS.SITES_SUFFIX}&screenshot=true&meta=false&embed=screenshot.url`;
-            const ssRes = await fetch(ssUrl);
-            if (!ssRes.ok) return '';
-            const ssData = await ssRes.json() as any;
-            const imageUrl = ssData?.data?.screenshot?.url;
-            if (!imageUrl) return '';
-
-            const critiqueRes = await fetch('https://api.openai.com/v1/chat/completions', {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                model: 'gpt-4o',
-                messages: [{
-                  role: 'user',
-                  content: [
-                    { type: 'text', text: 'You are reviewing a website screenshot. List the TOP 5 visual/design issues to fix. Be specific about CSS changes needed. Focus on: image placement, color consistency, text readability, spacing, and overall polish. Return a concise numbered list.' },
-                    { type: 'image_url', image_url: { url: imageUrl, detail: 'high' } },
-                  ],
-                }],
-                max_tokens: 400,
-                temperature: 0.3,
-              }),
-            });
-            if (!critiqueRes.ok) return '';
-            const critiqueData = await critiqueRes.json() as any;
-            return critiqueData.choices?.[0]?.message?.content || '';
-          });
-          visualCritique = (inspectResult as string) || '';
-          if (visualCritique) {
-            await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.visual_critique', {
-              stage: 'after-a', critique: visualCritique.slice(0, 500),
-              message: 'AI visual critique after Stage A: ' + visualCritique.slice(0, 200),
-            });
-          }
-        } catch { /* non-critical */ }
+      if (currentFiles.length > 0) {
+        const inspectResult = await step.do('inspect-after-foundation', RETRY_3, async () => {
+          return visualInspect('after-foundation');
+        });
+        visualCritique = (inspectResult as string) || '';
       }
 
-      // ── STAGE B: Enhancement (individual steps to avoid timeout) ──
+      // ── CALL 2: All enhancements in a single container (6 prompts, ~25 min) ──
+      // All 6 prompts run sequentially in the same directory — files persist between prompts.
+      // Visual critique from GPT-4o is injected into the first enhancement prompt.
       if (currentFiles.some(f => f.name === 'package.json' || f.name === 'index.html')) {
-        const b1 = await step.do('stage-b1-beauty', {
-          retries: { limit: 1, delay: '10 seconds', backoff: 'exponential' },
-          timeout: '15 minutes',
-        }, async () => {
-          return callContainer([
-            { label: 'B1-beauty', timeoutMin: 10, text: 'Make ALL React pages/components MORE BEAUTIFUL. Do NOT rewrite from scratch — enhance what exists.\n\nThis is a Vite + React + Tailwind project. Edit .tsx files in src/pages/ and src/components/.\n\nFor ALL page components:\n- 10+ @keyframes animations in src/index.css (fadeInUp, slideInLeft, scaleIn, subtleFloat, gradientShift, glowPulse)\n- IntersectionObserver: sections start opacity-0 translate-y-8, animate to visible on scroll (use a useInView hook)\n- Glassmorphism on cards (backdrop-blur-xl bg-white/10)\n- Use the BRAND COLORS from the original site (check _research.json for extracted colors)\n- Gradient text on hero headings using brand primary color (bg-gradient-to-r bg-clip-text text-transparent)\n- Smooth hover transforms on cards (hover:-translate-y-1 hover:shadow-xl transition-all)\n- Check every image: is it RELEVANT to its section? Is it duplicated on another page? Fix any mismatches.\n- Every section should have 3-5 images minimum, arranged in grids or galleries.\n- Fill any empty image placeholders with relevant Unsplash photos.\n- All image URLs must be absolute https:// URLs\n- Replace generic SVG icons with relevant stock photos\n- Add image galleries (3-4 photos) to sections that only have 1 image\n- SELF-PROMPT: Look at each page critically. What would make it more stunning? Do it.\n\nMULTIMEDIA ENHANCEMENT:\n- Ensure hero has background video (muted, autoplay, loop) or stunning gradient\n- Every section should have multiple high-quality images\n- Match images to content context\n- NEVER reuse the same image on multiple pages\n- TEXT OVER IMAGES: use gradient overlays (bg-gradient-to-t from-black/60)\n- For gaps, use Unsplash: https://images.unsplash.com/photo-{ID}?w={W}&h={H}&fit=crop' + (visualCritique ? '\n\nAI VISUAL INSPECTION FOUND THESE ISSUES (fix ALL of them):\n' + visualCritique : '') },
-          ], currentFiles, 'stage-b1');
-        });
-        const b1Arr = b1 as { name: string; content: string }[];
-        if (b1Arr?.length > 0) currentFiles = b1Arr;
-
-        const b2 = await step.do('stage-b2-seo-content', {
-          retries: { limit: 1, delay: '10 seconds', backoff: 'exponential' },
-          timeout: '15 minutes',
-        }, async () => {
-          return callContainer([
-            { label: 'B2-seo-content', timeoutMin: 10, text: 'SEO + content audit on ALL React page components. Do NOT rewrite from scratch.\n\nThis is a Vite + React + Tailwind project. Edit .tsx files in src/pages/.\n\n1. SEO: Each page component should set document.title and meta tags via useEffect. Add JSON-LD LocalBusiness schema on Home page (rendered via dangerouslySetInnerHTML in a <script> tag). FAQPage schema. Internal links between ALL pages using <Link> from react-router-dom. Verify public/robots.txt + public/sitemap.xml list all routes.\n2. CONTENT: Read _scraped.txt and _research.json. Ensure ALL original website content is present. If any services, programs, team members, or details are missing — add them. Every page should have images with alt text.\n3. IMAGE COMPLETENESS: Count images per page — if any page has fewer than 15, add more from Unsplash/Pexels. Verify no image appears on more than one page.' },
-          ], currentFiles, 'stage-b2');
-        });
-        const b2Arr = b2 as { name: string; content: string }[];
-        if (b2Arr?.length > 0) currentFiles = b2Arr;
-
-        // Upload interim v2
-        await step.do('upload-interim-v2', RETRY_3, async () => {
-          await uploadToR2(currentFiles, true);
-          return 'uploaded';
-        });
-      }
-
-      // ── STAGE C: Quality (3 prompts, ~10 min) ──
-      if (currentFiles.some(f => f.name === 'package.json' || f.name === 'index.html')) {
+        // Build domain-specific prompt
         let domainPrompt = 'Add domain-specific features to the React page components in src/pages/. This is a Vite + React + Tailwind project. ';
         const catLower = category.toLowerCase();
         if (catLower.includes('non-profit') || catLower.includes('community') || catLower.includes('church') || catLower.includes('soup')) {
@@ -1709,32 +1685,27 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           domainPrompt += 'Add appropriate features for this business type.';
         }
 
-        const stageC = await step.do('stage-c-quality', {
+        const enhancementResult = await step.do('stage-b-enhancements', {
           retries: { limit: 1, delay: '10 seconds', backoff: 'exponential' },
-          timeout: '20 minutes',
+          timeout: '25 minutes',
         }, async () => {
           return callContainer([
-            { label: 'C1-visual', timeoutMin: 5, text: 'Visual quality audit on ALL HTML files.\n\n1. Check EVERY image: is it relevant to the section content? Remove/replace irrelevant ones.\n2. Check for DUPLICATE images across pages — each page must have unique imagery.\n3. Fill any empty image placeholders with relevant Unsplash photos.\n4. Ensure the LOGO from the original site is visible in the header of every page.\n5. Verify brand colors match the original site (not generic blue/cyan).\n6. Text contrast: readable on all backgrounds.\n7. Grid partial rows centered.\n8. Nav should have max 5-7 top-level links, use dropdowns for sub-pages.\n9. Google Maps address should link to directions URL.\n10. AUDIT every image: no white space, no text overlays, no borders, no montage styling.\n11. Replace any montage/collage images with clean individual photographs.\n12. Verify all images use <picture> with WebP + fallback.\n13. Check that icons have been replaced with photos where appropriate.\n14. Each page should have 15+ images — add more if under that count.\n15. SELF-PROMPT: What else would make each page more stunning? Do it.' },
-            { label: 'C2-domain', timeoutMin: 5, text: domainPrompt },
-          ], currentFiles, 'stage-c');
-        });
-        const stageCArr = stageC as { name: string; content: string }[];
-        if (stageCArr?.length > 0) currentFiles = stageCArr;
-      }
-
-      // ── STAGE D: Final (2 prompts, ~5 min) ──
-      if (currentFiles.some(f => f.name === 'index.html')) {
-        const stageD = await step.do('stage-d-final', {
-          retries: { limit: 1, delay: '10 seconds', backoff: 'exponential' },
-          timeout: '15 minutes',
-        }, async () => {
-          return callContainer([
-            { label: 'D1-production', timeoutMin: 5, text: 'Final production polish on ALL files.\n\n1. No console.log. Valid HTML. All URLs use HTTPS.\n2. Google Fonts preconnect + display=swap.\n3. Back-to-top button. Smooth scroll. Copyright ' + new Date().getFullYear() + '.\n4. Address text links to Google Maps directions URL.\n5. Verify logo appears in header of EVERY page.\n6. Verify app icon/favicon is set.\n7. Every page must look pixel-perfect at 1280px and 375px.\n8. SELF-PROMPT: Browse every page as a user would. What feels incomplete or ugly? Fix it now.' },
+            // Prompt 1: Beauty + visual critique fixes
+            { label: 'B1-beauty', timeoutMin: 8, text: 'Make ALL React pages/components MORE BEAUTIFUL. Do NOT rewrite from scratch — enhance what exists.\n\nThis is a Vite + React + Tailwind project. Edit .tsx files in src/pages/ and src/components/.\n\nFor ALL page components:\n- 10+ @keyframes animations in src/index.css (fadeInUp, slideInLeft, scaleIn, subtleFloat, gradientShift, glowPulse)\n- IntersectionObserver: sections start opacity-0 translate-y-8, animate to visible on scroll (use a useInView hook)\n- Glassmorphism on cards (backdrop-blur-xl bg-white/10)\n- Use the BRAND COLORS from the original site (check _research.json for extracted colors)\n- Gradient text on hero headings using brand primary color (bg-gradient-to-r bg-clip-text text-transparent)\n- Smooth hover transforms on cards (hover:-translate-y-1 hover:shadow-xl transition-all)\n- Check every image: is it RELEVANT to its section? Is it duplicated on another page? Fix any mismatches.\n- Every section should have 3-5 images minimum, arranged in grids or galleries.\n- Fill any empty image placeholders with relevant Unsplash photos.\n- All image URLs must be absolute https:// URLs\n- Replace generic SVG icons with relevant stock photos\n- Add image galleries (3-4 photos) to sections that only have 1 image\n- SELF-PROMPT: Look at each page critically. What would make it more stunning? Do it.\n\nMULTIMEDIA ENHANCEMENT:\n- Ensure hero has background video (muted, autoplay, loop) or stunning gradient\n- Every section should have multiple high-quality images\n- Match images to content context\n- NEVER reuse the same image on multiple pages\n- TEXT OVER IMAGES: use gradient overlays (bg-gradient-to-t from-black/60)\n- For gaps, use Unsplash: https://images.unsplash.com/photo-{ID}?w={W}&h={H}&fit=crop' + (visualCritique ? '\n\nAI VISUAL INSPECTION FOUND THESE ISSUES (fix ALL of them):\n' + visualCritique : '') },
+            // Prompt 2: SEO + content completeness
+            { label: 'B2-seo-content', timeoutMin: 8, text: 'SEO + content audit on ALL React page components. Do NOT rewrite from scratch.\n\nThis is a Vite + React + Tailwind project. Edit .tsx files in src/pages/.\n\n1. SEO: Each page component should set document.title and meta tags via useEffect. Add JSON-LD LocalBusiness schema on Home page (rendered via dangerouslySetInnerHTML in a <script> tag). FAQPage schema. Internal links between ALL pages using <Link> from react-router-dom. Verify public/robots.txt + public/sitemap.xml list all routes.\n2. CONTENT: Read _scraped.txt and _research.json. Ensure ALL original website content is present. If any services, programs, team members, or details are missing — add them. Every page should have images with alt text.\n3. IMAGE COMPLETENESS: Count images per page — if any page has fewer than 15, add more from Unsplash/Pexels. Verify no image appears on more than one page.' },
+            // Prompt 3: Visual quality audit
+            { label: 'C1-visual', timeoutMin: 5, text: 'Visual quality audit on ALL React components.\n\n1. Check EVERY image: is it relevant to the section content? Remove/replace irrelevant ones.\n2. Check for DUPLICATE images across pages — each page must have unique imagery.\n3. Fill any empty image placeholders with relevant Unsplash photos.\n4. Ensure the LOGO from the original site is visible in the header of every page.\n5. Verify brand colors match the original site (not generic blue/cyan).\n6. Text contrast: readable on all backgrounds.\n7. Grid partial rows centered.\n8. Nav should have max 5-7 top-level links, use dropdowns for sub-pages.\n9. Google Maps address should link to directions URL.\n10. AUDIT every image: no white space, no text overlays, no borders, no montage styling.\n11. Replace any montage/collage images with clean individual photographs.\n12. Check that icons have been replaced with photos where appropriate.\n13. Each page should have 15+ images — add more if under that count.\n14. SELF-PROMPT: What else would make each page more stunning? Do it.' },
+            // Prompt 4: Domain-specific features
+            { label: 'C2-domain', timeoutMin: 4, text: domainPrompt },
+            // Prompt 5: Production polish
+            { label: 'D1-production', timeoutMin: 4, text: 'Final production polish on ALL files.\n\n1. No console.log. Valid HTML. All URLs use HTTPS.\n2. Google Fonts preconnect + display=swap.\n3. Back-to-top button. Smooth scroll. Copyright ' + new Date().getFullYear() + '.\n4. Address text links to Google Maps directions URL.\n5. Verify logo appears in header of EVERY page.\n6. Verify app icon/favicon is set.\n7. Every page must look pixel-perfect at 1280px and 375px.\n8. SELF-PROMPT: Browse every page as a user would. What feels incomplete or ugly? Fix it now.' },
+            // Prompt 6: Safety + SEO final check
             { label: 'D2-safety', timeoutMin: 2, text: 'Safety + SEO final check.\n1. Privacy notice on contact/donation forms.\n2. Footer: Privacy + Terms links on every page.\n3. External links: rel=noopener noreferrer.\n4. FAQ last item: Built by ProjectSites.dev.\n5. Verify sitemap.xml lists ALL pages.\n6. Verify robots.txt allows crawling.' },
-          ], currentFiles, 'stage-d');
+          ], currentFiles, 'stage-b');
         });
-        const stageDArr = stageD as { name: string; content: string }[];
-        if (stageDArr?.length > 0) currentFiles = stageDArr;
+        const enhancementArr = enhancementResult as { name: string; content: string }[];
+        if (enhancementArr?.length > 0) currentFiles = enhancementArr;
       }
 
       // ── FINAL DEPLOY ──
@@ -1746,144 +1717,35 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           ).bind(crypto.randomUUID(), params.siteId, version).run();
           return version;
         });
-        // ── VISUAL INSPECTION (non-blocking) ──────────────────
-        await step.do('visual-inspection', RETRY_3, async () => {
+
+        // ── Final GPT-4o visual inspection (non-blocking) ──
+        await step.do('visual-inspection-final', RETRY_3, async () => {
+          const critique = await visualInspect('final');
+          if (!critique) return JSON.stringify({ skipped: true, reason: 'no_critique' });
+
+          // Parse and log structured results
           try {
-            // 1. Take a screenshot of the published site via microlink.io
-            const screenshotUrl = `https://api.microlink.io/?url=https://${params.slug}.projectsites.dev&screenshot=true&meta=false&embed=screenshot.url`;
-            const ssRes = await fetch(screenshotUrl, {
-              headers: { 'User-Agent': 'ProjectSites/1.0' },
-            });
-
-            if (!ssRes.ok) {
-              await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.visual_inspection_skipped', {
-                step: 'visual-inspection',
-                reason: 'screenshot_failed',
-                status: ssRes.status,
-                message: `Visual inspection skipped: screenshot API returned ${ssRes.status}`,
-              });
-              return JSON.stringify({ skipped: true, reason: 'screenshot_failed' });
-            }
-
-            const ssData = await ssRes.json() as { data?: { screenshot?: { url?: string } } };
-            const imageUrl = ssData.data?.screenshot?.url;
-
-            if (!imageUrl) {
-              await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.visual_inspection_skipped', {
-                step: 'visual-inspection',
-                reason: 'no_screenshot_url',
-                message: 'Visual inspection skipped: no screenshot URL in response',
-              });
-              return JSON.stringify({ skipped: true, reason: 'no_screenshot_url' });
-            }
-
-            // 2. Send screenshot to GPT-4o vision for web design critique
-            if (!env.OPENAI_API_KEY) {
-              await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.visual_inspection_skipped', {
-                step: 'visual-inspection',
-                reason: 'no_openai_key',
-                message: 'Visual inspection skipped: OPENAI_API_KEY not configured',
-              });
-              return JSON.stringify({ skipped: true, reason: 'no_openai_key' });
-            }
-
-            const critiqueRes = await fetch('https://api.openai.com/v1/chat/completions', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${env.OPENAI_API_KEY}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                model: 'gpt-4o',
-                messages: [{
-                  role: 'user',
-                  content: [
-                    {
-                      type: 'text',
-                      text: 'You are a senior web designer reviewing this website screenshot. Provide a concise critique:\n1. Overall visual quality (1-10)\n2. Color consistency with brand\n3. Typography quality\n4. Image placement and relevance\n5. Mobile-readiness assessment\n6. Top 3 specific issues to fix\n7. Is the logo visible and properly placed?\nReturn JSON: { score: number, issues: string[], logo_visible: boolean, brand_colors_correct: boolean }',
-                    },
-                    {
-                      type: 'image_url',
-                      image_url: { url: imageUrl, detail: 'high' },
-                    },
-                  ],
-                }],
-                max_tokens: 500,
-                temperature: 0.2,
-              }),
-            });
-
-            if (!critiqueRes.ok) {
-              const errText = await critiqueRes.text().catch(() => 'unknown');
-              await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.visual_inspection_failed', {
-                step: 'visual-inspection',
-                reason: 'gpt4o_api_error',
-                status: critiqueRes.status,
-                error: errText.substring(0, 500),
-                message: `Visual inspection GPT-4o call failed: ${critiqueRes.status}`,
-              });
-              return JSON.stringify({ skipped: true, reason: 'gpt4o_api_error', status: critiqueRes.status });
-            }
-
-            const critiqueData = await critiqueRes.json() as {
-              choices?: { message?: { content?: string } }[];
-            };
-            const rawContent = critiqueData.choices?.[0]?.message?.content ?? '';
-            const cleanedContent = rawContent.replace(/```json\n?/g, '').replace(/```/g, '').trim();
-
-            let critique: { score?: number; issues?: string[]; logo_visible?: boolean; brand_colors_correct?: boolean } = {};
-            try {
-              critique = JSON.parse(cleanedContent);
-            } catch {
-              // GPT-4o returned non-JSON — log the raw content
-              await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.visual_inspection_complete', {
-                step: 'visual-inspection',
-                raw_critique: cleanedContent.substring(0, 1000),
-                parse_error: true,
-                message: 'Visual inspection complete but critique was not valid JSON',
-              });
-              return JSON.stringify({ raw_critique: cleanedContent.substring(0, 1000), parse_error: true });
-            }
-
-            // 3. Log the critique to D1 via workflowLog
-            const score = typeof critique.score === 'number' ? critique.score : 0;
-            const issues = Array.isArray(critique.issues) ? critique.issues : [];
-            const hasCriticalIssues = !critique.logo_visible || !critique.brand_colors_correct;
+            const cleaned = critique.replace(/```json\n?/g, '').replace(/```/g, '').trim();
+            const parsed = JSON.parse(cleaned) as { score?: number; issues?: string[]; logo_visible?: boolean; brand_colors_correct?: boolean };
+            const score = typeof parsed.score === 'number' ? parsed.score : 0;
+            const issues = Array.isArray(parsed.issues) ? parsed.issues : [];
 
             await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.visual_inspection_complete', {
-              step: 'visual-inspection',
-              score,
-              issues,
-              logo_visible: critique.logo_visible ?? null,
-              brand_colors_correct: critique.brand_colors_correct ?? null,
-              has_critical_issues: hasCriticalIssues,
-              needs_improvement: score < 7 || hasCriticalIssues,
-              screenshot_url: imageUrl,
-              message: `Visual inspection: score=${score}/10, ${issues.length} issues, logo=${critique.logo_visible ? 'visible' : 'missing'}, colors=${critique.brand_colors_correct ? 'correct' : 'incorrect'}`,
+              step: 'visual-inspection-final', score, issues,
+              logo_visible: parsed.logo_visible ?? null,
+              brand_colors_correct: parsed.brand_colors_correct ?? null,
+              needs_improvement: score < 7 || !parsed.logo_visible || !parsed.brand_colors_correct,
+              message: `Final visual inspection: score=${score}/10, ${issues.length} issues`,
             });
-
-            // 4. Return critique for future improvement
-            return JSON.stringify({
-              score,
-              issues,
-              logo_visible: critique.logo_visible ?? null,
-              brand_colors_correct: critique.brand_colors_correct ?? null,
-              needs_improvement: score < 7 || hasCriticalIssues,
-            });
-          } catch (inspectionErr) {
-            // Non-blocking: log the failure but don't fail the workflow
-            const errMsg = inspectionErr instanceof Error ? inspectionErr.message : String(inspectionErr);
-            await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.step.visual_inspection_failed', {
-              step: 'visual-inspection',
-              error: errMsg,
-              message: 'Visual inspection failed (non-blocking): ' + errMsg,
-            });
-            return JSON.stringify({ skipped: true, reason: 'exception', error: errMsg });
+            return JSON.stringify({ score, issues, logo_visible: parsed.logo_visible, brand_colors_correct: parsed.brand_colors_correct });
+          } catch {
+            return JSON.stringify({ raw_critique: critique.slice(0, 1000), parse_error: true });
           }
         });
       } else {
         await updateSiteStatus(env.DB, params.siteId, 'error');
       }
+
 
     } catch (containerErr) {
       const containerErrMsg = containerErr instanceof Error ? containerErr.message : String(containerErr);
