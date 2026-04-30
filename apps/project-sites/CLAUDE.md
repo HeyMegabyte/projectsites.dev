@@ -5,6 +5,35 @@
 >
 > **Template repo:** https://github.com/HeyMegabyte/template.projectsites.dev
 
+## Mandatory Site-Generation Invariants (BUILD-BREAKING)
+
+These invariants are enforced programmatically in `src/services/build_validators.ts` and run between R2 upload and `published` status. Each maps to a gate in `~/.agentskills/15-site-generation/quality-gates.md`. A violation flips the site to `error` once we move from `report` → `strict` mode.
+
+| Invariant | Rule | Code |
+|---|---|---|
+| Required files | `site.webmanifest`, `robots.txt`, `humans.txt`, `sitemap.xml`, `browserconfig.xml`, `.well-known/security.txt`, `favicon.ico`, `favicon-16x16.png`, `favicon-32x32.png`, `apple-touch-icon.png` all exist | `manifest.required_file_missing` |
+| Asset existence | Every internal `src=` / `href=` / `url(...)` in HTML resolves to a file in R2; external hosts must be in allowlist | `asset.missing`, `asset.external_host_not_allowed` |
+| Image format | No PNG > 200KB except favicons (re-encode WebP/JPEG) | `image.png_too_large` |
+| OG image | `og-image.*` exists, ≤100KB, branded card (1200×630) | `og.missing`, `og.too_large` |
+| apple-touch-icon | 180×180 at root | `icon.apple_touch_missing` |
+| Meta lengths | `<title>` 50-60 chars, `<meta description>` 120-156 chars | `meta.title_length`, `meta.description_length` |
+| JSON-LD | 4+ blocks per HTML page (WebSite + Organization + WebPage + BreadcrumbList minimum) | `jsonld.count_below_threshold` |
+| H1 in shell | Exactly 1 `<h1>` in HTML shell (prerender) — outside script/style | `html.h1_count` |
+| color-scheme | `<meta name="color-scheme">` present | `meta.color_scheme_missing` |
+| Sitemap lastmod | Every `<url>` in `sitemap.xml` has `<lastmod>` | `sitemap.missing_lastmod` |
+| Banned slop | No "limitless", "revolutionize", "cutting-edge", "leverage", "world-class", etc. | `copy.banned_word` |
+| JS chunk size | No JS chunk > 750KB raw (~250KB gzip) — code-split by route | `js.chunk_too_large` |
+| Lightbox | JS bundle contains `data-zoomable` AND `data-gallery` strings | `lightbox.zoomable_missing`, `lightbox.gallery_missing` |
+
+**Mode flag (in workflow `validate-build` step):** currently `report` (logs to D1 audit, never throws). Flip to `strict` once template ships clean across all benchmarks (megabyte-labs, njsk, nyfb, vito's, soup kitchen).
+
+**Run from a unit test:**
+```ts
+import { validateBuild } from './src/services/build_validators';
+const report = validateBuild(files);
+if (!report.ok) console.error(report.errors);
+```
+
 ## Website Generation Philosophy (CRITICAL — read this first)
 
 **Our goal: Generate enterprise-grade, industry-leading websites that BEAT any existing website.** We don't copy sites — we take any website and use AI to make it dramatically better. Every generated site must be more beautiful, more accessible, better structured, faster loading, and better optimized for SEO/conversions than the source. We specialize in information-dense sites: take sprawling, poorly-organized original websites and condense them into gorgeous, well-organized, modern designs that pack MORE useful information into FEWER, better-designed pages.
@@ -63,47 +92,61 @@
 - Safety check is ALWAYS the last step regardless of business type.
 - Optimize every feature for bottom-line impact (conversions, SEO, retention).
 
-## Container Architecture (CRITICAL — how builds actually work)
+## Container Architecture: Single-Prompt Orchestrator + Parallel Subagents
 
-**The container is a STATELESS Claude Code executor.** It does not access D1 or R2 directly.
+**The container is a STATELESS Claude Code executor that runs a single orchestrator prompt.** That orchestrator delegates to specialist subagents in parallel via the Task tool. It does not access D1 or R2 directly.
 
+### Inheritance from megabytespace/claude-skills
+The container's `~/.claude/CLAUDE.md` `@-imports` the upstream `~/.agentskills/CLAUDE.md`, `AGENTS.md`, and `_router.md` — ProjectSites inherits the **entire Emdash Skills meta surface** (15 skill categories, 18 universal agents, 32 platform variants, conventions, profiles). Project-specific orchestrator instructions layer on top via the same file. Updates land within 10 minutes via `container-server.mjs` git-pull + `syncAgents()`.
+
+### Subagent Surface
+| Source | Agents | Role |
+|--------|--------|------|
+| `~/.agentskills/agents/` (synced to `~/.claude/agents/`) | visual-qa, seo-auditor, accessibility-auditor, performance-profiler, completeness-checker, content-writer, security-reviewer, test-writer (+10 more) | Universal audit/build specialists |
+| `apps/project-sites/.claude/agents/` (COPY'd in Dockerfile) | **domain-builder**, **validator-fixer** | Project-specific (no upstream equivalent) |
+
+`domain-builder` creates donation/menu/booking/medical/child-safety/local-business sections as new files in `src/components/sections/`. `validator-fixer` runs `scripts/run-validators.mjs` and surgically fixes the 13 violation codes from `build_validators.ts`.
+
+### Workflow Steps (current — single-call container)
 ```
-Workflow Step 1-3: Research (parallel)
-  → Profile, Brand, Social, Images, Scrape website, Structure plan
-  → All research runs on Workers AI (Llama 3.1) and external APIs
+Step 1-3: Research (parallel)
+  → Profile, Brand, Social, Images, Scrape, Structure plan
+  → Workers AI (Llama 3.1) + external APIs
 
-Workflow Step 4a: stage-a-foundation (20 min timeout)
-  → Container call 1: single foundation prompt generates full Vite+React+Tailwind project
-  → Container runs `claude -p` as non-root user `cuser`
-  → Returns ALL generated files to workflow
-  → Workflow uploads to R2 as interim v1
+Step 4: container-build (single call, ~25-40 min)
+  → Container runs ONE Claude Code orchestrator prompt
+  → Orchestrator loads ~/.agentskills/_router.md + skill 15 in full
+  → Customizes template directly (template -> dist)
+  → npm run build, fix errors
+  → PARALLEL FAN-OUT (single Task message, multiple subagents):
+      - domain-builder    (writes section components)
+      - visual-qa         (audit: screenshots + GPT-4o)
+      - seo-auditor       (audit: title/meta/JSON-LD/OG)
+      - accessibility-auditor (audit: axe-core 6 bp)
+      - performance-profiler  (audit: Lighthouse + bundles)
+  → Routes findings:
+      - copy/voice  → content-writer
+      - HTML/asset/meta/JSON-LD/sitemap/lightbox/js-chunk → validator-fixer
+      - a11y/perf remediation → validator-fixer (uses reports as input)
+  → Loop until run-validators.mjs reports blockers === 0
+  → completeness-checker as final gate (loop back if NOT_DONE)
+  → node /home/cuser/upload-to-r2.mjs
 
-Workflow Step 4b: GPT-4o visual inspection
-  → Screenshots the interim site via microlink.io
-  → Sends screenshot to GPT-4o vision for design critique
-  → Returns issues list + recommendations
-
-Workflow Step 4c: stage-b-enhancements (25 min timeout)
-  → Container call 2: 6 sequential prompts in a single container
-  → B1-beauty (with GPT-4o visual critique injected), B2-seo-content,
-    C1-visual audit, C2-domain features, D1-production polish, D2-safety
-  → All prompts run in the same directory — files persist between prompts
-  → Returns final files
-  → Workflow uploads to R2 as final version
-  → Workflow updates D1 status to 'published'
-  → Workflow creates 'initial' snapshot
-
-Workflow Step 4d: Final GPT-4o visual inspection (non-blocking)
-  → Screenshots the published site, scores via GPT-4o vision
-  → Logs score/issues to D1 for future improvement
+Step 5: visual-inspection-final (non-blocking)
+  → Screenshot published site, GPT-4o score, log to D1
 ```
 
-**Container entrypoint** (`src/container.ts`): ~3KB inline Node.js that:
-1. Runs `git pull` on pre-baked skills + template repos (Dockerfile pre-installs Claude Code, cuser, skills, template)
-2. Starts HTTP server on port 8080
-4. Accepts POST with `{ prompts, existingFiles, contextFiles }`
-5. Runs each prompt via `su cuser -s /bin/sh -c "sh /tmp/run.sh"`
-6. Returns all non-underscore files from the build directory
+### Why Orchestrator Pattern Beats Sequential Stages
+- **Subagents have isolated context windows** — fan-out is free, no context pressure.
+- **File partitioning prevents merge conflicts** — domain-builder owns sections, validator-fixer owns shell + public/ + config.
+- **Audit and build run concurrently** — visual-qa screenshots while domain-builder writes, both finish ~5 min instead of 15 min sequential.
+- **Single container call** — no R2 upload between stages, no workflow step boundaries to lose state across.
+
+### Container entrypoint (`scripts/container-server.mjs`)
+1. Boot: `git pull` on `~/.agentskills` + `~/template`, then `syncAgents()` copies `*.md` from `~/.agentskills/agents/` to `~/.claude/agents/` (project agents already on disk are preserved).
+2. Every 10 min: `maybeRefreshSkills()` re-pulls + re-syncs.
+3. HTTP server on 8080. `POST /build` accepts `{ prompts, existingFiles, contextFiles }`, runs `claude -p` as `cuser`, HMAC-signs callback to `/api/internal/build-status`.
+4. Returns all non-underscore files from the build directory after completion.
 
 **API Credit Discipline (NON-NEGOTIABLE):**
 - **NEVER** waste API credits on speculative or debugging builds
@@ -530,13 +573,13 @@ Step 2.5 (sequential): move-uploaded-assets      → move user uploads to R2
 Step 2.5b (optional): scrape-website             → deep-crawl existing site
 Step 2.6 (optional):  seed-site-data             → seed per-site D1 tables
 Step 3 (sequential):  structure-plan             → site structure plan (fast LLM)
-Steps 4-6 (container build — 2 calls + visual inspection):
-  stage-a-foundation     → Container call 1: foundation prompt (15min)
-  upload-interim-v1      → upload to R2
-  inspect-after-foundation → GPT-4o visual inspection → critique
-  stage-b-enhancements   → Container call 2: 6 prompts sequentially (25min)
-                           B1-beauty (+ visual critique), B2-seo, C1-visual,
-                           C2-domain, D1-production, D2-safety
+Steps 4-5 (container build — single-prompt orchestrator):
+  build-orchestrator     → Container call: orchestrator prompt fans out to
+                           parallel subagents (visual-qa, seo-auditor,
+                           accessibility-auditor, performance-profiler,
+                           content-writer, security-reviewer, domain-builder,
+                           validator-fixer) under one Claude Code session,
+                           gates DONE on completeness-checker (~40min)
   upload-final           → upload to R2, update D1 status to 'published'
   visual-inspection-final → GPT-4o final scoring (non-blocking)
 ```
