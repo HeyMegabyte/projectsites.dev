@@ -1,6 +1,7 @@
-import { Component, type OnInit, signal, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
+import { Component, type OnInit, type OnDestroy, signal, inject } from '@angular/core';
+import { Router, NavigationEnd } from '@angular/router';
+import { Subscription, filter } from 'rxjs';
+import { AuthService } from '../../services/auth.service';
 
 interface OnboardingStep {
   id: string;
@@ -14,7 +15,7 @@ interface OnboardingStep {
 @Component({
   selector: 'app-onboarding',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   template: `
     @if (visible()) {
       <div class="onboarding-overlay" (click)="dismiss()">
@@ -129,9 +130,13 @@ interface OnboardingStep {
     @keyframes fadeInScale { from { opacity: 0; transform: scale(0.95) } to { opacity: 1; transform: scale(1) } }
   `],
 })
-export class OnboardingComponent implements OnInit {
+export class OnboardingComponent implements OnInit, OnDestroy {
   private router = inject(Router);
+  private auth = inject(AuthService);
   private readonly STORAGE_KEY = 'ps_onboarding';
+  private readonly SEEN_KEY = 'ps_onboarding_seen';
+  private routerSub?: Subscription;
+  private shownThisSession = false;
 
   visible = signal(false);
 
@@ -148,9 +153,7 @@ export class OnboardingComponent implements OnInit {
 
   ngOnInit(): void {
     const stored = localStorage.getItem(this.STORAGE_KEY);
-    if (stored === 'dismissed') return;
-
-    if (stored) {
+    if (stored && stored !== 'dismissed') {
       try {
         const completed: string[] = JSON.parse(stored);
         const updated = this.steps().map((s) => ({ ...s, completed: completed.includes(s.id) }));
@@ -161,12 +164,30 @@ export class OnboardingComponent implements OnInit {
       }
     }
 
-    // Show after a brief delay to not block first paint
-    setTimeout(() => this.visible.set(true), 1500);
+    this.maybeShow(this.router.url);
+    this.routerSub = this.router.events
+      .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
+      .subscribe((e) => this.maybeShow(e.urlAfterRedirects));
+  }
+
+  ngOnDestroy(): void {
+    this.routerSub?.unsubscribe();
+  }
+
+  /** Show the tour only on the first /admin visit after sign-in. */
+  private maybeShow(url: string): void {
+    if (this.shownThisSession) return;
+    if (localStorage.getItem(this.SEEN_KEY) === '1') return;
+    if (!this.auth.isLoggedIn()) return;
+    const path = url.split('?')[0];
+    if (!path.startsWith('/admin')) return;
+    this.shownThisSession = true;
+    setTimeout(() => this.visible.set(true), 800);
   }
 
   dismiss(): void {
     this.visible.set(false);
+    localStorage.setItem(this.SEEN_KEY, '1');
     localStorage.setItem(this.STORAGE_KEY, 'dismissed');
   }
 
@@ -175,6 +196,7 @@ export class OnboardingComponent implements OnInit {
       this.router.navigate([step.route]);
       this.markComplete(step.id);
       this.visible.set(false);
+      localStorage.setItem(this.SEEN_KEY, '1');
     }
   }
 

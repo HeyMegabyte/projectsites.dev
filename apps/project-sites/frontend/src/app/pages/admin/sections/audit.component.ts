@@ -1,5 +1,5 @@
 import { Component, inject, signal, type OnInit, type OnDestroy } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { NgClass } from '@angular/common';
 import { AdminStateService } from '../admin-state.service';
 import { ApiService, type LogEntry } from '../../../services/api.service';
 import { ToastService } from '../../../services/toast.service';
@@ -7,7 +7,7 @@ import { ToastService } from '../../../services/toast.service';
 @Component({
   selector: 'app-admin-audit',
   standalone: true,
-  imports: [CommonModule],
+  imports: [NgClass],
   template: `
     <div class="p-5 flex-1 overflow-y-auto animate-fade-in">
       <div class="flex items-center justify-between mb-3 gap-2">

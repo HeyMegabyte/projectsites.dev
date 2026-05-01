@@ -670,53 +670,57 @@ gtag('config','${measurementId}',{
 }
 
 /**
- * Generate the PostHog client-side tracking snippet.
+ * Generate the PWA meta + favicon link block injected into every served site.
  *
- * Injects the PostHog JS SDK loader and initializes it with the project API key.
- * Uses `identified_only` person profiles to minimize data collection.
+ * Fixes the deprecated `apple-mobile-web-app-capable` warning by including the
+ * standardized `mobile-web-app-capable` alongside it, and guarantees the icon
+ * paths referenced by `site.webmanifest` resolve (worker fallback serves them
+ * from `sites/{slug}/assets/`).
  *
- * @param posthogApiKey - PostHog project API key.
- * @param slug          - Site slug for event enrichment.
- * @returns HTML `<script>` block to inject before `</head>`.
+ * @param slug - Site slug used in icon path resolution + theme branding hooks.
+ * @returns HTML block to inject before `</head>`.
  */
-function generatePostHogSnippet(posthogApiKey: string, slug: string): string {
-  return `<!-- PostHog Analytics -->
-<script>
-!function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.async=!0,p.src=s.api_host+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="capture identify alias people.set people.set_once set_config register register_once unregister opt_out_capturing has_opted_out_capturing opt_in_capturing reset isFeatureEnabled onFeatureFlags getFeatureFlag getFeatureFlagPayload reloadFeatureFlags group updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures getActiveMatchingSurveys getSurveys onSessionId".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
-posthog.init('${posthogApiKey}',{api_host:'https://us.i.posthog.com',person_profiles:'identified_only'});
-posthog.capture('$pageview',{site_slug:'${slug}'});
-</script>`;
+function generatePwaMetaSnippet(slug: string): string {
+  void slug;
+  return `<!-- PWA + Favicon (auto-injected) -->
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/android-chrome-192x192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/android-chrome-512x512.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">`;
 }
 
 /**
- * Generate the Sentry client-side error tracking snippet.
+ * Anti-FOUC (Flash Of Unstyled Content) snippet, injected into every served site.
  *
- * Uses the lightweight Sentry Loader approach for minimal bundle impact.
- * The DSN is extracted to build the loader URL.
+ * Generated sites load Google Fonts with `display=swap`, which paints with a
+ * fallback face first and then re-renders when the web font arrives — visible as
+ * a text reflow / layout shift on first load. This snippet hides `<body>` until
+ * either `document.fonts.ready` resolves or a 1500 ms safety net fires
+ * (whichever comes first), then fades content in over 180 ms.
  *
- * @param sentryDsn - Full Sentry DSN string.
- * @param slug      - Site slug for Sentry tag enrichment.
- * @returns HTML `<script>` block to inject before `</head>`.
+ * The CSS lives in `<head>` so it applies before first paint. The class is
+ * toggled on `<html>` (not `<body>`) so it works even before `<body>` parses.
+ *
+ * @returns HTML `<style>` + `<script>` block to inject before `</head>`.
  */
-function generateSentrySnippet(sentryDsn: string, slug: string): string {
-  // Extract the public key from the DSN for the loader URL
-  // DSN format: https://{public_key}@{host}/{project_id}
-  const dsnMatch = sentryDsn.match(/https:\/\/([^@]+)@[^/]+\/(\d+)/);
-  if (!dsnMatch) return '';
-
-  const projectId = dsnMatch[2];
-  return `<!-- Sentry Error Tracking -->
-<script
-  src="https://js.sentry-cdn.com/${dsnMatch[1]}.min.js"
-  crossorigin="anonymous"
-></script>
-<script>
-window.Sentry && Sentry.onLoad(function(){
-  Sentry.init({dsn:'${sentryDsn}',tracesSampleRate:0.1,environment:'production'});
-  Sentry.setTag('site_slug','${slug}');
-  Sentry.setTag('project_id','${projectId}');
-});
-</script>`;
+function generateAntiFoucSnippet(): string {
+  return `<!-- Anti-FOUC: hide + freeze animations until fonts ready or 1.5s safety net -->
+<style id="ps-anti-fouc">
+html:not(.ps-fonts-ready) body{opacity:0}
+html:not(.ps-fonts-ready) *,html:not(.ps-fonts-ready) *::before,html:not(.ps-fonts-ready) *::after{
+  animation:none !important;
+  transition:none !important;
+}
+html.ps-fonts-ready body{opacity:1;transition:opacity .2s ease-out}
+@media (prefers-reduced-motion: reduce){html.ps-fonts-ready body{transition:none}}
+</style>
+<script>(function(){var h=document.documentElement,fired=false,r=function(){if(fired)return;fired=true;requestAnimationFrame(function(){requestAnimationFrame(function(){h.classList.add('ps-fonts-ready')})})};if(document.fonts&&document.fonts.ready){document.fonts.ready.then(r);}setTimeout(r,1500);})();</script>`;
 }
 
 /**
@@ -759,13 +763,18 @@ async function buildSiteResponse(
         headInjection += generateGa4Snippet(env.GA4_MEASUREMENT_ID, site.slug);
       }
 
-      if (env.POSTHOG_API_KEY) {
-        headInjection += generatePostHogSnippet(env.POSTHOG_API_KEY, site.slug);
-      }
+      // PostHog and Sentry are intentionally NOT injected into served
+      // business-portfolio sites. End users visit small-business sites and
+      // we don't surveil them or expose third-party error trackers there.
+      // Worker-internal telemetry (this Worker's own monitoring) still uses
+      // POSTHOG_API_KEY + SENTRY_DSN, but those keys never reach client HTML.
 
-      if (env.SENTRY_DSN) {
-        headInjection += generateSentrySnippet(env.SENTRY_DSN, site.slug);
-      }
+      // Always inject mobile-web-app meta + favicon links (auto-managed PWA setup).
+      headInjection += generatePwaMetaSnippet(site.slug);
+
+      // Always inject anti-FOUC snippet — gates body visibility on font load to
+      // prevent the Google Fonts swap-flash that shifts hero/headline layout.
+      headInjection += generateAntiFoucSnippet();
 
       if (headInjection) {
         html = html.replace(/<\/head>/i, `${headInjection}\n</head>`);

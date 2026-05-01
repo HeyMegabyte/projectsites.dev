@@ -84,7 +84,8 @@ export class SearchComponent implements OnInit, OnDestroy {
         }),
         takeUntil(this.destroy$)
       )
-      .subscribe((res) => {
+      .subscribe({
+        next: (res) => {
         this.loading.set(false);
         if (!res) return;
 
@@ -170,6 +171,8 @@ export class SearchComponent implements OnInit, OnDestroy {
 
         this.results.set(items);
         this.dropdownOpen.set(true);
+        },
+        error: () => { this.loading.set(false); },
       });
 
     // Request geolocation after delay

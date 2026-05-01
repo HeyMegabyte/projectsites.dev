@@ -1,5 +1,4 @@
 import { Component, type OnInit, signal, inject, type OnDestroy } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
@@ -18,7 +17,7 @@ interface Notification {
 @Component({
   selector: 'app-notification-bell',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   template: `
     <div class="notification-wrapper">
       <button
@@ -168,9 +167,12 @@ export class NotificationBellComponent implements OnInit, OnDestroy {
     this.pollSub = interval(60_000).pipe(
       filter(() => this.auth.isLoggedIn()),
       switchMap(() => this.api.get<{ data: Notification[]; unread_count: number }>('/notifications')),
-    ).subscribe((res) => {
-      this.notifications.set(res.data);
-      this.unreadCount.set(res.unread_count);
+    ).subscribe({
+      next: (res) => {
+        this.notifications.set(res.data);
+        this.unreadCount.set(res.unread_count);
+      },
+      error: () => { /* silent — poll failures are non-critical */ },
     });
   }
 

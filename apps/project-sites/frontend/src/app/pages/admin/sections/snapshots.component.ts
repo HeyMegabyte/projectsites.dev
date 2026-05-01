@@ -1,5 +1,5 @@
 import { Component, inject, signal, type OnInit } from '@angular/core';
-import { CommonModule, DatePipe } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AdminStateService } from '../admin-state.service';
 import { ApiService } from '../../../services/api.service';
@@ -16,7 +16,7 @@ interface Snapshot {
 @Component({
   selector: 'app-admin-snapshots',
   standalone: true,
-  imports: [CommonModule, FormsModule, DatePipe],
+  imports: [FormsModule, DatePipe],
   template: `
     <div class="p-7 flex-1 overflow-y-auto animate-fade-in max-md:p-4 space-y-6">
 

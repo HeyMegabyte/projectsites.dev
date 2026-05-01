@@ -59,9 +59,9 @@ if (!report.ok) console.error(report.errors);
 
 **For information-heavy sites (like whitehouse.gov):**
 - The homepage should pack MORE useful information than the original
-- Navigation should be cleaner (3-4 pages max vs. hundreds)
+- Page count = source sitemap count (1:N mapping, max 1000 pages). Do NOT collapse 200 source pages into 4 — recreate every URL the source serves. Navigation reorganization happens in the IA hierarchy (mega-menu, faceted nav, search), not by deleting pages
 - Content should be reorganized by user intent, not org structure
-- Blog/news section should be auto-generated from scraped articles
+- Blog/news section should be auto-generated from scraped articles, with one route per post
 
 **For community/non-profit sites (like njsk.org):**
 - Bundle scattered pages into cohesive sections
@@ -209,6 +209,61 @@ Step 5: visual-inspection-final (non-blocking)
 - Brand colors from the original website are extracted via AI vision, then enhanced to be more vibrant if needed while keeping the hue family
 - If brand colors have poor contrast combinations, the AI must adjust them (lighter/darker variants) while maintaining brand recognition
 
+**Logo Luminance Drives Theme (BUILD-BREAKING):**
+- During brand research, compute the dominant-color luminance of the brand logo (sRGB → relative luminance per WCAG)
+- **Dark logo (luminance < 0.4):** build a LIGHT theme (cream/white/off-white background, dark text, accent colors pulled from logo)
+- **Light logo (luminance > 0.6):** build a DARK theme (the existing dark-first preference applies here)
+- **Mid-luminance logo (0.4-0.6):** default to dark theme but verify logo contrast against header/hero/footer backgrounds — if any combination falls below 4.5:1, flip to light theme
+- Logo legibility outranks the dark-theme aesthetic preference. The site's primary background MUST contrast the logo by ≥4.5:1
+- Set `_brand.json.theme = "light" | "dark"` BEFORE template selection. The orchestrator must read this and pick a light or dark template variant accordingly
+- **Examples:** njsk.org (dark burgundy wordmark) → light theme. Stripe (light-on-dark wordmark) → dark theme. Linear (dark monochrome) → light theme
+
+**Source-Site Theme Preservation (BUILD-BREAKING):**
+- GPT-4o-score the source homepage screenshot on aesthetic polish (0-10) during brand research
+- If score ≥7 (polished site), preserve the source theme polarity: light → light, dark → dark. Do NOT flip a polished light site to dark just because dark is the platform default
+- Set `_brand.json.preserve_source_design = true` when source ≥7/10 — orchestrator clones source layout patterns before adding our improvements
+- **Example:** lonemountainglobal.com is a light-themed bespoke WordPress site → MUST stay light. Flipping to dark destroys brand recognition
+
+**Logo Extraction Priority Chain (BUILD-BREAKING):**
+- Source HTML must be parsed BEFORE the LLM brand step. Extract logo via deterministic crawler with this priority chain:
+  1. Header `<img>` with class/alt containing "logo" → 2. `site.webmanifest` icons[] → 3. WordPress `cropped-*-icon-*.png` and `*-icon-512x512*.png` patterns → 4. `<link rel="apple-touch-icon">` 180×180 → 5. `<link rel="icon">` 32×32 → 6. `og:image` (last resort) → 7. Logo.dev / Brandfetch API → 8. Ideogram A/B/C generation as ABSOLUTE last resort
+- Persist BOTH `_brand.json.logo.original_url` (full horizontal/wordmark) AND `_brand.json.logo.original_icon_url` (square icon-only, no text)
+- Container orchestrator MUST verify `original_icon_url` HEAD-200s before declaring brand-research complete
+
+**real-favicongenerator Pipeline (MANDATORY every build):**
+- Run RFG (`https://realfavicongenerator.net/api/favicon`) against the icon-only logo to produce the FULL 11-file favicon set: `favicon.ico`, `favicon-{16,32,48}.png`, `apple-touch-icon.png` (180×180), `android-chrome-{192,512}.png`, `mstile-150x150.png`, `safari-pinned-tab.svg`, `site.webmanifest` (icons[] populated), `browserconfig.xml`
+- If RFG unavailable, fall back to `sharp-cli` + `realfavicon` npm package inside the container
+- Build fails if any of the 11 files missing from `public/` after the step
+
+**Media Augmentation 1.4–2.0× (BUILD-BREAKING):**
+- Extract ALL original media from source: homepage hero, sliders, galleries, team headshots, og:image, every `<img>` src, every CSS `background-image:` URL. Persist under `_assets.json.original[]`
+- Augment via Pexels + Unsplash + Pixabay + Google CSE + DALL-E 3 (heavy use) + Ideogram + YouTube + Sora. Persist under `_assets.json.augmented[]`
+- Target count: `augmented.length >= original.length * 1.4` and `<= original.length * 2.0`
+- Per-page minimum: 6+ images on homepage, 4+ images on every sub-page
+- Group preservation: source `[data-gallery="services"]` MUST round-trip to new site `[data-gallery="services"]` with same images + new ones
+- `validator-fixer` fails build if any page has <4 images or if `augmented.length < original.length * 0.4`
+
+**Original Document Preservation:**
+- Parse all `<a>` href endings in `.(pdf|docx|pptx|xlsx|doc|ppt|xls|zip)` during scrape
+- Download each, host under `public/docs/{filename}`, persist `_assets.json.documents[]` with `{original_url, filename, linked_from_page, anchor_text}`
+- Surface on the same page topic in the rebuilt site (CV/resume on About, brochure on Services, etc.)
+
+**Hero Asset From Logo (Brand Convergence):**
+- GPT-4o-compare brand logo against source homepage hero image. If cosine similarity of dominant shapes > 0.7, set `_brand.json.hero_extracted_from_logo = true` and persist asset URL
+- Container orchestrator MUST use that extracted asset as the hero background AND apply the logo's font family to H1 + nav
+- **Example:** lonemountainglobal.com `mountain-background-splash.png` is the mountain shape from the logo blown up — pairing logo + hero + Poppins (logo font) creates instant brand convergence
+
+**Homepage-Clone-When-Source-Excellent:**
+- When source aesthetic score ≥7/10, the rebuild MIRRORS source homepage layout (hero structure, section order, color scheme, typography pairings) before adding our polish/animations/content density
+- Sub-pages then inherit the homepage's design language for consistency
+- "Clone" means structure + color + type — not literal pixel-copy. Improvements layer on top: scroll animations, denser content, better SEO, AI-augmented imagery
+
+**Typography Extraction From Source (NEVER substitute):**
+- During brand research, parse source CSS for `font-family` declarations (homepage stylesheets, Google Fonts URL params, `<link rel="stylesheet" href="*fonts.googleapis.com*">`)
+- Persist `_brand.json.fonts.{logo, heading, body}` with `source: "extracted"` flag and the exact font names
+- Use those EXACT fonts in the rebuild — do not substitute with "modern equivalents" (Inter, Space Grotesk) when source has chosen with intent
+- **Example:** lonemountainglobal.com uses Poppins (logo + headings) + Hind (body). Generic "Inter + Space Grotesk" substitution destroys brand identity
+
 ## SEO Strategy (MANDATORY — world-class, not boilerplate)
 
 Every generated website must implement aggressive, intelligent SEO that targets low-hanging fruit:
@@ -261,11 +316,14 @@ Two dedicated SEO prompts run during the build:
 - **Dark theme preferred** — darker + colorful is trending. Use dark backgrounds with vibrant accent colors
 - Sites must look award-winning — Stripe / Linear / Vercel level polish
 
-**Multi-page architecture (5-8 pages minimum for content-rich businesses):**
-- Don't cram everything into one page
-- Homepage = compelling marketing summary of the entire business mission
-- Every sub-page (About, Services, Get Involved, etc.) must be its own stunning experience
-- Proper navigation between all pages
+**Multi-page architecture (page count = source sitemap, 1:N up to 1000 max — BUILD-BREAKING):**
+- Page count is NEVER capped at 5–8. Recreate every URL the source serves: 12 → 12, 80 → 80, 750 → 750. Cap at 1000 only as a sanity ceiling for runaway crawls
+- Source sitemap discovery (priority chain): (1) `/sitemap.xml` + `/sitemap_index.xml` + nested `<sitemap><loc>` indexes, (2) `/wp-sitemap.xml` (WP) / `/sitemap-index.xml` (Squarespace), (3) `robots.txt` Sitemap: lines, (4) Wayback Machine CDX API for full historical URL set, (5) breadth-first crawl from homepage with depth ≤ 6 + same-host rule + dedupe by canonical
+- Persist EVERY discovered URL to `_scraped_content.json.routes[]` with `{url, title, h1, body_word_count, internal_links, depth, og_image, hero_image}`. Container builds one Vite+React route per entry
+- Floor for thin source sites: even a 1-page source = ≥4 page rebuild (Home + About + Services + Contact). Never go thinner than the 4-page floor
+- Homepage = compelling marketing summary of the entire business mission. Sub-pages keep source URL slugs (`/about`, `/programs/scholarships`, `/blog/2024-03-annual-report`) — never lose deep-link continuity
+- Blog: every post in source = one route in rebuild. `/blog` index + `/blog/{slug}` permalinks. `BlogPosting` JSON-LD per post
+- Proper navigation: mega-menu / faceted nav / on-site search when route count > 12. Tree-organize by URL hierarchy, not by flat sitemap dump
 
 **Brand Recreation Philosophy (CRITICAL — suped-up clone):**
 - The goal is a SUPED-UP CLONE — same brand, same content, dramatically more beautiful
@@ -335,7 +393,7 @@ Every generated website must embody **Stripe / Linear / Vercel-level polish**:
 2. **AI visual inspection on EVERY asset** — GPT-4o vision checks quality, professionalism, relevance, safety, resolution
 3. **Score and rank** — each asset gets a quality score (0-100) and a relevance score
 4. **Select top 10-15** for the final website — the absolute best from the 100 candidates
-5. **Include rich media generously** — a 3-4 page site should have 15-20 high-quality images + 1-2 videos minimum
+5. **Include rich media generously** — scale by route count: 6+ images per route home, 4+ per sub-route, plus 1–2 videos per content cluster. A 4-route site = 15–20 images; a 50-route site = 200+ images; a 500-route site = 2000+. Never cap at 4-page-site numbers when source is larger
 
 ### What Gets Inspected
 - **Every image**: resolution, composition, relevance to business, professionalism, no watermarks

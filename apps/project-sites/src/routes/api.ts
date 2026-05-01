@@ -599,14 +599,22 @@ api.post('/api/billing/checkout', async (c) => {
   const validated = createCheckoutSessionSchema.parse(body);
 
   const orgId = c.get('orgId');
-  if (!orgId || orgId !== validated.org_id) {
+  const userId = c.get('userId');
+  if (!orgId || !userId) throw unauthorized('Must be authenticated');
+  if (validated.org_id && validated.org_id !== orgId) {
     throw forbidden('Cannot create checkout for another org');
   }
 
+  const userRow = await dbQueryOne<{ email: string }>(
+    c.env.DB,
+    'SELECT email FROM users WHERE id = ? AND deleted_at IS NULL',
+    [userId],
+  );
+
   const result = await billingService.createCheckoutSession(c.env.DB, c.env, {
-    orgId: validated.org_id,
+    orgId,
     siteId: validated.site_id,
-    customerEmail: '', // Retrieved from user context
+    customerEmail: userRow?.email || '',
     successUrl: validated.success_url,
     cancelUrl: validated.cancel_url,
   });
@@ -636,14 +644,22 @@ api.post('/api/billing/embedded-checkout', async (c) => {
   const validated = createEmbeddedCheckoutSchema.parse(body);
 
   const orgId = c.get('orgId');
-  if (!orgId || orgId !== validated.org_id) {
+  const userId = c.get('userId');
+  if (!orgId || !userId) throw unauthorized('Must be authenticated');
+  if (validated.org_id && validated.org_id !== orgId) {
     throw forbidden('Cannot create checkout for another org');
   }
 
+  const userRow = await dbQueryOne<{ email: string }>(
+    c.env.DB,
+    'SELECT email FROM users WHERE id = ? AND deleted_at IS NULL',
+    [userId],
+  );
+
   const result = await billingService.createEmbeddedCheckoutSession(c.env.DB, c.env, {
-    orgId: validated.org_id,
+    orgId,
     siteId: validated.site_id,
-    customerEmail: '',
+    customerEmail: userRow?.email || '',
     returnUrl: validated.return_url,
   });
 

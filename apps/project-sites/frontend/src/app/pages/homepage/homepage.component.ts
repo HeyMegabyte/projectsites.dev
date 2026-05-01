@@ -22,7 +22,7 @@ import {
   of,
   takeUntil,
 } from 'rxjs';
-import { ApiService } from '../../services/api.service';
+import { ApiService, type BusinessResult } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { GeolocationService } from '../../services/geolocation.service';
 
@@ -115,14 +115,15 @@ export class HomepageComponent implements OnInit, OnDestroy, AfterViewInit {
         }),
         takeUntil(this.destroy$)
       )
-      .subscribe((res) => {
+      .subscribe({
+        next: (res) => {
         this.loading.set(false);
         if (!res) return;
 
         const items: SearchItem[] = [];
         const seen = new Set<string>();
 
-        const placeMap = new Map<string, any>();
+        const placeMap = new Map<string, BusinessResult>();
         for (const b of res.businesses.data || []) {
           if (b.place_id) placeMap.set(b.place_id, b);
         }
@@ -199,6 +200,8 @@ export class HomepageComponent implements OnInit, OnDestroy, AfterViewInit {
           this.ctaDropdownOpen.set(true);
           this.heroDropdownOpen.set(false);
         }
+        },
+        error: () => { this.loading.set(false); },
       });
 
     if (isPlatformBrowser(this.platformId)) {

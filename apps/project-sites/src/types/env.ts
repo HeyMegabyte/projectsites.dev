@@ -82,8 +82,10 @@ export interface Env {
   GA4_PROPERTY_ID?: string;
 
   // ── PostHog (Analytics) ───────────────────────────────────
-  /** PostHog project API key for server-side event capture. */
+  /** PostHog API key for server-side event capture (personal phx_* or project phc_*). */
   POSTHOG_API_KEY: string;
+  /** PostHog public project key (phc_*) injected into served-site HTML. Required for client-side init. */
+  POSTHOG_PUBLIC_KEY?: string;
   /** PostHog API host (defaults to `https://app.posthog.com`). */
   POSTHOG_HOST?: string;
 
@@ -216,6 +218,10 @@ export interface Env {
   CF_ACCESS_CLIENT_ID?: string;
   /** Cloudflare Access Service Token client secret. */
   CF_ACCESS_CLIENT_SECRET?: string;
+  /** HMAC secret for container→worker build status callbacks. */
+  INTERNAL_BUILD_SECRET?: string;
+  /** Override callback URL (workers.dev) to bypass zone CF managed challenge. */
+  INTERNAL_CALLBACK_URL?: string;
 
   // ── Email (Resend / SendGrid) ────────────────────────────
   /** Resend API key for transactional email. Preferred provider. */

@@ -298,7 +298,7 @@ export class HeaderComponent {
     this.menuOpen.set(false);
     // Open Stripe billing portal (same as admin panel billing button)
     this.api.getBillingPortal(window.location.href).subscribe({
-      next: (res: any) => {
+      next: (res) => {
         if (res.data?.portal_url) window.open(res.data.portal_url, '_blank');
         else this.router.navigate(['/admin']);
       },

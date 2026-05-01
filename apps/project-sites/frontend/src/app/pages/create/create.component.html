@@ -100,14 +100,14 @@
               Phone <span class="text-gray-500 font-normal text-[0.75rem]">(optional)</span>
               @if (loadingPhone()) { <span class="field-loading"></span> }
             </label>
-            <input id="create-phone" type="tel" class="w-full py-3 px-4 text-[0.95rem] font-sans bg-dark-surface border border-white/[0.08] rounded-xl text-light outline-none transition-all placeholder:text-gray-500 hover:border-primary/[0.15] focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,229,255,0.12)]" placeholder="+1 (555) 123-4567" [(ngModel)]="businessPhone" (blur)="saveFormDraft()" maxlength="20" />
+            <input id="create-phone" type="tel" autocomplete="tel" class="w-full py-3 px-4 text-[0.95rem] font-sans bg-dark-surface border border-white/[0.08] rounded-xl text-light outline-none transition-all placeholder:text-gray-500 hover:border-primary/[0.15] focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,229,255,0.12)]" placeholder="+1 (555) 123-4567" [(ngModel)]="businessPhone" (blur)="saveFormDraft()" maxlength="20" />
           </div>
           <div class="mb-5 text-left">
             <label class="block text-[0.85rem] font-semibold text-light mb-1.5" for="create-website">
               Existing Website <span class="text-gray-500 font-normal text-[0.75rem]">(optional)</span>
               @if (loadingWebsite()) { <span class="field-loading"></span> }
             </label>
-            <input id="create-website" type="url" class="w-full py-3 px-4 text-[0.95rem] font-sans bg-dark-surface border border-white/[0.08] rounded-xl text-light outline-none transition-all placeholder:text-gray-500 hover:border-primary/[0.15] focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,229,255,0.12)]" placeholder="https://example.com" [(ngModel)]="businessWebsite" (blur)="saveFormDraft()" maxlength="500" />
+            <input id="create-website" type="url" autocomplete="url" class="w-full py-3 px-4 text-[0.95rem] font-sans bg-dark-surface border border-white/[0.08] rounded-xl text-light outline-none transition-all placeholder:text-gray-500 hover:border-primary/[0.15] focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,229,255,0.12)]" placeholder="https://example.com" [(ngModel)]="businessWebsite" (blur)="saveFormDraft()" maxlength="500" />
           </div>
         </div>
       </div>

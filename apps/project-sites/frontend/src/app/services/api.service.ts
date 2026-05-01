@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpHeaders, type HttpErrorResponse } from '@angular/common/http';
-import { Observable, throwError } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { Observable, throwError, TimeoutError } from 'rxjs';
+import { catchError, timeout } from 'rxjs/operators';
 import { Router } from '@angular/router';
 import { AuthService } from './auth.service';
 import { ToastService } from './toast.service';
@@ -22,14 +22,22 @@ export class ApiService {
     return headers;
   }
 
+  private static readonly REQUEST_TIMEOUT_MS = 30_000;
+
   /**
    * Handles HTTP errors with user-friendly toast messages.
+   * Applies a 30s timeout to prevent indefinite hangs.
    * Re-throws the error so callers can implement additional handling.
    */
   private handleError<T>(): (source: Observable<T>) => Observable<T> {
     return (source: Observable<T>) =>
       source.pipe(
-        catchError((error: HttpErrorResponse) => {
+        timeout(ApiService.REQUEST_TIMEOUT_MS),
+        catchError((error: HttpErrorResponse | TimeoutError) => {
+          if (error instanceof TimeoutError) {
+            this.toast.error('Request timed out. Please try again.');
+            return throwError(() => error);
+          }
           const message = this.getErrorMessage(error);
           this.toast.error(message);
 
@@ -222,31 +230,6 @@ export class ApiService {
     return this.post('/contact', body);
   }
 
-  /** List files for a site. API returns { data: { files, prefix, version } } */
-  listFiles(siteId: string): Observable<{ data: { files: SiteFile[]; prefix: string; version: string | null } }> {
-    return this.get(`/sites/${siteId}/files`);
-  }
-
-  /** Get file content */
-  getFileContent(siteId: string, key: string): Observable<{ data: { content: string } }> {
-    return this.get(`/sites/${siteId}/files/${encodeURIComponent(key)}`);
-  }
-
-  /** Save file content */
-  saveFile(siteId: string, key: string, content: string): Observable<void> {
-    return this.put(`/sites/${siteId}/files/${encodeURIComponent(key)}`, { content });
-  }
-
-  /** Delete a file */
-  deleteFile(siteId: string, key: string): Observable<void> {
-    return this.delete(`/sites/${siteId}/files/${encodeURIComponent(key)}`);
-  }
-
-  /** Export all text files as a flat map (for bolt.diy import) */
-  exportFiles(siteId: string): Observable<{ data: { files: Record<string, string>; prefix: string; version: string | null } }> {
-    return this.get(`/sites/${siteId}/files-export`);
-  }
-
   /** Generate an expert prompt using OpenAI research pipeline */
   generatePrompt(body: { site_id?: string; business_name: string; business_address?: string; google_place_id?: string; additional_context?: string }): Observable<{ data: { prompt: string; research: Record<string, unknown> } }> {
     return this.post('/sites/generate-prompt', body);
@@ -331,6 +314,62 @@ export class ApiService {
   getAnalytics(siteId: string, period = '7'): Observable<{ data: AnalyticsData }> {
     return this.get(`/analytics/${siteId}`, { period });
   }
+
+  /** List form submissions for a site */
+  listFormSubmissions(siteId: string, limit = 50): Observable<{ data: FormSubmission[] }> {
+    return this.get(`/sites/${siteId}/forms`, { limit: limit.toString() });
+  }
+
+  /** List newsletter integrations for a site */
+  listIntegrations(siteId: string): Observable<{ data: NewsletterIntegration[] }> {
+    return this.get(`/sites/${siteId}/integrations`);
+  }
+
+  /** Connect a newsletter integration to a site */
+  createIntegration(
+    siteId: string,
+    body: { provider: NewsletterProvider; api_key: string; list_id?: string; webhook_url?: string; config?: Record<string, unknown> },
+  ): Observable<{ data: NewsletterIntegration }> {
+    return this.post(`/sites/${siteId}/integrations`, body);
+  }
+
+  /** Update an integration (toggle active, rotate key) */
+  updateIntegration(siteId: string, id: string, body: Partial<NewsletterIntegration>): Observable<{ data: NewsletterIntegration }> {
+    return this.patch(`/sites/${siteId}/integrations/${id}`, body);
+  }
+
+  /** Delete an integration */
+  deleteIntegration(siteId: string, id: string): Observable<void> {
+    return this.delete(`/sites/${siteId}/integrations/${id}`);
+  }
+}
+
+export type NewsletterProvider = 'mailchimp' | 'webhook' | 'resend' | 'sendgrid' | 'convertkit' | 'klaviyo';
+
+export interface NewsletterIntegration {
+  id: string;
+  site_id: string;
+  provider: NewsletterProvider;
+  list_id?: string;
+  webhook_url?: string;
+  active: boolean;
+  config?: Record<string, unknown>;
+  api_key_preview?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FormSubmission {
+  id: string;
+  site_id: string;
+  form_name: string;
+  email?: string;
+  payload: Record<string, unknown>;
+  ip_address?: string;
+  user_agent?: string;
+  origin_url?: string;
+  forwarded_to?: string[];
+  created_at: string;
 }
 
 export interface BusinessResult {
@@ -374,6 +413,10 @@ export interface Site {
   plan?: string;
   current_build_version?: number;
   primary_hostname?: string;
+  place_id?: string;
+  business_phone?: string;
+  business_website?: string;
+  site_id?: string;
   created_at: string;
   updated_at: string;
 }
@@ -426,12 +469,6 @@ export interface DomainSummary {
 export interface AddressResult {
   description: string;
   place_id?: string;
-}
-
-export interface SiteFile {
-  key: string;
-  size: number;
-  uploaded: string;
 }
 
 export interface WorkflowStatus {

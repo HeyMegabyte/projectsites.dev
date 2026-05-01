@@ -1,14 +1,14 @@
 import { Component, inject, signal, type OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { NgClass } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AdminStateService } from '../admin-state.service';
-import { ApiService, type Hostname } from '../../../services/api.service';
+import { ApiService, type Hostname, type Site } from '../../../services/api.service';
 import { ToastService } from '../../../services/toast.service';
 
 @Component({
   selector: 'app-admin-settings',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [NgClass, FormsModule],
   template: `
     <div class="p-7 flex-1 overflow-y-auto animate-fade-in max-md:p-4 space-y-6">
 
@@ -159,18 +159,18 @@ import { ToastService } from '../../../services/toast.service';
 
       <!-- ── Contact Email ─────────────────────────── -->
       <div class="bg-white/[0.02] border border-white/[0.06] rounded-[14px] p-6">
-        <h3 class="text-base font-semibold text-white m-0 mb-5 flex items-center gap-2">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-          Contact Email
-        </h3>
-        @if (state.selectedSite(); as site) {
+        <div class="flex items-center justify-between mb-5">
+          <h3 class="text-base font-semibold text-white m-0 flex items-center gap-2">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            Contact Email
+          </h3>
+          <span class="text-[0.62rem] font-bold py-0.5 px-2.5 rounded-full uppercase bg-primary/10 text-primary">Coming soon</span>
+        </div>
+        @if (state.selectedSite()) {
           <div>
             <label class="block text-[0.78rem] font-semibold text-text-secondary mb-2">Contact Form Recipient</label>
-            <div class="flex gap-2.5 items-center">
-              <input type="email" class="input-field flex-1" placeholder="you@email.com" #emailInput />
-              <button class="btn-ghost-sm" disabled>Save</button>
-            </div>
-            <span class="text-[0.68rem] text-text-secondary/50 mt-1.5 block">Contact form submissions will be forwarded to this email address.</span>
+            <input type="email" class="input-field" placeholder="you@email.com" disabled />
+            <span class="text-[0.68rem] text-text-secondary/50 mt-1.5 block">Contact form submissions will soon forward to this address.</span>
           </div>
         }
       </div>
@@ -236,7 +236,7 @@ export class AdminSettingsComponent implements OnInit {
   saveName(value: string, siteId: string): void {
     const name = value.trim();
     if (!name) return;
-    this.api.updateSite(siteId, { business_name: name } as any).subscribe({
+    this.api.updateSite(siteId, { business_name: name }).subscribe({
       next: (res) => {
         this.state.sites.update(sites => sites.map(s => s.id === siteId ? { ...s, ...res.data } : s));
         this.toast.success('Name updated');
@@ -248,7 +248,7 @@ export class AdminSettingsComponent implements OnInit {
   saveSlug(value: string, siteId: string): void {
     const slug = value.trim();
     if (!slug) return;
-    this.api.updateSite(siteId, { slug } as any).subscribe({
+    this.api.updateSite(siteId, { slug }).subscribe({
       next: (res) => {
         this.state.sites.update(sites => sites.map(s => s.id === siteId ? { ...s, slug: res.data?.slug || slug } : s));
         this.toast.success('Slug updated');
@@ -268,7 +268,7 @@ export class AdminSettingsComponent implements OnInit {
     const site = this.state.selectedSite();
     const newSlug = this.modalSlugValue.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
     if (!site || !newSlug) return;
-    this.api.updateSite(site.id, { slug: newSlug } as any).subscribe({
+    this.api.updateSite(site.id, { slug: newSlug }).subscribe({
       next: (res) => {
         this.state.sites.update(sites => sites.map(s => s.id === site.id ? { ...s, slug: res.data?.slug || newSlug } : s));
         this.editingSlug.set(false);
@@ -325,7 +325,7 @@ export class AdminSettingsComponent implements OnInit {
     });
   }
 
-  deleteSite(site: any): void {
+  deleteSite(site: Site): void {
     this.state.deleteSite(site, false);
     this.confirmingDelete.set(false);
   }

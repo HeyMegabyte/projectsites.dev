@@ -1,4 +1,5 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
+import { Dialog } from '@angular/cdk/dialog';
 import { Router } from '@angular/router';
 import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
 import { forkJoin, interval, takeWhile, switchMap, of, catchError } from 'rxjs';
@@ -24,6 +25,7 @@ export class AdminStateService {
   private toast = inject(ToastService);
   private router = inject(Router);
   private sanitizer = inject(DomSanitizer);
+  private dialog = inject(Dialog);
 
   sites = signal<Site[]>([]);
   selectedSiteId = signal<string | null>(null);
@@ -37,10 +39,11 @@ export class AdminStateService {
   private alive = true;
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
 
-  selectedSite = computed(() => {
+  selectedSite = computed<Site | null>(() => {
     const id = this.selectedSiteId();
-    if (!id) return this.sites()[0] || null;
-    return this.sites().find(s => s.id === id) || this.sites()[0] || null;
+    const sites = this.sites();
+    if (!id) return sites[0] ?? null;
+    return sites.find(s => s.id === id) ?? sites[0] ?? null;
   });
 
   loadData(): void {
@@ -131,6 +134,7 @@ export class AdminStateService {
       )
       .subscribe({
         next: (res) => this.sites.set(res.data || []),
+        error: () => { /* silent — poll failures are non-critical */ },
       });
   }
 
@@ -248,15 +252,47 @@ export class AdminStateService {
 
   openCheckout(): void {
     const site = this.selectedSite();
-    if (!site) return;
-    this.api.post<{ data: { checkout_url?: string; client_secret?: string } }>('/billing/checkout', {
-      site_id: site.id,
-      return_url: window.location.href,
-    }).subscribe({
-      next: (res) => {
-        if (res.data?.checkout_url) window.location.href = res.data.checkout_url;
+    const returnUrl = window.location.href;
+    this.api.getMe().subscribe({
+      next: (me) => {
+        const body: Record<string, unknown> = {
+          org_id: me.data.org_id,
+          success_url: returnUrl,
+          cancel_url: returnUrl,
+        };
+        if (site) body['site_id'] = site.id;
+        this.api.post<{ data: { checkout_url?: string } }>('/billing/checkout', body).subscribe({
+          next: (res) => {
+            if (res.data?.checkout_url) {
+              window.location.href = res.data.checkout_url;
+            } else {
+              this.toast.error('Stripe did not return a checkout URL');
+            }
+          },
+          error: (err) => {
+            const msg = err?.error?.error?.message || 'Failed to start checkout';
+            this.toast.error(msg);
+          },
+        });
       },
       error: () => this.toast.error('Failed to start checkout'),
+    });
+  }
+
+  openDeleteConfirm(site: Site): void {
+    import('../../components/delete-confirm/delete-confirm-dialog.component').then(m => {
+      const ref = this.dialog.open(m.DeleteConfirmDialogComponent, {
+        data: { siteId: site.id, siteName: site.business_name, hasPaidPlan: site.plan === 'paid' },
+        panelClass: 'cdk-overlay-transparent',
+      });
+      ref.closed.subscribe(result => {
+        if (result) {
+          this.sites.update(sites => sites.filter(s => s.id !== site.id));
+          if (this.selectedSiteId() === site.id) {
+            this.selectedSiteId.set(null);
+          }
+        }
+      });
     });
   }
 
@@ -267,24 +303,6 @@ export class AdminStateService {
       },
       error: () => this.toast.error('Failed to open billing portal'),
     });
-  }
-
-  openReset(site: Site): void {
-    this.auth.setSelectedBusiness({
-      name: site.business_name || '',
-      address: site.business_address || '',
-      place_id: (site as any).place_id,
-      phone: (site as any).business_phone,
-      website: (site as any).business_website,
-    });
-    this.auth.setMode('business');
-    this.auth.setPendingBuild(true);
-    const queryParams: Record<string, string> = {
-      name: site.business_name || '',
-      reset: site.id,
-    };
-    if (site.business_address) queryParams['address'] = site.business_address;
-    this.router.navigate(['/create'], { queryParams });
   }
 
   goToWaiting(site: Site): void {

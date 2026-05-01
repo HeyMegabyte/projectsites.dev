@@ -40,6 +40,7 @@ import { api } from './routes/api.js';
 import { search } from './routes/search.js';
 import { webhooks } from './routes/webhooks.js';
 import { assets } from './routes/assets.js';
+import { forms } from './routes/forms.js';
 import { resolveSite, serveSiteFromR2 } from './services/site_serving.js';
 import { dbUpdate } from './services/db.js';
 import { registerAllPrompts } from './services/ai_workflows.js';
@@ -62,6 +63,18 @@ app.use('*', payloadLimitMiddleware);
 
 // Security headers
 app.use('*', securityHeadersMiddleware);
+
+// Public forms ingest must accept ANY origin (custom domains post here too).
+// Server-side origin allow-list inside the handler is the real security check.
+app.use(
+  '/api/v1/forms/submit',
+  cors({
+    origin: (origin) => origin || '*',
+    allowMethods: ['POST', 'OPTIONS'],
+    allowHeaders: ['Content-Type', 'X-Site-Slug'],
+    maxAge: 86400,
+  }),
+);
 
 // Permissive CORS for *.projectsites.dev on ALL routes (sites loaded in iframes, cross-subdomain requests)
 app.use(
@@ -96,6 +109,7 @@ import { rateLimitMiddleware } from './middleware/rate_limit.js';
 app.use('/api/auth/magic-link', rateLimitMiddleware({ maxRequests: 5, windowSeconds: 300, prefix: 'rl:magic' }));
 app.use('/api/search/businesses', rateLimitMiddleware({ maxRequests: 30, windowSeconds: 60, prefix: 'rl:search' }));
 app.use('/api/sites/create-from-search', rateLimitMiddleware({ maxRequests: 10, windowSeconds: 3600, prefix: 'rl:create' }));
+app.use('/api/v1/forms/submit', rateLimitMiddleware({ maxRequests: 30, windowSeconds: 60, prefix: 'rl:forms' }));
 app.use('/api/ai/*', rateLimitMiddleware({ maxRequests: 20, windowSeconds: 60, prefix: 'rl:ai' }));
 
 // Auth middleware for API routes (sets userId/orgId if valid session)
@@ -109,8 +123,64 @@ app.onError(errorHandler);
 app.route('/', health);
 app.route('/', search);  // Must come before api so /api/sites/search wins over /api/sites/:id
 app.route('/', assets);  // Asset uploads + build-assets listing
+app.route('/', forms);   // Public form ingest + auth-gated submissions/integrations CRUD
 app.route('/', api);
 app.route('/', webhooks);
+
+// Diagnostic: round-trip the container with a static index.html. Proves
+// container can boot → write file → upload R2 → return, without Claude Code.
+app.post('/api/diag/container-minimal', async (c) => {
+  const secret = c.req.header('x-test-secret') || '';
+  if (!secret || secret !== (c.env.CF_API_TOKEN || '').slice(0, 12)) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  if (!c.env.SITE_BUILDER) return c.json({ error: 'SITE_BUILDER not configured' }, 500);
+  const slug = ((await c.req.json().catch(() => ({}))) as { slug?: string }).slug || 'minimal-test';
+  const id = c.env.SITE_BUILDER.idFromName(`${slug}-build-test`);
+  const stub = c.env.SITE_BUILDER.get(id);
+  const t0 = Date.now();
+  const res = await stub.fetch('http://container/build-minimal', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      slug,
+      envVars: {
+        CF_API_TOKEN: c.env.CF_API_TOKEN || '',
+        CF_ACCOUNT_ID: '84fa0d1b16ff8086dd958c468ce7fd59',
+        R2_BUCKET_NAME: 'project-sites-production',
+        SITE_SLUG: slug,
+        SITE_VERSION: `v-${Date.now()}`,
+      },
+    }),
+  });
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  return c.json({ workerElapsedMs: Date.now() - t0, ...data });
+});
+
+// Container→worker build status callback (HMAC-protected, KV-backed).
+// Container POSTs status updates here. Worker writes to CACHE_KV at key
+// `build:{jobId}` so the workflow can poll KV instead of the container.
+// State survives container replacement.
+app.post('/api/internal/build-status', async (c) => {
+  const secret = c.env.INTERNAL_BUILD_SECRET;
+  if (!secret) return c.json({ error: 'callback not configured' }, 500);
+  const sig = c.req.header('x-build-sig') || '';
+  const body = await c.req.text();
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
+  );
+  const sigBytes = new Uint8Array(await crypto.subtle.sign('HMAC', key, enc.encode(body)));
+  const expected = Array.from(sigBytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+  if (sig !== expected) return c.json({ error: 'invalid signature' }, 401);
+  let payload: { jobId?: string; status?: string; step?: string };
+  try { payload = JSON.parse(body); } catch { return c.json({ error: 'bad json' }, 400); }
+  const jobId = payload.jobId;
+  if (!jobId || typeof jobId !== 'string') return c.json({ error: 'missing jobId' }, 400);
+  const record = JSON.stringify({ ...payload, lastUpdate: Date.now() });
+  await c.env.CACHE_KV.put(`build:${jobId}`, record, { expirationTtl: 3600 });
+  return c.json({ ok: true });
+});
 
 // ─── Site Serving (catch-all for subdomain routing) ──────────
 

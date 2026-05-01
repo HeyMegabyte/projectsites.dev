@@ -1,0 +1,127 @@
+<section class="min-h-screen flex items-center justify-center px-4 py-20 relative">
+  <!-- Background glow -->
+  <div class="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/5 rounded-full blur-[150px] pointer-events-none"></div>
+
+  <div class="relative z-10 w-full max-w-[520px]">
+    @if (!submitted()) {
+      <div class="bg-gradient-to-br from-[rgba(13,13,40,0.95)] to-[rgba(8,8,32,0.98)] border border-white/[0.08] rounded-2xl p-8 sm:p-10 shadow-[0_8px_32px_rgba(0,0,0,0.4),0_0_60px_rgba(0,229,255,0.03)] backdrop-blur-2xl animate-[fadeInScale_0.4s_cubic-bezier(0.34,1.56,0.64,1)]">
+        <h1 class="text-2xl font-bold text-white mb-2">Get in Touch</h1>
+        <p class="text-[0.88rem] text-text-secondary mb-8 leading-relaxed">
+          Questions, feedback, or partnership inquiries. We typically respond within 24 hours.
+        </p>
+
+        <div class="flex flex-col gap-5">
+          <!-- Name -->
+          <div>
+            <label class="block text-[0.82rem] font-semibold text-light mb-1.5" for="contact-name">Name <span class="text-red-400">*</span></label>
+            <input
+              id="contact-name"
+              type="text"
+              autocomplete="name"
+              class="w-full py-3 px-4 text-[0.92rem] font-sans bg-dark-surface border rounded-xl text-light outline-none transition-all placeholder:text-gray-500 hover:border-primary/[0.15] focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,229,255,0.12)]"
+              [class]="nameInvalid ? 'border-red-500/50' : 'border-white/[0.08]'"
+              placeholder="Your name"
+              [(ngModel)]="name"
+              maxlength="200"
+              [attr.aria-invalid]="nameInvalid"
+              [attr.aria-describedby]="nameInvalid ? 'name-error' : null"
+              required
+            />
+            @if (nameInvalid) {
+              <p id="name-error" class="text-red-400 text-xs mt-1" role="alert">Name is required.</p>
+            }
+          </div>
+
+          <!-- Email -->
+          <div>
+            <label class="block text-[0.82rem] font-semibold text-light mb-1.5" for="contact-email">Email <span class="text-red-400">*</span></label>
+            <input
+              id="contact-email"
+              type="email"
+              autocomplete="email"
+              class="w-full py-3 px-4 text-[0.92rem] font-sans bg-dark-surface border rounded-xl text-light outline-none transition-all placeholder:text-gray-500 hover:border-primary/[0.15] focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,229,255,0.12)]"
+              [class]="emailInvalid ? 'border-red-500/50' : 'border-white/[0.08]'"
+              placeholder="you@example.com"
+              [(ngModel)]="email"
+              maxlength="254"
+              [attr.aria-invalid]="emailInvalid"
+              [attr.aria-describedby]="emailInvalid ? 'email-error' : null"
+              required
+            />
+            @if (emailInvalid) {
+              <p id="email-error" class="text-red-400 text-xs mt-1" role="alert">Valid email is required.</p>
+            }
+          </div>
+
+          <!-- Phone (optional) -->
+          <div>
+            <label class="block text-[0.82rem] font-semibold text-light mb-1.5" for="contact-phone">Phone <span class="text-text-secondary text-[0.72rem] font-normal">(optional)</span></label>
+            <input
+              id="contact-phone"
+              type="tel"
+              autocomplete="tel"
+              class="w-full py-3 px-4 text-[0.92rem] font-sans bg-dark-surface border border-white/[0.08] rounded-xl text-light outline-none transition-all placeholder:text-gray-500 hover:border-primary/[0.15] focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,229,255,0.12)]"
+              placeholder="+1 (555) 000-0000"
+              [(ngModel)]="phone"
+              maxlength="20"
+            />
+          </div>
+
+          <!-- Message -->
+          <div>
+            <label class="block text-[0.82rem] font-semibold text-light mb-1.5" for="contact-message">Message <span class="text-red-400">*</span></label>
+            <textarea
+              id="contact-message"
+              class="w-full py-3 px-4 text-[0.92rem] font-sans bg-dark-surface border rounded-xl text-light outline-none transition-all placeholder:text-gray-500 hover:border-primary/[0.15] focus:border-primary focus:shadow-[0_0_0_3px_rgba(0,229,255,0.12)] resize-none"
+              [class]="messageInvalid ? 'border-red-500/50' : 'border-white/[0.08]'"
+              placeholder="How can we help?"
+              [(ngModel)]="message"
+              rows="5"
+              maxlength="5000"
+              [attr.aria-invalid]="messageInvalid"
+              [attr.aria-describedby]="messageInvalid ? 'message-error' : null"
+              required
+            ></textarea>
+            @if (messageInvalid) {
+              <p id="message-error" class="text-red-400 text-xs mt-1" role="alert">Message is required.</p>
+            }
+          </div>
+
+          <!-- Submit -->
+          <button
+            class="w-full bg-primary text-dark font-semibold rounded-xl px-6 py-3.5 text-base hover:brightness-110 hover:shadow-[0_0_24px_rgba(0,229,255,0.4)] transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-1"
+            [disabled]="submitting() || !name.trim() || !email.trim() || !message.trim()"
+            (click)="submit()"
+          >
+            @if (submitting()) { Sending... } @else { Send Message }
+          </button>
+        </div>
+      </div>
+    } @else {
+      <!-- Success state -->
+      <div class="bg-gradient-to-br from-[rgba(13,13,40,0.95)] to-[rgba(8,8,32,0.98)] border border-primary/[0.15] rounded-2xl p-10 text-center shadow-[0_8px_32px_rgba(0,0,0,0.4),0_0_60px_rgba(0,229,255,0.06)] backdrop-blur-2xl animate-[fadeInScale_0.4s_cubic-bezier(0.34,1.56,0.64,1)]">
+        <div class="w-16 h-16 mx-auto mb-5 rounded-full bg-primary/10 flex items-center justify-center">
+          <svg class="text-primary" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </div>
+        <h2 class="text-xl font-bold text-white mb-2">Message Sent</h2>
+        <p class="text-[0.88rem] text-text-secondary leading-relaxed mb-6">
+          We received your message and will get back to you within 24 hours.
+        </p>
+        <button
+          class="px-8 py-3 rounded-full bg-primary text-dark font-semibold text-sm hover:shadow-lg hover:shadow-primary/25 transition-all"
+          (click)="goHome()"
+        >
+          Back to Home
+        </button>
+      </div>
+    }
+
+    <!-- Back link -->
+    <div class="text-center mt-6">
+      <button class="inline-flex items-center gap-1.5 text-[0.82rem] text-text-secondary hover:text-primary transition-colors" (click)="goHome()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
+        Back to home
+      </button>
+    </div>
+  </div>
+</section>

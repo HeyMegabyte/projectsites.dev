@@ -17,13 +17,23 @@ import { join, extname, relative } from 'path';
 
 const CF_API_TOKEN = process.env.CF_API_TOKEN;
 const CF_ACCOUNT_ID = process.env.CF_ACCOUNT_ID;
+const CLOUDFLARE_API_KEY = process.env.CLOUDFLARE_API_KEY;
+const CLOUDFLARE_EMAIL = process.env.CLOUDFLARE_EMAIL;
 const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME || 'project-sites-production';
 const SITE_SLUG = process.env.SITE_SLUG;
 const SITE_VERSION = process.env.SITE_VERSION || 'v1';
 
-if (!CF_API_TOKEN || !CF_ACCOUNT_ID || !SITE_SLUG) {
-  console.warn('[upload] Missing required env vars: CF_API_TOKEN, CF_ACCOUNT_ID, SITE_SLUG');
+const HAS_TOKEN_AUTH = Boolean(CF_API_TOKEN);
+const HAS_GLOBAL_KEY_AUTH = Boolean(CLOUDFLARE_API_KEY && CLOUDFLARE_EMAIL);
+
+if ((!HAS_TOKEN_AUTH && !HAS_GLOBAL_KEY_AUTH) || !CF_ACCOUNT_ID || !SITE_SLUG) {
+  console.warn('[upload] Missing required env vars: need CF_ACCOUNT_ID, SITE_SLUG, and either CF_API_TOKEN or (CLOUDFLARE_API_KEY + CLOUDFLARE_EMAIL)');
   process.exit(1);
+}
+
+function authHeaders() {
+  if (HAS_TOKEN_AUTH) return { Authorization: `Bearer ${CF_API_TOKEN}` };
+  return { 'X-Auth-Email': CLOUDFLARE_EMAIL, 'X-Auth-Key': CLOUDFLARE_API_KEY };
 }
 
 const buildDir = process.argv[2] || process.cwd();
@@ -77,7 +87,7 @@ async function uploadFile(key, filePath, contentType) {
   const res = await fetch(`${R2_BASE}/${encodeURIComponent(key)}`, {
     method: 'PUT',
     headers: {
-      'Authorization': `Bearer ${CF_API_TOKEN}`,
+      ...authHeaders(),
       'Content-Type': contentType,
     },
     body,
@@ -125,24 +135,13 @@ async function main() {
     }
   }
 
-  // If Vite project, also upload source files for reference
-  if (isViteProject) {
-    const srcFiles = collectFiles(buildDir).filter(f => !f.rel.startsWith('dist/'));
-    for (const file of srcFiles) {
-      const r2Key = `sites/${SITE_SLUG}/${SITE_VERSION}/_src/${file.rel}`;
-      const contentType = getMimeType(file.rel);
-      await uploadFile(r2Key, file.path, contentType);
-    }
-    console.warn(`[upload] Also uploaded ${srcFiles.length} source files to _src/`);
-  }
-
   // Upload manifest
   const manifestJson = JSON.stringify(manifest, null, 2);
   const manifestKey = `sites/${SITE_SLUG}/${SITE_VERSION}/_manifest.json`;
   await fetch(`${R2_BASE}/${encodeURIComponent(manifestKey)}`, {
     method: 'PUT',
     headers: {
-      'Authorization': `Bearer ${CF_API_TOKEN}`,
+      ...authHeaders(),
       'Content-Type': 'application/json',
     },
     body: manifestJson,

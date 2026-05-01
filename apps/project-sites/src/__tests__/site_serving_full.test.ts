@@ -443,3 +443,117 @@ describe('serveSiteFromR2', () => {
     expect(html).toContain('ps-bar');
   });
 });
+
+// ─── Served-site analytics policy: GA4+GTM only, never PostHog/Sentry ─────
+//
+// Business-portfolio sites must never expose end users to third-party
+// surveillance (PostHog) or error-tracker SDKs (Sentry). Worker-internal
+// telemetry still uses POSTHOG_API_KEY + SENTRY_DSN, but those keys must
+// never reach client HTML. PWA meta + standard favicon link tags are
+// always injected so site.webmanifest icon paths resolve cleanly.
+describe('serveSiteFromR2 — served-site analytics policy', () => {
+  const HTML_WITH_HEAD = '<html><head><title>X</title></head><body><h1>H</h1></body></html>';
+
+  const makeEnv = (overrides: Record<string, unknown> = {}) => ({
+    CACHE_KV: createMockKV(),
+    SITES_BUCKET: createMockR2(),
+    DB: {} as D1Database,
+    ...overrides,
+  });
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('NEVER injects PostHog snippet — even when POSTHOG_PUBLIC_KEY is a phc_* key', async () => {
+    const env = makeEnv({
+      POSTHOG_PUBLIC_KEY: 'phc_publicProjectKey123',
+      POSTHOG_API_KEY: 'phc_publicProjectKey123',
+    });
+    (env.SITES_BUCKET.get as jest.Mock).mockResolvedValue(createMockR2Object(HTML_WITH_HEAD));
+
+    const response = await serveSiteFromR2(env as any, makeSite({ plan: 'paid' }), '/index.html');
+    const html = await response.text();
+
+    expect(html).not.toContain('posthog.init');
+    expect(html).not.toContain('phc_publicProjectKey123');
+    expect(html).not.toContain('us.i.posthog.com');
+  });
+
+  it('NEVER leaks a personal PostHog key (phx_*) into served HTML', async () => {
+    const env = makeEnv({
+      POSTHOG_PUBLIC_KEY: 'phx_uEgqlh3OGKL0FPN5DEkNDQ3rVWKL73BPIdPeX9OGlwaraGk',
+      POSTHOG_API_KEY: 'phx_uEgqlh3OGKL0FPN5DEkNDQ3rVWKL73BPIdPeX9OGlwaraGk',
+    });
+    (env.SITES_BUCKET.get as jest.Mock).mockResolvedValue(createMockR2Object(HTML_WITH_HEAD));
+
+    const response = await serveSiteFromR2(env as any, makeSite({ plan: 'paid' }), '/index.html');
+    const html = await response.text();
+
+    expect(html).not.toContain('phx_');
+    expect(html).not.toContain('posthog');
+  });
+
+  it('NEVER injects Sentry snippet — even when SENTRY_DSN is set', async () => {
+    const env = makeEnv({ SENTRY_DSN: 'https://abc123@o12345.ingest.sentry.io/67890' });
+    (env.SITES_BUCKET.get as jest.Mock).mockResolvedValue(createMockR2Object(HTML_WITH_HEAD));
+
+    const response = await serveSiteFromR2(env as any, makeSite({ plan: 'paid' }), '/index.html');
+    const html = await response.text();
+
+    expect(html).not.toContain('sentry-cdn.com');
+    expect(html).not.toContain('Sentry.init');
+    expect(html).not.toContain('abc123@o12345');
+  });
+
+  it('always injects mobile-web-app-capable + apple-mobile-web-app-capable meta tags', async () => {
+    const env = makeEnv({});
+    (env.SITES_BUCKET.get as jest.Mock).mockResolvedValue(createMockR2Object(HTML_WITH_HEAD));
+
+    const response = await serveSiteFromR2(env as any, makeSite({ plan: 'paid' }), '/index.html');
+    const html = await response.text();
+
+    expect(html).toMatch(/<meta\s+name="mobile-web-app-capable"\s+content="yes"/);
+    expect(html).toMatch(/<meta\s+name="apple-mobile-web-app-capable"\s+content="yes"/);
+  });
+
+  it('always injects standard real-favicon-generator link tags', async () => {
+    const env = makeEnv({});
+    (env.SITES_BUCKET.get as jest.Mock).mockResolvedValue(createMockR2Object(HTML_WITH_HEAD));
+
+    const response = await serveSiteFromR2(env as any, makeSite({ plan: 'paid' }), '/index.html');
+    const html = await response.text();
+
+    expect(html).toContain('href="/favicon.ico"');
+    expect(html).toContain('href="/favicon-16x16.png"');
+    expect(html).toContain('href="/favicon-32x32.png"');
+    expect(html).toContain('href="/android-chrome-192x192.png"');
+    expect(html).toContain('href="/android-chrome-512x512.png"');
+    expect(html).toContain('href="/apple-touch-icon.png"');
+    expect(html).toContain('href="/site.webmanifest"');
+  });
+
+  it('still injects GA4 snippet when GA4_MEASUREMENT_ID is set', async () => {
+    const env = makeEnv({ GA4_MEASUREMENT_ID: 'G-ABCDEF1234' });
+    (env.SITES_BUCKET.get as jest.Mock).mockResolvedValue(createMockR2Object(HTML_WITH_HEAD));
+
+    const response = await serveSiteFromR2(env as any, makeSite({ plan: 'paid' }), '/index.html');
+    const html = await response.text();
+
+    expect(html).toContain('G-ABCDEF1234');
+    expect(html).toContain('googletagmanager.com/gtag/js');
+  });
+
+  it('always injects anti-FOUC snippet that gates body visibility on font load', async () => {
+    const env = makeEnv({});
+    (env.SITES_BUCKET.get as jest.Mock).mockResolvedValue(createMockR2Object(HTML_WITH_HEAD));
+
+    const response = await serveSiteFromR2(env as any, makeSite({ plan: 'paid' }), '/index.html');
+    const html = await response.text();
+
+    expect(html).toContain('id="ps-anti-fouc"');
+    expect(html).toMatch(/html:not\(\.ps-fonts-ready\)\s*body\s*\{\s*opacity\s*:\s*0/);
+    expect(html).toContain('document.fonts.ready');
+    expect(html).toContain("classList.add('ps-fonts-ready')");
+    expect(html).toContain('setTimeout');
+    expect(html).toContain('1500');
+  });
+});

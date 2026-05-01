@@ -1,4 +1,4 @@
-import { Component, type OnInit, HostListener, inject, signal } from '@angular/core';
+import { Component, type OnInit, type OnDestroy, HostListener, inject, signal } from '@angular/core';
 import { RouterOutlet, Router, ActivatedRoute, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs';
 import { HeaderComponent } from './components/header/header.component';
@@ -49,7 +49,7 @@ import { MetaService } from './services/meta.service';
     }
   `],
 })
-export class AppComponent implements OnInit {
+export class AppComponent implements OnInit, OnDestroy {
   private auth = inject(AuthService);
   private api = inject(ApiService);
   private meta = inject(MetaService);
@@ -59,6 +59,10 @@ export class AppComponent implements OnInit {
   showHeader = signal(true);
   showCommandPalette = signal(false);
   showShortcuts = signal(false);
+
+  private cursorFollowerEl?: HTMLElement;
+  private cursorAnimationId?: number;
+  private cursorListeners: { type: string; handler: EventListener }[] = [];
 
   @HostListener('document:keydown', ['$event'])
   onGlobalKeydown(event: KeyboardEvent): void {
@@ -122,68 +126,83 @@ export class AppComponent implements OnInit {
       });
   }
 
+  ngOnDestroy(): void {
+    // Clean up cursor follower
+    for (const { type, handler } of this.cursorListeners) {
+      document.removeEventListener(type, handler);
+    }
+    this.cursorListeners = [];
+    if (this.cursorAnimationId != null) {
+      cancelAnimationFrame(this.cursorAnimationId);
+    }
+    this.cursorFollowerEl?.remove();
+  }
+
+  private addDocListener(type: string, handler: EventListener): void {
+    document.addEventListener(type, handler);
+    this.cursorListeners.push({ type, handler });
+  }
+
   private initCursorFollower(): void {
     if (typeof window === 'undefined') return;
-    // Respect prefers-reduced-motion and hover capability
     if (!window.matchMedia('(hover: hover)').matches) return;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
     const follower = document.createElement('div');
     follower.className = 'cursor-follower';
     document.body.appendChild(follower);
+    this.cursorFollowerEl = follower;
 
     let mouseX = 0;
     let mouseY = 0;
     let followerX = 0;
     let followerY = 0;
 
-    document.addEventListener('mousemove', (e) => {
-      mouseX = e.clientX;
-      mouseY = e.clientY;
+    this.addDocListener('mousemove', (e) => {
+      const me = e as MouseEvent;
+      mouseX = me.clientX;
+      mouseY = me.clientY;
       if (!follower.classList.contains('visible')) {
         follower.classList.add('visible');
       }
     });
 
-    document.addEventListener('mouseleave', () => {
+    this.addDocListener('mouseleave', () => {
       follower.classList.remove('visible');
     });
 
-    // Hover detection for interactive elements
-    document.addEventListener('mouseover', (e) => {
-      const target = e.target as HTMLElement;
-      if (target.closest('a, button, input, textarea, select, [data-tooltip], .search-result, .address-option')) {
+    const interactiveSelector = 'a, button, input, textarea, select, [data-tooltip], .search-result, .address-option';
+    this.addDocListener('mouseover', (e) => {
+      if ((e.target as HTMLElement).closest(interactiveSelector)) {
         follower.classList.add('hover');
       }
     });
-    document.addEventListener('mouseout', (e) => {
-      const target = e.target as HTMLElement;
-      if (target.closest('a, button, input, textarea, select, [data-tooltip], .search-result, .address-option')) {
+    this.addDocListener('mouseout', (e) => {
+      if ((e.target as HTMLElement).closest(interactiveSelector)) {
         follower.classList.remove('hover');
       }
     });
 
-    // Click ripple
-    document.addEventListener('click', (e) => {
+    this.addDocListener('click', (e) => {
+      const me = e as MouseEvent;
       const ripple = document.createElement('div');
       ripple.className = 'click-ripple';
-      ripple.style.left = e.clientX + 'px';
-      ripple.style.top = e.clientY + 'px';
+      ripple.style.left = me.clientX + 'px';
+      ripple.style.top = me.clientY + 'px';
       ripple.style.width = '80px';
       ripple.style.height = '80px';
       document.body.appendChild(ripple);
       ripple.addEventListener('animationend', () => ripple.remove());
     });
 
-    // Smooth follow with lerp
     const animate = () => {
       followerX += (mouseX - followerX) * 0.15;
       followerY += (mouseY - followerY) * 0.15;
       follower.style.left = followerX + 'px';
       follower.style.top = followerY + 'px';
-      requestAnimationFrame(animate);
+      this.cursorAnimationId = requestAnimationFrame(animate);
     };
-    requestAnimationFrame(animate);
+    this.cursorAnimationId = requestAnimationFrame(animate);
   }
 
   private handleAuthCallback(): void {

@@ -524,30 +524,40 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
 
       const parsed = JSON.parse(wrap.body || '{}') as KvBuildRecord & ContainerStatus & { error?: string | null };
 
-      // Container DO restart → /status returns {error:'unknown job'} with no `status` field.
-      // Treat that as "still building" (fall back to KV) rather than a terminal state.
-      // Without this guard, undefined !== 'running' would break the loop and skip uploadResult.
       const TERMINAL = new Set(['complete', 'error']);
-      if (!TERMINAL.has(String(parsed.status || ''))) {
-        if (wrap._src === 'container' && parsed.status === undefined) {
-          // DO lost the job. Try KV directly before declaring stale.
-          const raw = await env.CACHE_KV.get(`build:${jobId}`);
-          if (raw) {
-            const kv = JSON.parse(raw) as KvBuildRecord;
-            if (TERMINAL.has(kv.status)) {
-              finalStatus = {
-                status: kv.status,
-                step: kv.step,
-                elapsed: kv.elapsed,
-                fileCount: kv.fileCount,
-                error: kv.error || null,
-              };
-              kvFinalRecord = kv;
-              break;
-            }
+      const unknownJob = wrap._src === 'container' && parsed.status === undefined;
+
+      // Container DO restart → /status returns {error:'unknown job'} with no `status` field.
+      // First try KV (terminal record may exist from before the DO died). If KV is empty too,
+      // the job is unrecoverable — break immediately instead of polling for 8 more minutes.
+      if (unknownJob) {
+        const raw = await env.CACHE_KV.get(`build:${jobId}`);
+        if (raw) {
+          const kv = JSON.parse(raw) as KvBuildRecord;
+          if (TERMINAL.has(kv.status)) {
+            finalStatus = {
+              status: kv.status,
+              step: kv.step,
+              elapsed: kv.elapsed,
+              fileCount: kv.fileCount,
+              error: kv.error || null,
+            };
+            kvFinalRecord = kv;
+            break;
           }
-          continue;
         }
+        await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.container_unknown_job', {
+          poll: i,
+          message: 'Container DO lost job and KV has no terminal record — abandoning build',
+        });
+        finalStatus = {
+          status: 'error',
+          step: 'unknown-job',
+          elapsed: 0,
+          fileCount: 0,
+          error: 'Container DO evicted before build completed (job state lost)',
+        };
+        break;
       }
 
       // Container /status returns plain ContainerStatus (no lastUpdate). For wall-clock
@@ -558,7 +568,9 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
         : (Date.now() - ((parsed as KvBuildRecord).lastUpdate || 0));
 
       const stateChanged = parsed.status !== lastSeenStatus || parsed.step !== lastSeenStep;
-      if (isFromContainer) lastFreshAt = Date.now();
+      // Only bump freshness on responses with a real status; unknown-job (handled above)
+      // would otherwise mask staleness forever.
+      if (isFromContainer && parsed.status) lastFreshAt = Date.now();
       lastSeenStatus = parsed.status || lastSeenStatus;
       lastSeenStep = parsed.step || lastSeenStep;
 
@@ -746,6 +758,74 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
         return JSON.stringify(parsed);
       } catch {
         return JSON.stringify({ skipped: true, reason: 'error' });
+      }
+    });
+
+    // ── Step 4.5: Benchmark + retrospective (non-blocking, $0 default) ──
+    // Tier 1 (programmatic) + Tier 2 (PSI) both free. Retrospective LLM call
+    // (~$0.001 Haiku) only fires when build regressed or score < 0.85.
+    // See services/benchmark.ts and services/retrospective.ts.
+    await step.do('benchmark-and-learn', {
+      retries: { limit: 1, delay: '10 seconds', backoff: 'exponential' },
+      timeout: '3 minutes',
+    }, async () => {
+      try {
+        const { runBenchmarks } = await import('../services/benchmark.js');
+        const { buildRetrospective, recordRetrospectivePath } = await import('../services/retrospective.js');
+
+        const prevRow = await env.DB.prepare(
+          'SELECT id, mean_score FROM site_benchmarks WHERE site_id = ? ORDER BY run_at DESC LIMIT 1',
+        ).bind(params.siteId).first() as { id: string; mean_score: number | null } | null;
+
+        const result = await runBenchmarks({
+          env,
+          siteId: params.siteId,
+          slug: params.slug,
+          siteUrl: `https://${params.slug}.${DOMAINS.SITES_SUFFIX}`,
+          previousMeanScore: prevRow?.mean_score ?? null,
+        });
+
+        await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.benchmark', {
+          mean_score: result.meanScore,
+          programmatic_score: result.programmatic.score,
+          psi_perf: result.psi?.performance ?? null,
+          regressed: result.regressedFromPrevious,
+          banned_words: result.programmatic.bannedWordHits,
+          message: `Benchmark: mean=${result.meanScore.toFixed(2)} regressed=${result.regressedFromPrevious}`,
+        });
+
+        const retro = await buildRetrospective({ env, current: result });
+        if (!retro.generated) {
+          await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.retrospective_skipped', {
+            reason: retro.skipReason,
+          });
+          return JSON.stringify({ benchmark: result.meanScore, retrospective: 'skipped' });
+        }
+
+        const retroRow = await env.DB.prepare(
+          'SELECT id FROM site_benchmarks WHERE site_id = ? ORDER BY run_at DESC LIMIT 1',
+        ).bind(params.siteId).first() as { id: string } | null;
+
+        const retroPath = `retrospectives/${retro.filename}`;
+        await env.SITES_BUCKET.put(retroPath, retro.markdown, {
+          httpMetadata: { contentType: 'text/markdown; charset=utf-8' },
+        });
+
+        if (retroRow) await recordRetrospectivePath(env, retroRow.id, retroPath);
+
+        await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.retrospective_generated', {
+          path: retroPath,
+          filename: retro.filename,
+          message: `Retrospective written to ${retroPath}`,
+        });
+
+        return JSON.stringify({ benchmark: result.meanScore, retrospective: retroPath });
+      } catch (err) {
+        await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.benchmark_error', {
+          error: err instanceof Error ? err.message : String(err),
+          message: 'Benchmark/retrospective skipped due to error',
+        });
+        return JSON.stringify({ skipped: true });
       }
     });
 

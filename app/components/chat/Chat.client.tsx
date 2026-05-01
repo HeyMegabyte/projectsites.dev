@@ -392,20 +392,26 @@ export const ChatImpl = memo(
       }
     }, [model, provider, searchParams]);
 
-    // Handle importChatFrom URL parameter (used by Project Sites "Edit" button)
+    /*
+     * Handle importChatFrom URL parameter (used by Project Sites "Edit" button)
+     * Also accepts ?slug=X shorthand which resolves to projectsites.dev's by-slug/chat endpoint
+     */
     useEffect(() => {
-      const importUrl = searchParams.get('importChatFrom');
+      const slug = searchParams.get('slug');
+      const explicitUrl = searchParams.get('importChatFrom');
+      const importUrl =
+        explicitUrl || (slug ? `https://projectsites.dev/api/sites/by-slug/${encodeURIComponent(slug)}/chat` : null);
 
       if (importUrl && !importTriggeredRef.current) {
         importTriggeredRef.current = true;
         setSearchParams({});
 
-        toast.info('Importing chat from Project Sites...');
+        toast.info(slug ? `Loading ${slug} into editor...` : 'Importing chat from Project Sites...');
 
         fetch(importUrl)
           .then((res) => {
             if (!res.ok) {
-              throw new Error('Failed to fetch chat data');
+              throw new Error(`Failed to fetch chat data (${res.status})`);
             }
 
             return res.json();

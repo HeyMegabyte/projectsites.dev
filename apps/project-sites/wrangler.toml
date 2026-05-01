@@ -65,6 +65,7 @@ binding = "AI"
 # ─── Production ──────────────────────────────────────────────
 [env.production]
 name = "project-sites"
+workers_dev = true
 routes = [
   { pattern = "projectsites.dev", custom_domain = true },
   { pattern = "*.projectsites.dev/*", zone_name = "projectsites.dev" }
@@ -72,6 +73,7 @@ routes = [
 
 [env.production.vars]
 ENVIRONMENT = "production"
+INTERNAL_CALLBACK_URL = "https://project-sites.manhattan.workers.dev/api/internal/build-status"
 
 [[env.production.workflows]]
 name = "site-generation-workflow-production"
@@ -82,10 +84,12 @@ class_name = "SiteGenerationWorkflow"
 binding = "AI"
 
 # Claude Code build container — custom image with Claude Code + skills + template pre-baked
+# standard-4 = 4 vCPU, 12 GiB RAM, 8 GB disk. Larger size accelerates parallel prompt execution.
 [[env.production.containers]]
 class_name = "SiteBuilderContainer"
 image = "./Dockerfile"
 max_instances = 10
+instance_type = "standard-4"
 
 [[env.production.durable_objects.bindings]]
 name = "SITE_BUILDER"

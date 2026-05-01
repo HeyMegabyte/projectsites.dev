@@ -1,4 +1,5 @@
 import { type Routes } from '@angular/router';
+import { authGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
   {
@@ -32,6 +33,7 @@ export const routes: Routes = [
   },
   {
     path: 'admin',
+    canActivate: [authGuard],
     loadComponent: () =>
       import('./pages/admin/admin.component').then((m) => m.AdminComponent),
     children: [
@@ -57,26 +59,6 @@ export const routes: Routes = [
           import('./pages/admin/sections/analytics.component').then((m) => m.AdminAnalyticsComponent),
       },
       {
-        path: 'email',
-        loadComponent: () =>
-          import('./pages/admin/sections/email.component').then((m) => m.AdminEmailComponent),
-      },
-      {
-        path: 'social',
-        loadComponent: () =>
-          import('./pages/admin/sections/social.component').then((m) => m.AdminSocialComponent),
-      },
-      {
-        path: 'forms',
-        loadComponent: () =>
-          import('./pages/admin/sections/forms.component').then((m) => m.AdminFormsComponent),
-      },
-      {
-        path: 'integrations',
-        loadComponent: () =>
-          import('./pages/admin/sections/integrations.component').then((m) => m.AdminIntegrationsComponent),
-      },
-      {
         path: 'billing',
         loadComponent: () =>
           import('./pages/admin/sections/billing.component').then((m) => m.AdminBillingComponent),
@@ -87,17 +69,17 @@ export const routes: Routes = [
           import('./pages/admin/sections/audit.component').then((m) => m.AdminAuditComponent),
       },
       {
+        path: 'email',
+        loadComponent: () =>
+          import('./pages/admin/sections/email.component').then((m) => m.AdminEmailComponent),
+      },
+      {
         path: 'settings',
         loadComponent: () =>
           import('./pages/admin/sections/settings.component').then((m) => m.AdminSettingsComponent),
       },
-      // Redirects for removed routes
       {
         path: 'domains',
-        redirectTo: 'settings',
-      },
-      {
-        path: 'seo',
         redirectTo: 'settings',
       },
     ],
@@ -123,6 +105,11 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./pages/legal/legal.component').then((m) => m.LegalComponent),
     data: { type: 'content' },
+  },
+  {
+    path: 'contact',
+    loadComponent: () =>
+      import('./pages/contact/contact.component').then((m) => m.ContactComponent),
   },
   {
     path: 'billing',

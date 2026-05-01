@@ -67,10 +67,12 @@
               }
             ],
             "styles": [
+              "node_modules/animate.css/animate.min.css",
               "src/tailwind.css",
               "src/styles.scss"
             ],
-            "scripts": []
+            "scripts": [],
+            "allowedCommonJsDependencies": ["jszip"]
           },
           "configurations": {
             "production": {

@@ -52,3 +52,4 @@ export * from './api.js';
 export * from './contact.js';
 export * from './confidence.js';
 export * from './seed-v3.js';
+export * from './forms.js';

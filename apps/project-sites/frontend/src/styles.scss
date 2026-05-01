@@ -1,8 +1,20 @@
 // ═══════════════════════════════════════════
+// CDK Dialog Overrides
+// ═══════════════════════════════════════════
+.cdk-overlay-transparent .cdk-overlay-pane {
+  background: transparent !important;
+  max-width: 100vw !important;
+}
+.cdk-overlay-container {
+  z-index: 2000;
+}
+
+// ═══════════════════════════════════════════
 // Global Reset — Tailwind-first
 // ═══════════════════════════════════════════
-
-@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+// NOTE: Fonts are loaded via <link rel="preload"> + <link rel="stylesheet"> in index.html
+// to eliminate FOUC. CSS @import inside a stylesheet defers font download until the bundle
+// parses, which causes a visible font swap. Loading from <head> avoids that.
 
 :root {
   --accent: #00E5FF;

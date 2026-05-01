@@ -1,12 +1,11 @@
 import { Component, signal, inject, HostListener } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { ApiService } from '../../services/api.service';
 import { ToastService } from '../../services/toast.service';
 
 @Component({
   selector: 'app-feedback-widget',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   template: `
     <!-- Floating feedback button -->
     @if (!isOpen()) {

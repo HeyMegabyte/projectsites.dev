@@ -1,11 +1,10 @@
 import { Component, inject } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { AdminStateService } from '../admin-state.service';
 
 @Component({
   selector: 'app-admin-seo',
   standalone: true,
-  imports: [FormsModule],
+  imports: [],
   template: `
     <div class="p-7 flex-1 overflow-y-auto animate-fade-in max-md:p-4 space-y-6">
 
@@ -17,36 +16,27 @@ import { AdminStateService } from '../admin-state.service';
 
       <!-- Meta Tags -->
       <div class="bg-white/[0.02] border border-white/[0.06] rounded-[14px] p-6">
-        <h3 class="text-base font-semibold text-white m-0 mb-5 flex items-center gap-2">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          Meta Tags
-        </h3>
-        <div class="flex flex-col gap-4">
+        <div class="flex items-center justify-between mb-5">
+          <h3 class="text-base font-semibold text-white m-0 flex items-center gap-2">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Meta Tags
+          </h3>
+          <span class="text-[0.62rem] font-bold py-0.5 px-2.5 rounded-full uppercase bg-primary/10 text-primary">Coming soon</span>
+        </div>
+        <p class="text-[0.72rem] text-text-secondary/70 m-0 mb-4">Meta tags are auto-generated from your business profile. Manual overrides land in a future release.</p>
+        <div class="flex flex-col gap-4 opacity-60 pointer-events-none select-none">
           <div>
             <label class="block text-[0.78rem] font-semibold text-text-secondary mb-2">Page Title</label>
-            <input type="text" class="input-field" [placeholder]="siteTitle + ' | ' + siteName" [(ngModel)]="metaTitle" maxlength="60" />
-            <div class="flex items-center justify-between mt-1.5">
-              <span class="text-[0.68rem] text-text-secondary/50">Appears in browser tabs and search results</span>
-              <span class="text-[0.62rem] font-mono" [class]="(metaTitle || '').length > 55 ? 'text-amber-400' : 'text-text-secondary/40'">{{ (metaTitle || '').length }}/60</span>
-            </div>
+            <input type="text" class="input-field" [placeholder]="siteTitle + ' | ' + siteName" disabled />
           </div>
           <div>
             <label class="block text-[0.78rem] font-semibold text-text-secondary mb-2">Meta Description</label>
-            <textarea class="input-field !h-20 resize-none" placeholder="Describe your business in 1-2 sentences for search results..." [(ngModel)]="metaDescription" maxlength="160"></textarea>
-            <div class="flex items-center justify-between mt-1.5">
-              <span class="text-[0.68rem] text-text-secondary/50">Shown below your title in search results</span>
-              <span class="text-[0.62rem] font-mono" [class]="(metaDescription || '').length > 150 ? 'text-amber-400' : 'text-text-secondary/40'">{{ (metaDescription || '').length }}/160</span>
-            </div>
+            <textarea class="input-field !h-20 resize-none" placeholder="Describe your business in 1-2 sentences for search results..." disabled></textarea>
           </div>
           <div>
             <label class="block text-[0.78rem] font-semibold text-text-secondary mb-2">Keywords</label>
-            <input type="text" class="input-field" placeholder="keyword1, keyword2, keyword3" [(ngModel)]="metaKeywords" />
-            <span class="text-[0.68rem] text-text-secondary/50 mt-1.5 block">Comma-separated list of target keywords</span>
+            <input type="text" class="input-field" placeholder="keyword1, keyword2, keyword3" disabled />
           </div>
-          <button class="btn-accent self-start" disabled>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>
-            Save Meta Tags
-          </button>
         </div>
       </div>
 
@@ -56,10 +46,10 @@ import { AdminStateService } from '../admin-state.service';
         <div class="bg-white rounded-xl p-4 max-w-[600px]">
           <div class="text-[0.72rem] text-[#202124] mb-0.5 font-sans">{{ siteDomain }}</div>
           <div class="text-[1.05rem] text-[#1a0dab] font-sans leading-tight mb-1 hover:underline cursor-pointer">
-            {{ metaTitle || (siteTitle + ' | ' + siteName) }}
+            {{ siteTitle }} | {{ siteName }}
           </div>
           <div class="text-[0.82rem] text-[#4d5156] font-sans leading-snug">
-            {{ metaDescription || 'Your site description will appear here. Write a compelling description that includes your primary keyword and a call to action.' }}
+            Your site description will appear here once meta overrides ship. Until then we generate one from your business profile.
           </div>
         </div>
       </div>
@@ -104,10 +94,6 @@ import { AdminStateService } from '../admin-state.service';
 })
 export class AdminSeoComponent {
   state = inject(AdminStateService);
-
-  metaTitle = '';
-  metaDescription = '';
-  metaKeywords = '';
 
   get siteName(): string {
     return this.state.selectedSite()?.business_name || 'Your Business';

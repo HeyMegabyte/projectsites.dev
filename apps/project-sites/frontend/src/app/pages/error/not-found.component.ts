@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 
 @Component({
@@ -326,9 +326,8 @@ import { Router, RouterLink } from '@angular/router';
   `],
 })
 export class NotFoundComponent {
+  private router = inject(Router);
   searchQuery = signal('');
-
-  constructor(private router: Router) {}
 
   onSearchInput(event: Event): void {
     const input = event.target as HTMLInputElement;

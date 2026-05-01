@@ -327,6 +327,23 @@
   <!-- Preconnect -->
   <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin="anonymous">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+
+  <!-- Fonts: preload + load in <head> to prevent FOUC. swap is imperceptible because CSS is fetched in parallel with HTML. -->
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" crossorigin="anonymous">
+
+  <!-- Metric-adjusted fallback so the system-ui → Sora swap is visually invisible -->
+  <style>
+    @font-face {
+      font-family: 'Sora Fallback';
+      src: local('-apple-system'), local('BlinkMacSystemFont'), local('Segoe UI'), local('Roboto');
+      size-adjust: 102%;
+      ascent-override: 92%;
+      descent-override: 24%;
+      line-gap-override: 0%;
+    }
+    html, body { font-family: 'Sora', 'Sora Fallback', system-ui, -apple-system, sans-serif; }
+  </style>
 </head>
 <body>
   <!-- Google Tag Manager (noscript) -->

@@ -2,7 +2,7 @@ import { Component, type OnInit, type OnDestroy, inject, signal, ChangeDetectorR
 import { Router, ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Subject, debounceTime, distinctUntilChanged, switchMap, of, takeUntil } from 'rxjs';
-import { ApiService } from '../../services/api.service';
+import { ApiService, type CreateSitePayload } from '../../services/api.service';
 import { AuthService, type SelectedBusiness } from '../../services/auth.service';
 import { GeolocationService } from '../../services/geolocation.service';
 import { ToastService } from '../../services/toast.service';
@@ -965,7 +965,7 @@ export class CreateComponent implements OnInit, OnDestroy {
   private createSiteWithUploadId(uploadId?: string): void {
     const biz = this.selectedBusiness();
 
-    const payload: any = {
+    const payload: CreateSitePayload & { upload_id?: string } = {
       mode: biz ? 'business' : 'custom',
       additional_context: this.additionalContext || undefined,
       business: {
@@ -990,8 +990,7 @@ export class CreateComponent implements OnInit, OnDestroy {
           this.clearFormDraft();
           this.toast.success('Site build started!');
           // API returns site_id (not id) — handle both formats
-          const data = res.data as any;
-          const siteId = data.site_id || data.id;
+          const siteId = res.data.site_id || res.data.id;
           const slug = res.data.slug;
           this.router.navigate(['/waiting'], {
             queryParams: { id: siteId, slug },
