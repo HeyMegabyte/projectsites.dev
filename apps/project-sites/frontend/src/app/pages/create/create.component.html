@@ -146,6 +146,85 @@
           </select>
         </div>
 
+        <!-- AI Expert Chat — feeds cumulative <expertNotes> into Directive v1 L6 -->
+        <div class="mb-5 text-left">
+          <div class="flex items-center justify-between gap-3 p-3 px-4 bg-gradient-to-r from-secondary/[0.08] to-primary/[0.05] border border-primary/[0.18] rounded-xl">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <div class="w-8 h-8 rounded-lg bg-primary/[0.12] text-primary flex items-center justify-center flex-shrink-0">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              </div>
+              <div class="min-w-0">
+                <div class="text-[0.88rem] font-semibold text-light">Talk to our AI strategist</div>
+                <div class="text-[0.75rem] text-gray-500 truncate">Answer a few questions, we shape the brief automatically.</div>
+              </div>
+            </div>
+            <button
+              type="button"
+              class="whitespace-nowrap text-[0.78rem] font-semibold py-2 px-3.5 rounded-lg border border-primary/25 bg-primary/[0.1] text-primary cursor-pointer transition-all hover:bg-primary/[0.2] flex items-center gap-1.5"
+              (click)="toggleChat()"
+            >
+              {{ chatOpen() ? 'Hide chat' : 'Open chat' }}
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" [style.transform]="chatOpen() ? 'rotate(180deg)' : 'none'" style="transition:transform 0.2s"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+          </div>
+
+          @if (chatOpen()) {
+            <div class="mt-3 border border-white/[0.08] rounded-xl bg-dark-surface/60 overflow-hidden animate-fade-in-up">
+              <!-- Transcript -->
+              <div class="p-3.5 max-h-[260px] overflow-y-auto flex flex-col gap-2.5">
+                @if (chatMessages().length === 0) {
+                  <div class="text-[0.82rem] text-gray-500 leading-relaxed">
+                    Start anywhere — you can just type, or pick a question to break the ice. Every answer gets folded into the build brief on the right.
+                  </div>
+                  <div class="flex flex-wrap gap-1.5 mt-1.5">
+                    @for (s of chatStarters; track s) {
+                      <button
+                        type="button"
+                        class="text-[0.74rem] py-1.5 px-2.5 rounded-lg border border-primary/15 bg-primary/[0.05] text-primary/90 hover:bg-primary/[0.12] transition-colors cursor-pointer"
+                        (click)="useChatStarter(s)"
+                      >{{ s }}</button>
+                    }
+                  </div>
+                }
+                @for (msg of chatMessages(); track msg.ts) {
+                  @if (msg.role === 'user') {
+                    <div class="self-end max-w-[85%] py-2 px-3 rounded-xl rounded-br-sm bg-primary/[0.12] border border-primary/20 text-light text-[0.84rem] leading-relaxed whitespace-pre-wrap break-words">{{ msg.text }}</div>
+                  } @else {
+                    <div class="self-start max-w-[85%] py-2 px-3 rounded-xl rounded-bl-sm bg-white/[0.04] border border-white/[0.08] text-text-secondary text-[0.84rem] leading-relaxed whitespace-pre-wrap break-words">{{ msg.text }}</div>
+                  }
+                }
+                @if (chatSending()) {
+                  <div class="self-start py-2 px-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-primary text-[0.82rem]">
+                    <span class="loading-dots"><span></span><span></span><span></span></span>
+                  </div>
+                }
+              </div>
+
+              <!-- Composer -->
+              <div class="border-t border-white/[0.06] p-2.5 flex gap-2">
+                <input
+                  type="text"
+                  class="flex-1 py-2.5 px-3.5 text-[0.88rem] font-sans bg-dark-surface border border-white/[0.08] rounded-xl text-light outline-none transition-all placeholder:text-gray-500 focus:border-primary"
+                  placeholder="Type a detail about your business…"
+                  [(ngModel)]="chatInput"
+                  (keydown.enter)="sendChatMessage(); $event.preventDefault()"
+                  [disabled]="chatSending()"
+                  maxlength="800"
+                />
+                <button
+                  type="button"
+                  class="bg-primary text-dark font-semibold rounded-xl py-2.5 px-4 text-[0.85rem] whitespace-nowrap flex-shrink-0 transition-all hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                  (click)="sendChatMessage()"
+                  [disabled]="!chatInput.trim() || chatSending()"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                  Send
+                </button>
+              </div>
+            </div>
+          }
+        </div>
+
         <div class="mb-5 text-left">
           <label class="block text-[0.85rem] font-semibold text-light mb-1.5" for="create-context">
             Additional details <span class="text-gray-500 font-normal text-[0.75rem]">(optional but recommended)</span>

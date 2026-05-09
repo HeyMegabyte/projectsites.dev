@@ -202,6 +202,19 @@ export class CreateComponent implements OnInit, OnDestroy {
   additionalFiles: File[] = [];
   imagePreviews: { name: string; url: string }[] = [];
 
+  // ── AI Expert Chat (feeds <expertNotes> into Directive v1 L6) ──
+  chatOpen = signal(false);
+  chatSending = signal(false);
+  chatInput = '';
+  chatMessages = signal<{ role: 'user' | 'assistant'; text: string; ts: number }[]>([]);
+  chatStarters = [
+    "What's the one thing customers should know about this business?",
+    'Who is the ideal customer? Be specific (age, role, pain point).',
+    'What 3 services or products should I feature on the homepage?',
+    'Describe the brand voice in 5 words.',
+    'Any awards, press mentions, or notable clients to highlight?',
+  ];
+
   private destroy$ = new Subject<void>();
 
   ngOnInit(): void {
@@ -890,6 +903,88 @@ export class CreateComponent implements OnInit, OnDestroy {
 
   private hasFilesToUpload(): boolean {
     return !!(this.logoFile || this.faviconFile || this.additionalFiles.length > 0);
+  }
+
+  // ── AI Expert Chat methods ─────────────────────────────────
+
+  /** Toggle the chat panel open/closed. */
+  toggleChat(): void {
+    this.chatOpen.update((v) => !v);
+  }
+
+  /** Use a suggested starter as the chat input. */
+  useChatStarter(starter: string): void {
+    this.chatInput = starter;
+  }
+
+  /**
+   * Send a chat message. The user's note is appended to the running
+   * `additionalContext` (the customer-expert injection slot for the
+   * directive's L6 `<expertNotes>` block). The AI then returns a
+   * structured, polished version of the cumulative expert notes that
+   * replaces the textarea contents.
+   */
+  sendChatMessage(): void {
+    const raw = this.chatInput.trim();
+    if (!raw || this.chatSending()) return;
+
+    const now = Date.now();
+    this.chatMessages.update((m) => [...m, { role: 'user', text: raw, ts: now }]);
+    this.chatInput = '';
+    this.chatSending.set(true);
+
+    // Build cumulative expert notes: existing additionalContext + every chat turn
+    const transcript = this.chatMessages()
+      .filter((m) => m.role === 'user')
+      .map((m) => `- ${m.text}`)
+      .join('\n');
+    const seedText = [
+      this.additionalContext.trim(),
+      transcript ? `Owner notes from chat:\n${transcript}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+
+    this.api
+      .improvePrompt({
+        text: seedText,
+        business_name: this.businessName.trim() || undefined,
+        business_address: this.businessAddress.trim() || undefined,
+      })
+      .subscribe({
+        next: (res) => {
+          const improved = res?.data?.improved_text?.trim() || seedText;
+          // Replace additionalContext with the improved cumulative notes
+          this.additionalContext = improved;
+          this.chatMessages.update((m) => [
+            ...m,
+            {
+              role: 'assistant',
+              text: 'Got it — I added that to your project notes and tightened the wording. Anything else?',
+              ts: Date.now(),
+            },
+          ]);
+          this.chatSending.set(false);
+          this.saveFormDraft();
+        },
+        error: () => {
+          // Graceful fallback: keep raw user note appended without AI polish
+          if (!this.additionalContext.includes(raw)) {
+            this.additionalContext =
+              (this.additionalContext.trim() ? this.additionalContext.trim() + '\n' : '') + `- ${raw}`;
+          }
+          this.chatMessages.update((m) => [
+            ...m,
+            {
+              role: 'assistant',
+              text: 'Saved your note (AI polish unavailable right now). Keep going — I will refine on the next message.',
+              ts: Date.now(),
+            },
+          ]);
+          this.chatSending.set(false);
+          this.saveFormDraft();
+        },
+      });
   }
 
   private buildUploadFormData(): FormData {

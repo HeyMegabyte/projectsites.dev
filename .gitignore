@@ -51,3 +51,4 @@ docs/instructions/Roadmap.md
 .cursorrules
 *.md
 .qodo
+.claude/settings.local.json

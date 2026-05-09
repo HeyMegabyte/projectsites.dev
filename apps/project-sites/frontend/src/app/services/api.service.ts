@@ -235,6 +235,11 @@ export class ApiService {
     return this.post('/sites/generate-prompt', body);
   }
 
+  /** Improve / restructure rough notes via Workers AI (no auth required) */
+  improvePrompt(body: { text: string; business_name?: string; business_address?: string }): Observable<{ data: { improved_text: string } }> {
+    return this.post('/sites/improve-prompt', body);
+  }
+
   /** Deploy ZIP to site */
   deploySite(siteId: string, formData: FormData): Observable<{ data: { message: string } }> {
     return this.postFormData(`/sites/${siteId}/deploy`, formData);
