@@ -1,15 +1,47 @@
 /**
  * @module services/retrospective
- * @description Generates per-build retrospectives. Diffs current benchmark
- * against the last 10 builds and asks Claude Haiku to identify patterns worth
- * encoding as rules.
  *
- * Cost: one Haiku call (~$0.001) per build. Skipped entirely if mean score is
- * healthy (>=0.85) and no regression — no learning to do when everything works.
+ * @description
+ * Generates per-build retrospectives. Diffs the current benchmark against
+ * the last 10 builds and asks Claude Haiku to identify 1–3 patterns worth
+ * encoding as rules in `RULES.md`.
  *
- * Output: a markdown file in `apps/project-sites/.claude/skills/learned/retrospectives/`
- * named `YYYY-MM-DD-{slug}.md`. The weekly aggregator clusters these into
- * candidate rules in RULES.md.
+ * ## Lifecycle
+ *
+ * 1. Called from `workflows/site-generation.ts` in the `retrospective` step
+ *    immediately after `benchmark.ts` writes its row to `site_benchmarks`.
+ * 2. {@link shouldGenerate} is the cheap gate — clean builds (mean ≥ 0.85
+ *    AND no regression) skip Haiku entirely, saving ~$0.001 + ~3s latency.
+ * 3. {@link buildRetrospective} pulls the last N priors from D1, renders a
+ *    structured prompt, calls Haiku 4.5, and returns markdown.
+ * 4. Caller writes the markdown to R2 (and optionally to a GitHub PR via
+ *    `services/git.ts`) and calls {@link recordRetrospectivePath} to link
+ *    the file back to the benchmark row.
+ *
+ * ## Output
+ *
+ * A markdown file in `apps/project-sites/.claude/skills/learned/retrospectives/`
+ * named `YYYY-MM-DD-{slug}.md`. The weekly aggregator (see
+ * `scripts/aggregate-retrospectives.mjs`) clusters these into candidate
+ * rules in `RULES.md` once a pattern hits the 20-build / 0.85-confidence
+ * promotion threshold.
+ *
+ * ## Cost
+ *
+ * One Haiku call per build, ~1200 output tokens, ~$0.001. Skipped on
+ * healthy builds so total monthly cost stays under $1 even at 1k builds/mo.
+ *
+ * @example
+ * ```ts
+ * const retro = await buildRetrospective({ env, current: benchmark });
+ * if (retro.generated) {
+ *   await env.SITES_BUCKET.put(`retrospectives/${retro.filename}`, retro.markdown);
+ *   await recordRetrospectivePath(env, benchmark.id, retro.filename);
+ * }
+ * ```
+ *
+ * @see {@link module:services/benchmark}
+ * @see {@link module:services/external_llm}
  */
 
 import { dbQuery, dbUpdate } from './db.js';
@@ -41,8 +73,26 @@ export interface RetrospectiveOutput {
 }
 
 /**
- * Decide whether this build needs a retrospective. Skip if mean is high AND
- * no regression — there's nothing useful to learn from a clean build.
+ * Decide whether this build needs a retrospective.
+ *
+ * Skip if mean ≥ 0.85 AND no regression vs. the previous build — there is
+ * nothing useful to learn from a clean build, and the Haiku call would be
+ * wasted spend.
+ *
+ * @param current - Benchmark result just produced by `services/benchmark.ts`.
+ * @returns `true` if Haiku should be called; `false` if the build is healthy.
+ *
+ * @remarks
+ * Pure function — no I/O, no side effects. Safe to call from any execution
+ * context (workflow step, unit test, CLI).
+ *
+ * @example
+ * ```ts
+ * if (!shouldGenerate(current)) {
+ *   logger.info('Skipping retrospective — build is healthy');
+ *   return;
+ * }
+ * ```
  */
 export function shouldGenerate(current: BenchmarkResult): boolean {
   const HEALTHY_THRESHOLD = 0.85;
@@ -53,8 +103,30 @@ export function shouldGenerate(current: BenchmarkResult): boolean {
 
 /**
  * Build a retrospective from the current benchmark + last N priors.
- * Persists nothing — caller decides where to write the markdown
- * (R2, GitHub PR, local file via container callback).
+ *
+ * Persists nothing — caller decides where to write the markdown (R2,
+ * GitHub PR via `services/git.ts`, or local file via container callback).
+ *
+ * @param args.env          - Worker bindings; `env.DB` (D1) and any keys
+ *   needed by `external_llm` (`ANTHROPIC_API_KEY`) are required.
+ * @param args.current      - Just-produced benchmark for this build.
+ * @param args.historyLimit - How many prior builds to include in the prompt
+ *   (default `10`). Capped at 10 inside {@link renderRetroPrompt}.
+ * @returns A {@link RetrospectiveOutput}. When `generated=false` the
+ *   markdown is empty and the caller should skip persistence.
+ *
+ * @remarks
+ * Side effects:
+ * - 1 D1 read (`SELECT … FROM site_benchmarks` for prior builds).
+ * - 1 HTTP call to Anthropic via `callExternalLLM` (Haiku 4.5, ~1200 tok).
+ *
+ * Failure mode: when the LLM call throws, the retrospective is still
+ * produced but the pattern-analysis section embeds the error message
+ * verbatim. Callers SHOULD persist the markdown anyway — the structured
+ * findings section is still useful for the weekly aggregator.
+ *
+ * @throws Never — LLM errors are caught and rendered inline. D1 errors
+ *   propagate as rejected promises (caller's `error_handler` wraps them).
  */
 export async function buildRetrospective(args: {
   env: Env;
@@ -106,7 +178,21 @@ export async function buildRetrospective(args: {
   return { markdown, filename, generated: true };
 }
 
-/** Pure prompt builder — extracted for testing. */
+/**
+ * Pure prompt builder — extracted so unit tests can assert against the
+ * exact wire-format text sent to Haiku without spinning up a workflow.
+ *
+ * @param current - Current benchmark.
+ * @param priors  - Up to 10 prior benchmarks (truncated inside).
+ * @returns A multi-line prompt string ready for `callExternalLLM`.
+ *
+ * @remarks
+ * The prompt is structured as: current build stats → specific checklist
+ * issues (h1, JSON-LD, title length, etc.) → last-N history rows → request
+ * for 1–3 patterns with `Trigger:/Mitigation:/Confidence:` format. Haiku
+ * is instructed to only emit patterns supported by 2+ builds to suppress
+ * single-build noise.
+ */
 export function renderRetroPrompt(current: BenchmarkResult, priors: PriorBenchmark[]): string {
   const priorRows = priors
     .slice(0, 10)
@@ -190,7 +276,19 @@ ${llmFindings}
 `;
 }
 
-/** Update the site_benchmarks row with the retrospective path once written. */
+/**
+ * Update the `site_benchmarks` row with the retrospective path once the
+ * markdown is persisted.
+ *
+ * @param env         - Worker bindings; `env.DB` (D1) required.
+ * @param benchmarkId - PK of the `site_benchmarks` row produced earlier.
+ * @param path        - R2 key or relative repo path to the markdown file.
+ *
+ * @remarks
+ * Side effect: 1 D1 UPDATE. Idempotent — overwrites any prior value.
+ *
+ * @throws {Error} Propagates D1 errors as rejected promises.
+ */
 export async function recordRetrospectivePath(env: Env, benchmarkId: string, path: string): Promise<void> {
   await dbUpdate(env.DB, 'site_benchmarks', { retrospective_path: path }, 'id = ?', [benchmarkId]);
 }

@@ -1,11 +1,47 @@
 /**
  * @module services/contact
- * @description Contact form handler that validates input and sends emails
- * via Resend (primary) or SendGrid (fallback).
  *
- * Sends two emails per submission:
- * 1. Main email to the brand contact address with all form fields.
- * 2. Confirmation email to the user acknowledging receipt.
+ * @description
+ * Contact-form submission handler for the Project Sites marketing
+ * surface. Validates input with the shared `contactFormSchema`,
+ * delivers a notification email to `BRAND.CONTACT_EMAIL`, and sends
+ * a styled confirmation back to the submitter.
+ *
+ * ## Provider routing
+ *
+ * Email delivery uses a two-provider routing model. Resend is the
+ * primary provider; SendGrid is the fallback. If `RESEND_API_KEY` is
+ * present, Resend is tried first; on Resend failure (any non-2xx
+ * response), the handler transparently falls back to SendGrid if
+ * `SENDGRID_API_KEY` is configured. If neither is present, the
+ * handler throws `badRequest('Email delivery is not configured.')`
+ * which the error middleware surfaces as a 400 with a friendly
+ * message — better than a generic 500.
+ *
+ * ## Side effects (per submission)
+ *
+ * - 1 Resend `POST /emails` (or SendGrid `POST /v3/mail/send`) to
+ *   notify the team
+ * - 1 same to confirm receipt to the user
+ * - Worst case 4 outbound HTTPS calls when Resend fails both times
+ *   and falls back to SendGrid for both messages — well within the
+ *   Worker subrequest budget.
+ *
+ * ## Security
+ *
+ * All user-supplied strings are run through {@link escapeHtml} before
+ * being embedded in the HTML email body. The `from:` address is fixed
+ * (`noreply@megabyte.space`) so spoofing is impossible from the form.
+ * `reply_to` is set to the submitter's email so replies route back to
+ * them directly.
+ *
+ * @example
+ * ```ts
+ * await handleContactForm(c.env, await c.req.json());
+ * return c.json({ ok: true });
+ * ```
+ *
+ * @see {@link module:services/notifications}
  */
 
 import { BRAND, contactFormSchema, badRequest } from '@project-sites/shared';
@@ -23,6 +59,28 @@ interface EmailOpts {
   replyTo?: string;
 }
 
+/**
+ * Send an email via Resend's `POST /emails` endpoint.
+ *
+ * @param apiKey - Resend API key (`re_*` format).
+ * @param opts - Email envelope. `to` is a single recipient (Resend
+ *   accepts arrays but this handler always sends to one address per
+ *   call). `replyTo` is optional — omit for the user-confirmation
+ *   email, set for the team-notification email so replies route to
+ *   the submitter.
+ *
+ * @remarks
+ * `from:` is fixed at `Project Sites <noreply@megabyte.space>` —
+ * the megabyte.space domain MUST be verified in the Resend dashboard
+ * or delivery fails with a 422.
+ *
+ * Failure path: any non-2xx response is logged with status + first
+ * 500 chars of the response body (helps debug Resend's structured
+ * errors) and re-thrown as `badRequest`. Caller in {@link sendEmail}
+ * catches and tries SendGrid.
+ *
+ * @throws {AppError} `badRequest` on any non-2xx HTTP response.
+ */
 async function sendViaResend(apiKey: string, opts: EmailOpts): Promise<void> {
   const body: Record<string, unknown> = {
     from: 'Project Sites <noreply@megabyte.space>',
@@ -57,6 +115,26 @@ async function sendViaResend(apiKey: string, opts: EmailOpts): Promise<void> {
   }
 }
 
+/**
+ * Send an email via SendGrid's `POST /v3/mail/send` endpoint.
+ *
+ * @param apiKey - SendGrid API key (`SG.*` format).
+ * @param opts - Email envelope; same shape as {@link sendViaResend}.
+ *
+ * @remarks
+ * `tracking_settings` disables click/open/subscription tracking — we
+ * deliver transactional confirmations, not marketing email, so
+ * tracking would be inappropriate and would also mangle URLs in the
+ * body. `from:` is fixed at `Project Sites <noreply@megabyte.space>`
+ * (same as Resend) — must be a verified sender in the SendGrid
+ * dashboard.
+ *
+ * Failure path: identical to Resend — log + throw `badRequest`. There
+ * is no third fallback; if SendGrid also fails the handler propagates
+ * the error up to the route layer.
+ *
+ * @throws {AppError} `badRequest` on any non-2xx HTTP response.
+ */
 async function sendViaSendGrid(apiKey: string, opts: EmailOpts): Promise<void> {
   const body: Record<string, unknown> = {
     personalizations: [{ to: [{ email: opts.to }] }],
@@ -96,6 +174,29 @@ async function sendViaSendGrid(apiKey: string, opts: EmailOpts): Promise<void> {
   }
 }
 
+/**
+ * Provider-routing dispatcher. Selects Resend (primary) or SendGrid
+ * (fallback) based on which API keys are configured in `env`.
+ *
+ * @param env - Worker bindings; checks `RESEND_API_KEY` and
+ *   `SENDGRID_API_KEY` (both optional).
+ * @param opts - Email envelope; passed verbatim to the chosen provider.
+ *
+ * @remarks
+ * Routing matrix:
+ * - Both keys present: Resend first, fall back to SendGrid on
+ *   Resend failure
+ * - Only Resend: Resend, no fallback (re-throws on failure)
+ * - Only SendGrid: SendGrid only
+ * - Neither: throws `badRequest('Email delivery is not configured')`
+ *
+ * Fallback is best-effort: the warn log captures Resend failure
+ * details before SendGrid is tried, so post-incident analysis can
+ * separate "Resend down" from "both providers down".
+ *
+ * @throws {AppError} `badRequest` if no provider is configured OR if
+ *   the only configured provider returns a non-2xx response.
+ */
 async function sendEmail(env: Env, opts: EmailOpts): Promise<void> {
   if (env.RESEND_API_KEY) {
     try {
@@ -128,6 +229,25 @@ async function sendEmail(env: Env, opts: EmailOpts): Promise<void> {
 /*  HTML helpers                                                       */
 /* ------------------------------------------------------------------ */
 
+/**
+ * HTML-entity-escape a user-supplied string for safe embedding in an
+ * email body.
+ *
+ * @param str - Untrusted string from the contact form (name, email,
+ *   phone, message).
+ * @returns Same string with `&`, `<`, `>`, `"` replaced by their
+ *   named HTML entities.
+ *
+ * @remarks
+ * Single quotes are not escaped because the email template never
+ * embeds user input inside a single-quoted attribute. Double quotes
+ * ARE escaped because `email` is embedded inside `href="..."` and a
+ * single double-quote there would break the markup.
+ *
+ * Pure function — no I/O, no allocations beyond the returned string.
+ *
+ * @throws Never — string operations only.
+ */
 function escapeHtml(str: string): string {
   return str
     .replace(/&/g, '&amp;')
@@ -136,6 +256,24 @@ function escapeHtml(str: string): string {
     .replace(/"/g, '&quot;');
 }
 
+/**
+ * Build the HTML body of the team-notification email.
+ *
+ * @param data - Validated contact-form payload (already passed through
+ *   `contactFormSchema.parse`).
+ * @returns Inline-styled HTML email body. All fields are
+ *   {@link escapeHtml}-escaped. Includes a `mailto:` link on the
+ *   submitter's email so the recipient can reply in one click.
+ *
+ * @remarks
+ * Email styling uses inline `style="..."` attributes (no `<style>`
+ * block) because most email clients strip or sandbox `<style>`.
+ * Color palette matches the marketing-site dark theme (`#161635`
+ * background, `#50a5db` accent) so inbound contact emails feel
+ * branded. `phone` row is rendered only when present in the payload.
+ *
+ * @throws Never — pure string composition.
+ */
 function buildContactNotificationEmail(data: ContactForm): string {
   return `
 <!DOCTYPE html>
@@ -160,6 +298,21 @@ function buildContactNotificationEmail(data: ContactForm): string {
 </html>`.trim();
 }
 
+/**
+ * Build the HTML body of the user-confirmation email (auto-reply).
+ *
+ * @param data - Validated contact-form payload.
+ * @returns Inline-styled HTML email body addressed to `data.name`,
+ *   echoing back `data.message` so the submitter has a record of
+ *   what they sent.
+ *
+ * @remarks
+ * Same styling system as {@link buildContactNotificationEmail}.
+ * Signed off with "— The Project Sites Team". No CTAs, no marketing
+ * — this is a transactional acknowledgement, full stop.
+ *
+ * @throws Never — pure string composition.
+ */
 function buildContactConfirmationEmail(data: ContactForm): string {
   return `
 <!DOCTYPE html>
@@ -187,11 +340,38 @@ function buildContactConfirmationEmail(data: ContactForm): string {
 /* ------------------------------------------------------------------ */
 
 /**
- * Handle a contact form submission.
+ * Handle a contact form submission end-to-end: validate, notify the
+ * team, confirm to the submitter.
  *
- * 1. Validates the input against `contactFormSchema`.
- * 2. Sends a notification email to `BRAND.CONTACT_EMAIL`.
- * 3. Sends a confirmation email to the user.
+ * @param env - Worker bindings; at least one of `RESEND_API_KEY` or
+ *   `SENDGRID_API_KEY` MUST be configured or this throws.
+ * @param input - Raw JSON body from the request — typically
+ *   `await c.req.json()`. Validated against `contactFormSchema`
+ *   (name, email, optional phone, message).
+ *
+ * @remarks
+ * Sequence of operations:
+ *
+ * 1. `contactFormSchema.parse(input)` — throws `ZodError` on invalid
+ *    input; the global error middleware maps `ZodError` to a 400
+ *    with human-readable field errors.
+ * 2. Send notification email to `BRAND.CONTACT_EMAIL` (defined in
+ *    `@project-sites/shared` constants) with `replyTo` set to the
+ *    submitter's email so replies route back to them.
+ * 3. Send confirmation email to the submitter; no `replyTo` because
+ *    inbound replies to this auto-reply have nowhere useful to go.
+ *
+ * Both emails are sent sequentially (not in parallel) so a
+ * notification failure prevents a confirmation from being sent — we
+ * don't want to acknowledge receipt if the team won't actually get
+ * the message. If notification succeeds but confirmation fails, the
+ * caller still receives a 500 but the team has the inquiry, which is
+ * the priority ordering.
+ *
+ * @throws {ZodError} On invalid input shape.
+ * @throws {AppError} `badRequest('Email delivery is not configured.')`
+ *   when neither provider key is set, OR provider HTTP error from
+ *   {@link sendEmail}.
  */
 export async function handleContactForm(env: Env, input: unknown): Promise<void> {
   const validated = contactFormSchema.parse(input);
