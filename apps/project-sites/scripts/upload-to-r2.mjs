@@ -66,16 +66,31 @@ function getMimeType(filePath) {
   return MIME_TYPES[extname(filePath).toLowerCase()] || 'application/octet-stream';
 }
 
+// R2 single-object size cap. Cloudflare R2 supports >5GB via multipart, but the
+// CF REST API PUT used here is single-shot — keep one comfortable headroom and
+// log oversize files instead of silently dropping them.
+const MAX_FILE_BYTES = 50_000_000; // 50MB
+// Source-only artifacts that must never reach R2 (research JSON, build dirs,
+// secrets, dotfiles). Keep this tight — anything else SHOULD be uploaded.
+const SKIP_DIRS = new Set(['node_modules', '.git', '.claude', '.cache', '.vite', '.turbo', '_src', '_research', '_assets']);
+const skipped = { large: [], empty: [], hidden: [] };
+
 function collectFiles(dir, base = '') {
   const files = [];
   for (const entry of readdirSync(dir)) {
-    if (entry.startsWith('_') || entry === 'node_modules' || entry === '.git' || entry === '.claude') continue;
+    if (SKIP_DIRS.has(entry)) continue;
+    // Skip underscore-prefixed top-level research artifacts (_research.json,
+    // _brand.json, etc.) but ONLY at the build root; nested _src/_archive
+    // already filtered above. base==='' means we're scanning the build root.
+    if (base === '' && entry.startsWith('_')) { skipped.hidden.push(entry); continue; }
     const fullPath = join(dir, entry);
     const relPath = base ? `${base}/${entry}` : entry;
     const stat = statSync(fullPath);
     if (stat.isDirectory()) {
       files.push(...collectFiles(fullPath, relPath));
-    } else if (stat.isFile() && stat.size > 0 && stat.size < 10_000_000) {
+    } else if (stat.isFile()) {
+      if (stat.size === 0) { skipped.empty.push(relPath); continue; }
+      if (stat.size > MAX_FILE_BYTES) { skipped.large.push({ rel: relPath, size: stat.size }); continue; }
       files.push({ path: fullPath, rel: relPath, size: stat.size });
     }
   }
@@ -103,12 +118,35 @@ async function uploadFile(key, filePath, contentType) {
 async function main() {
   const distDir = join(buildDir, 'dist');
   const hasDistDir = (() => { try { return statSync(distDir).isDirectory(); } catch { return false; } })();
+  const publicDir = join(buildDir, 'public');
+  const hasPublicDir = (() => { try { return statSync(publicDir).isDirectory(); } catch { return false; } })();
 
   const isViteProject = hasDistDir;
   const sourceDir = isViteProject ? distDir : buildDir;
   const files = collectFiles(sourceDir);
 
+  // Sanity check: a Vite build must copy public/ into dist/. If a file exists in
+  // public/ but not in dist/, that's a real upload bug — surface and re-include.
+  // Common causes: file added to public/ after `vite build` ran; case-sensitive
+  // mismatch between repo path and import path; vite excludes via `publicDir: false`.
+  const recoveredFromPublic = [];
+  if (isViteProject && hasPublicDir) {
+    const distRels = new Set(files.map(f => f.rel));
+    const publicFiles = collectFiles(publicDir);
+    for (const f of publicFiles) {
+      if (!distRels.has(f.rel)) {
+        recoveredFromPublic.push(f.rel);
+        files.push(f);
+      }
+    }
+    if (recoveredFromPublic.length) {
+      console.warn(`[upload] recovered ${recoveredFromPublic.length} public/ files missing from dist/:`, recoveredFromPublic.slice(0, 10).join(', '));
+    }
+  }
+
   console.warn(`[upload] ${files.length} files from ${sourceDir} → R2 sites/${SITE_SLUG}/${SITE_VERSION}/`);
+  if (skipped.large.length) console.warn(`[upload] WARN: ${skipped.large.length} files >${MAX_FILE_BYTES}B skipped:`, skipped.large.slice(0, 5));
+  if (skipped.empty.length) console.warn(`[upload] WARN: ${skipped.empty.length} empty files skipped:`, skipped.empty.slice(0, 5));
 
   const manifest = {
     slug: SITE_SLUG,
@@ -117,6 +155,12 @@ async function main() {
     building: false,
     uploaded_at: new Date().toISOString(),
     files: [],
+    skipped: {
+      large: skipped.large,
+      empty: skipped.empty,
+      hidden: skipped.hidden,
+    },
+    recovered_from_public: recoveredFromPublic,
   };
 
   let uploaded = 0;
@@ -156,6 +200,9 @@ async function main() {
     fileCount: uploaded,
     version: SITE_VERSION,
     manifest_key: manifestKey,
+    recovered_from_public: recoveredFromPublic.length,
+    skipped_large: skipped.large.length,
+    skipped_empty: skipped.empty.length,
   }));
 }
 

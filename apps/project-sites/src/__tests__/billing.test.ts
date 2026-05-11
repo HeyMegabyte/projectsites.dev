@@ -25,6 +25,7 @@ import {
   getOrgEntitlements,
   getOrgSubscription,
   createBillingPortalSession,
+  appendBudgetTierAddon,
 } from '../services/billing.js';
 
 const mockQueryOne = dbQueryOne as jest.MockedFunction<typeof dbQueryOne>;
@@ -613,5 +614,66 @@ describe('createBillingPortalSession', () => {
     await expect(
       createBillingPortalSession(mockEnv, 'cus_1', 'https://example.com/settings'),
     ).rejects.toThrow('Failed to create billing portal');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// appendBudgetTierAddon
+// ---------------------------------------------------------------------------
+describe('appendBudgetTierAddon', () => {
+  it('is a no-op when tier is undefined', () => {
+    const params = new URLSearchParams();
+    appendBudgetTierAddon(params, undefined);
+    expect(params.toString()).toBe('');
+  });
+
+  it('is a no-op for free tier', () => {
+    const params = new URLSearchParams();
+    appendBudgetTierAddon(params, 'free');
+    expect(params.toString()).toBe('');
+  });
+
+  it('is a no-op for standard tier', () => {
+    const params = new URLSearchParams();
+    appendBudgetTierAddon(params, 'standard');
+    expect(params.toString()).toBe('');
+  });
+
+  it('appends $29 line_items[1] for plus tier', () => {
+    const params = new URLSearchParams();
+    appendBudgetTierAddon(params, 'plus');
+    expect(params.get('line_items[1][price_data][unit_amount]')).toBe('2900');
+    expect(params.get('line_items[1][price_data][product_data][name]')).toBe('Plus Multimedia Addon');
+    expect(params.get('line_items[1][price_data][product_data][description]')).toContain('Sora hero video');
+    expect(params.get('line_items[1][quantity]')).toBe('1');
+    expect(params.get('metadata[budget_tier]')).toBe('plus');
+    expect(params.get('metadata[budget_addon_cents]')).toBe('2900');
+  });
+
+  it('appends $79 line_items[1] for premium tier', () => {
+    const params = new URLSearchParams();
+    appendBudgetTierAddon(params, 'premium');
+    expect(params.get('line_items[1][price_data][unit_amount]')).toBe('7900');
+    expect(params.get('line_items[1][price_data][product_data][name]')).toBe('Premium Multimedia Suite');
+    expect(params.get('line_items[1][price_data][product_data][description]')).toContain('NotebookLM podcast');
+    expect(params.get('line_items[1][quantity]')).toBe('1');
+    expect(params.get('metadata[budget_tier]')).toBe('premium');
+    expect(params.get('metadata[budget_addon_cents]')).toBe('7900');
+  });
+
+  it('uses correct currency from PRICING constant', () => {
+    const params = new URLSearchParams();
+    appendBudgetTierAddon(params, 'plus');
+    expect(params.get('line_items[1][price_data][currency]')).toBe('usd');
+  });
+
+  it('does not collide with line_items[0] keys', () => {
+    const params = new URLSearchParams();
+    params.append('line_items[0][price]', 'price_recurring_monthly');
+    params.append('line_items[0][quantity]', '1');
+    appendBudgetTierAddon(params, 'premium');
+    expect(params.get('line_items[0][price]')).toBe('price_recurring_monthly');
+    expect(params.get('line_items[0][quantity]')).toBe('1');
+    expect(params.get('line_items[1][quantity]')).toBe('1');
   });
 });

@@ -14,8 +14,16 @@ const DOCKERFILE = path.resolve(__dirname, '..', '..', 'Dockerfile');
 const dockerfile = fs.readFileSync(DOCKERFILE, 'utf-8');
 
 describe('Dockerfile orchestrator wiring', () => {
-  it('clones megabytespace/claude-skills into /home/cuser/.agentskills', () => {
-    expect(dockerfile).toMatch(/git clone[^\n]*megabytespace\/claude-skills[^\n]*\/home\/cuser\/\.agentskills/);
+  it('clones heymegabyte/claude-skills into /home/cuser/.agentskills (canonical org)', () => {
+    expect(dockerfile).toMatch(/git clone[^\n]*heymegabyte\/claude-skills[^\n]*\/home\/cuser\/\.agentskills/);
+  });
+
+  it('cache-busts the skills clone via ADD of upstream commit metadata', () => {
+    expect(dockerfile).toMatch(/ADD\s+https:\/\/api\.github\.com\/repos\/heymegabyte\/claude-skills\/commits\/master/);
+  });
+
+  it('pre-warms Vite/esbuild dep cache by running a throwaway template build', () => {
+    expect(dockerfile).toMatch(/npm run build[\s\S]*rm -rf \/home\/cuser\/template\/dist/);
   });
 
   it('installs tsx for run-validators.mjs', () => {

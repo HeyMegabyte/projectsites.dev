@@ -23,6 +23,12 @@ const JOBS_DIR = '/var/jobs';
 const SKILLS_DIR = '/home/cuser/.agentskills';
 const TEMPLATE_DIR = '/home/cuser/template';
 
+// Anthropic credit-low signature lands in stderr when claude -p hits the API
+// and gets HTTP 400 with `{"error":{"type":"invalid_request_error","message":"Your credit balance is too low..."}}`.
+// Detected in real-time so we kill the child + skip wasteful npm install/build/R2 upload.
+const CREDIT_LOW_RE = /credit balance is too low|invalid_request_error[^}]*credit/i;
+const STREAM_TAIL_BYTES = 2048;
+
 try { fs.mkdirSync(JOBS_DIR, { recursive: true }); } catch {}
 
 let CP = '/usr/local/bin/claude';
@@ -46,7 +52,7 @@ function refreshRepo(prefix, label, dir) {
   }
 }
 
-// Sync universal agents from megabytespace/claude-skills into ~/.claude/agents/
+// Sync universal agents from heymegabyte/claude-skills into ~/.claude/agents/
 // without clobbering project-specific agents (which were COPY'd in the
 // Dockerfile after the cp). Runs after every claude-skills git-pull so
 // upstream agent edits land in the orchestrator within 10 minutes.
@@ -78,7 +84,8 @@ refreshRepo('boot', 'Template', TEMPLATE_DIR);
 syncAgents('boot');
 
 // Long-lived Durable Object containers don't reboot for days — refresh every 10min
-// so megabytespace/claude-skills updates land without redeploying the worker.
+// (background heartbeat) so heymegabyte/claude-skills updates land even if no
+// build comes in. Per-build refresh below is the canonical hook.
 let lastRefresh = Date.now();
 function maybeRefreshSkills() {
   if (Date.now() - lastRefresh < 10 * 60 * 1000) return;
@@ -86,6 +93,21 @@ function maybeRefreshSkills() {
   refreshRepo('refresh', 'Skills', SKILLS_DIR);
   refreshRepo('refresh', 'Template', TEMPLATE_DIR);
   syncAgents('refresh');
+}
+
+// MUST run before EVERY claude-code invocation (per Brian's directive). Forces a
+// `git pull` on heymegabyte/claude-skills + the template repo so the build draws
+// from the latest published instructions, agents, and component templates with
+// no 10-minute throttle window. Cheap (~200ms shallow fetch); skipping it
+// shipped a stale build window of up to 10 minutes after every skills release.
+function refreshSkillsForBuild(jobId) {
+  const t0 = Date.now();
+  const okSkills = refreshRepo(`${jobId}:prebuild`, 'Skills', SKILLS_DIR);
+  const okTemplate = refreshRepo(`${jobId}:prebuild`, 'Template', TEMPLATE_DIR);
+  if (okSkills) syncAgents(`${jobId}:prebuild`);
+  lastRefresh = Date.now();
+  console.warn(`[${jobId}] pre-build refresh: skills=${okSkills} template=${okTemplate} (${Date.now() - t0}ms)`);
+  return { skills: okSkills, template: okTemplate, ms: Date.now() - t0 };
 }
 
 const jobs = {};
@@ -155,19 +177,34 @@ function liveFileCount(dir) {
   return n;
 }
 
+function readPhase(dir) {
+  if (!dir) return '';
+  try {
+    const raw = fs.readFileSync(path.join(dir, '.build-phase'), 'utf-8').trim();
+    return raw.replace(/[^a-z0-9._-]/gi, '').slice(0, 40);
+  } catch { return ''; }
+}
+
 function pushStatus(jobId) {
   const j = jobs[jobId];
   if (!j || !j.callbackUrl || !j.callbackSecret) return;
   const liveCount = j.status === 'running' && j.dir ? liveFileCount(j.dir) : 0;
   const finalCount = j.files ? j.files.length : 0;
+  const phase = j.status === 'running' ? readPhase(j.dir) : '';
+  const stepName = phase ? `${j.step}:${phase}` : j.step;
   const payload = {
     jobId,
     status: j.status,
-    step: j.step,
+    step: stepName,
     elapsed: ((Date.now() - j.startTime) / 1000) | 0,
     fileCount: finalCount || liveCount,
     error: j.error ? String(j.error).slice(0, 500) : null,
     uploadResult: j.uploadResult || null,
+    stdoutTail: j.stdoutTail || null,
+    stderrTail: j.stderrTail || null,
+    claudeExitCode: j.claudeExitCode ?? null,
+    claudeRanSeconds: j.claudeRanSeconds ?? null,
+    errorClass: j.errorClass || null,
   };
   const body = JSON.stringify(payload);
   const sig = crypto.createHmac('sha256', j.callbackSecret).update(body).digest('hex');
@@ -213,7 +250,7 @@ function collectFiles(dir, base = '') {
   return files;
 }
 
-function runJob(jobId, dir, prompt, envVars, timeoutMin, callbackUrl, callbackSecret, skipBuild) {
+function runJob(jobId, dir, prompt, envVars, timeoutMin, callbackUrl, callbackSecret, skipBuild, claudeOauth) {
   jobs[jobId] = {
     jobId,
     status: 'running',
@@ -226,6 +263,7 @@ function runJob(jobId, dir, prompt, envVars, timeoutMin, callbackUrl, callbackSe
     callbackUrl: callbackUrl || null,
     callbackSecret: callbackSecret || null,
     skipBuild: Boolean(skipBuild),
+    authMode: claudeOauth ? 'subscription' : 'api_key',
   };
   saveJob(jobId);
   pushStatus(jobId);
@@ -233,7 +271,54 @@ function runJob(jobId, dir, prompt, envVars, timeoutMin, callbackUrl, callbackSe
   const pf = path.join(dir, '_prompt.txt');
   fs.writeFileSync(pf, prompt);
 
+  // Subscription auth: write the keychain-shaped blob to cuser's
+  // ~/.claude/.credentials.json so `claude -p` finds it on startup. CLI
+  // refreshes its own token mid-run if the access token expires (writes
+  // back into the same file — fine, container is ephemeral). Per
+  // ~/.claude/rules/auth-spawned-claude.md, ANTHROPIC_API_KEY MUST be
+  // absent from the spawned shell so the CLI prefers the credentials file.
+  if (claudeOauth && claudeOauth.accessToken && claudeOauth.refreshToken && claudeOauth.expiresAt) {
+    try {
+      const credsDir = '/home/cuser/.claude';
+      fs.mkdirSync(credsDir, { recursive: true });
+      const credsPath = path.join(credsDir, '.credentials.json');
+      fs.writeFileSync(credsPath, JSON.stringify({
+        claudeAiOauth: {
+          accessToken: claudeOauth.accessToken,
+          refreshToken: claudeOauth.refreshToken,
+          expiresAt: Number(claudeOauth.expiresAt),
+          scopes: ['user:inference', 'user:profile'],
+          subscriptionType: 'max',
+        },
+      }), { mode: 0o600 });
+      try { x(`chown -R cuser:cuser ${credsDir}`, { stdio: 'pipe', shell: true }); } catch {}
+      try { x(`chmod 600 ${credsPath}`, { stdio: 'pipe', shell: true }); } catch {}
+      console.warn(`[${jobId}] Subscription auth: wrote ${credsPath} (mode 600)`);
+      // Drop API-key env vars from the job's env before the shell script
+      // emits exports — leaks would defeat the subscription path.
+      delete envVars.ANTHROPIC_API_KEY;
+      delete envVars.ANTHROPIC_AUTH_TOKEN;
+    } catch (e) {
+      console.warn(`[${jobId}] Failed to write credentials.json: ${e.message} — falling back to API key`);
+    }
+  }
+
   const envLines = ['#!/bin/sh'];
+  // Always unset Anthropic API-key vars + parent CLAUDE_CODE_* vars per
+  // ~/.claude/rules/auth-spawned-claude.md so subscription auth resolves
+  // cleanly. Harmless when API-key path is active (envVars exports below
+  // re-set ANTHROPIC_API_KEY when present).
+  envLines.push('unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN');
+  envLines.push('unset CLAUDE_CODE_ENTRYPOINT CLAUDECODE CLAUDE_CODE_EXECPATH');
+  // Cost-discipline: default orchestrator + inherit-model subagents (domain-builder,
+  // validator-fixer) to Sonnet 4.6. Opus 4.7 stays opt-in via explicit subagent
+  // frontmatter (source-fidelity-fixer.md sets `model: opus`). Per
+  // ~/.claude/rules/model-routing.md — implementation/audit work is Sonnet's lane;
+  // architecture/security/visual-QA stay on Opus by agent-level override.
+  // Target: $2-4 per build vs $15-22 baseline (Opus ~5x more expensive than Sonnet).
+  // envVars below can override by setting ANTHROPIC_MODEL explicitly.
+  envLines.push('export ANTHROPIC_MODEL=claude-sonnet-4-6');
+  envLines.push('export ANTHROPIC_DEFAULT_HAIKU_MODEL=claude-haiku-4-5-20251001');
   for (const k in envVars) if (envVars[k]) envLines.push(`export ${k}=${JSON.stringify(envVars[k])}`);
   envLines.push('export HOME=/home/cuser');
   envLines.push(`export SKILLS_DIR=${SKILLS_DIR}`);
@@ -264,8 +349,24 @@ function runJob(jobId, dir, prompt, envVars, timeoutMin, callbackUrl, callbackSe
     timeout: to, stdio: ['pipe', 'pipe', 'pipe'], maxBuffer: 100 * 1024 * 1024,
   });
   let stdout = '', stderr = '';
-  child.stdout.on('data', d => { stdout += d.toString(); });
-  child.stderr.on('data', d => { stderr += d.toString(); });
+  // Mirror last 2KB of each stream onto the job record so pushStatus surfaces them
+  // every heartbeat — turns post-mortem-only data into live diagnostics.
+  // Also scan each chunk for the Anthropic credit-low signature so we kill the
+  // child IMMEDIATELY rather than waiting for it to silently produce a
+  // template-only dist that masquerades as workflow.complete.
+  const captureChunk = (chunk, isStderr) => {
+    const s = chunk.toString();
+    if (isStderr) stderr += s; else stdout += s;
+    const tailKey = isStderr ? 'stderrTail' : 'stdoutTail';
+    jobs[jobId][tailKey] = ((jobs[jobId][tailKey] || '') + s).slice(-STREAM_TAIL_BYTES);
+    if (!jobs[jobId].errorClass && CREDIT_LOW_RE.test(s)) {
+      jobs[jobId].errorClass = 'anthropic_credit_balance_too_low';
+      console.warn(`[${jobId}] credit-low signature detected — killing claude child`);
+      try { child.kill('SIGTERM'); } catch {}
+    }
+  };
+  child.stdout.on('data', d => captureChunk(d, false));
+  child.stderr.on('data', d => captureChunk(d, true));
 
   // Run a shell command async via spawn so the Node event loop stays free for setInterval heartbeats.
   // Returns { code, stdout } or throws on timeout/spawn error.
@@ -283,7 +384,39 @@ function runJob(jobId, dir, prompt, envVars, timeoutMin, callbackUrl, callbackSe
   }
 
   child.on('close', async code => {
-    console.warn(`[${jobId}] Claude Code exited code=${code} stdout=${stdout.length}b stderr=${stderr.length}b elapsed=${((Date.now() - jobs[jobId].startTime) / 1000) | 0}s`);
+    const ranSeconds = ((Date.now() - jobs[jobId].startTime) / 1000) | 0;
+    console.warn(`[${jobId}] Claude Code exited code=${code} stdout=${stdout.length}b stderr=${stderr.length}b elapsed=${ranSeconds}s`);
+
+    // Persist exit metadata for the next pushStatus heartbeat + audit trail.
+    jobs[jobId].claudeExitCode = code;
+    jobs[jobId].claudeRanSeconds = ranSeconds;
+
+    // Post-hoc scan in case the credit-low message landed at end of stream
+    // and the live captureChunk didn't fire (chunk boundary, etc.).
+    if (!jobs[jobId].errorClass && (CREDIT_LOW_RE.test(stderr) || CREDIT_LOW_RE.test(stdout))) {
+      jobs[jobId].errorClass = 'anthropic_credit_balance_too_low';
+    }
+
+    // Detect "claude exited fast with no .build-phase progress" — the silent
+    // failure mode where credits were exhausted but stderr was empty/redirected.
+    // ranSeconds<60 + no phase markers = the orchestrator never started real work.
+    const phaseRecorded = readPhase(dir);
+    if (!jobs[jobId].errorClass && code === 0 && ranSeconds < 60 && !phaseRecorded) {
+      jobs[jobId].errorClass = 'claude_silent_exit';
+    }
+
+    // Short-circuit: skip npm install/build/R2 upload entirely when claude
+    // never produced real output. Prevents 5+ minutes of wasted container time
+    // and a misleading "published" status on a template-only dist.
+    if (jobs[jobId].errorClass) {
+      setStatus(jobId, {
+        status: 'error',
+        error: jobs[jobId].errorClass,
+        step: 'done',
+        files: [],
+      });
+      return;
+    }
 
     setStatus(jobId, { step: 'npm-build' });
 
@@ -404,9 +537,10 @@ http.createServer((q, r) => {
 
     const snapshot = () => {
       const j = jobs[jid];
+      const phase = j.status === 'running' ? readPhase(j.dir) : '';
       return {
         status: j.status,
-        step: j.step,
+        step: phase ? `${j.step}:${phase}` : j.step,
         elapsed: ((Date.now() - j.startTime) / 1000) | 0,
         fileCount: j.files ? j.files.length : 0,
         error: j.error ? j.error.slice(0, 500) : null,
@@ -559,23 +693,41 @@ http.createServer((q, r) => {
       try {
         const P = JSON.parse(b);
         const jobId = `job-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-        const dir = `/tmp/build-${P.slug || 'site'}-${Date.now()}`;
+        const slug = P.slug || 'site';
+        const isWarm = P.warmReuse === true;
+        const iteration = typeof P.iteration === 'number' && P.iteration > 0 ? P.iteration : 1;
+        // Warm reuse: reuse stable per-slug dir so node_modules + ~/.cache/vite + dist/
+        // survive across convergence iterations (saves ~60-130s per warm iter).
+        const dir = isWarm ? `/tmp/build-${slug}` : `/tmp/build-${slug}-${Date.now()}`;
         fs.mkdirSync(dir, { recursive: true });
+        const hasWarmCache = isWarm && fs.existsSync(path.join(dir, 'node_modules')) && fs.existsSync(path.join(dir, 'package.json'));
 
-        // Lazy refresh — bring skills + template up to origin/main on burst job arrivals.
-        maybeRefreshSkills();
+        // Forced pre-build refresh — every build pulls heymegabyte/claude-skills + template
+        // before the orchestrator runs, so Claude Code always sees the latest published
+        // instructions/agents/components. No throttle window.
+        const refreshResult = refreshSkillsForBuild(jobId);
 
         if (P.skipBuild !== true && fs.existsSync(`${TEMPLATE_DIR}/package.json`)) {
-          try {
-            x(`cp -r ${TEMPLATE_DIR}/* ${dir}/ 2>/dev/null; cp -r ${TEMPLATE_DIR}/.[!.]* ${dir}/ 2>/dev/null; true`, { shell: true, stdio: 'pipe' });
-            console.warn(`[${jobId}] Template copied`);
-          } catch {}
+          if (hasWarmCache) {
+            console.warn(`[${jobId}] Warm reuse: iteration ${iteration}, dir ${dir}, skipping template copy (node_modules cached)`);
+          } else {
+            try {
+              x(`cp -r ${TEMPLATE_DIR}/* ${dir}/ 2>/dev/null; cp -r ${TEMPLATE_DIR}/.[!.]* ${dir}/ 2>/dev/null; true`, { shell: true, stdio: 'pipe' });
+              console.warn(`[${jobId}] Template copied (warm=${isWarm}, iter=${iteration})`);
+            } catch {}
+          }
         }
 
+        // Write each context file at exactly the requested key name. Keys that already
+        // start with `_` (e.g. `_brand.json`, `_assets.json`, `_scraped_content.json`) land
+        // verbatim — the orchestrator prompt instructs Claude to read those exact paths.
+        // Legacy keys without a leading `_` are still prefixed so they ship as ignored
+        // sidecar files (collectFiles strips files starting with `_`).
         if (P.contextFiles && typeof P.contextFiles === 'object') {
           for (const k in P.contextFiles) {
+            const fileName = k.startsWith('_') ? k : `_${k}`;
             fs.writeFileSync(
-              path.join(dir, `_${k}`),
+              path.join(dir, fileName),
               typeof P.contextFiles[k] === 'string' ? P.contextFiles[k] : JSON.stringify(P.contextFiles[k], null, 2)
             );
           }
@@ -593,9 +745,26 @@ http.createServer((q, r) => {
         const callbackUrl = P.callbackUrl || envVars.CALLBACK_URL || null;
         const callbackSecret = P.callbackSecret || envVars.CALLBACK_SECRET || null;
 
-        runJob(jobId, dir, P.prompt || '', envVars, P.timeoutMin || 45, callbackUrl, callbackSecret, P.skipBuild === true);
+        // On warm convergence iterations, prepend prior-iteration recommendations
+        // so the orchestrator focuses on targeted fixes instead of redoing research.
+        let finalPrompt = P.prompt || '';
+        if (isWarm && Array.isArray(P.priorRecommendations) && P.priorRecommendations.length > 0) {
+          const recBlock = P.priorRecommendations
+            .slice(0, 50)
+            .map((rec, idx) => `${idx + 1}. [${rec.severity || 'minor'}] (${rec.category || 'unknown'}) ${rec.description || ''}`)
+            .join('\n');
+          const warmHeader = `## Prior Iteration Recommendations (Convergence Iteration ${iteration})\n\nThe previous build of this site was scored by the multi-judge stack and produced the following actionable recommendations. Address EACH ONE in this iteration. Do NOT re-run research, brand extraction, or template setup — those artifacts are already on disk in this warm container. Focus your subagents on surgical fixes.\n\n${recBlock}\n\nAfter applying the fixes above, re-run the validators and visual inspection. The convergence loop will score this build and decide whether another iteration is needed.\n\n---\n\n`;
+          finalPrompt = warmHeader + finalPrompt;
+          console.warn(`[${jobId}] Warm iteration ${iteration}: prepended ${P.priorRecommendations.length} prior recommendations to prompt`);
+        }
+
+        runJob(jobId, dir, finalPrompt, envVars, P.timeoutMin || 45, callbackUrl, callbackSecret, P.skipBuild === true, P._claudeOauth || null);
+        if (jobs[jobId]) {
+          jobs[jobId].prebuildRefresh = refreshResult;
+          saveJob(jobId);
+        }
         r.writeHead(200);
-        r.end(JSON.stringify({ jobId, status: 'started' }));
+        r.end(JSON.stringify({ jobId, status: 'started', prebuildRefresh: refreshResult }));
       } catch (e) {
         r.writeHead(200);
         r.end(JSON.stringify({ error: e.message }));

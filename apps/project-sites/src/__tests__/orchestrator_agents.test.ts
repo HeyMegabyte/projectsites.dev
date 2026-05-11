@@ -56,7 +56,7 @@ describe('orchestrator agents', () => {
 
   describe('universal agents referenced by orchestrator (~/.agentskills/agents/)', () => {
     // Skip in CI where ~/.agentskills isn't checked out — only run locally where
-    // the dev has the megabytespace/claude-skills repo cloned (the Dockerfile
+    // the dev has the heymegabyte/claude-skills repo cloned (the Dockerfile
     // git-clones it inside the container so the runtime check is on the image).
     const universalAvailable = fs.existsSync(UNIVERSAL_AGENTS_DIR);
 

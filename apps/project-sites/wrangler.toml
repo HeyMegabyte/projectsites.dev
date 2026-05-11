@@ -115,19 +115,23 @@ head_sampling_rate = 0.1
 [[env.production.kv_namespaces]]
 binding = "CACHE_KV"
 id = "d4f48d52fbe14ccd884ea6dd368568ba"
+preview_id = "d4f48d52fbe14ccd884ea6dd368568ba"
 
 [[env.production.kv_namespaces]]
 binding = "PROMPT_STORE"
 id = "5ab9b9509a0741f5a76a6f5c97d7c709"
+preview_id = "5ab9b9509a0741f5a76a6f5c97d7c709"
 
 [[env.production.d1_databases]]
 binding = "DB"
 database_name = "project-sites-db-production"
 database_id = "ea3e839a-c641-4861-ae30-dfc63bff8032"
+preview_database_id = "ea3e839a-c641-4861-ae30-dfc63bff8032"
 
 [[env.production.r2_buckets]]
 binding = "SITES_BUCKET"
 bucket_name = "project-sites-production"
+preview_bucket_name = "project-sites-production"
 
 # Cron trigger: every 30 minutes — verify hostnames + unstick stuck builds
 [env.production.triggers]

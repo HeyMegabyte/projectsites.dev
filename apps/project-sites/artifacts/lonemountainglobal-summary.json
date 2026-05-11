@@ -1,0 +1,11 @@
+{
+  "slug": "lonemountainglobal",
+  "name": "Lone Mountain Global",
+  "iterations": 1,
+  "stop_reason": "iteration_cap",
+  "overall_history": [
+    6.34
+  ],
+  "cumulative_cost_usd": 10.433333333333334,
+  "final_overall": 6.34
+}

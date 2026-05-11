@@ -35,6 +35,7 @@
 import { z } from 'zod';
 import { baseFields, uuidSchema } from './base.js';
 import { SUBSCRIPTION_STATES } from '../constants/index.js';
+import { budgetTierSchema } from './site.js';
 
 /**
  * Full subscription record as stored in the `subscriptions` database table.
@@ -74,6 +75,7 @@ export const createCheckoutSessionSchema = z.object({
   site_id: uuidSchema.optional(),
   success_url: z.string().url().max(2048),
   cancel_url: z.string().url().max(2048),
+  budget_tier: budgetTierSchema.optional(),
 });
 
 /**
@@ -87,6 +89,7 @@ export const createEmbeddedCheckoutSchema = z.object({
   org_id: uuidSchema.optional(),
   site_id: uuidSchema.optional(),
   return_url: z.string().url().max(2048),
+  budget_tier: budgetTierSchema.optional(),
 });
 
 /**

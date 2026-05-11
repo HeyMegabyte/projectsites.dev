@@ -11,6 +11,7 @@
  */
 
 import type { Env } from '../types/env.js';
+import { buildDoctrinePrefix } from '../prompts/renderer.js';
 
 const DEFAULT_MODEL = 'o3-mini';
 
@@ -269,8 +270,8 @@ async function formulateExpertPrompt(
     additionalContext?: string;
   },
 ): Promise<string> {
-  const systemPrompt = `You are an expert web developer and designer. Your job is to write a SINGLE, comprehensive prompt
-that will be given to an AI code editor (bolt.diy) to generate a complete, stunning, production-ready website.
+  const systemPrompt = `${buildDoctrinePrefix()}You are an expert web developer and designer. Your job is to write a SINGLE, comprehensive prompt
+that will be given to an AI code editor (bolt.diy) to generate a complete, stunning, production-ready website. The build prompt you produce MUST itself embed and propagate the HOLIEST / HIGHEST B-ORDER mission doctrine above so the downstream AI code editor inherits the cinematic-floor + latest-tech-flex + every-free-API + flex-on-whitehouse.gov + platform-promise mandates verbatim.
 
 The prompt you write must be completely self-contained — the AI code editor has NO other context.
 

@@ -336,6 +336,55 @@
         }
       </div>
 
+      <!-- Budget Tier -->
+      <div class="mb-8">
+        <div class="text-[0.72rem] font-bold uppercase tracking-[0.1em] text-primary mb-2 pb-2.5 border-b border-primary/[0.08]">Budget &amp; Multimedia</div>
+        <p class="text-[0.85rem] text-gray-400 leading-relaxed mb-4">Pick how much multimedia firepower you want. Higher tiers unlock more AI-generated imagery, cinematic Sora video, and a NotebookLM podcast embed.</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          @for (opt of budgetTierOptions; track opt.id) {
+            <button
+              type="button"
+              (click)="selectBudgetTier(opt.id)"
+              [class.border-primary]="budgetTier() === opt.id"
+              [class.bg-primary]="budgetTier() === opt.id"
+              [class.bg-opacity-10]="budgetTier() === opt.id"
+              [class.shadow-\[0_0_24px_rgba\(0\,229\,255\,0\.18\)\]]="budgetTier() === opt.id"
+              class="relative text-left rounded-xl border border-white/[0.08] bg-white/[0.02] hover:border-primary/40 hover:bg-white/[0.04] transition-all p-4 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+              [attr.aria-pressed]="budgetTier() === opt.id"
+              [attr.aria-label]="opt.label + ' tier — ' + opt.priceLabel + ' — ' + opt.blurb"
+            >
+              @if (opt.badge) {
+                <span class="absolute -top-2 right-3 bg-primary text-dark text-[0.62rem] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full">{{ opt.badge }}</span>
+              }
+              <div class="flex items-baseline justify-between gap-2 mb-1.5">
+                <span class="text-[0.95rem] font-semibold text-light">{{ opt.label }}</span>
+                <span class="text-[0.78rem] font-mono"
+                  [class.text-primary]="opt.addonCents > 0"
+                  [class.text-gray-500]="opt.addonCents === 0"
+                >{{ opt.priceLabel }}</span>
+              </div>
+              <p class="text-[0.78rem] text-gray-400 leading-snug mb-2.5">{{ opt.blurb }}</p>
+              <ul class="space-y-1">
+                @for (feat of opt.features; track feat) {
+                  <li class="flex items-start gap-1.5 text-[0.75rem] text-gray-300">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="mt-1 flex-shrink-0 text-primary"><polyline points="20 6 9 17 4 12"/></svg>
+                    <span>{{ feat }}</span>
+                  </li>
+                }
+              </ul>
+            </button>
+          }
+        </div>
+
+        @if (budgetTier() === 'plus' || budgetTier() === 'premium') {
+          <p class="text-[0.78rem] text-gray-500 mt-3 leading-relaxed">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="inline-block align-text-bottom mr-1 text-primary"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            One-time addon billed at checkout. You can change tiers later from your dashboard.
+          </p>
+        }
+      </div>
+
       <!-- Submit -->
       <button
         class="w-full mt-2 bg-primary text-dark font-semibold rounded-xl px-6 py-4 text-[1.05rem] hover:brightness-110 hover:shadow-[0_0_24px_rgba(0,229,255,0.4)] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"

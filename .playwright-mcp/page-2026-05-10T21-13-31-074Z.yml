@@ -1,0 +1,247 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - link "Built by ProjectSites" [ref=e5] [cursor=pointer]:
+        - /url: https://projectsites.dev
+        - img [ref=e6]
+      - link "Edit with AI" [ref=e10] [cursor=pointer]:
+        - /url: https://editor.projectsites.dev/?slug=lonemountainglobal
+        - img [ref=e11]
+        - text: Edit with AI
+    - paragraph [ref=e14]:
+      - strong [ref=e15]: This website is yours
+      - text: — make it official
+    - generic [ref=e16]:
+      - button "Claim for $50/mo" [ref=e17] [cursor=pointer]
+      - button "Dismiss" [ref=e18] [cursor=pointer]: ×
+  - heading "Lone Mountain Global — Fight Corruption, Advance Population Health" [level=1] [ref=e19]
+  - generic [ref=e20]:
+    - link "Skip to main content" [ref=e21] [cursor=pointer]:
+      - /url: "#main"
+    - banner [ref=e22]:
+      - navigation "Primary" [ref=e23]:
+        - link "Lone Mountain Global — Home" [ref=e24] [cursor=pointer]:
+          - /url: /
+          - img "Lone Mountain Global" [ref=e25]
+        - generic [ref=e26]:
+          - link "Home" [ref=e27] [cursor=pointer]:
+            - /url: /
+          - link "About" [ref=e28] [cursor=pointer]:
+            - /url: /about
+          - link "Publications" [ref=e29] [cursor=pointer]:
+            - /url: /publications
+          - link "Contractor" [ref=e30] [cursor=pointer]:
+            - /url: /contractor
+          - link "Contact" [ref=e31] [cursor=pointer]:
+            - /url: /contact
+          - link "Contact Us" [ref=e32] [cursor=pointer]:
+            - /url: /contact
+    - main [ref=e33]:
+      - region "Hero" [ref=e34]:
+        - img "Mountain landscape representing Lone Mountain Global's commitment to global health" [ref=e35]
+        - generic [ref=e38]:
+          - paragraph [ref=e39]: Advance Population Health and Wellbeing
+          - heading "Fight Corruption" [level=1] [ref=e40]
+          - paragraph [ref=e41]: Empowering health systems against corruption with Lone Mountain Global. Join Dr. Taryn Vian's 30+ years of expertise for healthier, corruption-free communities.
+          - generic [ref=e42]:
+            - link "Contact Us" [ref=e43] [cursor=pointer]:
+              - /url: /contact
+              - text: Contact Us
+              - img [ref=e44]
+            - link "View Publications" [ref=e46] [cursor=pointer]:
+              - /url: /publications
+              - text: View Publications
+              - img [ref=e47]
+      - region "Trusted partner organizations" [ref=e51]:
+        - generic [ref=e52]:
+          - heading "Internationally Trusted — Clients & Partners" [level=2] [ref=e54]
+          - paragraph [ref=e56]: Lone Mountain Global is a foremost authority on anti-corruption in the health sector, known for its expertise and experience engaging with clients from government, the private sector, and civil society worldwide.
+          - generic [ref=e57]:
+            - img "World Health Organization" [ref=e59]
+            - img "United Nations" [ref=e61]
+            - img "The World Bank" [ref=e63]
+            - img "USAID" [ref=e65]
+            - img "OECD" [ref=e67]
+            - img "Transparency International" [ref=e69]
+            - img "Council of Europe" [ref=e71]
+            - img "U4 Anti-Corruption Resource Centre" [ref=e73]
+            - img "Center for International Private Enterprise" [ref=e75]
+      - region "Our mission" [ref=e76]:
+        - img "Lone Mountain Global healthcare mountains illustration" [ref=e77]
+        - generic [ref=e79]:
+          - heading "Corruption Costs Lives" [level=2] [ref=e81]
+          - paragraph [ref=e82]: Corruption in the health sector diverts an estimated $500 billion annually from patient care. Lone Mountain Global works at the intersection of health systems, governance, and accountability — translating research into action that saves lives.
+          - generic [ref=e83]:
+            - generic [ref=e84]:
+              - paragraph [ref=e85]: 30+
+              - paragraph [ref=e86]: Years of Expertise
+            - generic [ref=e87]:
+              - paragraph [ref=e88]: 50+
+              - paragraph [ref=e89]: Countries Engaged
+            - generic [ref=e90]:
+              - paragraph [ref=e91]: 100+
+              - paragraph [ref=e92]: Publications & Reports
+            - generic [ref=e93]:
+              - paragraph [ref=e94]: "9"
+              - paragraph [ref=e95]: Global Partner Organizations
+      - region "Our focus areas" [ref=e96]:
+        - generic [ref=e97]:
+          - generic [ref=e98]:
+            - heading "Our Focus Areas" [level=2] [ref=e100]
+            - paragraph [ref=e101]: Three interconnected pillars guide our work toward corruption-free health systems.
+          - generic [ref=e102]:
+            - generic [ref=e104]:
+              - img [ref=e106]
+              - heading "Anti-Corruption" [level=3] [ref=e107]
+              - paragraph [ref=e108]: We design, implement, and evaluate programs that reduce corruption risks in health procurement, service delivery, and governance — saving lives by ensuring resources reach patients.
+            - generic [ref=e110]:
+              - img [ref=e112]
+              - heading "Health System Strengthening" [level=3] [ref=e113]
+              - paragraph [ref=e114]: Robust health systems require accountability and transparency. We help governments and civil society build the institutional capacity to detect, deter, and prevent corrupt practices.
+            - generic [ref=e116]:
+              - img [ref=e118]
+              - heading "Global Health Equity" [level=3] [ref=e119]
+              - paragraph [ref=e120]: Corruption disproportionately harms the most vulnerable. Our work spans low- and middle-income countries, building the evidence base and tools needed to achieve equitable health outcomes.
+      - region "Our impact in the field" [ref=e121]:
+        - generic [ref=e122]:
+          - generic [ref=e123]:
+            - heading "Impact in the Field" [level=2] [ref=e125]
+            - paragraph [ref=e126]: From training health workers to advising ministries, our work reaches communities around the world.
+          - generic [ref=e127]:
+            - generic [ref=e129]:
+              - img "Lone Mountain Global nurse staff in the field" [ref=e130]
+              - generic [ref=e131]:
+                - heading "Frontline Health Workers" [level=3] [ref=e132]
+                - paragraph [ref=e133]: Training nurses and clinicians to recognize and report corrupt practices that harm patient safety.
+            - generic [ref=e135]:
+              - img "Communities helped through Lone Mountain Global programs" [ref=e136]
+              - generic [ref=e137]:
+                - heading "Communities Served" [level=3] [ref=e138]
+                - paragraph [ref=e139]: Accountability systems that ensure health resources reach the patients who need them most.
+            - generic [ref=e141]:
+              - img "Lone Mountain Global community welcome and engagement" [ref=e142]
+              - generic [ref=e143]:
+                - heading "Community Engagement" [level=3] [ref=e144]
+                - paragraph [ref=e145]: Building grassroots coalitions between citizens, health workers, and policymakers for systemic change.
+      - region "About Dr. Taryn Vian" [ref=e146]:
+        - generic [ref=e148]:
+          - generic [ref=e150]:
+            - img "Dr. Taryn Vian at an award ceremony" [ref=e151]
+            - generic [ref=e152]:
+              - paragraph [ref=e153]: 30+
+              - paragraph [ref=e154]: Years of Expertise
+          - generic [ref=e155]:
+            - heading "Dr. Taryn Vian" [level=2] [ref=e157]
+            - paragraph [ref=e158]: Founder & Principal
+            - paragraph [ref=e159]: Dr. Taryn Vian is a globally recognized expert in anti-corruption in the health sector. Over three decades, she has developed evidence-based frameworks and diagnostic tools used by leading international organizations to combat corruption in low- and middle-income country health systems.
+            - paragraph [ref=e160]: Her peer-reviewed research, widely cited policy reports, and hands-on technical assistance have shaped anti-corruption programs for clients at the World Health Organization, World Bank, USAID, and dozens of national ministries of health across sub-Saharan Africa, Eastern Europe, and Southeast Asia.
+            - generic [ref=e161]:
+              - link "Full Bio" [ref=e162] [cursor=pointer]:
+                - /url: /about
+                - text: Full Bio
+                - img [ref=e163]
+              - link "Research & Publications" [ref=e165] [cursor=pointer]:
+                - /url: /publications
+      - region "Our services" [ref=e166]:
+        - generic [ref=e167]:
+          - heading "How We Work" [level=2] [ref=e170]
+          - generic [ref=e171]:
+            - generic [ref=e173]:
+              - img [ref=e175]
+              - heading "Diagnostic Assessments" [level=3] [ref=e177]
+              - paragraph [ref=e178]: Rigorous risk assessments that map corruption vulnerabilities across health systems, facilities, and supply chains — the evidence base for targeted interventions.
+            - generic [ref=e180]:
+              - img [ref=e182]
+              - heading "Capacity Building" [level=3] [ref=e185]
+              - paragraph [ref=e186]: Tailored training programs for government officials, health managers, and civil society actors to build lasting institutional capacity for accountability and transparency.
+            - generic [ref=e188]:
+              - img [ref=e190]
+              - heading "Policy & Advocacy" [level=3] [ref=e195]
+              - paragraph [ref=e196]: Evidence-based policy recommendations, legislative support, and advocacy strategies that embed anti-corruption norms into law, regulation, and practice.
+      - region "Frequently asked questions" [ref=e197]:
+        - generic [ref=e198]:
+          - heading "Common Questions" [level=2] [ref=e201]
+          - generic [ref=e202]:
+            - group [ref=e204]:
+              - generic "What is health sector corruption?" [ref=e205] [cursor=pointer]:
+                - text: What is health sector corruption?
+                - img [ref=e206]
+            - group [ref=e209]:
+              - generic "How does Lone Mountain Global help governments address corruption?" [ref=e210] [cursor=pointer]:
+                - text: How does Lone Mountain Global help governments address corruption?
+                - img [ref=e211]
+            - group [ref=e214]:
+              - generic "What types of organizations does Lone Mountain Global work with?" [ref=e215] [cursor=pointer]:
+                - text: What types of organizations does Lone Mountain Global work with?
+                - img [ref=e216]
+            - group [ref=e219]:
+              - generic "How can I access Lone Mountain Global research and publications?" [ref=e220] [cursor=pointer]:
+                - text: How can I access Lone Mountain Global research and publications?
+                - img [ref=e221]
+      - region "Call to action" [ref=e223]:
+        - img [ref=e224]
+        - generic [ref=e227]:
+          - img [ref=e228]
+          - heading "Ready to Fight Corruption?" [level=2] [ref=e231]
+          - paragraph [ref=e232]: Partner with Lone Mountain Global to build the accountability systems that protect health resources and improve patient outcomes.
+          - generic [ref=e233]:
+            - link "Get in Touch" [ref=e234] [cursor=pointer]:
+              - /url: /contact
+              - text: Get in Touch
+              - img [ref=e235]
+            - link "Explore Research" [ref=e237] [cursor=pointer]:
+              - /url: /publications
+              - text: Explore Research
+              - img [ref=e238]
+    - contentinfo [ref=e241]:
+      - generic [ref=e242]:
+        - generic [ref=e243]:
+          - generic [ref=e244]:
+            - img "Lone Mountain Global" [ref=e245]
+            - paragraph [ref=e246]: A foremost authority on anti-corruption in the health sector, engaging clients from government, private sector, and civil society worldwide to advance population health and wellbeing.
+            - generic [ref=e247]:
+              - img [ref=e248]
+              - link "lonemountainglobal.com" [ref=e251] [cursor=pointer]:
+                - /url: https://lonemountainglobal.com
+              - img [ref=e252]
+          - navigation "Footer navigation" [ref=e256]:
+            - heading "Navigation" [level=4] [ref=e257]
+            - list [ref=e258]:
+              - listitem [ref=e259]:
+                - link "Home" [ref=e260] [cursor=pointer]:
+                  - /url: /
+              - listitem [ref=e261]:
+                - link "About" [ref=e262] [cursor=pointer]:
+                  - /url: /about
+              - listitem [ref=e263]:
+                - link "Publications" [ref=e264] [cursor=pointer]:
+                  - /url: /publications
+              - listitem [ref=e265]:
+                - link "Contractor" [ref=e266] [cursor=pointer]:
+                  - /url: /contractor
+              - listitem [ref=e267]:
+                - link "Contact" [ref=e268] [cursor=pointer]:
+                  - /url: /contact
+          - generic [ref=e269]:
+            - heading "Contact" [level=4] [ref=e270]
+            - link "info@lonemountainglobal.com" [ref=e272] [cursor=pointer]:
+              - /url: mailto:info@lonemountainglobal.com
+              - img [ref=e273]
+              - generic [ref=e276]: info@lonemountainglobal.com
+            - heading "Legal" [level=4] [ref=e277]
+            - list [ref=e278]:
+              - listitem [ref=e279]:
+                - link "Privacy Policy" [ref=e280] [cursor=pointer]:
+                  - /url: /privacy
+              - listitem [ref=e281]:
+                - link "Terms of Service" [ref=e282] [cursor=pointer]:
+                  - /url: /terms
+              - listitem [ref=e283]:
+                - link "Accessibility" [ref=e284] [cursor=pointer]:
+                  - /url: /accessibility
+        - generic [ref=e285]:
+          - paragraph [ref=e286]: © 2026 Lone Mountain Global. All rights reserved.
+          - paragraph [ref=e287]:
+            - text: Built with
+            - link "ProjectSites" [ref=e288] [cursor=pointer]:
+              - /url: https://projectsites.dev

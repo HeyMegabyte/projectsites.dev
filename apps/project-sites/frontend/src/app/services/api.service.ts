@@ -193,8 +193,14 @@ export class ApiService {
   }
 
   /** Billing checkout */
-  createCheckout(orgId: string, siteId: string, returnUrl: string): Observable<{ data: { client_secret: string } }> {
-    return this.post('/billing/embedded-checkout', { org_id: orgId, site_id: siteId, return_url: returnUrl });
+  createCheckout(orgId: string, siteId: string, returnUrl: string, budgetTier?: BudgetTier): Observable<{ data: { client_secret: string } }> {
+    const payload: { org_id: string; site_id: string; return_url: string; budget_tier?: BudgetTier } = {
+      org_id: orgId,
+      site_id: siteId,
+      return_url: returnUrl,
+    };
+    if (budgetTier && budgetTier !== 'free') payload.budget_tier = budgetTier;
+    return this.post('/billing/embedded-checkout', payload);
   }
 
   /** Billing portal */
@@ -426,6 +432,15 @@ export interface Site {
   updated_at: string;
 }
 
+/**
+ * Budget tier selected at /create checkout — drives premium media gating
+ * (Sora hero video, NotebookLM podcast, immersive infographics) and the
+ * `max_generated_images` cap inside the site-generation orchestrator.
+ *
+ * Mirrors `budgetTierSchema` in `@project-sites/shared/schemas`.
+ */
+export type BudgetTier = 'free' | 'standard' | 'plus' | 'premium';
+
 export interface CreateSitePayload {
   mode: 'business' | 'custom';
   additional_context?: string;
@@ -438,11 +453,13 @@ export interface CreateSitePayload {
     types?: string[];
     category?: string;
   };
+  budget_tier?: BudgetTier;
 }
 
 export interface ResetSitePayload {
   business: { name: string; address: string; place_id?: string };
   additional_context?: string;
+  budget_tier?: BudgetTier;
 }
 
 export interface LogEntry {

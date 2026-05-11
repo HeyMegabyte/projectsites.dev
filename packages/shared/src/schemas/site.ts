@@ -44,6 +44,54 @@ import { baseFields, slugSchema, httpsUrlSchema, nameSchema, confidenceScoreSche
  *
  * Includes all {@link baseFields} (id, org_id, created_at, updated_at, deleted_at).
  */
+/**
+ * Budget tier controls how much premium media generation a build can consume.
+ *
+ * - `free`: Stock-first imagery, 2 generated images max, no video/podcast/immersive.
+ * - `standard`: 5 generated images, no video/podcast.
+ * - `plus` ($29 one-time): 10 generated images + 1 Sora hero video.
+ * - `premium` ($79 one-time): 15 generated images + Sora suite + NotebookLM podcast + immersive infographics.
+ */
+export const budgetTierSchema = z.enum(['free', 'standard', 'plus', 'premium']);
+
+/** Inferred TypeScript type for budget tier. */
+export type BudgetTier = z.infer<typeof budgetTierSchema>;
+
+/**
+ * Per-tier capability map. Drives image_discovery + image_generation caps,
+ * Sora/podcast gating in the workflow, and Stripe checkout addon line items.
+ */
+export const TIER_CAPS = {
+  free: {
+    max_generated_images: 2,
+    video_enabled: false,
+    podcast_enabled: false,
+    immersive_enabled: false,
+    addon_cents: 0,
+  },
+  standard: {
+    max_generated_images: 5,
+    video_enabled: false,
+    podcast_enabled: false,
+    immersive_enabled: false,
+    addon_cents: 0,
+  },
+  plus: {
+    max_generated_images: 10,
+    video_enabled: true,
+    podcast_enabled: false,
+    immersive_enabled: false,
+    addon_cents: 2900,
+  },
+  premium: {
+    max_generated_images: 15,
+    video_enabled: true,
+    podcast_enabled: true,
+    immersive_enabled: true,
+    addon_cents: 7900,
+  },
+} as const;
+
 export const siteSchema = z.object({
   ...baseFields,
   slug: slugSchema,
@@ -55,6 +103,7 @@ export const siteSchema = z.object({
   bolt_chat_id: z.string().max(255).nullable(),
   current_build_version: z.string().max(100).nullable(),
   status: z.enum(['draft', 'building', 'published', 'archived']),
+  budget_tier: budgetTierSchema.default('free'),
   lighthouse_score: z.number().int().min(0).max(100).nullable(),
   lighthouse_last_run: z.string().datetime().nullable(),
 });
@@ -73,6 +122,7 @@ export const createSiteSchema = z.object({
   business_email: z.string().email().max(254).optional(),
   business_address: z.string().max(500).optional(),
   google_place_id: z.string().max(255).optional(),
+  budget_tier: budgetTierSchema.optional(),
 });
 
 /**
@@ -91,6 +141,7 @@ export const updateSiteSchema = z.object({
   bolt_chat_id: z.string().max(255).nullable().optional(),
   current_build_version: z.string().max(100).nullable().optional(),
   status: z.enum(['draft', 'building', 'published', 'archived']).optional(),
+  budget_tier: budgetTierSchema.optional(),
 });
 
 /**

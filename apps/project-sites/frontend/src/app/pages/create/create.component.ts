@@ -2,7 +2,7 @@ import { Component, type OnInit, type OnDestroy, inject, signal, ChangeDetectorR
 import { Router, ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Subject, debounceTime, distinctUntilChanged, switchMap, of, takeUntil } from 'rxjs';
-import { ApiService, type CreateSitePayload } from '../../services/api.service';
+import { ApiService, type CreateSitePayload, type BudgetTier } from '../../services/api.service';
 import { AuthService, type SelectedBusiness } from '../../services/auth.service';
 import { GeolocationService } from '../../services/geolocation.service';
 import { ToastService } from '../../services/toast.service';
@@ -144,6 +144,75 @@ export class CreateComponent implements OnInit, OnDestroy {
   businessCategory = '';
   additionalContext = '';
   submitting = signal(false);
+
+  /**
+   * Selected budget tier — drives premium media gating in the build pipeline.
+   *
+   * @remarks
+   * - `free` (default): 2 generated images, no video/podcast/immersive.
+   * - `standard`: 5 generated images, no video/podcast/immersive.
+   * - `plus` ($29 once): 10 generated images + Sora hero video.
+   * - `premium` ($79 once): 15 generated images + Sora video + NotebookLM podcast + immersive infographics.
+   *
+   * Persisted to D1 `sites.budget_tier` and threaded into the orchestrator via `_build_caps.json`.
+   */
+  budgetTier = signal<BudgetTier>('free');
+
+  /** Tier metadata rendered in the selector grid. `addonCents` mirrors `TIER_CAPS[tier].addon_cents`. */
+  readonly budgetTierOptions: readonly {
+    id: BudgetTier;
+    label: string;
+    priceLabel: string;
+    addonCents: number;
+    blurb: string;
+    features: readonly string[];
+    badge?: string;
+  }[] = [
+    {
+      id: 'free',
+      label: 'Free',
+      priceLabel: 'Included',
+      addonCents: 0,
+      blurb: 'A polished site with stock + AI imagery.',
+      features: ['2 AI-generated images', 'Full multipage site', 'Stock photo curation'],
+    },
+    {
+      id: 'standard',
+      label: 'Standard',
+      priceLabel: 'Included',
+      addonCents: 0,
+      blurb: 'Richer image library, same fast turnaround.',
+      features: ['5 AI-generated images', 'Brand-extracted palette', 'Maps + lightbox gallery'],
+    },
+    {
+      id: 'plus',
+      label: 'Plus',
+      priceLabel: '$29 once',
+      addonCents: 2900,
+      blurb: 'Add a cinematic Sora hero video.',
+      features: ['10 AI-generated images', 'Sora hero video', 'Priority render queue'],
+      badge: 'Most Popular',
+    },
+    {
+      id: 'premium',
+      label: 'Premium',
+      priceLabel: '$79 once',
+      addonCents: 7900,
+      blurb: 'Full multimedia: video, podcast, immersive.',
+      features: [
+        '15 AI-generated images',
+        'Sora hero video',
+        'NotebookLM podcast embed',
+        'Immersive infographic suite',
+      ],
+    },
+  ];
+
+  /** Set the active budget tier and persist the form draft so reloads survive. */
+  selectBudgetTier(tier: BudgetTier): void {
+    this.budgetTier.set(tier);
+    this.saveFormDraft();
+  }
 
   /** Industry categories for the dropdown */
   categories = [
@@ -718,6 +787,7 @@ export class CreateComponent implements OnInit, OnDestroy {
       aiImageUrls: this.aiImageUrls,
       brandAssessment: this.brandAssessment,
       selectedBusiness: this.selectedBusiness(),
+      budgetTier: this.budgetTier(),
       savedAt: Date.now(),
     };
     try {
@@ -748,6 +818,9 @@ export class CreateComponent implements OnInit, OnDestroy {
       if (draft.brandAssessment) this.brandAssessment = draft.brandAssessment;
       if (draft.aiImageUrls?.length) this.aiImageUrls = draft.aiImageUrls;
       if (draft.selectedBusiness?.place_id) this.selectedBusiness.set(draft.selectedBusiness);
+      if (draft.budgetTier && ['free', 'standard', 'plus', 'premium'].includes(draft.budgetTier)) {
+        this.budgetTier.set(draft.budgetTier);
+      }
       // Force Angular to pick up the category select value
       setTimeout(() => this.cdr.detectChanges(), 0);
     } catch { /* corrupt data — ignore */ }
@@ -1026,6 +1099,7 @@ export class CreateComponent implements OnInit, OnDestroy {
       this.api.resetSite(this.resetSiteId, {
         business: { name: this.businessName.trim(), address: this.businessAddress.trim() },
         additional_context: this.additionalContext || undefined,
+        budget_tier: this.budgetTier(),
       }).subscribe({
         next: () => {
           this.submitting.set(false);
@@ -1072,6 +1146,7 @@ export class CreateComponent implements OnInit, OnDestroy {
         types: biz?.types,
         category: this.businessCategory || undefined,
       },
+      budget_tier: this.budgetTier(),
     };
     if (uploadId) payload.upload_id = uploadId;
 

@@ -1,5 +1,5 @@
 // Skills freshness TDD — boots the container and asserts that the boot path
-// pulls megabytespace/claude-skills + the template repo from origin/main, so a
+// pulls heymegabyte/claude-skills + the template repo from origin/main, so a
 // long-lived Durable Object container always has the latest prompts/skills
 // without rebuilding the image.
 

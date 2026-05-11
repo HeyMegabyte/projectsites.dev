@@ -8,6 +8,7 @@
  */
 
 import type { Env } from '../types/env.js';
+import { TIER_CAPS, type BudgetTier } from '@project-sites/shared/schemas';
 
 interface AssetInfo {
   key: string;
@@ -35,6 +36,10 @@ interface BuildContext {
     images?: unknown;
   };
   assets: AssetInfo[];
+  budget: {
+    tier: BudgetTier;
+    caps: typeof TIER_CAPS[BudgetTier];
+  };
   instructions: string;
   createdAt: string;
 }
@@ -47,6 +52,7 @@ export function generateBuildContext(
   research: { profile?: unknown; brand?: unknown; sellingPoints?: unknown; social?: unknown; images?: unknown },
   assets: AssetInfo[],
   slug: string,
+  budgetTier: BudgetTier = 'free',
 ): BuildContext {
   const assetBaseUrl = `https://${slug}.projectsites.dev/assets`;
 
@@ -56,11 +62,20 @@ export function generateBuildContext(
     url: a.url || `${assetBaseUrl}/${a.key.replace(`sites/${slug}/assets/`, '')}`,
   }));
 
+  const caps = TIER_CAPS[budgetTier];
+  const tierInstructions = [
+    `Budget tier: ${budgetTier} (max ${caps.max_generated_images} AI-generated images this build).`,
+    caps.video_enabled ? 'Sora hero video ENABLED — embed one short autoplay-muted hero clip.' : 'No paid video generation — stock footage from Pexels/Pixabay only when needed.',
+    caps.podcast_enabled ? 'NotebookLM podcast embed ENABLED — render the episode player on /about.' : 'No podcast embed.',
+    caps.immersive_enabled ? 'Immersive infographic gallery ENABLED — generate one Recraft+Vega-Lite explainer per main service.' : 'Static section visuals only.',
+  ].join(' ');
+
   return {
     version: '1',
     business,
     research,
     assets: enrichedAssets,
+    budget: { tier: budgetTier, caps },
     instructions: [
       `Build a complete, gorgeous, animated portfolio website for "${business.name}".`,
       'Use the provided brand colors, fonts, and design style from the research data.',
@@ -69,6 +84,7 @@ export function generateBuildContext(
       'Include smooth scroll animations, hover micro-interactions, and responsive mobile-first layout.',
       'Create all pages: index.html, privacy.html, terms.html, plus any relevant section pages.',
       'Include favicon references in the <head> linking to the provided favicon assets.',
+      tierInstructions,
     ].join('\n'),
     createdAt: new Date().toISOString(),
   };

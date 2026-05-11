@@ -24,6 +24,7 @@
 import { Hono } from 'hono';
 import type { Env, Variables } from '../types/env.js';
 import { badRequest, unauthorized, sanitizeHtml, stripHtml, DOMAINS } from '@project-sites/shared';
+import { budgetTierSchema, type BudgetTier } from '@project-sites/shared/schemas';
 import { dbInsert, dbQuery, dbQueryOne } from '../services/db.js';
 import { writeAuditLog } from '../services/audit.js';
 
@@ -381,6 +382,13 @@ interface CreateFromSearchBody {
   business?: BusinessPayload;
   /** Creation mode: 'business' or 'custom' */
   mode?: string;
+  /**
+   * Budget tier selected at /create checkout (free | standard | plus | premium).
+   * Drives premium media gating: Sora video, NotebookLM podcast, immersive
+   * infographics, and the `max_generated_images` cap inside the orchestrator.
+   * Defaults to `'free'` when omitted.
+   */
+  budget_tier?: string;
 }
 
 search.post('/api/sites/create-from-search', async (c) => {
@@ -440,6 +448,12 @@ search.post('/api/sites/create-from-search', async (c) => {
     console.warn(`[create-from-search] mode=${mode}, business=${sanitizedName}`);
   }
 
+  // Parse + validate budget tier; default to 'free' on missing/invalid input.
+  // Premium tiers ($29 Plus, $79 Premium) gate Sora video, NotebookLM podcast,
+  // immersive infographics, and bump the AI image-generation cap (2→5→10→15).
+  const budgetTierParse = budgetTierSchema.safeParse(body.budget_tier);
+  const budgetTier: BudgetTier = budgetTierParse.success ? budgetTierParse.data : 'free';
+
   // AI-calculated slug: produce the shortest, most meaningful URL-safe representation
   const baseSlug = await generateSmartSlug(c.env, sanitizedName, businessAddress);
 
@@ -461,6 +475,7 @@ search.post('/api/sites/create-from-search', async (c) => {
     bolt_chat_id: null,
     current_build_version: null,
     status: 'building',
+    budget_tier: budgetTier,
     lighthouse_score: null,
     lighthouse_last_run: null,
     deleted_at: null,
@@ -488,6 +503,7 @@ search.post('/api/sites/create-from-search', async (c) => {
         additionalContext: additionalContext ?? undefined,
         uploadId: (body as Record<string, unknown>).upload_id as string | undefined,
         orgId: orgId,
+        budgetTier,
       },
     });
     workflowInstanceId = instance.id;
@@ -975,7 +991,7 @@ search.get('/api/sites/:slug/preview', async (c) => {
 
     let content = await html.text();
     // Inject base tag so relative URLs resolve correctly
-    content = content.replace('<head>', `<head><base href="https://${slug}.${DOMAINS.SITES_SUFFIX}/">`);
+    content = content.replace('<head>', `<head><base href="https://${slug}${DOMAINS.SITES_SUFFIX}/">`);
 
     return new Response(content, {
       headers: {
@@ -2330,8 +2346,8 @@ search.post('/api/conversion/checkout', async (c) => {
     params.set('metadata[org_id]', site.org_id);
     params.set('metadata[domain]', body.domain || '');
     params.set('metadata[source]', 'conversion-flow');
-    params.set('success_url', `https://${site.slug}.${DOMAINS.SITES_SUFFIX}/?upgraded=1`);
-    params.set('cancel_url', `https://${site.slug}.${DOMAINS.SITES_SUFFIX}/`);
+    params.set('success_url', `https://${site.slug}${DOMAINS.SITES_SUFFIX}/?upgraded=1`);
+    params.set('cancel_url', `https://${site.slug}${DOMAINS.SITES_SUFFIX}/`);
     if (body.email) params.set('customer_email', body.email);
 
     const stripeRes = await fetch('https://api.stripe.com/v1/checkout/sessions', {

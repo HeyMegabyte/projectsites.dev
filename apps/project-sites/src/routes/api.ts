@@ -43,6 +43,7 @@ import {
   forbidden,
   unauthorized,
 } from '@project-sites/shared';
+import { budgetTierSchema, type BudgetTier } from '@project-sites/shared/schemas';
 import * as authService from '../services/auth.js';
 import * as billingService from '../services/billing.js';
 import * as domainService from '../services/domains.js';
@@ -52,6 +53,7 @@ import { classifyError } from '../services/retry.js';
 import * as posthog from '../lib/posthog.js';
 import { captureError } from '../lib/sentry.js';
 import { fetchSheetData, fetchSheetMeta } from '../services/google_sheets.js';
+import { migrateExternalAssets } from '../services/asset_migration.js';
 
 const api = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -617,6 +619,7 @@ api.post('/api/billing/checkout', async (c) => {
     customerEmail: userRow?.email || '',
     successUrl: validated.success_url,
     cancelUrl: validated.cancel_url,
+    budgetTier: validated.budget_tier,
   });
 
   // Audit: billing checkout session created
@@ -661,6 +664,7 @@ api.post('/api/billing/embedded-checkout', async (c) => {
     siteId: validated.site_id,
     customerEmail: userRow?.email || '',
     returnUrl: validated.return_url,
+    budgetTier: validated.budget_tier,
   });
 
   auditService.writeAuditLog(c.env.DB, {
@@ -1823,23 +1827,69 @@ api.post('/api/sites/:id/reset', async (c) => {
 
   const siteId = c.req.param('id');
 
-  // Verify ownership
-  const site = await dbQueryOne<{ id: string; slug: string; org_id: string }>(
+  // Verify ownership + load existing fields (used as fallback when body is empty)
+  const site = await dbQueryOne<{
+    id: string;
+    slug: string;
+    org_id: string;
+    business_name: string | null;
+    business_address: string | null;
+    google_place_id: string | null;
+    budget_tier: string | null;
+  }>(
     c.env.DB,
-    'SELECT id, slug, org_id FROM sites WHERE id = ? AND org_id = ? AND deleted_at IS NULL',
+    'SELECT id, slug, org_id, business_name, business_address, google_place_id, budget_tier FROM sites WHERE id = ? AND org_id = ? AND deleted_at IS NULL',
     [siteId, orgId],
   );
   if (!site) throw notFound('Site not found');
 
   let body: {
-    business?: { name?: string; address?: string; place_id?: string };
+    business?: { name?: string; address?: string; place_id?: string; website?: string };
     additional_context?: string;
+    /**
+     * Convergence loop hint: 1-indexed iteration number. When > 1, the workflow
+     * reuses a stable container DO across iterations (warm-keep) and the
+     * orchestrator prompt receives the prior recommendations as targeted fixes.
+     */
+    directive_version?: number;
+    prior_recommendations?: Array<{ category?: string; severity?: string; description?: string }>;
+    expert_notes?: string;
+    /**
+     * Optional budget tier override on rebuild (free | standard | plus | premium).
+     * When omitted, falls back to the tier persisted on the D1 site row.
+     */
+    budget_tier?: string;
   } = {};
   try {
     body = (await c.req.json()) as typeof body;
   } catch {
     // Empty or malformed body is acceptable — reset with defaults
   }
+
+  const iteration = typeof body.directive_version === 'number' && body.directive_version > 0
+    ? Math.floor(body.directive_version)
+    : undefined;
+
+  // Resolve budget tier: explicit body override > persisted site row > 'free' default.
+  // Validate via Zod so invalid values silently fall through to the safe baseline.
+  const budgetTierFromBody = budgetTierSchema.safeParse(body.budget_tier);
+  const budgetTierFromSite = budgetTierSchema.safeParse(site.budget_tier);
+  const budgetTier: BudgetTier = budgetTierFromBody.success
+    ? budgetTierFromBody.data
+    : budgetTierFromSite.success
+      ? budgetTierFromSite.data
+      : 'free';
+  const priorRecommendations = Array.isArray(body.prior_recommendations)
+    ? body.prior_recommendations
+        .filter((r) => r && typeof r === 'object')
+        .map((r) => ({
+          category: typeof r.category === 'string' ? r.category.slice(0, 60) : 'unknown',
+          severity: typeof r.severity === 'string' ? r.severity.slice(0, 20) : 'minor',
+          description: typeof r.description === 'string' ? r.description.slice(0, 500) : '',
+        }))
+        .filter((r) => r.description.length > 0)
+        .slice(0, 50)
+    : undefined;
 
   // Update business info if provided
   const updates: string[] = ['status = \'building\'', 'updated_at = datetime(\'now\')'];
@@ -1873,10 +1923,15 @@ api.post('/api/sites/:id/reset', async (c) => {
           siteId,
           orgId,
           slug: site.slug,
-          businessName: body.business?.name || '',
-          businessAddress: body.business?.address || '',
-          additionalContext: body.additional_context || '',
+          businessName: body.business?.name || site.business_name || '',
+          businessAddress: body.business?.address || site.business_address || '',
+          businessWebsite: body.business?.website || '',
+          googlePlaceId: body.business?.place_id || site.google_place_id || '',
+          additionalContext: body.additional_context || body.expert_notes || '',
           isReset: true,
+          iteration,
+          priorRecommendations,
+          budgetTier,
         },
       });
       workflowInstanceId = instance.id;
@@ -1894,8 +1949,11 @@ api.post('/api/sites/:id/reset', async (c) => {
             slug: site.slug,
             businessName: body.business?.name || '',
             businessAddress: body.business?.address || '',
-            additionalContext: body.additional_context || '',
+            additionalContext: body.additional_context || body.expert_notes || '',
             isReset: true,
+            iteration,
+            priorRecommendations,
+            budgetTier,
           },
         });
         workflowInstanceId = instance.id;
@@ -3241,7 +3299,7 @@ api.post('/api/sites/:siteId/snapshots', async (c) => {
     created_by: userId || null,
   });
 
-  const snapshotUrl = `https://${site.slug}-${snapshotName}.${DOMAINS.SITES_SUFFIX}`;
+  const snapshotUrl = `https://${site.slug}-${snapshotName}${DOMAINS.SITES_SUFFIX}`;
 
   return c.json({
     data: {
@@ -3909,6 +3967,77 @@ async function queryGa4DataApi(
     topPages,
   };
 }
+
+/**
+ * POST /api/admin/sites/:slug/migrate-assets
+ *
+ * Self-host external assets (e.g. WordPress hotlinks blocked by Referer) for an
+ * already-published build. Resolves `current_build_version` from D1, runs
+ * `migrateExternalAssets` over `sites/{slug}/{version}/`, returns the audit summary.
+ *
+ * Auth: standard Bearer session (set by middleware `auth.ts`). Caller's `orgId` must
+ * match the site's `org_id`. Idempotent — second run finds zero external URLs.
+ *
+ * Body: empty (no JSON required) — slug comes from path param.
+ *
+ * @example
+ *   curl -X POST https://project-sites.megabyte.workers.dev/api/admin/sites/lonemountainglobal/migrate-assets \
+ *        -H "authorization: Bearer $SESSION_TOKEN"
+ */
+api.post('/api/admin/sites/:slug/migrate-assets', async (c) => {
+  const orgId = c.get('orgId');
+  if (!orgId) throw unauthorized('Must be authenticated');
+
+  const slug = c.req.param('slug');
+  if (!slug || !/^[a-z0-9-]+$/i.test(slug)) {
+    return c.json({ error: 'invalid slug' }, 400);
+  }
+
+  const site = await dbQueryOne<{ id: string; slug: string; current_build_version: string | null; org_id: string }>(
+    c.env.DB,
+    'SELECT id, slug, current_build_version, org_id FROM sites WHERE slug = ? AND deleted_at IS NULL LIMIT 1',
+    [slug],
+  );
+  if (!site) return c.json({ error: 'site not found' }, 404);
+  if (site.org_id !== orgId) return c.json({ error: 'forbidden' }, 403);
+  if (!site.current_build_version) {
+    return c.json({ error: 'site has no published build' }, 409);
+  }
+
+  const t0 = Date.now();
+  const report = await migrateExternalAssets(c.env.SITES_BUCKET, slug, site.current_build_version);
+  const elapsedMs = Date.now() - t0;
+
+  try {
+    await c.env.DB.prepare(
+      "INSERT INTO audit_logs (id, org_id, site_id, action, metadata, created_at) VALUES (?, ?, ?, 'admin.asset_migration', ?, datetime('now'))",
+    ).bind(
+      crypto.randomUUID(),
+      site.org_id,
+      site.id,
+      JSON.stringify({
+        slug,
+        version: site.current_build_version,
+        scanned_files: report.scanned_files,
+        unique_urls: report.unique_urls,
+        uploaded: report.uploaded,
+        rewritten_files: report.rewritten_files,
+        failed_count: report.failed.length,
+        elapsed_ms: elapsedMs,
+      }),
+    ).run();
+  } catch {
+    // audit insert is best-effort
+  }
+
+  return c.json({
+    ok: true,
+    slug,
+    version: site.current_build_version,
+    elapsed_ms: elapsedMs,
+    ...report,
+  });
+});
 
 /** Helper: guess content type for revert file uploads */
 function guessContentTypeForRevert(filename: string): string {

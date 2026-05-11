@@ -10,15 +10,67 @@
 import type { Env } from '../types/env.js';
 import type { PromptSpec, LlmCallResult } from '../prompts/types.js';
 import { registry } from '../prompts/index.js';
-import { renderPrompt } from '../prompts/renderer.js';
+import { renderPromptWithDoctrine } from '../prompts/renderer.js';
 import { validatePromptInput, validatePromptOutput } from '../prompts/schemas.js';
 import { withObservability } from '../prompts/observability.js';
 
 // ── Core LLM call ────────────────────────────────────────────
 
 /**
- * Call an LLM model through the Workers AI binding.
- * Uses the prompt registry for resolution, rendering, and observability.
+ * Central LLM call wrapper — every Workers AI inference in the codebase routes through this.
+ *
+ * @remarks
+ * Five-step pipeline:
+ *   1. {@link registry.resolve} the {@link PromptSpec} (with optional A/B variant via `seed` or `variant`).
+ *   2. {@link validatePromptInput} against the prompt's Zod input schema (rejects malformed callers).
+ *   3. {@link renderPrompt} the system + user templates with `safeDelimit:true` (prevents injection).
+ *   4. {@link withObservability} wraps the actual `env.AI.run` call — emits prompt_id, version,
+ *      input_hash (SHA-256), latency, outcome to D1 audit_logs for every call.
+ *   5. Return {@link LlmCallResult} with the raw text + metadata.
+ *
+ * Centralization prevents three classes of bug: (a) silent prompt-version drift across services,
+ * (b) untracked LLM cost bleed (every call logged with token estimate), (c) prompt-injection via
+ * unescaped user input (renderer escapes `{{...}}` delimiters by default).
+ *
+ * Variant selection: `options.seed` deterministically routes by SHA-256(seed) % weight-sum, so
+ * `orgId` as seed gives consistent A/B bucketing per tenant. `options.variant` forces a specific
+ * variant ('a','b','c'). Neither set = default variant per registry config.
+ *
+ * @param env - Worker `Env` with `AI` binding (Workers AI).
+ * @param promptId - Registry key, e.g. `'research_profile'` or `'generate_website'`.
+ * @param version - Integer version. Multiple versions can coexist; pick the one matching your
+ *   call-site's contract.
+ * @param rawInputs - Untyped input bag. Validated against the prompt's input schema before render.
+ * @param options.variant - Force a specific A/B variant (skips weighted selection).
+ * @param options.seed - Deterministic variant selection key (e.g. `orgId`).
+ * @param options.retryCount - Recorded in observability log; caller wraps in retry, this just tags.
+ * @param options.modelOverride - Bypass the prompt's declared model list (use sparingly — defeats
+ *   the purpose of prompt-spec model declarations).
+ *
+ * @throws `Error('Prompt not found: <id>@<v>')` when registry has no matching spec.
+ * @throws `ZodError` from {@link validatePromptInput} when `rawInputs` violates the schema.
+ * @throws Workers-AI errors (rate limits, model unavailable) — caller should retry.
+ *
+ * @example Basic call
+ * ```ts
+ * const result = await runPrompt(env, 'research_profile', 1, {
+ *   business_name: 'Acme Plumbing',
+ *   business_address: '123 Main St',
+ * });
+ * const profile = extractJsonFromText(result.output) as ProfileResult;
+ * ```
+ *
+ * @example A/B variant (deterministic per org)
+ * ```ts
+ * const result = await runPrompt(env, 'site_copy', 3,
+ *   { businessName, city, services, tone: 'premium' },
+ *   { seed: orgId },
+ * );
+ * ```
+ *
+ * @see ../prompts/registry.ts — version + variant resolution
+ * @see ../prompts/observability.ts — D1 audit logging shape
+ * @see ../prompts/renderer.ts — `safeDelimit` injection prevention
  */
 export async function runPrompt(
   env: Env,
@@ -53,8 +105,9 @@ export async function runPrompt(
     stringInputs[k] = Array.isArray(v) ? v.join(', ') : String(v ?? '');
   }
 
-  // 3. Render the prompt templates
-  const rendered = renderPrompt(spec, stringInputs, { safeDelimit: true });
+  // 3. Render the prompt templates with HOLIEST / HIGHEST B-ORDER mission
+  //    doctrine + Creativity + Love + Stars doctrine prepended to system.
+  const rendered = renderPromptWithDoctrine(spec, stringInputs, { safeDelimit: true });
   const model = options.modelOverride ?? rendered.model;
 
   // 4. Call the LLM with observability wrapper
@@ -97,15 +150,49 @@ export async function runPrompt(
 }
 
 /**
- * Extract JSON from an LLM response that may contain surrounding text.
+ * Extract JSON from an LLM response that may contain surrounding text or markdown fences.
  *
- * LLMs sometimes return JSON wrapped in markdown fences or preceded by
- * explanatory text (e.g. "Based on the information..."). This function
- * finds the first valid JSON object or array in the text and parses it.
+ * @remarks
+ * LLMs (especially Llama-class) routinely violate "return ONLY JSON" instructions. Observed
+ * failure modes in production:
+ *   - Markdown code fences: ` ```json\n{...}\n``` `
+ *   - Preface text: `"Based on the research, here is the JSON:\n{...}"`
+ *   - Trailing commentary: `"{...}\n\nLet me know if you need adjustments."`
+ *   - Nested objects with the JSON buried mid-paragraph
  *
- * @param text - Raw LLM output text.
- * @returns Parsed JSON value.
- * @throws {SyntaxError} If no valid JSON can be extracted.
+ * Three-stage extraction (try-fast-fall-through):
+ *   1. Direct `JSON.parse(trimmed)` — fast path when the LLM behaves.
+ *   2. Markdown-fence regex — captures the body of the first \`\`\`json...\`\`\` block.
+ *   3. First-`{`/`[` to last-matching-`}`/`]` substring — last-resort bracket walk.
+ *
+ * Note: the bracket walk uses naive `lastIndexOf` so it CAN match a `}` inside a string literal
+ * embedded in the explanatory text. In practice this is rare because LLM commentary doesn't
+ * contain unescaped braces. If you see parse failures on long preambles, audit the LLM output
+ * for stray `{` in explanations and adjust the prompt to be stricter.
+ *
+ * @param text - Raw LLM output (may include fences, preface, trailing commentary).
+ * @returns The parsed JSON value (object | array | primitive).
+ * @throws {SyntaxError} When no recognizable JSON shape is found in the input.
+ *
+ * @example Markdown-fence wrapped output
+ * ```ts
+ * extractJsonFromText('```json\n{"name":"Acme"}\n```')
+ * // → { name: 'Acme' }
+ * ```
+ *
+ * @example Preface + JSON
+ * ```ts
+ * extractJsonFromText('Based on research:\n{"score": 0.85}\n\nNotes: ...')
+ * // → { score: 0.85 }
+ * ```
+ *
+ * @example Failure case
+ * ```ts
+ * extractJsonFromText('I cannot help with that request.')
+ * // throws SyntaxError: No JSON found in LLM output: I cannot help...
+ * ```
+ *
+ * @see runPrompt — every JSON-output prompt pipes through this after `runPrompt`
  */
 export function extractJsonFromText(text: string): unknown {
   const trimmed = text.trim();
@@ -159,6 +246,26 @@ export function extractJsonFromText(text: string): unknown {
 
 // ── Research Business ────────────────────────────────────────
 
+/**
+ * Legacy v1 research output — single-pass research producing all content fields at once.
+ *
+ * @remarks
+ * Superseded by the v2 split (Profile + Social + Brand + SellingPoints + Images) in
+ * {@link WorkflowResearch}. v1 is kept for the `/api/sites/improve-prompt` and
+ * `/api/sites/generate-prompt` endpoints which only need lightweight content generation
+ * without full brand/social research.
+ *
+ * Field constraints enforced by `validatePromptOutput('research_business', ...)`:
+ *   - `tagline`: under 60 chars (used in hero subhead)
+ *   - `description`: 2–3 sentences
+ *   - `services`: 3–8 items
+ *   - `faq`: 3–5 items
+ *   - `seoTitle`: under 60 chars (HTML `<title>`)
+ *   - `seoDescription`: under 160 chars (HTML `<meta name="description">`)
+ *
+ * @see runSiteGenerationWorkflowV2 — preferred multi-pass research pipeline
+ * @see ../prompts/research_business.prompt.md — system + user prompt source
+ */
 export interface ResearchResult {
   businessName: string;
   tagline: string;
@@ -170,6 +277,39 @@ export interface ResearchResult {
   seoDescription: string;
 }
 
+/**
+ * Legacy v1 single-pass business research.
+ *
+ * @remarks
+ * Combines profile, services, hours, FAQ, and SEO meta into one LLM call. Faster than v2
+ * (one prompt vs five) but lower quality — no separate brand color extraction, no social
+ * link discovery, no image strategy. Use for fast prototyping or pre-edit copy refresh, NOT
+ * for full site generation.
+ *
+ * Output is normalized: missing fields default to empty string / empty array. Caller never
+ * sees `undefined` for required keys.
+ *
+ * @param env - Worker environment with `AI` binding.
+ * @param input.businessName - Required. Drives the entire prompt.
+ * @param input.businessPhone - Optional. Empty string when omitted (template-safe).
+ * @param input.businessAddress - Optional. Used for "in {city}" SEO phrasing when present.
+ * @param input.googlePlaceId - Optional. Hint for the LLM that Places-enriched data is available.
+ * @param input.additionalContext - Optional free-form context (e.g., user-supplied bio).
+ *
+ * @throws {SyntaxError} When the LLM returns malformed JSON ({@link extractJsonFromText} fails).
+ * @throws {ZodError} When the parsed JSON fails the `research_business` output schema.
+ *
+ * @example
+ * ```ts
+ * const research = await researchBusiness(env, {
+ *   businessName: "Vito's Mens Salon",
+ *   businessAddress: '74 N Beverwyck Rd, Lake Hiawatha, NJ 07034',
+ * });
+ * // → { businessName: "Vito's Mens Salon", tagline: 'Classic cuts...', services: [...] }
+ * ```
+ *
+ * @see runSiteGenerationWorkflowV2 — the production multi-pass replacement
+ */
 export async function researchBusiness(
   env: Env,
   input: {
@@ -211,6 +351,37 @@ export async function researchBusiness(
 
 // ── Generate Site HTML ───────────────────────────────────────
 
+/**
+ * Legacy v1 single-page HTML generator from {@link ResearchResult}.
+ *
+ * @remarks
+ * Produces a complete `<!DOCTYPE html>` document with embedded CSS, no external dependencies,
+ * under 50KB. Sections: hero+CTA, services, about, hours, contact, FAQ. WCAG 2.1 AA target.
+ *
+ * Superseded by the v2 container-orchestrator pipeline (single-prompt orchestrator → parallel
+ * subagents → multi-page Vite+React+Tailwind+shadcn output). v1 stays for the lightweight
+ * prompt-improvement / single-page demo paths only.
+ *
+ * Output validation: `validatePromptOutput('generate_site', ...)` checks for `<!DOCTYPE html>`
+ * presence — that's the only structural assertion. Real quality enforcement happens later via
+ * {@link build_validators.validateBuild} once R2 upload completes.
+ *
+ * @param env - Worker environment with `AI` binding.
+ * @param researchData - Output of {@link researchBusiness} (or compatible shape).
+ * @returns Full HTML document string ready to upload to R2.
+ *
+ * @throws {Error} From the underlying schema validator if output lacks `<!DOCTYPE html>`.
+ *
+ * @example
+ * ```ts
+ * const research = await researchBusiness(env, { businessName: 'Acme' });
+ * const html = await generateSiteHtml(env, research);
+ * await env.SITES_BUCKET.put(`sites/${slug}/v1/index.html`, html);
+ * ```
+ *
+ * @see runSiteGenerationWorkflowV2 — production multi-page pipeline
+ * @see ../prompts/generate_site.prompt.md — system + user prompt source
+ */
 export async function generateSiteHtml(env: Env, researchData: ResearchResult): Promise<string> {
   const result = await runPrompt(env, 'generate_site', 2, {
     research_data: JSON.stringify(researchData),
@@ -224,6 +395,16 @@ export async function generateSiteHtml(env: Env, researchData: ResearchResult): 
 
 // ── Score Quality ────────────────────────────────────────────
 
+/**
+ * Legacy v1 quality score — superseded by {@link WebsiteScore} (8 dimensions vs 5).
+ *
+ * @remarks
+ * All sub-scores normalized 0.0–1.0. `overall` is a weighted mean computed by the LLM (not
+ * recomputed here — trust-but-verify the LLM's math when feeding into convergence loops).
+ * Threshold convention: `overall < 0.6` → regenerate.
+ *
+ * @see WebsiteScore — v2 8-dimension replacement
+ */
 export interface QualityScore {
   scores: {
     accuracy: number;
@@ -237,6 +418,36 @@ export interface QualityScore {
   suggestions: string[];
 }
 
+/**
+ * Legacy v1 LLM-based quality score (5 dimensions: accuracy, completeness, professionalism,
+ * SEO, accessibility).
+ *
+ * @remarks
+ * Truncates input to 4000 chars to fit a small-context model. For 80KB+ HTML (typical v2
+ * output), prefer {@link runScoreWebsite} which uses 6000 chars and 8 dimensions.
+ *
+ * LLM-as-judge has known biases: leniency on its own output (the same model that generated
+ * the HTML scores it kindly), drift over time, and confabulated sub-scores when issues are
+ * subtle. Use as a coarse signal — pair with deterministic validators ({@link build_validators})
+ * for ground truth.
+ *
+ * @param env - Worker environment with `AI` binding.
+ * @param htmlContent - Generated HTML (truncated to first 4000 chars for the model).
+ * @returns Score envelope with sub-scores, overall, issue list, suggestion list.
+ *
+ * @throws {SyntaxError} When extraction fails ({@link extractJsonFromText}).
+ * @throws {ZodError} When parsed JSON doesn't match the `score_quality` schema.
+ *
+ * @example
+ * ```ts
+ * const score = await scoreQuality(env, generatedHtml);
+ * if (score.overall < 0.6) await regenerate();
+ * for (const issue of score.issues) console.warn('quality', issue);
+ * ```
+ *
+ * @see runScoreWebsite — v2 8-dimension replacement
+ * @see ../prompts/score_quality.prompt.md — prompt source
+ */
 export async function scoreQuality(env: Env, htmlContent: string): Promise<QualityScore> {
   const result = await runPrompt(env, 'score_quality', 2, {
     html_content: htmlContent.substring(0, 4000),
@@ -250,6 +461,43 @@ export async function scoreQuality(env: Env, htmlContent: string): Promise<Quali
 
 // ── Site Copy (with A/B variant support) ─────────────────────
 
+/**
+ * Generate marketing copy for hero + benefits + about with deterministic A/B routing.
+ *
+ * @remarks
+ * Two variants registered for prompt `site_copy@3`:
+ *   - **Variant A (80% weight):** business-name-led hero — `"{businessName} | {city} {service}"`.
+ *   - **Variant B (20% weight):** benefit-led hero — leads with the primary benefit, business
+ *     name appears in subhead. Hypothesis: 15% CTR lift on benefit-led headlines.
+ *
+ * `orgId` as `seed` keeps each tenant on a stable variant across regenerations — required for
+ * clean A/B analysis (mid-experiment variant flip would contaminate the result). Without
+ * `orgId`, every call rolls weighted dice independently.
+ *
+ * Output is Markdown (not JSON) — caller must render to HTML before injecting into the page.
+ *
+ * @param env - Worker environment with `AI` binding.
+ * @param input.businessName - Brand display name.
+ * @param input.city - Location string for "{benefit} in {city}" SEO phrasing.
+ * @param input.services - Service list (joined with `, ` by {@link runPrompt}).
+ * @param input.tone - One of `'friendly' | 'premium' | 'no-nonsense'`. Strict tone-guide enforcement.
+ * @param orgId - Optional. Deterministic variant seed — same `orgId` always gets same variant.
+ * @returns Markdown string with hero, benefits, about sections.
+ *
+ * @example Stable per-tenant A/B
+ * ```ts
+ * const md = await generateSiteCopy(env, {
+ *   businessName: 'Acme',
+ *   city: 'Newark, NJ',
+ *   services: ['plumbing','heating'],
+ *   tone: 'no-nonsense',
+ * }, orgId);
+ * ```
+ *
+ * @see ../prompts/site_copy.prompt.md — variant A source
+ * @see ../prompts/site_copy_v3b.prompt.md — variant B source
+ * @see ../prompts/registry.ts — `configureVariants` weight table
+ */
 export async function generateSiteCopy(
   env: Env,
   input: {
@@ -280,6 +528,41 @@ export async function generateSiteCopy(
 
 // ── Full Site Generation Workflow (legacy v1) ────────────────
 
+/**
+ * Legacy v1 sequential site generation: research → HTML → quality score.
+ *
+ * @remarks
+ * Three-step pipeline with NO parallelization, NO container build, NO subagent fan-out.
+ * Produces a single-page HTML site under 50KB. Total runtime: ~30–90 s.
+ *
+ * Kept ONLY for the prompt-improvement / quick-demo paths and historical comparison. The
+ * production pipeline is {@link runSiteGenerationWorkflowV2} which orchestrates 5+ parallel
+ * research prompts plus a Cloudflare Container running Claude Code with full subagent fan-out.
+ *
+ * No D1 writes, no R2 upload, no Cloudflare Workflow durability — caller is responsible for
+ * persistence. Use for ad-hoc generation only.
+ *
+ * @param env - Worker environment with `AI` binding.
+ * @param input.businessName - Required.
+ * @param input.businessPhone - Optional.
+ * @param input.businessAddress - Optional.
+ * @param input.googlePlaceId - Optional.
+ *
+ * @returns `{ research, html, quality }` — three-step output.
+ *
+ * @throws Propagates errors from {@link researchBusiness}, {@link generateSiteHtml}, {@link scoreQuality}.
+ *
+ * @example
+ * ```ts
+ * const { html, quality } = await runSiteGenerationWorkflow(env, {
+ *   businessName: 'Acme',
+ *   businessAddress: '123 Main St',
+ * });
+ * if (quality.overall >= 0.7) await env.SITES_BUCKET.put(key, html);
+ * ```
+ *
+ * @see runSiteGenerationWorkflowV2 — production replacement
+ */
 export async function runSiteGenerationWorkflow(
   env: Env,
   input: {
@@ -318,7 +601,20 @@ import type {
   ScoreWebsiteOutput as WebsiteScore,
 } from '../prompts/schemas.js';
 
-/** Input for the v2 site generation workflow. */
+/**
+ * Input contract for the v2 site generation workflow.
+ *
+ * @remarks
+ * The minimum viable input is `businessName` alone — every other field is optional and the
+ * pipeline will research/infer missing pieces. In practice the API surface always supplies at
+ * least name + address (Google Places search prefills) and `additionalContext` (user textarea).
+ *
+ * `uploadedAssets` is the R2 key list of user-uploaded files (logos, photos, brochure PDFs)
+ * that the container orchestrator MUST surface in the rebuilt site. Format: `['org/{orgId}/sites/{siteId}/uploads/{filename}', ...]`.
+ *
+ * @see ../routes/api.ts → POST /api/sites/create-from-search — primary caller
+ * @see runSiteGenerationWorkflowV2 — consumer
+ */
 export interface WorkflowInput {
   businessName: string;
   businessAddress?: string;
@@ -328,7 +624,18 @@ export interface WorkflowInput {
   uploadedAssets?: string[];
 }
 
-/** Complete research results from all parallel prompts. */
+/**
+ * Aggregated output of all five parallel research prompts.
+ *
+ * @remarks
+ * Built in two passes: profile (sequential, blocks the rest), then social/brand/selling-points/
+ * images in parallel. All five outputs are persisted to R2 at `org/{orgId}/sites/{siteId}/_research.json`
+ * for the container build context, and the brand sub-block is written to D1 `research_data` table
+ * for fast reload during user edits.
+ *
+ * @see ../prompts/schemas.ts — full Zod shape per sub-block
+ * @see runSiteGenerationWorkflowV2 — producer
+ */
 export interface WorkflowResearch {
   profile: ProfileResult;
   social: SocialResult;
@@ -337,7 +644,20 @@ export interface WorkflowResearch {
   images: ImagesResult;
 }
 
-/** Full output of the v2 workflow. */
+/**
+ * Full v2 workflow output — what the workflow step ultimately persists to R2.
+ *
+ * @remarks
+ * NOT the production output anymore — the production pipeline now produces a multi-page
+ * Vite+React+Tailwind+shadcn site via the container orchestrator (see workflows/site-generation.ts
+ * `build-orchestrator` step). This shape is retained for the inline-LLM fallback path and the
+ * v2 unit tests.
+ *
+ * `quality.overall < 0.6` triggers regeneration in the legacy path.
+ *
+ * @see runSiteGenerationWorkflowV2 — producer
+ * @see ../workflows/site-generation.ts — production multi-page replacement
+ */
 export interface WorkflowResult {
   research: WorkflowResearch;
   html: string;
@@ -506,12 +826,54 @@ async function runScoreWebsite(
 // ── V2 Full Workflow Orchestration ───────────────────────────
 
 /**
- * Run the v2 site generation workflow with parallelized research.
+ * V2 inline-LLM site generation workflow with parallelized research.
  *
- * Phase 1: Profile research (need business_type for other prompts)
- * Phase 2: Social, brand, selling points, images (parallel)
- * Phase 3: Generate main website HTML
- * Phase 4: Privacy page + terms page + quality score (parallel)
+ * @remarks
+ * Four-phase pipeline running entirely on Workers AI (no container, no subagents):
+ *   - **Phase 1 (sequential, ~10s):** `runResearchProfile` — produces `business_type` which all
+ *     downstream prompts depend on for industry-specific context.
+ *   - **Phase 2 (parallel, ~15s):** `runResearchSocial`, `runResearchBrand`,
+ *     `runResearchSellingPoints`, `runResearchImages` fan out via `Promise.all`. Brand step
+ *     additionally invokes GPT-4o vision for color extraction when an existing website URL is
+ *     present (prevents the LLM from guessing industry-stereotype colors — the
+ *     {@link feedback_brand_color_extraction} 2025-04 njsk.org burgundy incident).
+ *   - **Phase 3 (sequential, ~30s):** `runGenerateWebsite` produces the full HTML using all
+ *     accumulated research as input. Token-heavy (16k max).
+ *   - **Phase 4 (parallel, ~20s):** Privacy page + terms page + 8-dimension quality score run
+ *     concurrently — they share no inputs that could change between calls.
+ *
+ * Total wall-clock: ~75s when Workers AI is responsive.
+ *
+ * **NOT the production pipeline.** Production uses the container orchestrator (see
+ * `workflows/site-generation.ts` `build-orchestrator` step) which runs Claude Opus 4.7 with
+ * full subagent fan-out and produces multi-page Vite+React+Tailwind+shadcn output. This
+ * function survives as the inline-LLM fallback path and the integration-test harness.
+ *
+ * Phase boundaries log structured JSON via `console.warn` for D1 audit log correlation.
+ *
+ * @param env - Worker environment with `AI` binding + optional `OPENAI_API_KEY`/`ANTHROPIC_API_KEY`
+ *   for vision-based color extraction.
+ * @param input - {@link WorkflowInput}.
+ * @returns {@link WorkflowResult} with research blocks, main HTML, legal pages, and 8-dim score.
+ *
+ * @throws Propagates Workers AI errors, schema validation errors, JSON parse errors from any phase.
+ *   Phase 2 brand color extraction failures are non-fatal — caught and logged, falls back to
+ *   LLM-inferred colors.
+ *
+ * @example
+ * ```ts
+ * const result = await runSiteGenerationWorkflowV2(env, {
+ *   businessName: "Vito's Mens Salon",
+ *   businessAddress: '74 N Beverwyck Rd, Lake Hiawatha, NJ 07034',
+ *   uploadedAssets: ['org/abc/sites/123/uploads/storefront.jpg'],
+ * });
+ * await env.SITES_BUCKET.put(`sites/${slug}/v1/index.html`, result.html);
+ * await env.SITES_BUCKET.put(`sites/${slug}/v1/privacy.html`, result.privacyHtml);
+ * await env.SITES_BUCKET.put(`sites/${slug}/v1/terms.html`, result.termsHtml);
+ * ```
+ *
+ * @see ../workflows/site-generation.ts → build-orchestrator — production replacement
+ * @see external_llm.callExternalLLMWithVision — color extraction integration
  */
 export async function runSiteGenerationWorkflowV2(
   env: Env,
@@ -576,12 +938,41 @@ export async function runSiteGenerationWorkflowV2(
 // ── Prompt Registration (called at startup) ──────────────────
 
 /**
- * Register all prompt definitions in the registry.
- * Called once at Worker startup.
+ * Register every prompt spec used by this Worker into the in-memory {@link registry}.
  *
- * Each prompt is defined inline here (bundled with the Worker).
- * The corresponding .prompt.md files in /prompts/ are the
- * human-readable, diffable source of truth for review.
+ * @remarks
+ * Two-step registration keeps the bundle simple:
+ *   1. Legacy v2 prompts: `research_business`, `generate_site`, `score_quality`, `site_copy`
+ *      (variants A + B).
+ *   2. V2 workflow prompts: `research_profile`, `research_social`, `research_brand`,
+ *      `research_selling_points`, `research_images`, `generate_website`, `generate_legal_pages`,
+ *      `score_website`.
+ *
+ * Each spec is defined inline here AND mirrored as a `.prompt.md` file under `/prompts/`. The
+ * inline spec is the **runtime source of truth** (bundled with the Worker for cold-start speed).
+ * The `.md` file is the **human review surface** — when editing a prompt, edit BOTH and verify
+ * with `npm test` (parser tests assert MD↔inline parity).
+ *
+ * Call this exactly once at Worker startup (typically from `src/index.ts` initialization). The
+ * registry is module-singleton so a second call is a no-op but still wastes CPU. Idempotency
+ * is enforced inside `registry.registerAll` via internal de-dup on `(id, version, variant)` tuple.
+ *
+ * Variant A/B weights are configured via {@link registry.configureVariants} after the
+ * `site_copy@3` registrations — 80/20 split, deterministic when caller supplies a seed.
+ *
+ * KV hot-patching: any `prompt:{id}@{version}` key in the `PROMPT_STORE` KV namespace overrides
+ * the inline spec at resolve-time. This is the emergency hotfix path — push a corrected prompt
+ * via `wrangler kv key put` without redeploying. See `../prompts/registry.ts`.
+ *
+ * @example
+ * ```ts
+ * // src/index.ts
+ * import { registerAllPrompts } from './services/ai_workflows';
+ * registerAllPrompts(); // module load — runs once per isolate
+ * ```
+ *
+ * @see ../prompts/registry.ts — registry implementation, KV hot-patching
+ * @see ../prompts/parser.ts — .prompt.md parser (asserts MD↔inline parity in tests)
  */
 export function registerAllPrompts(): void {
   registry.registerAll([

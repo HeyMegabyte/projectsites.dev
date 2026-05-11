@@ -41,6 +41,12 @@ import { search } from './routes/search.js';
 import { webhooks } from './routes/webhooks.js';
 import { assets } from './routes/assets.js';
 import { forms } from './routes/forms.js';
+import { liveStream } from './routes/live_stream.js';
+import { terminal } from './routes/terminal.js';
+import { diffArt } from './routes/diff_art.js';
+import { replay } from './routes/replay.js';
+import { changelogAudio } from './routes/changelog_audio.js';
+import { serverTimingMiddleware } from './middleware/server_timing.js';
 import { resolveSite, serveSiteFromR2 } from './services/site_serving.js';
 import { dbUpdate } from './services/db.js';
 import { registerAllPrompts } from './services/ai_workflows.js';
@@ -63,6 +69,9 @@ app.use('*', payloadLimitMiddleware);
 
 // Security headers
 app.use('*', securityHeadersMiddleware);
+
+// Server-Timing emission per skill (1337 LAYER #7)
+app.use('*', serverTimingMiddleware());
 
 // Public forms ingest must accept ANY origin (custom domains post here too).
 // Server-side origin allow-list inside the handler is the real security check.
@@ -126,6 +135,11 @@ app.route('/', assets);  // Asset uploads + build-assets listing
 app.route('/', forms);   // Public form ingest + auth-gated submissions/integrations CRUD
 app.route('/', api);
 app.route('/', webhooks);
+app.route('/', liveStream);     // 1337 LAYER #2 — SSE build stream
+app.route('/', terminal);       // 1337 LAYER #6 — owner-gated terminal
+app.route('/', diffArt);        // 1337 LAYER #5 — diff-as-art SVG
+app.route('/', replay);         // 1337 LAYER #3 — build-replay scrubber
+app.route('/', changelogAudio); // 1337 LAYER #4 — AI-narrated changelog audio
 
 // Diagnostic: round-trip the container with a static index.html. Proves
 // container can boot → write file → upload R2 → return, without Claude Code.

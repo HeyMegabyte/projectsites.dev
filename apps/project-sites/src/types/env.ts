@@ -110,6 +110,12 @@ export interface Env {
   OPENAI_API_KEY?: string;
   /** Anthropic API key for Claude models in headless generation pipeline. */
   ANTHROPIC_API_KEY?: string;
+  /** Claude Code subscription OAuth access token (Max 20x). Seeded via `scripts/import-claude-oauth.mjs`. */
+  CLAUDE_OAUTH_ACCESS_TOKEN?: string;
+  /** Claude Code subscription OAuth refresh token. Long-lived. */
+  CLAUDE_OAUTH_REFRESH_TOKEN?: string;
+  /** Claude Code subscription OAuth access-token expiry (ms since epoch). */
+  CLAUDE_OAUTH_EXPIRES_AT?: string;
   /** Model ID for the research/prompt-formulation pipeline (default: o3-mini). */
   RESEARCH_MODEL?: string;
   /** OpenRouter API key for model routing. */
@@ -309,4 +315,6 @@ export interface Variables {
   userRole?: string;
   /** Whether the user is a billing admin for their org. */
   billingAdmin?: boolean;
+  /** Per-skill `Server-Timing` accumulator (1337 LAYER #7). */
+  timings?: Map<string, { dur: number; desc?: string }>;
 }

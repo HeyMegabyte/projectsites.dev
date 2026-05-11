@@ -33,7 +33,14 @@
  * @packageDocumentation
  */
 
-import { PRICING, type Entitlements, getEntitlements, badRequest } from '@project-sites/shared';
+import {
+  PRICING,
+  TIER_CAPS,
+  type BudgetTier,
+  type Entitlements,
+  getEntitlements,
+  badRequest,
+} from '@project-sites/shared';
 import { dbQueryOne, dbInsert, dbUpdate } from './db.js';
 import type { Env } from '../types/env.js';
 
@@ -114,6 +121,42 @@ export async function getOrCreateStripeCustomer(
 }
 
 /**
+ * Append a one-time addon line item to a Stripe Checkout `URLSearchParams`
+ * payload when the selected budget tier carries a paid surcharge.
+ *
+ * The addon is billed as a single non-recurring line item alongside the
+ * subscription. Pricing comes from `TIER_CAPS[tier].addon_cents`:
+ *
+ * - `plus` → $29 once (`2900¢`) — Sora hero video + 10 AI images.
+ * - `premium` → $79 once (`7900¢`) — Sora + NotebookLM podcast + immersive infographics.
+ *
+ * No-ops for `free` and `standard` tiers (addon cents = 0). The `mode` arg
+ * lets callers pass `'subscription'` (default) — Stripe accepts mixing a
+ * recurring price with a one-time price in subscription mode.
+ *
+ * @internal Used by both `createCheckoutSession` and `createEmbeddedCheckoutSession`.
+ */
+export function appendBudgetTierAddon(params: URLSearchParams, tier: BudgetTier | undefined): void {
+  if (!tier || tier === 'free' || tier === 'standard') return;
+  const cap = TIER_CAPS[tier];
+  if (!cap || cap.addon_cents <= 0) return;
+
+  const label = tier === 'plus' ? 'Plus Multimedia Addon' : 'Premium Multimedia Suite';
+  const description =
+    tier === 'plus'
+      ? 'Sora hero video + 10 AI-generated images'
+      : 'Sora video + NotebookLM podcast + immersive infographics + 15 AI images';
+
+  params.append('line_items[1][price_data][currency]', PRICING.CURRENCY);
+  params.append('line_items[1][price_data][unit_amount]', String(cap.addon_cents));
+  params.append('line_items[1][price_data][product_data][name]', label);
+  params.append('line_items[1][price_data][product_data][description]', description);
+  params.append('line_items[1][quantity]', '1');
+  params.append('metadata[budget_tier]', tier);
+  params.append('metadata[budget_addon_cents]', String(cap.addon_cents));
+}
+
+/**
  * Create a Stripe Checkout session optimised for Stripe Link.
  *
  * Resolves (or creates) the org's Stripe customer, then builds a Checkout
@@ -147,6 +190,7 @@ export async function createCheckoutSession(
     customerEmail: string;
     successUrl: string;
     cancelUrl: string;
+    budgetTier?: BudgetTier;
   },
 ): Promise<{ checkout_url: string; session_id: string }> {
   const { stripe_customer_id } = await getOrCreateStripeCustomer(
@@ -178,6 +222,7 @@ export async function createCheckoutSession(
     params.append('metadata[site_id]', opts.siteId);
   }
   params.append('metadata[org_id]', opts.orgId);
+  appendBudgetTierAddon(params, opts.budgetTier);
 
   const response = await fetch('https://api.stripe.com/v1/checkout/sessions', {
     method: 'POST',
@@ -195,7 +240,7 @@ export async function createCheckoutSession(
   }
 
   const session = (await response.json()) as { id: string; url: string };
-  console.warn(JSON.stringify({ level: 'info', service: 'billing', message: 'Checkout session created', org_id: opts.orgId, session_id: session.id }));
+  console.warn(JSON.stringify({ level: 'info', service: 'billing', message: 'Checkout session created', org_id: opts.orgId, session_id: session.id, budget_tier: opts.budgetTier ?? 'free' }));
 
   return { checkout_url: session.url, session_id: session.id };
 }
@@ -214,6 +259,7 @@ export async function createEmbeddedCheckoutSession(
     siteId?: string;
     customerEmail: string;
     returnUrl: string;
+    budgetTier?: BudgetTier;
   },
 ): Promise<{ client_secret: string; session_id: string }> {
   const { stripe_customer_id } = await getOrCreateStripeCustomer(
@@ -245,6 +291,7 @@ export async function createEmbeddedCheckoutSession(
     params.append('metadata[site_id]', opts.siteId);
   }
   params.append('metadata[org_id]', opts.orgId);
+  appendBudgetTierAddon(params, opts.budgetTier);
 
   const response = await fetch('https://api.stripe.com/v1/checkout/sessions', {
     method: 'POST',
@@ -262,7 +309,7 @@ export async function createEmbeddedCheckoutSession(
   }
 
   const session = (await response.json()) as { id: string; client_secret: string };
-  console.warn(JSON.stringify({ level: 'info', service: 'billing', message: 'Embedded checkout session created', org_id: opts.orgId, session_id: session.id }));
+  console.warn(JSON.stringify({ level: 'info', service: 'billing', message: 'Embedded checkout session created', org_id: opts.orgId, session_id: session.id, budget_tier: opts.budgetTier ?? 'free' }));
 
   return { client_secret: session.client_secret, session_id: session.id };
 }

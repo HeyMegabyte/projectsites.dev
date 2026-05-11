@@ -1,0 +1,80 @@
+{
+  "iteration": 1,
+  "site_slug": "lonemountainglobal",
+  "site_url": "https://lonemountainglobal.projectsites.dev",
+  "scores": {
+    "visual_design": 0.5,
+    "content_quality": 0.06133333333333333,
+    "completeness": 0.7,
+    "responsiveness": 0.9,
+    "accessibility": 0.5,
+    "seo": 1,
+    "performance": 0.946172,
+    "brand_consistency": 0.7,
+    "media_richness": 0,
+    "text_contrast": 0.7,
+    "wedge_fit": 0.6,
+    "customer_voice": 1
+  },
+  "overall": 6.34,
+  "pass": false,
+  "cost_usd": 10.433333333333334,
+  "recommendations": [
+    {
+      "category": "content_quality",
+      "severity": "minor",
+      "description": "Homepage has only 1 <h2> sections (target 3+ for content density)"
+    },
+    {
+      "category": "media_richness",
+      "severity": "major",
+      "description": "Homepage has only 0 images (target 6+ per per-route media density spec)"
+    },
+    {
+      "category": "content_quality",
+      "severity": "major",
+      "description": "Homepage has only 92 words (target 1000+ for content depth + SEO)"
+    },
+    {
+      "category": "seo",
+      "severity": "minor",
+      "description": "Homepage has only 0 internal links (target 5+ for crawl depth + topical coverage)"
+    },
+    {
+      "category": "seo",
+      "severity": "minor",
+      "description": "Homepage has 0 outbound links (target 1+ for trust signals)"
+    },
+    {
+      "category": "completeness",
+      "severity": "major",
+      "description": "Sitemap declares only 7 routes (target 8+ for sub-page depth)"
+    }
+  ],
+  "judge_meta": {
+    "kind": "structural",
+    "url": "https://lonemountainglobal.projectsites.dev",
+    "http_status": 200,
+    "bytes": 26914,
+    "title_length": 56,
+    "description_length": 142,
+    "h1_count": 1,
+    "h2_count": 1,
+    "h3_count": 0,
+    "img_count": 0,
+    "img_with_alt": 0,
+    "img_lazy": 0,
+    "internal_links": 0,
+    "external_links": 0,
+    "jsonld_blocks": 5,
+    "route_count": 7,
+    "word_count": 92,
+    "missing_assets": []
+  },
+  "cost_breakdown": {
+    "judge_usd": 0,
+    "estimate_usd": 10.4333,
+    "audit_usd": 0
+  },
+  "elapsed_sec": 1565
+}

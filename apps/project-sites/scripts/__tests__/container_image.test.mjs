@@ -77,7 +77,7 @@ test('python helpers are installed', () => {
 
 test('claude-skills repo cloned at /home/cuser/.agentskills', () => {
   const out = runIn('cd /home/cuser/.agentskills && git remote -v | head -1');
-  assert.match(out, /megabytespace\/claude-skills/);
+  assert.match(out, /heymegabyte\/claude-skills/i);
 });
 
 test('skills router file is present', () => {

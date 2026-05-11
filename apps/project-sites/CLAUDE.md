@@ -5,6 +5,26 @@
 >
 > **Template repo:** https://github.com/HeyMegabyte/template.projectsites.dev
 
+## ***HOLIEST / HIGHEST B-ORDER***: Mission Doctrine (SUPREME BINDING ORDER)
+
+Every site generated through this Worker must satisfy the five mandates defined in `prompts/_mission_preamble.txt`:
+
+1. **CINEMATIC FLOOR** — HBO opening / Vimeo Staff Picks / Canon ad / Tropic Thunder production polish. Open with motion. The site is a short film, never a brochure.
+2. **LATEST-TECH FLEX** — WebGPU, WebGL2, View Transitions, scroll-driven animations, anchor positioning, container queries, OKLCH, popover, WebMIDI, WebXR (Meta Quest), WebUSB (Canon/Insta360/DJI), Web Bluetooth, OffscreenCanvas, WASM. Reverse-engineer the gorgeous parts of Three.js demos, Meta Quest browser examples, Raspberry Pi kiosks, Canon DPP, DJI Fly.
+3. **EVERY FREE OR OPTIMAL API** — exhaust the catalog (Unsplash, Pexels, Pixabay, Foursquare, Yelp, YouTube, DALL-E, Ideogram, Stability, Replicate, Remove.bg, Cloudinary, Logo.dev, Brandfetch, ElevenLabs, HeyGen, Recraft, Sora, OpenAI/Anthropic Vision, Workers AI, NotebookLM-style podcast+infographic+explainer-video, Mapbox, Google Maps, Vimeo, Spotify, Lottie, real-favicongenerator, PageSpeed, Lighthouse CI). Collect 100 → AI-curate → ship the top 10–15.
+4. **FLEX ON WHITEHOUSE.GOV** — head-to-head benchmark vs. `whitehouse.gov` / `linear.app` / `stripe.com` / `vercel.com` / `apple.com`. Out-perform on polish, motion craft, multimedia density, a11y, Lighthouse, SEO, info density.
+5. **PLATFORM PROMISE** — anyone gets a great free site. Auto-boost loop improves each run. AI chat + direct code edits unlimited on $50/mo Patron. Free vs. paid output QUALITY is IDENTICAL — gate is volume, never craftsmanship.
+
+**This outranks every other rule** when conflicts arise. If a quality gate (e.g. "homepage must have an H1") conflicts with the cinematic mandate (e.g. a 5-second video preroll before H1 reveal), the doctrine wins — keep the cinematic craft, satisfy the gate via View Transitions / animated H1 reveal.
+
+**Where it is encoded:**
+- `prompts/_mission_preamble.txt` — preamble file the orchestrator container prepends to every Claude Code system message
+- `prompts/_creativity_preamble.txt` — Creativity + Love + Stars doctrine (delight floor, anti-slop filter, recommendation engine)
+- `src/prompts/renderer.ts` — `MISSION_PREAMBLE`, `CREATIVITY_PREAMBLE`, `buildDoctrinePrefix()`, `renderPromptWithDoctrine()` exports
+- `src/services/ai_workflows.ts::runPrompt` — wires `renderPromptWithDoctrine()` so every Workers-AI call inherits the doctrine
+- `src/services/openai_research.ts::formulateExpertPrompt` — prepends `buildDoctrinePrefix()` so the meta-prompt LLM embeds the doctrine into the build prompt it produces for the container
+- Memory pin: `~/.claude/projects/-Users-apple-emdash-projects-projectsites-dev/memory/project_mission_doctrine.md`
+
 ## Mandatory Site-Generation Invariants (BUILD-BREAKING)
 
 These invariants are enforced programmatically in `src/services/build_validators.ts` and run between R2 upload and `published` status. Each maps to a gate in `~/.agentskills/15-site-generation/quality-gates.md`. A violation flips the site to `error` once we move from `report` → `strict` mode.
@@ -17,13 +37,29 @@ These invariants are enforced programmatically in `src/services/build_validators
 | OG image | `og-image.*` exists, ≤100KB, branded card (1200×630) | `og.missing`, `og.too_large` |
 | apple-touch-icon | 180×180 at root | `icon.apple_touch_missing` |
 | Meta lengths | `<title>` 50-60 chars, `<meta description>` 120-156 chars | `meta.title_length`, `meta.description_length` |
-| JSON-LD | 4+ blocks per HTML page (WebSite + Organization + WebPage + BreadcrumbList minimum) | `jsonld.count_below_threshold` |
+| Per-route metadata fields | Every route HTML head contains all 28 required fields (title+meta description+canonical+og:* full set+twitter:* full set+robots+theme-color+application-name+apple-mobile-web-app-* +link rel=manifest/icon/apple-touch-icon+≥1 JSON-LD); per `~/.claude/rules/per-route-metadata.md` | `meta.field_missing` |
+| Per-route metadata uniqueness | No two routes share identical title, meta description, og:title, og:description, twitter:title, or twitter:description (case-insensitive whitespace-normalized hash) | `meta.duplicate_across_routes` |
+| Internal link integrity | Every internal `<a href>` resolves to a route in `KNOWN_ROUTES` (auto-derived from `dist/**/index.html`) | `link.unknown_route` |
+| HTML entity hygiene | No `&apos;`, `&amp;`, `&ldquo;`, `&hellip;`, `&ndash;`, `&mdash;`, `&middot;`, `&nbsp;`, `&quot;` in `.tsx`/`.jsx`/`.ts` source — JSX entity decoding fires only for JSX text children, not data-array string literals piped through `{var}` | `html.entity_in_source` |
+| Favicon set completeness | All 9 RFG-generated files exist (`favicon.ico`, `favicon-16x16.png`, `favicon-32x32.png`, `favicon-48x48.png`, `apple-touch-icon.png`, `android-chrome-192x192.png`, `android-chrome-512x512.png`, `mstile-150x150.png`, `safari-pinned-tab.svg`) | `favicon.set_incomplete` |
+| PWA kit | `site.webmanifest` (with screenshots[] + maskable icon), `sw.js` (Workbox), `offline.html` all present per `~/.claude/rules/pwa-checklist.md` | `pwa.manifest_missing`, `pwa.sw_missing`, `pwa.offline_missing` |
+| JSON-LD count | 4+ blocks per HTML page (WebSite + Organization + WebPage + BreadcrumbList minimum) | `jsonld.count_below_threshold` |
+| JSON-LD validity | Every `<script type="application/ld+json">` body parses as valid JSON | `jsonld.malformed` |
 | H1 in shell | Exactly 1 `<h1>` in HTML shell (prerender) — outside script/style | `html.h1_count` |
 | color-scheme | `<meta name="color-scheme">` present | `meta.color_scheme_missing` |
 | Sitemap lastmod | Every `<url>` in `sitemap.xml` has `<lastmod>` | `sitemap.missing_lastmod` |
 | Banned slop | No "limitless", "revolutionize", "cutting-edge", "leverage", "world-class", etc. | `copy.banned_word` |
+| Citation hygiene | Every `\d+%`, `\$\d+[MBK]`, `\d+x`, `\d+ users`, `since \d{4}` cites APA `(Author, Year)` within ±200 chars; per `~/.claude/rules/citations.md` | `citation.unsourced_claim` |
+| Brand color drift | Rendered primary color extracted from `dist/` matches `_brand.json.primary` within ΔE2000 ≤ 5 | `brand.color_drift` |
+| NAP consistency (local-business) | Name + Address + Phone match Google Business Profile exactly across every page; phone format normalized | `nap.inconsistent` |
+| Typography preservation | Rendered `<h1>` and body font families match `_brand.json.fonts.heading`/`body` (extracted from source, never substituted) | `typography.mismatch` |
+| Page count floor | At least 4 routes (Home + About + Services + Contact) even when source is single-page | `page.count_below_floor` |
 | JS chunk size | No JS chunk > 750KB raw (~250KB gzip) — code-split by route | `js.chunk_too_large` |
 | Lightbox | JS bundle contains `data-zoomable` AND `data-gallery` strings | `lightbox.zoomable_missing`, `lightbox.gallery_missing` |
+| Source fidelity (rebuilds) | GPT-4o rubric vs `_source_screenshot.png` passes: `logo_match=true` AND `color_match≥7` AND `typography_match≥7` AND `hero_structure≥7` AND `overall_fidelity≥8`; runs in `step.do('source-fidelity-check')` post-deploy | `fidelity.unverified` (info → handoff to source-fidelity-fixer) |
+| Color contrast | Every text-on-background combination ≥4.5:1 (text) or ≥3:1 (large text) per WCAG 2.2 AA; verified by accessibility-auditor at 6 breakpoints | `contrast.below_threshold_unverified` (info → handoff to accessibility-auditor) |
+| Image relevance | Every page-rendered `<img>` scores ≥8/10 against business type via GPT-4o vision | `image.relevance_unverified` (info → handoff to visual-qa) |
+| Photo authenticity | Team/about/gallery `<img>` elements aren't generic stock — must show actual people/location | `photo.authenticity_unverified` (info → handoff to visual-qa) |
 
 **Mode flag (in workflow `validate-build` step):** currently `report` (logs to D1 audit, never throws). Flip to `strict` once template ships clean across all benchmarks (megabyte-labs, njsk, nyfb, vito's, soup kitchen).
 
@@ -96,7 +132,7 @@ if (!report.ok) console.error(report.errors);
 
 **The container is a STATELESS Claude Code executor that runs a single orchestrator prompt.** That orchestrator delegates to specialist subagents in parallel via the Task tool. It does not access D1 or R2 directly.
 
-### Inheritance from megabytespace/claude-skills
+### Inheritance from heymegabyte/claude-skills
 The container's `~/.claude/CLAUDE.md` `@-imports` the upstream `~/.agentskills/CLAUDE.md`, `AGENTS.md`, and `_router.md` — ProjectSites inherits the **entire Emdash Skills meta surface** (15 skill categories, 18 universal agents, 32 platform variants, conventions, profiles). Project-specific orchestrator instructions layer on top via the same file. Updates land within 10 minutes via `container-server.mjs` git-pull + `syncAgents()`.
 
 ### Subagent Surface

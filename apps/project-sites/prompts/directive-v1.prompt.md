@@ -131,7 +131,7 @@ If `expert_notes` is non-empty, every section that contradicts it MUST be rewrit
 
 You are the ORCHESTRATOR. Subagents have isolated context windows so fan-out is free. Issue every parallel Task call in a SINGLE message; sequential dispatch defeats the architecture.
 
-**Available subagents** (synced from megabytespace/claude-skills + project overlay):
+**Available subagents** (synced from heymegabyte/claude-skills + project overlay):
 
 Audit-only (NEVER ask them to edit; forward reports to fix-capable agents):
 - `visual-qa` — screenshots 6 breakpoints + GPT-4o critique
