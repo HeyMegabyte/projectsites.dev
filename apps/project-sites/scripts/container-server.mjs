@@ -23,10 +23,17 @@ const JOBS_DIR = '/var/jobs';
 const SKILLS_DIR = '/home/cuser/.agentskills';
 const TEMPLATE_DIR = '/home/cuser/template';
 
-// Anthropic credit-low signature lands in stderr when claude -p hits the API
-// and gets HTTP 400 with `{"error":{"type":"invalid_request_error","message":"Your credit balance is too low..."}}`.
-// Detected in real-time so we kill the child + skip wasteful npm install/build/R2 upload.
-const CREDIT_LOW_RE = /credit balance is too low|invalid_request_error[^}]*credit/i;
+// Anthropic quota-exhausted signatures land on stdout/stderr when claude -p
+// either (a) hits the API-key path and gets HTTP 400 "Your credit balance is
+// too low...", or (b) hits the subscription-auth path and exceeds the Max 20x
+// monthly usage cap, which writes "You've hit your org's monthly usage limit"
+// to stdout before exiting code=1. Both signatures route to the same short-
+// circuit so we kill the child + skip wasteful npm install/build/R2 upload.
+// Reference incident (2026-05-11): LMG build job-1778511630344-q33i3h exited
+// code=1 in 3s with stdout="You've hit your org's monthly usage limit" — the
+// prior CREDIT_LOW_RE only matched credit-balance phrasing, so errorClass
+// stayed null and the container proceeded to ship a template-stub site.
+const CREDIT_LOW_RE = /credit balance is too low|invalid_request_error[^}]*credit|hit your org's monthly usage limit|monthly usage limit|usage limit (?:reached|exceeded|hit)/i;
 const STREAM_TAIL_BYTES = 2048;
 
 try { fs.mkdirSync(JOBS_DIR, { recursive: true }); } catch {}
@@ -441,6 +448,23 @@ function runJob(jobId, dir, prompt, envVars, timeoutMin, callbackUrl, callbackSe
         if (fs.existsSync(distDir)) {
           const distFiles = collectFiles(distDir);
           if (distFiles.length > 0) {
+            // Template-stub guard: literal {BUSINESS_*} / {BRAND_*} placeholders
+            // surviving into dist HTML mean Claude never customized the template.
+            // Fail-close BEFORE R2 upload so the workflow flips to error, not published.
+            const stubMarkers = /\{(BUSINESS_NAME|BUSINESS_SHORT_NAME|BUSINESS_DESCRIPTION|BUSINESS_ADDRESS|BUSINESS_PHONE|BUSINESS_EMAIL|BUSINESS_TAGLINE|BUSINESS_HOURS|BRAND_PRIMARY|BRAND_SECONDARY|BRAND_ACCENT|HERO_HEADLINE|HERO_SUBHEAD|CTA_PRIMARY|CTA_SECONDARY)\}/;
+            const stubFile = distFiles.find(
+              f => /\.(html|webmanifest|json|xml|txt)$/i.test(f.name) && stubMarkers.test(f.content || ''),
+            );
+            if (stubFile) {
+              const sample = (stubFile.content || '').match(stubMarkers)?.[0] || '?';
+              console.warn(`[${jobId}] template-stub detected: ${stubFile.name} contains ${sample}`);
+              if (jobs[jobId]) {
+                jobs[jobId].errorClass = 'claude_template_stub';
+              }
+              throw new Error(
+                `template-stub: unsubstituted placeholder ${sample} in ${stubFile.name} — Claude orchestrator never customized the template`,
+              );
+            }
             buildOk = true;
             console.warn(`[${jobId}] npm build ok: ${distFiles.length} dist files`);
           } else {
@@ -451,15 +475,21 @@ function runJob(jobId, dir, prompt, envVars, timeoutMin, callbackUrl, callbackSe
         }
       } catch (be) {
         console.warn(`[${jobId}] Build error:`, be.message.slice(0, 500));
+        if (jobs[jobId] && !jobs[jobId].buildErrorMessage) {
+          jobs[jobId].buildErrorMessage = be.message.slice(0, 500);
+        }
       }
     } else {
       console.warn(`[${jobId}] No package.json — skipping build`);
     }
 
     if (!buildOk) {
+      const errClass = (jobs[jobId] && jobs[jobId].errorClass) || 'build_failed';
+      const errMsg = (jobs[jobId] && jobs[jobId].buildErrorMessage) || 'npm build failed or produced no dist/ files';
       setStatus(jobId, {
         status: 'error',
-        error: 'npm build failed or produced no dist/ files',
+        errorClass: errClass,
+        error: errMsg,
         step: 'done',
         files: [],
       });

@@ -432,10 +432,70 @@ async function discoverRoutes(baseUrl: string, html: string): Promise<SourceBran
 }
 
 /**
- * Extract source-site brand assets, fonts, colors, theme, and routes.
+ * Extract source-site brand assets, fonts, colors, theme, and routes from a
+ * live URL. The Worker calls this BEFORE dispatching the container build so
+ * the orchestrator subagents receive deterministic, ground-truth brand data
+ * via `_brand.json` / `_assets.json` / `_scraped_content.json` instead of
+ * inferring identity from an LLM research pass (which historically collapsed
+ * to platform defaults — Inter/Space Grotesk dark theme — and destroyed
+ * brand recognition).
  *
- * Best-effort and never throws — failures populate `warnings[]` and fall
- * back to safe defaults so the workflow can continue without a source.
+ * @param sourceUrl - Source homepage URL. Bare hostnames (`example.com`)
+ *   auto-prepend `https://`. Must respond 2xx with `text/html` to populate
+ *   anything beyond the empty fallback skeleton.
+ * @param opts.openaiKey - Optional `OPENAI_API_KEY` enabling the GPT-4o-mini
+ *   logo-color vision pass via {@link extractLogoDominantColor}. When
+ *   omitted, brand colors fall back to CSS hex-frequency analysis (misses
+ *   raster-logo dominant colors — e.g. lonemountainglobal.com's burgundy
+ *   wordmark never appears in stylesheets).
+ *
+ * @returns A {@link SourceBrand} record. ALWAYS resolves — never throws.
+ *   On any fetch/parse failure, returns a partially-populated record with
+ *   the error surfaced in `warnings[]` so the workflow keeps progressing
+ *   on stub defaults rather than wedging mid-build.
+ *
+ * @remarks
+ * Pipeline order (each step soft-fails into `warnings[]`):
+ * 1. Fetch homepage HTML via {@link fetchHtml} (15s timeout, browser UA).
+ * 2. {@link detectCms} from HTML signatures (WP/Squarespace/Wix/Webflow/Shopify).
+ * 3. Fetch up to 3 same-host CSS files for `font-family` + hex-frequency mining.
+ * 4. Resolve Google Fonts families from `<link rel="stylesheet">` URLs +
+ *    `@import url(...)` blocks (some sites inline the Fonts import).
+ * 5. Pick logo wordmark + icon via the priority chain (header `<img>` →
+ *    manifest icons → `<link rel="apple-touch-icon">` → `<link rel="icon">` →
+ *    `og:image`). Persist BOTH so the rebuild has a square favicon source
+ *    AND a horizontal hero/header source.
+ * 6. Rank hex colors (non-mono, excluding `#fff`/`#000`/near-greys) by
+ *    frequency; when `opts.openaiKey` is set, run the GPT-4o-mini vision
+ *    pass to recover dominant color from raster logos.
+ * 7. Compute logo-luminance-driven theme polarity:
+ *    `luminance < 0.4` → light theme | `> 0.6` → dark theme | mid-range
+ *    defaults dark but verifies logo contrast ≥4.5:1.
+ * 8. Collect routes: prefer `/sitemap.xml` + `/sitemap_index.xml`, fall back
+ *    to nav anchor crawl (homepage `<a href>` extraction, capped at 200).
+ * 9. Score source aesthetic polish: when source is polished (≥7/10),
+ *    `preserve_source_design = true` to mirror layout/colors before adding
+ *    our polish layer.
+ *
+ * @throws Never — every failure mode collapses into `warnings[]`. Caller
+ *   inspects `warnings.length === 0` or specific entries to surface
+ *   degraded extraction quality.
+ *
+ * @example
+ * ```ts
+ * const brand = await extractSourceBrand('lonemountainglobal.com', {
+ *   openaiKey: env.OPENAI_API_KEY,
+ * });
+ * if (brand.warnings.length === 0) {
+ *   // Full extraction succeeded — orchestrator gets ground-truth brand
+ *   await persistSourceBrand(env.SITES_BUCKET, slug, brand);
+ * } else {
+ *   console.warn('Brand extraction partial:', brand.warnings);
+ * }
+ * ```
+ *
+ * @see {@link persistSourceBrand} for R2 persistence + container hand-off.
+ * @see {@link SourceBrand} for the full output schema.
  */
 export async function extractSourceBrand(
   sourceUrl: string,
@@ -755,15 +815,77 @@ export async function extractSourceBrand(
 }
 
 /**
- * Persist extraction artifacts to R2 and produce contextFiles entries.
+ * Persist a {@link SourceBrand} record to R2 as the three canonical artifacts
+ * the container orchestrator reads at boot, AND return the JSON strings so
+ * they can be passed inline as `contextFiles` in the container's `/build`
+ * payload — orchestrator reads them WITHOUT a second R2 round-trip
+ * (containers have no R2 binding; round-tripping requires re-uploading
+ * before container start, which is wasted bandwidth here).
  *
- * Writes three R2 objects:
- * - `sites/{slug}/assets/_brand.json`
- * - `sites/{slug}/assets/_assets.json`
- * - `sites/{slug}/assets/_scraped_content.json`
+ * @param bucket - The `SITES_BUCKET` R2 binding. Writes are concurrent
+ *   via `Promise.all` — partial failure (1 of 3 writes rejected) means the
+ *   build proceeds on a mixed-state R2 and the orchestrator may pull a
+ *   stale prior-iteration artifact for the missing key. Caller MUST catch
+ *   rejections and either retry or fail the workflow step.
+ * @param slug - Site slug from `sites.slug`. Used in R2 key prefix
+ *   `sites/{slug}/assets/_*.json`. Slug is already URL-safe per
+ *   D1 CHECK constraint, so no escaping required.
+ * @param brand - The {@link SourceBrand} record produced by
+ *   {@link extractSourceBrand}. Passed by value; not mutated.
  *
- * Returns the JSON strings so they can also be passed to the container as
- * `contextFiles` (orchestrator reads them at boot without re-fetching R2).
+ * @returns Three pretty-printed (`null, 2` indent) JSON strings — same
+ *   bytes written to R2. Caller forwards them as `contextFiles` entries
+ *   `{ path: '_brand.json', content: brandJson }` etc.
+ *
+ * @remarks
+ * Artifact shapes (consumed by skill 15 + orchestrator subagents):
+ * - `_brand.json` — full {@link SourceBrand} record verbatim.
+ * - `_assets.json` — `{ original: SourceBrandAsset[], augmented: [],
+ *   summary: { original_count, target_min, target_max } }` where
+ *   `target_min = ceil(original * 1.4)` and `target_max = ceil(original * 2.0)`
+ *   enforces the Media Augmentation 1.4–2.0× build-breaking invariant
+ *   (validator-fixer rejects builds with `augmented.length < original * 0.4`).
+ *   The `augmented[]` array stays empty here — image_discovery service
+ *   populates it during step 2.5 BEFORE container hand-off.
+ * - `_scraped_content.json` — `{ source_url, cms, routes, homepage_html_excerpt }`.
+ *   Feeds the deep-crawl + route-recreation invariant (page count = source
+ *   sitemap, 1:N up to 1000 routes).
+ *
+ * All three are written with `httpMetadata.contentType = 'application/json'`
+ * so a future `site_serving` route GET of these debug paths returns the
+ * right content-type to a curl-debugging Brian without extra header massage.
+ *
+ * @throws Will reject if any of the three R2 writes throw (network, quota,
+ *   bucket missing). `Promise.all` propagates the first rejection — the
+ *   other writes may or may not have completed by then. Caller MUST treat
+ *   this as a workflow step failure and retry; partial writes are tolerated
+ *   on retry because the keys are deterministic + idempotent.
+ *
+ * @example
+ * ```ts
+ * const brand = await extractSourceBrand(site.source_url, { openaiKey });
+ * const { brandJson, assetsJson, scrapedJson } = await persistSourceBrand(
+ *   env.SITES_BUCKET,
+ *   site.slug,
+ *   brand,
+ * );
+ *
+ * // Hand off to container without a second R2 round-trip
+ * await containerStub.fetch('http://container/build', {
+ *   method: 'POST',
+ *   body: JSON.stringify({
+ *     prompts: [...],
+ *     contextFiles: [
+ *       { path: '_brand.json', content: brandJson },
+ *       { path: '_assets.json', content: assetsJson },
+ *       { path: '_scraped_content.json', content: scrapedJson },
+ *     ],
+ *   }),
+ * });
+ * ```
+ *
+ * @see {@link extractSourceBrand} for upstream extraction.
+ * @see {@link SourceBrand} for the artifact schema.
  */
 export async function persistSourceBrand(
   bucket: R2Bucket,

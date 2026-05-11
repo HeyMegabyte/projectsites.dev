@@ -1,11 +1,73 @@
 /**
  * @module services/external_llm
- * @description Unified external LLM client for OpenAI and Anthropic APIs.
  *
- * Calls GPT-4o / Claude directly via fetch (no SDK needed in Workers).
- * GPT-4o is the primary provider for all research/vision calls.
- * Anthropic Claude is the fallback when GPT-4o fails.
- * Includes retry with exponential backoff + jitter and circuit breaker.
+ * @description
+ * Unified external LLM client for OpenAI and Anthropic Messages APIs. Calls
+ * GPT-4o / Claude directly via `fetch` — no SDK needed (and no SDK would
+ * cleanly run under the Workers runtime anyway, which is why the entire
+ * file is hand-rolled HTTP). Covers two surface areas: text completions
+ * (`callExternalLLM`) and vision-augmented completions
+ * (`callExternalLLMWithVision`).
+ *
+ * Provider precedence (deterministic, NOT randomized):
+ * - **GPT-4o is primary** for every research/vision call. The previous
+ *   A/B split between providers was removed — `chooseProvider()` returns
+ *   `'openai'` whenever `OPENAI_API_KEY` is present.
+ * - **Anthropic Claude is the fallback** when OpenAI fails after retries
+ *   OR when its circuit breaker is open OR when only `ANTHROPIC_API_KEY`
+ *   is set. Caller can force a provider via `options.provider: 'openai'|'anthropic'`.
+ * - **Neither key present** → fall through both loop iterations and throw
+ *   a clear "No LLM provider available" error (the throw also fires when
+ *   both providers fail after retries — symmetry simplifies the call site).
+ *
+ * Reliability stack (layered):
+ * 1. **Per-request timeout** — OpenAI 240s, Anthropic 480s (Claude Opus
+ *    can take 2-4 min for 32K-token generations; OpenAI is faster).
+ *    `AbortController` enforces the cap regardless of upstream behavior.
+ * 2. **Retry with exponential backoff** — 3 attempts via {@link withRetry}
+ *    from `services/retry`, base delay 1000ms. Each retry logs the
+ *    classified error category (rate-limit / timeout / 5xx / network /
+ *    other) so dashboards can drill into per-category failure trends.
+ * 3. **Circuit breaker** — 5 failures within 60s → skip provider for 30s.
+ *    State is module-scoped (`circuitState`), so all in-flight requests
+ *    across a Worker isolate share the breaker. Successful call resets the
+ *    failure counter; circuit auto-closes when `Date.now() >= openUntil`.
+ * 4. **Provider-level fallback** — primary fails after retries → fallback
+ *    provider gets a fresh 3-retry budget. Both providers failing surfaces
+ *    the FALLBACK's error to the caller (the primary's error was already
+ *    logged at `provider_exhausted`).
+ *
+ * Cost estimation: per-1M-token table in {@link MODEL_COSTS}; the
+ * estimator assumes a 30/70 input/output token split for generation tasks
+ * (cheap heuristic — `usage` from both APIs only returns a total count, not
+ * per-direction). Cost is informational, persisted in
+ * `ExternalLLMResult.cost_estimate` for analytics — NOT used for routing
+ * decisions.
+ *
+ * Failure modes (all collapse to a thrown `Error` reaching the caller):
+ * - Both API keys missing → `'No LLM provider available — set OPENAI_API_KEY or ANTHROPIC_API_KEY'`.
+ * - Both providers exhausted (retries + circuit) → the fallback's last error.
+ * - JSON Schema mode + invalid schema → OpenAI returns 400, surfaced as
+ *   `"OpenAI API error 400: <body>"`.
+ *
+ * @example
+ * ```ts
+ * import { callExternalLLM } from './services/external_llm.js';
+ *
+ * const result = await callExternalLLM(env, {
+ *   system: 'You are a senior copywriter.',
+ *   user: 'Write 3 hero taglines for a Newark soup kitchen.',
+ *   jsonMode: true,
+ *   maxTokens: 800,
+ * });
+ * // result.provider === 'openai' (deterministic default)
+ * // result.model_used === 'gpt-4o'
+ * // result.cost_estimate ≈ 0.002 (USD)
+ * ```
+ *
+ * @see {@link module:services/retry} — exponential-backoff + jitter helper.
+ * @see {@link module:services/ai_workflows} — primary caller.
+ * @see {@link module:services/openai_research} — vision-call caller.
  *
  * @packageDocumentation
  */
@@ -13,31 +75,76 @@
 import type { Env } from '../types/env.js';
 import { withRetry, classifyError, type ErrorCategory } from './retry.js';
 
+/**
+ * Caller-supplied options for a single LLM round-trip. Shared by both
+ * {@link callExternalLLM} (text) and {@link callExternalLLMWithVision}
+ * (text + image — the vision call extends this with `imageUrl?` /
+ * `imageBase64?` inline).
+ *
+ * @remarks
+ * `jsonMode` and `jsonSchema` are mutually-relevant: when BOTH are set,
+ * the strict-schema path wins (OpenAI receives `response_format.type =
+ * 'json_schema'` with `strict: true`). When only `jsonMode` is set,
+ * OpenAI receives `response_format.type = 'json_object'` — looser, no
+ * schema enforcement, just "valid JSON". Anthropic Claude ignores both
+ * flags at the API level; reliably-shaped JSON from Claude requires
+ * spelling out the schema in the system/user prompts.
+ *
+ * `provider: 'auto'` (default) routes to GPT-4o whenever
+ * `OPENAI_API_KEY` is present — the previous randomized A/B split was
+ * removed. `provider: 'openai'` / `'anthropic'` are escape hatches for
+ * caller-side cost optimization (e.g. force Haiku via `provider:
+ * 'anthropic'` + `model: 'claude-haiku-4-5-20251001'`).
+ */
 export interface ExternalLLMOptions {
-  /** System prompt */
+  /** System prompt (role: system). REQUIRED — empty string allowed but discouraged. */
   system: string;
-  /** User prompt */
+  /** User prompt (role: user). REQUIRED — empty string allowed but discouraged. */
   user: string;
-  /** Temperature (0-1) */
+  /** Sampling temperature, 0-1. Default `0.3` (analytical/research tasks). Set higher (0.7-0.9) for creative copy. */
   temperature?: number;
-  /** Max tokens for response */
+  /** Max output tokens. Default `8192`. OpenAI uses `max_completion_tokens`, Anthropic uses `max_tokens` — both surfaces accept this single field. */
   maxTokens?: number;
-  /** Request JSON output */
+  /** Request JSON output. OpenAI: `response_format.type='json_object'`. Anthropic: ignored — must be encoded in the prompt text. */
   jsonMode?: boolean;
-  /** JSON schema for OpenAI structured output (response_format) */
+  /** Strict JSON schema for OpenAI structured output. When set, `jsonMode` is implied + the schema is enforced server-side (400 on mismatch). Anthropic ignores. */
   jsonSchema?: { name: string; schema: Record<string, unknown> };
-  /** Preferred provider: 'openai' | 'anthropic' | 'auto' (default: 'auto' uses GPT-4o primary) */
+  /** Preferred provider. `'auto'` (default) → GPT-4o primary, Anthropic fallback. `'openai'`/`'anthropic'` forces that provider as primary. */
   provider?: 'openai' | 'anthropic' | 'auto';
-  /** Specific model override (e.g. 'gpt-4o-mini', 'claude-sonnet-4-20250514') */
+  /** Specific model override. Defaults to `gpt-4o` / `claude-sonnet-4-20250514` per provider. See {@link MODEL_COSTS} for the priced set. */
   model?: string;
 }
 
+/**
+ * Result envelope returned by both {@link callExternalLLM} and
+ * {@link callExternalLLMWithVision}. Persisted in upstream services
+ * (`ai_workflows`, `openai_research`) for cost analytics and run-history
+ * dashboards.
+ *
+ * @remarks
+ * `token_count` is the API-reported total (OpenAI: `usage.total_tokens`;
+ * Anthropic: `usage.input_tokens + usage.output_tokens`). Neither API
+ * surfaces a clean per-direction split per call, so `cost_estimate`
+ * applies the module-internal 30/70 heuristic on top of `token_count`
+ * (see module-level `@description`).
+ *
+ * `latency_ms` measures wall-clock from the first `fetch()` attempt to
+ * the successful response, INCLUDING `withRetry` backoff delays — so a
+ * 30s value with `attempts=3` reflects ~6-8s of cumulative backoff plus
+ * the successful third call.
+ */
 export interface ExternalLLMResult {
+  /** Raw text completion. JSON-mode callers MUST `JSON.parse()` before use. */
   output: string;
+  /** Actual model that responded (matches request, but persisted so logs survive future default-model changes). */
   model_used: string;
+  /** Provider that successfully responded. Useful for downstream cost dashboards + fallback-rate alerts. */
   provider: 'openai' | 'anthropic';
+  /** Wall-clock latency from first attempt to successful response, INCLUDING `withRetry` backoff. */
   latency_ms: number;
+  /** API-reported total token count (input + output). */
   token_count: number;
+  /** USD cost estimate via 30/70 input/output heuristic + {@link MODEL_COSTS}. Informational — never used for routing. */
   cost_estimate: number;
 }
 
@@ -293,13 +400,54 @@ function estimateCost(model: string, tokens: number): number {
 /**
  * Call an external LLM (OpenAI or Anthropic) with automatic fallback.
  *
- * Uses GPT-4o as the primary provider with retry + exponential backoff.
- * Falls back to Anthropic Claude if GPT-4o fails after retries.
- * Circuit breaker skips a provider if it fails 5 times within 60 seconds.
+ * Routes through the 4-layer reliability stack documented at module
+ * level: per-request timeout (240s OpenAI / 480s Anthropic),
+ * {@link withRetry} with exponential backoff (3 attempts, 1000ms base),
+ * module-scoped circuit breaker (5 failures / 60s → skip 30s), and
+ * primary→fallback provider chain. Each retry classifies the error
+ * (rate-limit / timeout / 5xx / network / other) via
+ * `classifyError` from `services/retry` so dashboards can drill into
+ * per-category failure trends.
  *
- * @param env - Worker environment with API keys
- * @param options - Prompt configuration
- * @returns LLM response with metadata
+ * @param env     - Worker environment. `OPENAI_API_KEY` and/or
+ *   `ANTHROPIC_API_KEY` must be set; with neither, the call throws
+ *   immediately. Provider with no key configured is silently skipped
+ *   in the provider loop (no error — just falls through to the next).
+ * @param options - Prompt configuration. See {@link ExternalLLMOptions}
+ *   for the full field-level contract, including `jsonMode` vs
+ *   `jsonSchema` precedence and provider/model overrides.
+ *
+ * @returns A populated {@link ExternalLLMResult} — `latency_ms` includes
+ *   `withRetry` backoff time, `token_count` is API-reported total,
+ *   `cost_estimate` derives from the 30/70 heuristic and
+ *   {@link MODEL_COSTS}. The returned `provider` reflects whoever
+ *   actually answered (so when primary fails over to fallback, the
+ *   result will say `'anthropic'` even though the caller didn't request
+ *   it).
+ *
+ * @remarks
+ * Fallback-error-surfacing rule: when BOTH providers fail after
+ * retries, the FALLBACK provider's last error reaches the caller — the
+ * primary's error was already logged at `provider_exhausted` and is
+ * not preserved further. If the caller needs to distinguish which
+ * provider failed, parse `error.message` for the `OpenAI API error` /
+ * `Anthropic API error` prefix.
+ *
+ * The 240s OpenAI timeout / 480s Anthropic timeout asymmetry is
+ * deliberate: Claude Opus generations of 32K-token outputs routinely
+ * take 2-4 minutes, while GPT-4o is typically <60s for the same prompt
+ * size. Lowering the Anthropic cap caused spurious aborts on long
+ * structure-planning prompts in the November 2025 timeframe.
+ *
+ * @throws {Error} `'No LLM provider available — set OPENAI_API_KEY or
+ *   ANTHROPIC_API_KEY'` when neither API key is configured AND no
+ *   provider fell through to a thrown upstream error first.
+ * @throws {Error} `'OpenAI API error <status>: <body>'` when OpenAI
+ *   returns non-2xx after retries (rate limit / invalid model /
+ *   structured-output schema validation 400).
+ * @throws {Error} `'Anthropic API error <status>: <body>'` when
+ *   Anthropic returns non-2xx after retries (rate limit / overloaded /
+ *   invalid model).
  *
  * @example
  * ```ts
@@ -309,7 +457,14 @@ function estimateCost(model: string, tokens: number): number {
  *   jsonMode: true,
  *   maxTokens: 4000,
  * });
+ * const plan = JSON.parse(result.output) as SitePlan;
+ * console.warn(JSON.stringify({ cost: result.cost_estimate }));
  * ```
+ *
+ * @see {@link ExternalLLMOptions}
+ * @see {@link ExternalLLMResult}
+ * @see {@link MODEL_COSTS}
+ * @see {@link module:services/retry} — `withRetry` and `classifyError`.
  */
 export async function callExternalLLM(
   env: Env,
@@ -425,12 +580,56 @@ export async function callExternalLLM(
 /**
  * Call an external LLM with vision capability (image analysis).
  *
- * Uses GPT-4o vision as primary, falls back to Anthropic Claude vision.
- * Accepts either an image URL or base64-encoded image data.
+ * GPT-4o vision is the primary path; Claude vision is the fallback.
+ * The same 4-layer reliability stack as {@link callExternalLLM}
+ * applies (per-request timeout, `withRetry`, circuit breaker,
+ * provider-level fallback) — the vision path just routes to different
+ * internal helpers (`callOpenAIWithVision` / `callAnthropicWithVision`)
+ * that wrap the base text helpers with the right multi-part message
+ * shape per provider.
  *
- * @param env - Worker environment with API keys
- * @param options - Prompt configuration with optional image data
- * @returns LLM response with metadata
+ * @param env     - Worker environment. Same key requirements as
+ *   {@link callExternalLLM}.
+ * @param options - Prompt configuration extended with `imageUrl?` /
+ *   `imageBase64?`. Exactly one image source SHOULD be provided. When
+ *   both are present, providers prefer their native form (OpenAI keeps
+ *   URL; Anthropic uses the base64 directly without refetching). When
+ *   NEITHER is provided, this function silently delegates to
+ *   {@link callExternalLLM} for a plain text completion — a deliberate
+ *   ergonomic for callers that build prompts up dynamically and may
+ *   end up without an image.
+ *
+ * @returns A populated {@link ExternalLLMResult}. Same fields as the
+ *   text path; `latency_ms` for Anthropic vision will include the
+ *   base64-conversion fetch round-trip when only `imageUrl` was
+ *   supplied (see Anthropic quirk below).
+ *
+ * @remarks
+ * Anthropic base64 auto-fetch quirk: the Anthropic Messages API
+ * accepts ONLY base64-encoded image data — no URL fetching server-side.
+ * When the caller passes `imageUrl` but not `imageBase64`, this
+ * function fetches the URL, reads it as `ArrayBuffer`, walks the bytes
+ * via `String.fromCharCode` (chunked to avoid stack overflow on large
+ * images), then `btoa`-encodes the result. The `content-type` from
+ * the fetch response is preserved as `media_type` (falls back to
+ * `image/png`). OpenAI does NOT need this conversion — it accepts
+ * URLs directly in `image_url.url`.
+ *
+ * Empty-image short-circuit: if both `imageUrl` and `imageBase64` are
+ * absent, we delegate to {@link callExternalLLM} BEFORE checking API
+ * keys / circuit state. This means a vision call with no image carries
+ * the same throw semantics as a plain text call.
+ *
+ * @throws {Error} `'No LLM vision provider available — set
+ *   OPENAI_API_KEY or ANTHROPIC_API_KEY'` when neither key is set AND
+ *   an image was provided.
+ * @throws {Error} `'Failed to fetch image for Anthropic vision:
+ *   <status>'` when the auto-fetch step for `imageUrl` → base64
+ *   conversion returns non-2xx (broken CDN URL, expired signed link,
+ *   404). Only fires on the Anthropic fallback path.
+ * @throws {Error} `'OpenAI API error <status>: <body>'` /
+ *   `'Anthropic API error <status>: <body>'` on provider-side
+ *   failures (same as text path).
  *
  * @example
  * ```ts
@@ -440,7 +639,14 @@ export async function callExternalLLM(
  *   imageUrl: 'https://example.com/screenshot.png',
  *   maxTokens: 2000,
  * });
+ * const analysis = result.output;
  * ```
+ *
+ * @see {@link callExternalLLM} — text-only path; this function
+ *   delegates here when no image is provided.
+ * @see {@link ExternalLLMOptions}
+ * @see {@link module:services/openai_research} — primary caller (brand
+ *   + screenshot analysis).
  */
 export async function callExternalLLMWithVision(
   env: Env,

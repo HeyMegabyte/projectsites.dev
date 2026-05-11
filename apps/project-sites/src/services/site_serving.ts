@@ -52,13 +52,47 @@ export function generateTopBar(slug: string): string {
 }
 
 /**
- * Generate the "Wow → Own → Buy" conversion flow for unpaid sites.
+ * Generate the "Wow → Own → Buy" conversion flow injected after `<body>` on
+ * every free-plan site response. Two-stage psychology: visitor first *sees*
+ * a polished site (Wow), then a non-intrusive bottom bar surfaces after
+ * proof-of-engagement (25s OR 40% scroll), then a "Claim" click opens the
+ * ownership modal that runs plan selection → domain search → Stripe
+ * Embedded Checkout WITHOUT a page navigation.
  *
- * Two components injected:
- * 1. Bottom bar with badge + CTA (appears after 25s or 40% scroll, animated)
- * 2. Ownership modal (on "Claim" click — plan, domain search, Stripe checkout)
+ * @param slug - The site's slug from `sites.slug`. Embedded URL-encoded
+ *   into the bolt-editor link (`{BOLT_BASE}/?slug=...`). MUST be URL-safe
+ *   (D1 CHECK constraint already enforces this on insert).
+ * @returns Single concatenated HTML string. Caller injects via a simple
+ *   `html.replace(/(<body[^>]*>)/i, "$1\n" + flow + "\n")` — the flow is
+ *   self-contained (inline `<style>` + inline `<script>`) so it survives
+ *   CSP `script-src 'unsafe-inline' 'unsafe-eval'`. NEVER inject before
+ *   `<body>` — the bar relies on `document.body` being present at script
+ *   evaluation time.
  *
- * Zero external dependencies. Self-contained vanilla JS/CSS.
+ * @remarks
+ * Zero external dependencies — no Stripe.js, Tailwind, framework runtime.
+ * Vanilla CSS (`@keyframes`), vanilla JS, vanilla DOM. Bundle weight under
+ * 8KB inlined. Free-plan-only — paid plan callers MUST skip this injection
+ * (`serveSiteFromR2` reads `site.plan` from {@link resolveSite}).
+ *
+ * Trigger heuristic: `setTimeout(showBar, 25_000)` OR scroll-listener
+ * firing when `scrollY / (scrollHeight - innerHeight) > 0.4`, whichever
+ * fires first. After fire, `localStorage['ps_bar_dismissed']` blocks
+ * re-show for the session — but the visitor cannot dismiss the bar
+ * permanently (only "Claim" or page reload clears the state).
+ *
+ * @throws Never — pure string concatenation, no external calls.
+ *
+ * @example
+ * ```ts
+ * if (site.plan === 'free') {
+ *   const flow = generateConversionFlow(site.slug);
+ *   html = html.replace(/(<body[^>]*>)/i, `$1\n${flow}\n`);
+ * }
+ * ```
+ *
+ * @see {@link generateTopBar} — thin alias that delegates here.
+ * @see {@link serveSiteFromR2} for the integration point.
  */
 export function generateConversionFlow(slug: string): string {
   const editUrl = `https://${DOMAINS.BOLT_BASE}/?slug=${encodeURIComponent(slug)}`;
@@ -499,21 +533,65 @@ export async function resolveSite(
 }
 
 /**
- * Serve a site's static files from R2.
+ * Serve a static file for a resolved site by looking up
+ * `sites/{slug}/{version}/{path}` in R2, with SPA fallback to `index.html`
+ * for paths that don't resolve and aren't an asset. Injects the
+ * "Wow → Own → Buy" conversion flow on free-plan HTML responses (see
+ * {@link generateConversionFlow}).
  *
- * Looks up the file at `sites/{slug}/{version}/{path}` in R2, falls back to
- * `index.html` for SPA-style routing. Injects the promotional top bar for
- * HTML responses on the free plan.
+ * @param env - Worker environment. Required bindings: `SITES_BUCKET` (R2).
+ *   Does NOT touch D1 or KV — caller {@link resolveSite} has already done
+ *   the site-record resolution.
+ * @param site - Resolved site record. `plan` decides top-bar injection;
+ *   `current_build_version` decides between branded "building..." HTML
+ *   (auto-refreshes every 15s) vs. real R2 fetch. `null` build_version
+ *   means "in-flight first build" — never serve a 404 in that state.
+ * @param requestPath - URL pathname (`/`, `/about`, `/style.css`, etc.).
+ *   Routes starting with `/_meta/` or exactly `/_manifest.json` are
+ *   ALWAYS rejected with 404 to prevent leaking build artifacts.
  *
- * @param env         - Worker environment (needs `SITES_BUCKET`).
- * @param site        - Resolved site info from {@link resolveSite}.
- * @param requestPath - The URL pathname (e.g. `/`, `/about`, `/style.css`).
- * @returns HTTP Response with correct content-type and caching headers.
+ * @returns A `Response` with the correct content-type, cache headers, and
+ *   conversion-flow injection on free-plan HTML. Caller MUST return this
+ *   verbatim — do NOT wrap or modify, the Response includes critical CSP
+ *   and security headers via the middleware pipeline upstream.
+ *
+ * @remarks
+ * Content-type detection bug (DO NOT REGRESS): use `marketingPath` /
+ * `r2Key` for extension parsing, never the raw `requestPath`. When
+ * `requestPath === '/'`, the path has no extension — checking it directly
+ * returns "" and the response goes out as `application/octet-stream`,
+ * which Chrome refuses to render. Always run extension detection on the
+ * R2 key after `index.html` resolution.
+ *
+ * SPA fallback chain: (1) Try `sites/{slug}/{version}{requestPath}`.
+ * (2) If 404 AND path has no asset extension AND doesn't start with
+ * `/api/`, try `sites/{slug}/{version}/index.html` so client-side routing
+ * works for `/about`, `/contact`, etc. (3) Final 404 returns a branded
+ * 404 page, not a bare "Not Found" string.
+ *
+ * Branded "building..." state: when `site.current_build_version === null`
+ * (the AI workflow hasn't produced a first deploy yet), returns an inline
+ * HTML page with `<meta http-equiv="refresh" content="15">`. Visitor
+ * sees a polished animated state instead of a raw 404, and the page
+ * auto-loads the real site as soon as `current_build_version` flips.
+ *
+ * Caching: long-`max-age` immutable for hashed assets (`*.{js,css}` with
+ * a content hash in the filename), short cache + `stale-while-revalidate`
+ * for HTML, no-store for `/api/*` paths (those shouldn't hit this path
+ * anyway — the route mounts catch API calls first).
+ *
+ * @throws Never — all error paths produce a `Response` (404, 500, or
+ *   branded fallback HTML). Caller does not need a `try` block.
  *
  * @example
  * ```ts
- * const response = await serveSiteFromR2(env, site, '/privacy.html');
+ * const site = await resolveSite(env, env.DB, request.headers.get('host'));
+ * if (!site) return notFound();
+ * return serveSiteFromR2(env, site, new URL(request.url).pathname);
  * ```
+ *
+ * @see {@link resolveSite} for hostname → site resolution.
+ * @see {@link generateConversionFlow} for the free-plan injection.
  */
 export async function serveSiteFromR2(
   env: Env,

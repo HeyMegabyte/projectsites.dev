@@ -1,10 +1,41 @@
 /**
  * @module services/template_cache
- * @description KV-cached industry template shells for site generation.
  *
- * Pre-generated structure templates per business category, cached in KV.
- * The LLM customizes these rather than inventing from scratch, improving
- * consistency and speed.
+ * @description
+ * KV-cached industry template shells for site generation. Each shell is a
+ * structural blueprint (section order, Tailwind hint patterns, color
+ * strategy, recommended pages) for one of 15 hard-coded business
+ * categories. The LLM customizes these rather than inventing from scratch —
+ * it produces better-looking, more consistent results AND cuts container
+ * build time materially (no green-field structure decisions).
+ *
+ * Two-tier lookup with graceful fallback:
+ * 1. KV cache hit (`template:{Category}`, 7-day TTL) → return cached shell.
+ * 2. KV miss / KV error → return built-in `TEMPLATES[category]`, then
+ *    fire-and-forget `KV.put()` to populate the cache for next time.
+ *
+ * Both KV operations are wrapped in `try/catch` and degrade silently — a
+ * KV outage NEVER blocks site generation. The built-in `TEMPLATES` record
+ * is the authoritative fallback and is always reachable.
+ *
+ * Category coverage (15): Restaurant, Salon, Legal, Medical, Retail, Tech,
+ * Construction, Fitness, Real Estate, Photography, Automotive, Education,
+ * Financial, Café, Other. Strings outside this set route to `'Other'` via
+ * keyword fallback in `matchCategory()`.
+ *
+ * Hot-patching: editing a cached shell via the KV dashboard takes effect
+ * immediately for new builds — the built-in `TEMPLATES` record is only
+ * consulted on KV miss/error, so dashboard overrides win until the 7-day
+ * TTL expires or the override is deleted.
+ *
+ * @example
+ * ```ts
+ * const shell = await getOrCreateTemplate(env, 'pizzeria in newark');
+ * // → TEMPLATES.Restaurant (keyword "pizzeria" matched)
+ * // → sections: ['hero-with-food-imagery', 'menu-highlights', ...]
+ * ```
+ *
+ * @see {@link module:services/ai_workflows}
  *
  * @packageDocumentation
  */
@@ -168,7 +199,42 @@ const TEMPLATES: Record<string, TemplateShell> = {
 };
 
 /**
- * Match a business type string to the nearest template category.
+ * Match a free-form business-type string to one of the 15 supported
+ * `TemplateCategory` values using a deterministic keyword table.
+ *
+ * @param businessType - Caller-supplied business descriptor. Free-form;
+ *   case-insensitive. Examples: `"Italian restaurant"`, `"hair salon and
+ *   day spa"`, `"family law attorney"`, `"crossfit gym"`.
+ * @returns The matched category, or `'Other'` if no keyword matched. The
+ *   return value is guaranteed to be a key in `TEMPLATES`.
+ *
+ * @remarks
+ * Pure synchronous function — no I/O, no allocations beyond the keyword
+ * table. Iteration order matches the `mappings` array: the first table
+ * row whose keyword list contains a substring of the lowercased input
+ * wins. Keyword lists were chosen to cover the most common Google Places
+ * `business_type` strings + free-text descriptions a user might type into
+ * the search box.
+ *
+ * Substring matching is naive (`String.includes`) — `"dental hygienist"`
+ * matches `Medical` via `"dental"`, but `"barbecue"` matches `Restaurant`
+ * via `"bbq"` only if the substring `"bbq"` is present. Add new keywords
+ * to the table when categorization misses are reported; do NOT add new
+ * categories without also adding a built-in shell to `TEMPLATES`.
+ *
+ * Ambiguity policy: when the input matches multiple rows, the FIRST row
+ * wins. The table is ordered with the more-specific categories first
+ * (Restaurant before Café, Legal before Financial) to bias toward the
+ * tighter match.
+ *
+ * @example
+ * ```ts
+ * matchCategory('Italian Restaurant');       // → 'Restaurant'
+ * matchCategory('crossfit gym');             // → 'Fitness'
+ * matchCategory('quantum widget consultancy'); // → 'Other'
+ * ```
+ *
+ * @throws Never — pure function.
  */
 export function matchCategory(businessType: string): TemplateCategory {
   const lower = businessType.toLowerCase();
@@ -198,13 +264,42 @@ export function matchCategory(businessType: string): TemplateCategory {
 }
 
 /**
- * Get or create a template shell for a business category.
+ * Resolve a `TemplateShell` for a business category, preferring the KV
+ * cache and falling back to the built-in `TEMPLATES` record on miss or
+ * error.
  *
- * Checks KV cache first, falls back to built-in templates.
+ * @param env - Worker bindings; `env.CACHE_KV` is required.
+ * @param category - Free-form business descriptor. Routed through
+ *   `matchCategory()` before lookup, so any string is acceptable —
+ *   unmatched inputs return the `'Other'` shell.
+ * @returns A `TemplateShell` matching the resolved category. Never
+ *   `null`/`undefined`; falls back to `TEMPLATES['Other']` as a final
+ *   guard against a `TEMPLATES` map miss.
  *
- * @param env - Worker environment with CACHE_KV binding
- * @param category - Business category (matched via matchCategory)
- * @returns Template shell for the category
+ * @remarks
+ * Two-tier lookup chain:
+ * 1. **KV read** — `env.CACHE_KV.get('template:${matched}', 'json')`.
+ *    A non-null result is returned as-is (no schema validation — KV
+ *    contents are trusted because we wrote them).
+ * 2. **Built-in fallback** — on KV miss OR KV error (network, throttle,
+ *    parse failure), fall through to `TEMPLATES[matched] ?? TEMPLATES['Other']`
+ *    and fire a best-effort `KV.put()` to populate the cache for next
+ *    time. The `put` is also wrapped in `try/catch` — failures are
+ *    swallowed because the caller already has the data it needs.
+ *
+ * KV TTL is 7 days (`TEMPLATE_TTL`). Cached entries expire automatically;
+ * built-in template edits propagate after expiry (or via explicit
+ * dashboard delete). For immediate propagation across all categories,
+ * bump the cache key prefix (`template:` → `template-v2:`).
+ *
+ * Performance: 1 KV read on cache hit (~5-20ms), 1 KV read + 1 KV write
+ * on cache miss (~20-50ms). Both operations are non-blocking from the
+ * caller's perspective — even total KV failure costs only the latency of
+ * the failed call, not the failure of the build.
+ *
+ * @throws Never — both KV operations are individually wrapped in
+ *   `try/catch`. Callers MAY assume this function always resolves to a
+ *   valid `TemplateShell` and skip defensive null checks.
  */
 export async function getOrCreateTemplate(
   env: Env,
@@ -236,7 +331,28 @@ export async function getOrCreateTemplate(
 }
 
 /**
- * Get all available template categories.
+ * Return the full list of 15 supported template categories.
+ *
+ * @returns Readonly tuple of category names in their canonical order.
+ *   Safe to bind directly to a `<select>` or admin UI dropdown — the
+ *   return value is the same `CATEGORIES` const used by `matchCategory()`,
+ *   so dropdown selections are guaranteed to resolve to a valid shell.
+ *
+ * @remarks
+ * Pure synchronous function. The returned reference is the module-level
+ * `CATEGORIES` array typed as `readonly` — DO NOT mutate. Adding a new
+ * category requires three coordinated edits in this file: append to
+ * `CATEGORIES`, add a row to `matchCategory()`'s `mappings` table, and
+ * add a `TEMPLATES[NewCategory]` entry. Skipping any one of those
+ * produces a runtime fallback to `'Other'`.
+ *
+ * @example
+ * ```ts
+ * const cats = getCategories();
+ * cats.forEach((c) => console.warn(c)); // Restaurant, Salon, Legal, ...
+ * ```
+ *
+ * @throws Never — pure function.
  */
 export function getCategories(): readonly string[] {
   return CATEGORIES;

@@ -1,10 +1,81 @@
 /**
- * AI workflow orchestration using the prompt registry.
+ * @module services/ai_workflows
  *
- * All LLM calls go through the prompt infrastructure:
- *   registry.resolve() → renderer.renderPrompt() → callModel() → schemas.validateOutput()
+ * @description
+ * Central AI workflow orchestrator — every Workers-AI inference in the codebase routes
+ * through this module's {@link runPrompt} wrapper. Sits between the route handlers
+ * (`src/routes/api.ts`, `src/routes/search.ts`) and the prompt infrastructure
+ * (`src/prompts/*`), keeping LLM call sites uniform, observable, and doctrine-injected.
  *
- * Every call is observed (prompt_id, version, input_hash, latency, outcome).
+ * @remarks
+ * Five-step pipeline applied to every call:
+ * 1. {@link registry.resolve} the {@link PromptSpec} (with optional A/B variant via
+ *    weighted seed-hashing or forced variant name).
+ * 2. {@link validatePromptInput} against the prompt's Zod input schema — boundary
+ *    validation rejects malformed callers before any token is spent.
+ * 3. {@link renderPromptWithDoctrine} renders the system + user templates with
+ *    `safeDelimit:true` (escapes `{{...}}` in untrusted input) AND prepends the
+ *    HOLIEST / HIGHEST B-ORDER Mission Doctrine preamble + Creativity + Love + Stars
+ *    preamble. See `src/prompts/renderer.ts::buildDoctrinePrefix` — the doctrine
+ *    flows into every LLM call automatically, no caller can opt out.
+ * 4. {@link withObservability} wraps the actual `env.AI.run` invocation — emits
+ *    `{ prompt_id, version, variant, input_hash (SHA-256), model, latency_ms, outcome,
+ *    token_count, retry_count }` to D1 `audit_logs` for every call. This is the audit
+ *    trail for both cost accounting and prompt-version A/B analysis.
+ * 5. Return {@link LlmCallResult} with raw output text + metadata for downstream
+ *    JSON extraction ({@link extractJsonFromText}) and Zod output validation
+ *    ({@link validatePromptOutput}).
+ *
+ * Two pipelines coexist:
+ * - **Legacy v1** (`researchBusiness` → `generateSiteHtml` → `scoreQuality`):
+ *   single-pass, single-page HTML, ~30–90 s, kept for `/api/sites/improve-prompt`
+ *   and `/api/sites/generate-prompt` lightweight paths.
+ * - **V2 inline-LLM** ({@link runSiteGenerationWorkflowV2}): four-phase, parallelized
+ *   research (profile → social/brand/selling-points/images in parallel), single
+ *   `generate_website` HTML pass, parallel legal pages + quality scoring. ~75 s
+ *   wall-clock. **NOT the production pipeline** — production runs the container
+ *   orchestrator in `src/workflows/site-generation.ts::build-orchestrator` with full
+ *   subagent fan-out producing multi-page Vite+React+Tailwind+shadcn output. V2
+ *   here is the inline-LLM fallback path and the integration-test harness.
+ *
+ * Centralization is the whole point — it prevents three classes of bug that bit us
+ * historically: (a) silent prompt-version drift across services (mismatched versions
+ * silently degrading output quality), (b) untracked LLM cost bleed (every call logged
+ * with token estimate so finance can attribute spend per site), (c) prompt-injection
+ * via unescaped user input (renderer escapes `{{...}}` delimiters by default).
+ *
+ * Registry hot-patching: any `prompt:{id}@{version}` key in the `PROMPT_STORE` KV
+ * namespace overrides the inline spec at resolve-time. Push corrected prompts via
+ * `wrangler kv key put` without redeploying — see `src/prompts/registry.ts`.
+ *
+ * @example Basic inline call (v2 workflow style)
+ * ```ts
+ * import { runSiteGenerationWorkflowV2 } from './services/ai_workflows.js';
+ *
+ * const result = await runSiteGenerationWorkflowV2(env, {
+ *   businessName: "Vito's Mens Salon",
+ *   businessAddress: '74 N Beverwyck Rd, Lake Hiawatha, NJ 07034',
+ *   uploadedAssets: ['org/abc/sites/123/uploads/storefront.jpg'],
+ * });
+ * await env.SITES_BUCKET.put(`sites/${slug}/v1/index.html`, result.html);
+ * ```
+ *
+ * @example Direct `runPrompt` call (custom pipelines)
+ * ```ts
+ * import { runPrompt, extractJsonFromText } from './services/ai_workflows.js';
+ *
+ * const { output } = await runPrompt(env, 'research_profile', 1, {
+ *   business_name: 'Acme Plumbing',
+ *   business_address: '123 Main St',
+ * });
+ * const profile = extractJsonFromText(output) as ProfileResult;
+ * ```
+ *
+ * @see ../prompts/registry.ts — version + variant resolution, KV hot-patching
+ * @see ../prompts/renderer.ts — doctrine injection, `safeDelimit` prevention
+ * @see ../prompts/observability.ts — D1 audit logging shape
+ * @see ../workflows/site-generation.ts — production multi-page replacement
+ * @see ../../CLAUDE.md — Mission Doctrine + Mandatory Invariants
  */
 
 import type { Env } from '../types/env.js';

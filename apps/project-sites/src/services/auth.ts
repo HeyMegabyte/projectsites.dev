@@ -510,7 +510,43 @@ export async function handleGoogleOAuthCallback(
 // ─── GitHub OAuth ──────────────────────────────────────────
 
 /**
- * Create a GitHub OAuth state and return the authorization URL.
+ * Mint a CSRF-resistant `state` token, persist it to the `oauth_states`
+ * table with 10-minute expiry, and return the GitHub OAuth authorization
+ * URL the browser should redirect to.
+ *
+ * Mirrors {@link createGoogleOAuthState} — same `oauth_states` table,
+ * same 10-min TTL, same `state`-token pattern (32-hex random) — but
+ * scopes the auth request to GitHub (`read:user` + `user:email`) and
+ * marks `provider='github'` so the callback handler can disambiguate.
+ *
+ * @param db          - D1 binding. Used to INSERT the new `oauth_states` row.
+ * @param env         - Worker bindings; needs `GITHUB_CLIENT_ID`. Missing
+ *   secret short-circuits with `400 Bad Request` (not silent — GitHub
+ *   sign-in is a user-visible button that must fail loudly when
+ *   misconfigured).
+ * @param redirectUrl - Optional post-auth redirect target. Persisted on
+ *   the state row so {@link handleGitHubOAuthCallback} can read it
+ *   without trusting the browser's `?redirect=` query param.
+ *
+ * @returns `{ authUrl, state }` — `authUrl` is the absolute
+ *   `https://github.com/login/oauth/authorize?...` URL; `state` is the
+ *   minted token (also embedded in `authUrl` — exposed separately so
+ *   tests can assert on it without re-parsing the URL).
+ *
+ * @throws {Error} `'GitHub OAuth is not configured. GITHUB_CLIENT_ID
+ *   secret is missing.'` (400) — when `env.GITHUB_CLIENT_ID` is empty.
+ *   Brian's secrets must include both `GITHUB_CLIENT_ID` AND
+ *   `GITHUB_CLIENT_SECRET`; this only checks ID because the callback
+ *   (where the secret is used) throws independently.
+ *
+ * @example
+ * ```ts
+ * const { authUrl } = await createGitHubOAuthState(env.DB, env, '/dashboard');
+ * return c.redirect(authUrl);
+ * ```
+ *
+ * @see {@link handleGitHubOAuthCallback} - paired callback handler.
+ * @see {@link createGoogleOAuthState} - sibling provider.
  */
 export async function createGitHubOAuthState(
   db: D1Database,
@@ -546,7 +582,65 @@ export async function createGitHubOAuthState(
 }
 
 /**
- * Handle the GitHub OAuth callback.
+ * Complete the GitHub OAuth flow: verify `state`, exchange `code` for
+ * an access token, fetch the user's profile + verified email, return
+ * normalized identity fields ready for {@link findOrCreateUser}.
+ *
+ * Three sequential network calls (any failure → 400/401 thrown):
+ * 1. `POST https://github.com/login/oauth/access_token` — exchange
+ *    `code` (+ `client_id` + `client_secret`) for `access_token`.
+ * 2. `GET https://api.github.com/user` — primary profile fields.
+ * 3. `GET https://api.github.com/user/emails` (conditional) — fired
+ *    ONLY when the `/user` response omits email (GitHub allows users
+ *    to hide their primary email from the profile API; the dedicated
+ *    `/user/emails` endpoint is the only reliable source). Picks the
+ *    `primary && verified` email first, then any `verified` email.
+ *
+ * Required `User-Agent` header on every GitHub API call —
+ * `api.github.com` returns 403 for requests without one.
+ *
+ * @param db    - D1 binding. Used to SELECT + DELETE the `oauth_states` row.
+ * @param env   - Worker bindings; needs `GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET`.
+ * @param code  - OAuth authorization code from GitHub's `?code=` query param.
+ * @param state - Opaque CSRF token from GitHub's `?state=` query param.
+ *   Looked up in `oauth_states` to verify provenance — invalid or
+ *   expired states throw 401 (NOT 400 — bad state is most likely a
+ *   replay attack, not a malformed request).
+ *
+ * @returns Normalized identity: `email` (always present — verified),
+ *   `display_name` (GitHub `name` field, falls back to `login` username),
+ *   `avatar_url` (GitHub gravatar URL), `redirect_url` (the post-auth
+ *   target stored on the state row by {@link createGitHubOAuthState}).
+ *
+ * @throws {Error} `'Invalid OAuth state'` (401) — state token not found
+ *   in `oauth_states` table.
+ * @throws {Error} `'OAuth state expired'` (401) — state row exists but
+ *   `expires_at` has passed (10-min TTL).
+ * @throws {Error} `'Failed to exchange GitHub OAuth code'` (400) — token
+ *   exchange returned non-2xx (invalid code, revoked client, GitHub outage).
+ * @throws {Error} `` `GitHub OAuth error: ${err}` `` (400) — token endpoint
+ *   returned 200 but body had an `error` field or no `access_token`.
+ * @throws {Error} `'Failed to fetch GitHub user info'` (400) — `/user`
+ *   endpoint returned non-2xx (revoked token, scope mismatch).
+ * @throws {Error} `'GitHub account has no verified email. Please add a
+ *   verified email to your GitHub account.'` (400) — user profile + emails
+ *   endpoint both lack a `primary && verified` email. Surfaces an
+ *   actionable next step rather than a generic auth error.
+ *
+ * @example
+ * ```ts
+ * const { email, display_name, avatar_url, redirect_url } =
+ *   await handleGitHubOAuthCallback(env.DB, env, code, state);
+ * const { user_id, org_id, is_new } = await findOrCreateUser(env.DB, {
+ *   email, display_name, avatar_url,
+ * });
+ * const { token } = await createSession(env.DB, user_id);
+ * return c.redirect(redirect_url ?? '/dashboard');
+ * ```
+ *
+ * @see {@link createGitHubOAuthState} - paired init handler.
+ * @see {@link handleGoogleOAuthCallback} - sibling provider.
+ * @see {@link findOrCreateUser} - downstream consumer.
  */
 export async function handleGitHubOAuthCallback(
   db: D1Database,

@@ -248,8 +248,70 @@ export async function createCheckoutSession(
 /**
  * Create a Stripe Checkout Session in **embedded** (`ui_mode: 'embedded'`) mode.
  *
- * Returns a `client_secret` that the frontend uses with `stripe.initEmbeddedCheckout()`
- * to render the checkout form inline, avoiding a full-page redirect.
+ * Resolves (or creates) the org's Stripe customer, then builds a Checkout
+ * Session configured for inline rendering. Returns a `client_secret` that the
+ * frontend pairs with `stripe.initEmbeddedCheckout({ clientSecret })` to mount
+ * the checkout form inside the page — avoiding the full-page redirect that
+ * {@link createCheckoutSession} requires.
+ *
+ * Line items, payment methods (card + Link), promotion-code support, and
+ * billing-address collection mirror the redirect sibling so both flows produce
+ * identical subscriptions. The single difference is the `ui_mode` flag and the
+ * `return_url` (where Stripe redirects after the embedded session completes)
+ * vs. the redirect mode's `success_url` / `cancel_url` pair.
+ *
+ * @param db   - The D1Database binding from `env.DB`.
+ * @param env  - Worker environment containing `STRIPE_SECRET_KEY`.
+ * @param opts - Checkout options.
+ * @param opts.orgId         - Organisation UUID; resolved to a Stripe customer.
+ * @param opts.siteId        - Optional site UUID; persisted as
+ *   `metadata.site_id` so the `checkout.session.completed` webhook can
+ *   upgrade the specific site to `plan='paid'`.
+ * @param opts.customerEmail - Billing email forwarded to Stripe when creating
+ *   the customer for the first time. Ignored when the customer already exists.
+ * @param opts.returnUrl     - URL Stripe redirects to after the embedded
+ *   session terminates (success OR cancellation — distinguish via the
+ *   `session_id` query param). Must be absolute.
+ * @param opts.budgetTier    - Optional multimedia addon tier. When `plus` or
+ *   `premium`, {@link appendBudgetTierAddon} appends a one-time line item
+ *   alongside the recurring subscription price.
+ *
+ * @returns Object containing the embedded session `client_secret` (single-use,
+ *   ~24-hour TTL — must be regenerated if the user abandons and returns) and
+ *   the Stripe `session_id` (for the `return_url` callback to look up the
+ *   completed session via `/v1/checkout/sessions/{id}`).
+ *
+ * @remarks
+ * Audit trail: every successful creation logs `Embedded checkout session
+ * created` at level `info` with `org_id`, `session_id`, and `budget_tier`
+ * (defaulting to `free` when no addon selected) — paired with the matching
+ * `checkout.session.completed` webhook log in {@link handleCheckoutCompleted}
+ * to reconstruct the full create → complete arc.
+ *
+ * @throws {AppError} `BAD_REQUEST` with message `'Failed to create Stripe
+ *   embedded checkout: <stripe body>'` when Stripe rejects the request
+ *   (invalid `return_url`, expired API key, Stripe outage, etc.). Mirrors the
+ *   redirect-mode error envelope so callers can share an error handler.
+ *
+ * @example
+ * ```ts
+ * const { client_secret, session_id } = await createEmbeddedCheckoutSession(
+ *   env.DB, env, {
+ *     orgId,
+ *     siteId: 'site-uuid',
+ *     customerEmail: 'owner@example.com',
+ *     returnUrl: 'https://example.com/billing/return?session_id={CHECKOUT_SESSION_ID}',
+ *     budgetTier: 'plus',
+ *   },
+ * );
+ * // Frontend:
+ * //   const checkout = await stripe.initEmbeddedCheckout({ clientSecret: client_secret });
+ * //   checkout.mount('#checkout-container');
+ * ```
+ *
+ * @see {@link createCheckoutSession} for the hosted-redirect equivalent.
+ * @see {@link appendBudgetTierAddon} for budget-tier addon billing.
+ * @see {@link handleCheckoutCompleted} for the webhook that fires after success.
  */
 export async function createEmbeddedCheckoutSession(
   db: D1Database,

@@ -1,3 +1,36 @@
+/**
+ * @module routes/health
+ *
+ * @description
+ * Two-tier health surface for the Worker. Both endpoints are public, never
+ * authenticated, and safe to hit at high frequency.
+ *
+ * - `GET /health` — lightweight liveness probe. Touches KV + R2 and returns
+ *   200 with `status: "ok"` or `"degraded"` plus per-dependency latency.
+ *   Suitable for uptime monitors (`uptimerobot`, `betteruptime`, CF Health
+ *   Checks). Never returns 5xx — degraded deps surface in the JSON body so
+ *   the probe can keep distinguishing transport errors from app errors.
+ *
+ * - `GET /health/deep` — full dependency walk: KV, R2, D1, AI binding.
+ *   Returns HTTP **503** when any dep is degraded so orchestration tools
+ *   (CF Workflows wait-for-healthy, Kubernetes-style readiness gates,
+ *   deployment smoke tests) can use HTTP status alone. Also reports the
+ *   serving colo (`cf.colo`) for region-level diagnostics.
+ *
+ * @remarks
+ * Both endpoints intentionally probe with the literal key
+ * `health-check-probe` — that R2 object never exists, which is the point:
+ * the round-trip exercises the binding without polluting the bucket.
+ *
+ * @example
+ * ```bash
+ * # Lightweight liveness — always 200, body carries truth
+ * curl https://projectsites.dev/health
+ *
+ * # Strict readiness — HTTP 503 if any dep is down
+ * curl -fSL https://projectsites.dev/health/deep
+ * ```
+ */
 import { Hono } from 'hono';
 import type { Env, Variables } from '../types/env.js';
 

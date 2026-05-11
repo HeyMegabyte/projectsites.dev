@@ -99,6 +99,9 @@ const HARD_BONUS = [
   '/home/cuser/.agentskills/15-site-generation/validate-photo-authenticity.mjs',
   resolve(process.env.HOME ?? '', '.agentskills/15-site-generation/validate-nap-consistency.mjs'),
   resolve(process.env.HOME ?? '', '.agentskills/15-site-generation/validate-photo-authenticity.mjs'),
+  // Placeholder substitution gate — catches {BUSINESS_NAME}/{{BUSINESS}}/lorem-ipsum leakage
+  // that produced the 2026-05-11 09:06 LMG nuke (13 files of raw template shell).
+  join(here, 'validate-no-placeholders.mjs'),
 ];
 const SOFT_BONUS = [
   join(here, 'validate-mission-doctrine.mjs'),

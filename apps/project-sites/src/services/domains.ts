@@ -340,11 +340,31 @@ export async function provisionCustomDomain(
 }
 
 /**
- * Get all hostnames for a site (includes is_primary flag).
+ * Get all hostnames attached to a site, sorted with the primary first.
  *
  * @param db     - D1Database binding.
  * @param siteId - The site to query hostnames for.
- * @returns Array of hostname records with is_primary flag.
+ * @returns Array of hostname records with `is_primary` flag. Empty array
+ *   when the site has never been provisioned (still `[]`, never `null`,
+ *   so callers can iterate without guarding).
+ *
+ * @remarks
+ * Sort order: `is_primary DESC, created_at ASC` — guarantees the primary
+ * domain renders first in the dashboard "Domains" table, with the
+ * remaining domains in creation order for stable UI rendering across
+ * refreshes. `COALESCE(is_primary, 0)` defends against legacy rows
+ * predating the `is_primary` column where the value is `NULL`.
+ *
+ * Soft-deleted rows (`deleted_at IS NOT NULL`) are filtered out — once
+ * a hostname is deprovisioned it should not reappear in the dashboard.
+ *
+ * @throws Never — D1 errors propagate as rejected promises.
+ *
+ * @example
+ * ```ts
+ * const hostnames = await getSiteHostnames(env.DB, siteId);
+ * const primary = hostnames.find((h) => h.is_primary === 1);
+ * ```
  */
 export async function getSiteHostnames(
   db: D1Database,
@@ -377,7 +397,29 @@ export async function getSiteHostnames(
  * @param db         - D1Database binding.
  * @param siteId     - The site ID.
  * @param hostnameId - The hostname ID to set as primary.
- * @throws {notFound} If the hostname doesn't exist for this site.
+ * @throws {notFound} If the hostname doesn't exist for this site or is
+ *   soft-deleted. The site-scoped lookup also acts as a cross-site
+ *   guard — passing a hostname from a different site returns `notFound`
+ *   rather than silently flipping the wrong row's primary flag.
+ *
+ * @remarks
+ * Two-statement write — there is no D1 transaction wrapping the
+ * "clear all" and "set one" UPDATEs. Race window: a concurrent call
+ * targeting the SAME site could briefly produce two primary rows or
+ * zero primary rows. Acceptable today (dashboard is single-user-per-
+ * site); migrate to `db.batch([...])` if multi-admin orgs surface
+ * concurrent edits.
+ *
+ * Side effect: writes to 1-N rows on the `hostnames` table. The primary
+ * hostname change propagates to `getPrimaryHostname()` and any KV cache
+ * (`host:{hostname}`) on the next 60s TTL expiry.
+ *
+ * @example
+ * ```ts
+ * await setPrimaryHostname(env.DB, siteId, 'hostname-uuid');
+ * const newPrimary = await getPrimaryHostname(env.DB, siteId);
+ * // → 'www.example.com'
+ * ```
  */
 export async function setPrimaryHostname(
   db: D1Database,
@@ -403,12 +445,38 @@ export async function setPrimaryHostname(
 }
 
 /**
- * Check if a hostname has a CNAME record pointing to the expected target.
+ * Resolve the CNAME target for a hostname via Cloudflare DNS-over-HTTPS.
  *
- * Uses Cloudflare's DNS over HTTPS resolver to look up CNAME records.
+ * @param hostname - The domain to query. Fully-qualified (no trailing dot).
+ * @returns CNAME target with trailing dot stripped (e.g. `'projectsites.dev'`),
+ *   or `null` when no CNAME is published OR the resolver call fails.
  *
- * @param hostname - The domain to check.
- * @returns The CNAME target (without trailing dot), or null if no CNAME found.
+ * @remarks
+ * Uses `cloudflare-dns.com/dns-query` (DoH) with `application/dns-json`
+ * accept header — bypasses the Worker runtime's lack of native DNS
+ * resolution. DoH is the only way to do DNS lookups from a Worker
+ * without proxying through an external service.
+ *
+ * Failure-soft: any error (network, parse, malformed response) collapses
+ * to `null`. Caller MUST distinguish "no CNAME published" from "DNS
+ * lookup failed" — both return `null`. For verification flows where
+ * that distinction matters, layer a retry + caller-side error tracking.
+ *
+ * Used by the "Add custom domain" UX to pre-flight whether the user's
+ * DNS is already correctly configured before kicking off Cloudflare
+ * custom-hostname provisioning. CNAME record type code per RFC 1035 = 5.
+ *
+ * @throws Never — all errors swallowed via outer try/catch.
+ *
+ * @example
+ * ```ts
+ * const target = await checkCnameTarget('www.example.com');
+ * if (target === 'projectsites.dev') {
+ *   // user's DNS is correctly pointing at us
+ * }
+ * ```
+ *
+ * @see {@link https://developers.cloudflare.com/1.1.1.1/encryption/dns-over-https/ Cloudflare DoH}
  */
 export async function checkCnameTarget(hostname: string): Promise<string | null> {
   try {
@@ -435,11 +503,35 @@ export async function checkCnameTarget(hostname: string): Promise<string | null>
 }
 
 /**
- * Get the primary hostname for a site (or first hostname if none set as primary).
+ * Get the primary hostname for a site, falling back to the oldest hostname
+ * when no row has been flagged as primary.
  *
  * @param db     - D1Database binding.
  * @param siteId - The site to query.
- * @returns The primary hostname string, or null if no hostnames exist.
+ * @returns The primary hostname string (e.g. `'www.example.com'`), or
+ *   `null` when the site has no provisioned hostnames at all (i.e. a
+ *   draft site that never reached `published`).
+ *
+ * @remarks
+ * Selection rule: `ORDER BY COALESCE(is_primary, 0) DESC, created_at ASC LIMIT 1`.
+ * This means:
+ * - If any hostname is flagged primary (`is_primary=1`), that one wins.
+ * - Otherwise the oldest hostname wins — which is the default
+ *   `slug.projectsites.dev` subdomain provisioned at site creation.
+ * - `COALESCE` defends against legacy rows where `is_primary` is `NULL`.
+ *
+ * Used to compute the canonical URL for sitemaps, OG metadata, redirect
+ * chains, and the "View live site" button in the dashboard. Sync with
+ * `services/site_serving.ts` host-resolution chain — both must agree on
+ * what "primary" means.
+ *
+ * @throws Never — D1 errors propagate as rejected promises.
+ *
+ * @example
+ * ```ts
+ * const primary = await getPrimaryHostname(env.DB, siteId);
+ * const canonicalUrl = primary ? `https://${primary}` : null;
+ * ```
  */
 export async function getPrimaryHostname(
   db: D1Database,
@@ -455,11 +547,36 @@ export async function getPrimaryHostname(
 }
 
 /**
- * Look up a hostname record by its domain name.
+ * Look up a hostname record by its full domain name (host header).
  *
  * @param db       - D1Database binding.
- * @param hostname - The full domain to look up.
- * @returns Hostname record or `null`.
+ * @param hostname - The full domain to look up (e.g. `'www.example.com'`
+ *   or `'acme.projectsites.dev'`). Match is exact — case-sensitive
+ *   comparison against the stored value. Callers MUST lowercase the
+ *   incoming `Host` header before passing in.
+ * @returns Hostname record `{ id, site_id, org_id, type, status }` on
+ *   match; `null` when the hostname is unknown or soft-deleted.
+ *
+ * @remarks
+ * Hot path: every request to a site domain hits this function via
+ * `services/site_serving.ts` to resolve the `Host` header to a site +
+ * org. Wrapped by a KV cache (`host:{hostname}`, 60s TTL) in the caller
+ * — direct invocations should be limited to cache-miss paths or admin
+ * tooling.
+ *
+ * Returned columns deliberately exclude `cf_custom_hostname_id` and
+ * `ssl_status` — the hot path doesn't need them, and minimizing the
+ * row payload reduces D1 transfer cost. Use {@link checkHostnameStatus}
+ * for the full Cloudflare metadata.
+ *
+ * @throws Never — D1 errors propagate as rejected promises.
+ *
+ * @example
+ * ```ts
+ * const record = await getHostnameByDomain(env.DB, hostname.toLowerCase());
+ * if (!record) return c.notFound();
+ * return serveSiteFromR2(env, record.site_id);
+ * ```
  */
 export async function getHostnameByDomain(
   db: D1Database,
@@ -492,7 +609,48 @@ export async function getHostnameByDomain(
  *
  * @param db  - D1Database binding.
  * @param env - Worker environment.
- * @returns Count of verified and failed hostnames.
+ * @returns Tally of `{ verified, failed }` over the pending set; rows
+ *   that remain pending (still propagating, no errors yet) are NOT
+ *   counted as either — they will be retried on the next cron tick.
+ *
+ * @remarks
+ * Invoked by `scheduled()` cron trigger every 15 minutes. Iteration is
+ * sequential (not parallel) to avoid bursting the Cloudflare custom-
+ * hostname API rate limit (~1200 req/5min/zone). At 50 pending
+ * hostnames the loop completes in ~5-10s — well under the cron 30s
+ * budget.
+ *
+ * State machine: `pending → active` (verification succeeded + SSL
+ * issued) | `pending → verification_failed` (errors array non-empty) |
+ * `pending → pending` (still propagating, retry next tick).
+ *
+ * Side effects: 1 UPDATE per pending row, regardless of whether status
+ * changed (refreshes `last_verified_at` heartbeat so the dashboard can
+ * surface "last checked X minutes ago"). Per-row try/catch isolates
+ * Cloudflare API errors — one failing hostname does not abort the
+ * cron run for the others.
+ *
+ * Failure-counting subtlety: a thrown error during status check counts
+ * as `failed++`, but the row's D1 status is NOT updated (the catch
+ * skips the UPDATE). On the next tick the row will be retried; status
+ * remains `pending`. This intentionally separates "verification
+ * permanently failed" from "transient API error."
+ *
+ * @throws Never — D1 errors propagate via `dbQuery` rejection, but
+ *   per-row Cloudflare errors are caught and logged. Cron orchestrator
+ *   SHOULD wrap this call in its own try/catch so a single failing
+ *   batch doesn't abort other scheduled jobs.
+ *
+ * @example
+ * ```ts
+ * // src/index.ts (scheduled handler)
+ * async scheduled(controller, env) {
+ *   const { verified, failed } = await verifyPendingHostnames(env.DB, env);
+ *   if (failed > 0) notifyOps({ verified, failed });
+ * }
+ * ```
+ *
+ * @see {@link checkHostnameStatus}
  */
 export async function verifyPendingHostnames(
   db: D1Database,

@@ -1,20 +1,68 @@
 /**
  * @module services/newsletter_dispatch
- * @description Standardized newsletter dispatch fan-out for projectsites.dev forms.
  *
- * Given a form submission and the active integrations on a site, fans the
- * subscriber out to every connected provider in parallel. Errors on individual
- * providers are captured per-integration but never fail the whole dispatch.
+ * @description
+ * Standardized newsletter dispatch fan-out for projectsites.dev forms.
+ * Given a form submission and the active newsletter integrations on a
+ * site, this module fans the subscriber record out to every connected
+ * provider in parallel using `Promise.all`. The dispatcher is the
+ * single transport layer behind `POST /api/contact-form/:slug` and the
+ * direct newsletter signup forms.
  *
- * Supported providers:
- * | Provider   | API surface                                                    |
- * | ---------- | -------------------------------------------------------------- |
- * | mailchimp  | POST /3.0/lists/{list_id}/members                              |
- * | sendgrid   | PUT /v3/marketing/contacts (list_ids[])                        |
- * | convertkit | POST /v3/forms/{form_id}/subscribe                             |
- * | klaviyo    | POST /api/profile-subscription-bulk-create-jobs                |
- * | resend     | POST /audiences/{audience_id}/contacts                         |
- * | webhook    | POST {webhook_url} with the full envelope                      |
+ * ## Supported providers
+ * | Provider   | API surface                                                    | Auth shape           |
+ * | ---------- | -------------------------------------------------------------- | -------------------- |
+ * | mailchimp  | POST /3.0/lists/{list_id}/members                              | Basic (anystr:key)   |
+ * | sendgrid   | PUT /v3/marketing/contacts (list_ids[])                        | Bearer               |
+ * | convertkit | POST /v3/forms/{form_id}/subscribe                             | api_key in body      |
+ * | klaviyo    | POST /api/profile-subscription-bulk-create-jobs                | Klaviyo-API-Key      |
+ * | resend     | POST /audiences/{audience_id}/contacts                         | Bearer               |
+ * | webhook    | POST {webhook_url} with the full envelope                      | (caller-defined)     |
+ *
+ * ## Failure model (CRITICAL — design intent)
+ * Per-integration errors are **always captured per-result and never
+ * thrown**. The `DispatchResult[]` returned by `dispatchToIntegrations`
+ * has one entry per input row, each annotated with `ok` + `error`.
+ * This is deliberate: a Mailchimp outage MUST NOT block the SendGrid
+ * fan-out, and a bad webhook URL on one integration MUST NOT cause
+ * the user-facing form submit to fail. Callers (route handlers)
+ * SHOULD log the failure results to `audit_logs` for downstream
+ * reconciliation, then ack 200 to the browser regardless.
+ *
+ * ## Timeouts
+ * Every upstream HTTP call is wrapped in `fetchWithTimeout(8s)` via
+ * `AbortController`. The 8-second cap matches the Worker invocation
+ * budget remaining after auth + DB I/O (~50s on paid plan, 30s
+ * unstuck slack).
+ *
+ * ## Tagging
+ * Every provider receives synthetic tags (`projectsites:{slug}` +
+ * `form:{form_name}`) so subscribers can be cleanly segmented per-site
+ * and per-form in the provider UI — useful when a single org runs
+ * multiple sites on shared Mailchimp/SendGrid accounts.
+ *
+ * @example
+ * ```ts
+ * const integrations = await dbQuery<IntegrationRow>(
+ *   db,
+ *   'SELECT * FROM newsletter_integrations WHERE site_id = ? AND deleted_at IS NULL',
+ *   [siteId],
+ * );
+ * const results = await dispatchToIntegrations({
+ *   site_id: siteId,
+ *   site_slug: 'vitos-mens-salon',
+ *   form_name: 'newsletter',
+ *   email: 'subscriber@example.com',
+ *   fields: { first_name: 'Alex' },
+ *   origin_url: 'https://vitos.projectsites.dev/contact',
+ *   ip_address: c.req.header('cf-connecting-ip'),
+ *   user_agent: c.req.header('user-agent'),
+ *   submitted_at: new Date().toISOString(),
+ * }, integrations.data);
+ * for (const r of results.filter(r => !r.ok)) audit(c, 'newsletter.dispatch_failed', r);
+ * ```
+ *
+ * @see {@link module:routes/api} for the `/api/contact-form/:slug` handler
  */
 
 import type { NewsletterProvider } from '@project-sites/shared';
@@ -54,10 +102,34 @@ export interface DispatchResult {
 const TIMEOUT_MS = 8000;
 
 /**
- * Fan out a submission to every active integration.
+ * Fan out a single submission to every active integration in parallel.
  *
- * Runs all dispatches in parallel. Per-integration failures are captured
- * in the returned `DispatchResult[]` but never throw.
+ * @param submission - The submission envelope. `email` is required for
+ *   all providers EXCEPT `webhook` (which receives the raw envelope
+ *   regardless of email presence). Other fields populate provider-
+ *   specific metadata (first/last name, source tags, IP, UA).
+ * @param integrations - The full set of active integrations for this
+ *   site, typically loaded via
+ *   `SELECT * FROM newsletter_integrations WHERE site_id = ? AND deleted_at IS NULL`.
+ *   Pass `[]` to short-circuit; this function returns `[]` without
+ *   making any HTTP calls.
+ * @returns One `DispatchResult` per input row, in input order, each
+ *   with `ok: boolean` and `error: string | null`. The array is
+ *   never partial.
+ *
+ * @remarks
+ * - Concurrency: every integration is invoked via `Promise.all`. There
+ *   is no upper-bound on parallelism — a site with 10 integrations
+ *   fires 10 concurrent HTTP requests. This is fine in practice
+ *   because sites rarely have more than 2–3 connected providers.
+ * - Order preservation: results match input order — callers can
+ *   correlate by index without inspecting `integration_id`.
+ * - Never throws — every per-provider error is caught and surfaced
+ *   in the `error` field. The only way this function can reject is
+ *   if `Promise.all` itself can't be constructed (impossible in
+ *   normal operation).
+ *
+ * @throws Never — failures are encoded in the result array.
  */
 export async function dispatchToIntegrations(
   submission: DispatchSubmission,

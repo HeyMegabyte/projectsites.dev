@@ -1,10 +1,55 @@
 /**
  * @module services/google_places
- * @description Google Places API client for enriching business data.
- * Uses the Places API (New) for detailed business information including
- * hours, photos, reviews, phone, website, geo coordinates.
  *
- * Falls back gracefully when GOOGLE_PLACES_API_KEY is not configured.
+ * @description
+ * Google Places API client that enriches AI-generated sites with
+ * verified, first-party business data — hours, phone, website, geo,
+ * photos, reviews, ratings, types, and the canonical `maps.google.com`
+ * deep-link. Used by the workflow's `google-places-lookup` step
+ * (`workflows/site-generation.ts`) AFTER the deterministic profile
+ * scrape to overwrite uncertain LLM-inferred fields with ground truth.
+ *
+ * Two-step API dance (Places API "Classic" Text Search + Place Details
+ * — NOT Places API New v1 — because the classic endpoint returns
+ * formatted hours + photo references in one round-trip, and v1's per-
+ * request field-mask billing model is harder to estimate at our scale):
+ *
+ * 1. `Text Search` (`/place/textsearch/json`) — fuzzy match
+ *    `"${name} ${address}"` → returns top result's `place_id`.
+ * 2. `Place Details` (`/place/details/json`) — fetch the 16 fields we
+ *    care about scoped to that `place_id`.
+ *
+ * Cost: 2 billable requests per call ($0.017 Text + $0.017 Details +
+ * $0.007 per photo URL if `photos[]` length matters — Photo URLs are
+ * built but NOT pre-resolved, so the photo billing only fires when the
+ * site actually loads the image). Brian's monthly Places budget is
+ * monitored via PostHog `funnel_places_lookup` event.
+ *
+ * Failure modes (all collapse to `null` return, never throw):
+ * - `apiKey` missing → silent skip (local dev, free tier).
+ * - HTTP non-2xx → swallowed (rate limit, outage, network).
+ * - Status `ZERO_RESULTS` → silent skip (legitimate "not found").
+ * - Status `OVER_QUERY_LIMIT` / `REQUEST_DENIED` → silent skip + warn
+ *   (quota exhausted; downstream uses scraped fallback).
+ * - JSON parse error → swallowed via outer try/catch.
+ *
+ * @example
+ * ```ts
+ * import { lookupBusiness } from './services/google_places.js';
+ *
+ * const result = await lookupBusiness(
+ *   env.GOOGLE_PLACES_API_KEY,
+ *   "Vito's Mens Salon",
+ *   '74 N Beverwyck Rd, Lake Hiawatha, NJ 07034',
+ * );
+ * if (result) {
+ *   // result.phone === '+1 973-335-1234'
+ *   // result.hours[0] === { day: 'Sunday', open: null, close: null, closed: true }
+ * }
+ * ```
+ *
+ * @see {@link https://developers.google.com/maps/documentation/places/web-service/search Text Search}
+ * @see {@link https://developers.google.com/maps/documentation/places/web-service/details Place Details}
  */
 
 export interface PlacesResult {
@@ -28,8 +73,53 @@ export interface PlacesResult {
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 /**
- * Look up a business using Google Places Text Search, then fetch full details.
- * Returns null if API key is missing or the search finds no results.
+ * Resolve a business to its Google Places ground-truth record by
+ * fuzzy-matching name + address, then fetching the full Place Details
+ * payload. Fire-and-forget — failures collapse to `null`, never throw.
+ *
+ * @param apiKey          - `GOOGLE_PLACES_API_KEY` Worker secret.
+ *   Empty/undefined short-circuits to `null` (local dev pattern).
+ * @param businessName    - Display name as the user entered it
+ *   (e.g. `"Vito's Mens Salon"`). Used in Text Search query alongside
+ *   address for fuzzy disambiguation between chains.
+ * @param businessAddress - Free-form address string (any format Google
+ *   geocodes — full street + city + state + ZIP best, but partials
+ *   like `"NYC"` also work). Concatenated with name for query.
+ *
+ * @returns Fully-populated `PlacesResult` on match, `null` on any
+ *   failure (missing key, no results, network error, rate limit,
+ *   non-OK status). Caller MUST handle `null` — never throws.
+ *
+ * @remarks
+ * Hours normalization: Google returns `periods[]` indexed 0-6 (Sun-Sat)
+ * with `time: "HHMM"` format. We expand this to a stable 7-element
+ * array of `{ day, open, close, closed }` so downstream JSON-LD
+ * `LocalBusiness.openingHoursSpecification` can be built without
+ * re-indexing logic in the prompt. Missing periods → `closed: true`.
+ *
+ * Photo capping: returns top 10 photos. The classic Photo URL is
+ * built (not resolved) — billing only fires when the rendered site
+ * actually loads the image, so building 10 is free at the API layer.
+ *
+ * Review capping: returns top 5 reviews (Google's default sort
+ * already prioritizes "most relevant"; we don't re-sort).
+ *
+ * Phone preference: `international_phone_number` (E.164 form) over
+ * `formatted_phone_number` (locale form) when both present. Downstream
+ * `tel:` href + JSON-LD prefer E.164.
+ *
+ * @throws Never — all errors swallowed via outer try/catch + `console.warn`.
+ *
+ * @example
+ * ```ts
+ * const place = await lookupBusiness(
+ *   env.GOOGLE_PLACES_API_KEY,
+ *   'Stripe HQ',
+ *   '510 Townsend St, San Francisco, CA',
+ * );
+ * // place.geo === { lat: 37.7672, lng: -122.4023 }
+ * // place.types === ['point_of_interest', 'establishment']
+ * ```
  */
 export async function lookupBusiness(
   apiKey: string | undefined,

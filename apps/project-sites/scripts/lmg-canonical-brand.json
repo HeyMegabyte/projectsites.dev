@@ -1,0 +1,24 @@
+{
+  "_doc": "Canonical brand contract for lonemountainglobal.projectsites.dev. Hardcoded pre-bake derived from R2 path sites/lonemountainglobal/2026-05-08T01-01-59-742Z/_src/.ssr/_brand.json (the 249-file blessed reference build). Read by site-generation workflow brand step to short-circuit the LLM brand-research pass — prevents Poppins/Hind reversal regression documented in memory feedback_brand_fidelity_regression.md.",
+  "_source_build": "2026-05-08T01-01-59-742Z",
+  "_authority": "BUILD-BREAKING — orchestrator MUST treat as ground truth",
+  "primary": "#1dc2c9",
+  "secondary": "#daecee",
+  "accent": "#0a8f95",
+  "theme": "light",
+  "preserve_source_design": true,
+  "hero_extracted_from_logo": true,
+  "color_source": "logo_vision_extraction",
+  "color_source_url": "https://lonemountainglobal.com/wp-content/uploads/2024/03/logo-icon-512x512-1.png",
+  "logo_dominant_pixels": ["#1dc2c9", "#ffffff", "#2a6496"],
+  "confidence": 0.97,
+  "logo": {
+    "original_url": "https://lonemountainglobal.com/wp-content/uploads/2024/03/logo-text-color.png",
+    "original_icon_url": "https://lonemountainglobal.com/wp-content/uploads/2024/03/logo-icon-512x512-1.png"
+  },
+  "fonts": {
+    "logo": "Poppins",
+    "heading": "Poppins",
+    "body": "Hind"
+  }
+}

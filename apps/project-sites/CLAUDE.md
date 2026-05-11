@@ -51,6 +51,7 @@ These invariants are enforced programmatically in `src/services/build_validators
 | Banned slop | No "limitless", "revolutionize", "cutting-edge", "leverage", "world-class", etc. | `copy.banned_word` |
 | Citation hygiene | Every `\d+%`, `\$\d+[MBK]`, `\d+x`, `\d+ users`, `since \d{4}` cites APA `(Author, Year)` within ±200 chars; per `~/.claude/rules/citations.md` | `citation.unsourced_claim` |
 | Brand color drift | Rendered primary color extracted from `dist/` matches `_brand.json.primary` within ΔE2000 ≤ 5 | `brand.color_drift` |
+| Brand contract violation | When `src/services/canonical_brand_overrides.ts::getCanonicalBrand(slug)` returns a contract, the `extract-source-brand` step MUST short-circuit the LLM brand pass and apply the contract verbatim (fonts, primary/secondary/accent, theme, logo URLs). Rendered build deviating from contract = build fail. Sourced from a blessed R2 reference build per `scripts/<slug>-canonical-brand.json` — see `feedback_brand_fidelity_regression.md` | `brand.contract_violation` |
 | NAP consistency (local-business) | Name + Address + Phone match Google Business Profile exactly across every page; phone format normalized | `nap.inconsistent` |
 | Typography preservation | Rendered `<h1>` and body font families match `_brand.json.fonts.heading`/`body` (extracted from source, never substituted) | `typography.mismatch` |
 | Page count floor | At least 4 routes (Home + About + Services + Contact) even when source is single-page | `page.count_below_floor` |
@@ -204,6 +205,8 @@ Step 5: visual-inspection-final (non-blocking)
 **Templates are pre-built project skeletons stored in R2.** Instead of generating from scratch every time, Claude Code starts from a template and customizes it.
 
 **Template repo:** https://github.com/HeyMegabyte/template.projectsites.dev
+
+**Template pre-includes roadmap:** [`docs/TEMPLATE_IMPROVEMENTS.md`](docs/TEMPLATE_IMPROVEMENTS.md) — 100 numbered pre-includes (brand-fidelity guards, placeholder guards, per-route metadata, PWA kit, performance presets, accessibility, motion, sections, error pages, analytics, security, delight floor). Every item maps to a build-breaking validator code so the orchestrator can detect+fix regressions surgically.
 
 **How templates work:**
 1. Templates are Vite + React + Tailwind + shadcn/ui project skeletons

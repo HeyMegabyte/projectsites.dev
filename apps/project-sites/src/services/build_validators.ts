@@ -1,17 +1,58 @@
 /**
- * Build validators — programmatic enforcement of post-build quality gates.
+ * @packageDocumentation
+ * @module services/build_validators
  *
- * @remarks
- * Runs after the container uploads to R2 and before D1 status flips to `published`.
- * Each gate maps 1:1 to a BUILD-BREAKING entry in skill 15 quality-gates.md and the
- * audit recommendations (megabyte-labs + nyfb retro).
+ * @description
+ * Programmatic enforcement of post-build quality gates — the last line of defense
+ * between a container-built site and the `published` D1 status flip. Each of the
+ * 31 individual validators (`validate*`) maps 1:1 to a BUILD-BREAKING invariant
+ * documented in `apps/project-sites/CLAUDE.md § Mandatory Site-Generation Invariants`
+ * and `~/.agentskills/15-site-generation/quality-gates.md`. The aggregator
+ * {@link validateBuild} composes them, partitions the `Violation[]` stream by
+ * severity, and returns a `ValidationReport` consumed by the workflow's
+ * `validate-build` step (`workflows/site-generation.ts`).
  *
- * Modes:
- * - `strict` — any error-severity violation throws → site stays in `error` status
- * - `report` — collect violations, log to D1 audit, never throw
+ * Pipeline placement:
+ * ```
+ * container build → R2 upload → loadBuildFromR2() → validateBuild()
+ *   → report.ok ? D1 status='published' : audit log + (strict ? throw : continue)
+ * ```
  *
- * @see ~/.agentskills/15-site-generation/quality-gates.md
- * @see ~/.agentskills/06-build-and-slice-loop/web-manifest-system.md
+ * Operating modes (passed via {@link ValidateBuildOpts.mode}):
+ * - `strict` — any `error`-severity violation throws → site stays in `error` status
+ *   → `validator-fixer` agent invoked for surgical remediation
+ * - `report` (current default) — collect violations, log to D1 audit, never throw
+ *
+ * The strict-mode flip lands once benchmark sites (megabyte-labs, njsk.org, nyfb,
+ * Vito's, lonemountainglobal) pass the full gate set cleanly across three
+ * consecutive builds — see `apps/project-sites/.claude/agents/validator-fixer.md`
+ * for the violation-code → fix-recipe routing table.
+ *
+ * @example
+ * ```ts
+ * import { loadBuildFromR2, validateBuild } from './services/build_validators.js';
+ *
+ * // Inside workflow `validate-build` step, after R2 upload completes:
+ * const files = await loadBuildFromR2(env.SITES_BUCKET, `sites/${slug}/${version}/`);
+ * const report = validateBuild(files, {
+ *   mode: 'report',                        // flip to 'strict' once benchmarks clean
+ *   brand: brandJson,                       // _brand.json — drives color-drift + typography gates
+ *   research: researchJson,                 // _research.json — drives citation + NAP gates
+ *   sourceRouteCount: scraped.routes.length,// drives 1:N route-count floor
+ * });
+ * if (!report.ok) {
+ *   await dbInsert(env.DB, 'audit_logs', {
+ *     site_id: siteId,
+ *     action: 'validate.build_failed',
+ *     metadata: JSON.stringify(report),
+ *   });
+ * }
+ * ```
+ *
+ * @see {@link https://github.com/heymegabyte/agentskills/blob/main/15-site-generation/quality-gates.md ~/.agentskills/15-site-generation/quality-gates.md}
+ * @see {@link https://github.com/heymegabyte/agentskills/blob/main/06-build-and-slice-loop/web-manifest-system.md ~/.agentskills/06-build-and-slice-loop/web-manifest-system.md}
+ * @see `apps/project-sites/.claude/agents/validator-fixer.md` — violation-code → fix routing table
+ * @see `apps/project-sites/CLAUDE.md § Mandatory Site-Generation Invariants` — human-readable invariant table
  */
 
 export type Severity = 'error' | 'warn' | 'info';
@@ -862,6 +903,14 @@ export const validateRequiredFiles = (files: BuildFile[]): Violation[] => {
 /**
  * Fail builds that under-recreate the source sitemap.
  *
+ * @param files - All build artifacts. Routes are counted by `files.filter(f =>
+ *   f.path.endsWith('index.html')).length` (each subdirectory's `index.html` = 1 route).
+ * @param sourceRouteCount - Count of distinct URLs discovered on the source site,
+ *   surfaced by the scrape step into `_scraped_content.json.routes[].length`.
+ *
+ * @returns Empty array when route count meets the 1:N target (sourceRouteCount,
+ *   clamped to [4, 1000]). One `route.count_below_source_count` Violation otherwise.
+ *
  * @remarks
  * Skill 15 mandates 1:N route mapping (max 1000) — never cap a 200-page source at 4–8.
  * `sourceRouteCount` comes from `_scraped_content.json.routes[].length` (priority chain:
@@ -869,6 +918,41 @@ export const validateRequiredFiles = (files: BuildFile[]): Violation[] => {
  *
  * Floor: thin sources (< 4 routes) skip the check — the 4-page floor handles those.
  * Ceiling: sourceRouteCount > 1000 is clamped to 1000 (sanity cap).
+ *
+ * @throws Violation `route.count_below_source_count` — `severity: 'error'` — when
+ *   built route count is < clamped(sourceRouteCount, 4, 1000). `detail` carries
+ *   `{ built, expected, source }` for the `validator-fixer` agent to consume.
+ *
+ * @example Passing — 200-route source → 200-route rebuild
+ * ```ts
+ * const files = [
+ *   { path: 'index.html', size: 12_000, text: '...' },
+ *   { path: 'about/index.html', size: 8_000, text: '...' },
+ *   // ...198 more route index.html entries
+ * ];
+ * validateRouteCount(files, 200); // → []
+ * ```
+ *
+ * @example Failing — 80-route source collapsed to 5 routes
+ * ```ts
+ * const files = [
+ *   { path: 'index.html', size: 12_000, text: '...' },
+ *   { path: 'about/index.html', size: 8_000, text: '...' },
+ *   { path: 'services/index.html', size: 9_000, text: '...' },
+ *   { path: 'contact/index.html', size: 7_000, text: '...' },
+ *   { path: 'blog/index.html', size: 5_000, text: '...' },
+ * ];
+ * validateRouteCount(files, 80);
+ * // → [{
+ * //   code: 'route.count_below_source_count',
+ * //   severity: 'error',
+ * //   message: 'Built 5 routes but source has 80 (target ≥ 80)',
+ * //   detail: { built: 5, expected: 80, source: 80 },
+ * // }]
+ * ```
+ *
+ * @see {@link https://github.com/heymegabyte/agentskills/blob/main/15-site-generation/build-breaking-rules.md ~/.agentskills/15-site-generation/build-breaking-rules.md} — "Every site rebuild full-corpus mandate"
+ * @see `apps/project-sites/CLAUDE.md § Multi-page architecture (BUILD-BREAKING)`
  */
 export const validateRouteCount = (
   files: BuildFile[],
@@ -1350,6 +1434,130 @@ export const validateTypography = (
 };
 
 /**
+ * Brand contract — strict gate when `_brand.json.warnings[]` carries
+ * `canonical_override_applied` (slug has a hardcoded contract in
+ * {@link canonical_brand_overrides}).
+ *
+ * @remarks
+ * The standard `validateBrandColors` + `validateTypography` checks are tuned
+ * for the LLM-extracted brand pass — they tolerate fonts the AI substituted
+ * with "modern equivalents" and primary hues that drifted within ΔE2000 ≤ 5.
+ * When the slug has a registered canonical contract, that tolerance is wrong:
+ * the contract IS the ground truth and the rebuild must match it pixel-for-pixel.
+ *
+ * This validator fires only when `opts.brandJson?.warnings` includes
+ * `canonical_override_applied`. It runs three sub-checks and emits one
+ * `brand.contract_violation` per failure:
+ *
+ * 1. **Primary hue** — at least one rendered `#RRGGBB` in CSS/HTML within
+ *    ΔE2000 ≤ 2 (half the soft-mode tolerance) of `brandJson.primary`.
+ * 2. **Heading + body fonts** — both `brandJson.fonts.heading` and
+ *    `brandJson.fonts.body` MUST appear in CSS/HTML/JS literally (case-insensitive).
+ *    No substitution allowed.
+ * 3. **Theme polarity** — when `brandJson.theme === 'light'`, the rendered
+ *    `<body>`/`<html>` background MUST resolve to a light value (any of
+ *    `#fff`, `#ffffff`, `bg-white`, `bg-stone-50/100`, `background: #f...`,
+ *    `theme-color="#f..."`). Dark→light flip (the LMG regression) blocks the build.
+ *
+ * Background: 2026-05-09 LMG regression — earlier `2026-05-08T01-01-59-742Z` build
+ * was Poppins+Hind + light theme + `#1dc2c9`. Subsequent rebuilds flipped to
+ * Inter + dark theme + muddied teal and PASSED all soft gates. This contract
+ * gate is the hard blocker that prevents the regression class.
+ *
+ * @throws Violation `brand.contract_violation` per failed sub-check (always `error`)
+ *
+ * @see {@link canonical_brand_overrides} — registry that pins the contract
+ * @see {@link applyCanonicalBrandOverride} — merge step that adds the warning
+ * @see memory pin `feedback_brand_fidelity_regression.md`
+ */
+export const validateBrandContract = (
+  files: BuildFile[],
+  opts?: Pick<ValidateBuildOpts, 'brandJson'>,
+): Violation[] => {
+  const brand = opts?.brandJson;
+  if (!brand) return [];
+  const hasOverride = (brand.warnings || []).some(w => w.code === 'canonical_override_applied');
+  if (!hasOverride) return [];
+
+  const out: Violation[] = [];
+
+  // 1) Primary hue — ΔE2000 ≤ 2 (twice as strict as the soft gate).
+  if (brand.primary) {
+    const target = hexToRgb(brand.primary);
+    if (target) {
+      let bestDelta = Infinity;
+      for (const f of files) {
+        if (!/\.(css|html)$/i.test(f.path) || !f.text) continue;
+        for (const m of f.text.matchAll(/#([0-9a-f]{3}|[0-9a-f]{6})\b/gi)) {
+          const rgb = hexToRgb(m[0]);
+          if (!rgb) continue;
+          const d = deltaE2000(target, rgb);
+          if (d < bestDelta) bestDelta = d;
+        }
+      }
+      if (bestDelta > 2) {
+        out.push({
+          code: 'brand.contract_violation',
+          severity: 'error',
+          message: `Canonical primary ${brand.primary} not rendered within ΔE2000 ≤ 2 (best: ${bestDelta.toFixed(2)}). Contract is ground truth — no substitution.`,
+          detail: `primary=${brand.primary} closest_delta=${bestDelta.toFixed(2)}`,
+        });
+      }
+    }
+  }
+
+  // 2) Heading + body fonts MUST appear literally (no substitution).
+  const fonts = brand.fonts;
+  if (fonts?.heading || fonts?.body) {
+    const haystack = files
+      .filter(f => /\.(css|html|js|json)$/i.test(f.path) && f.text)
+      .map(f => f.text || '')
+      .join('\n')
+      .toLowerCase();
+    for (const role of ['heading', 'body'] as const) {
+      const font = fonts[role];
+      if (!font) continue;
+      if (!haystack.includes(font.toLowerCase())) {
+        out.push({
+          code: 'brand.contract_violation',
+          severity: 'error',
+          message: `Canonical ${role} font "${font}" missing from rendered CSS/HTML/JS — contract forbids substitution.`,
+          detail: `${role}=${font}`,
+        });
+      }
+    }
+  }
+
+  // 3) Theme polarity — light contract forbids dark backgrounds.
+  if (brand.theme === 'light') {
+    const indexHtml = files.find(f => /^index\.html$/i.test(f.path) || /(^|\/)index\.html$/i.test(f.path));
+    const htmlBlob = (indexHtml?.text || '').toLowerCase();
+    const cssBlob = files
+      .filter(f => /\.css$/i.test(f.path) && f.text)
+      .map(f => (f.text || '').toLowerCase())
+      .join('\n');
+    const themeColorMatch = htmlBlob.match(/<meta\s+name=["']theme-color["']\s+content=["']([^"']+)["']/i);
+    const themeColor = themeColorMatch?.[1]?.toLowerCase() ?? '';
+    const darkSignals =
+      /background(?:-color)?\s*:\s*#0[0-9a-f]/i.test(cssBlob) ||
+      /background(?:-color)?\s*:\s*#1[0-9a-f]/i.test(cssBlob) ||
+      /bg-(?:black|slate-900|zinc-900|neutral-900|gray-900|stone-900)\b/i.test(htmlBlob) ||
+      /^#0[0-9a-f]/i.test(themeColor) ||
+      /^#1[0-9a-f]/i.test(themeColor);
+    if (darkSignals) {
+      out.push({
+        code: 'brand.contract_violation',
+        severity: 'error',
+        message: `Canonical theme is "light" but rendered build has dark-theme signals (bg-*-900, theme-color #0x/#1x). LMG-class regression blocked.`,
+        detail: `theme=${brand.theme} theme-color=${themeColor}`,
+      });
+    }
+  }
+
+  return out;
+};
+
+/**
  * Page count floor — even thin source sites get the 4-page minimum.
  *
  * @remarks
@@ -1547,6 +1755,7 @@ export const validateBuild = (
     ...validateBrandColors(files, opts),
     ...validateNapConsistency(files, opts),
     ...validateTypography(files, opts),
+    ...validateBrandContract(files, opts),
     ...validatePageCount(files),
     ...validateColorContrast(files),
     ...validateImageRelevance(files),
@@ -1569,12 +1778,53 @@ export const validateBuild = (
 };
 
 /**
- * Read every file under `prefix` from R2 into memory as BuildFile[].
+ * Read every file under `prefix` from R2 into memory as `BuildFile[]` — the
+ * input format every validator in this module consumes.
+ *
+ * @param bucket - R2 bucket binding (`env.SITES_BUCKET`). MUST be the production
+ *   bucket the container uploaded to during the build step.
+ * @param prefix - Object-key prefix to list under, ALWAYS terminated with `/`
+ *   (e.g. `sites/${slug}/${version}/`). Stripped from each emitted `BuildFile.path`
+ *   so validators see paths relative to the build root (`index.html`, `about/index.html`).
+ *
+ * @returns Flat `BuildFile[]` covering every object under `prefix`. Order matches
+ *   R2 list pagination order (lexicographic by key, stable across calls).
  *
  * @remarks
- * Used by site-generation workflow after the container's HMAC callback confirms upload.
- * Decodes text-ish files (HTML/JS/CSS/JSON/XML/SVG/TXT) with TextDecoder; binary files
- * (PNG/JPG/WebP/etc.) are returned with `text: undefined` and only their byte size.
+ * Used by the site-generation workflow's `validate-build` step after the container's
+ * HMAC-signed `/api/internal/build-status` callback confirms upload. Decodes text-ish
+ * files (HTML/JS/CSS/JSON/XML/SVG/TXT — see `isText()` helper) with TextDecoder up to
+ * 1.5 MiB; binary files (PNG/JPG/WebP/PDF/woff2) are returned with `text: undefined`
+ * and only their byte size populated. Validators that need binary inspection
+ * (image-format, OG image weight, JS chunk size) operate on `size` directly.
+ *
+ * Paginates with `cursor` + `limit: 1000` to cover R2's per-list cap; a 1500-route
+ * site with ~25 assets/route (~37 500 objects) yields ~38 round-trips. Each `get()`
+ * for a text file is an additional round-trip — typical build (~150 files) completes
+ * in 500-800 ms against the production bucket.
+ *
+ * @throws Never — per-file `get()` failures are swallowed by an inner `try {} catch {}`
+ *   so a single broken object can't wedge the validation step. The resulting `BuildFile`
+ *   keeps `text: undefined`; downstream validators treat missing text as "binary or
+ *   unreadable" and only inspect `size`/`path`. R2 list failures DO propagate (caller
+ *   should retry with backoff).
+ *
+ * @example
+ * ```ts
+ * // workflows/site-generation.ts — validate-build step
+ * const prefix = `sites/${site.slug}/${site.version}/`;
+ * const files = await loadBuildFromR2(env.SITES_BUCKET, prefix);
+ * const report = validateBuild(files, {
+ *   mode: 'report',
+ *   brand: await loadBrandJson(env.SITES_BUCKET, prefix),
+ *   research: await loadResearchJson(env.SITES_BUCKET, prefix),
+ *   sourceRouteCount: scraped.routes.length,
+ * });
+ * ```
+ *
+ * @see {@link validateBuild} — typical consumer of the returned files
+ * @see `workflows/site-generation.ts` — `validate-build` step that wires this call
+ * @see `apps/project-sites/src/services/build_validators.test.ts` — fixture-based unit tests
  */
 export const loadBuildFromR2 = async (
   bucket: R2Bucket,

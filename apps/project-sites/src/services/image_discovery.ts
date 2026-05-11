@@ -36,14 +36,61 @@ interface DiscoveredImage {
  * Search for brand-related images from ALL available multimedia APIs in parallel.
  *
  * Sources queried (when API keys are present):
- * - Google Custom Search Images (GOOGLE_CSE_KEY + GOOGLE_CSE_CX)
- * - Unsplash (UNSPLASH_ACCESS_KEY)
- * - Pexels photos AND videos (PEXELS_API_KEY)
- * - Pixabay (PIXABAY_API_KEY)
- * - Foursquare venue photos (FOURSQUARE_API_KEY)
- * - Yelp business photos (YELP_API_KEY)
+ * - Google Custom Search Images (`GOOGLE_CSE_KEY` + `GOOGLE_CSE_CX`)
+ * - Unsplash (`UNSPLASH_ACCESS_KEY`)
+ * - Pexels photos AND videos (`PEXELS_API_KEY`)
+ * - Pixabay (`PIXABAY_API_KEY`)
+ * - Foursquare venue photos (`FOURSQUARE_API_KEY`)
+ * - Yelp business photos (`YELP_API_KEY`)
  *
- * @returns Merged, deduplicated array of discovered images stored in R2.
+ * @param env          - Worker environment (provides R2 bucket + API keys).
+ * @param slug         - Site slug; used to namespace R2 keys under
+ *   `sites/{slug}/assets/discovered/`.
+ * @param businessName - Used in CSE/Unsplash/Foursquare/Yelp queries (exact
+ *   match boosts CSE confidence) and as filename prefix for venue photos.
+ * @param businessType - Used in generic-imagery queries (e.g. "restaurant
+ *   storefront", "soup kitchen interior"); also seeds Pexels/Pixabay
+ *   non-branded fallback photos.
+ * @param websiteUrl   - Optional. When present, CSE matches against this
+ *   hostname grant +25 confidence (treats source-site asset reuse as
+ *   high-trust). Pass the business's actual website URL when known.
+ * @returns Merged, deduplicated array of discovered images persisted to R2.
+ *   Confidence scores (40-95 for CSE, 45-65 for venue APIs, 45-55 for
+ *   stock) signal downstream curation priority — higher scores survive
+ *   the "top 10-15 from 100 candidates" GPT-4o cull.
+ *
+ * @remarks
+ * **Parallel-and-isolated:** every source runs concurrently via
+ * `Promise.allSettled` — a failed Unsplash request does NOT block Pexels.
+ * Missing API keys silently skip the source. Zero configured sources
+ * returns `[]` with a single warning log; callers SHOULD treat empty
+ * results as "discovery disabled," not "no images available."
+ *
+ * **Deduplication:** uses `sourceUrl` (the upstream URL or context page)
+ * as the dedup key. Same image surfaced by Google CSE AND Yelp will only
+ * appear once. Pexels videos use a manifest pattern (`.video.json`)
+ * because video files exceed R2-direct-write practicality.
+ *
+ * **Filenames carry confidence:** R2 keys end in `-{score}pct.{ext}` so
+ * downstream agents can sort by confidence with a single `R2.list({prefix})`.
+ *
+ * @throws Never — all source failures are caught and logged. Caller can
+ *   trust the return is always an array.
+ *
+ * @example
+ * ```ts
+ * const images = await discoverBrandImages(
+ *   env,
+ *   'vitos-mens-salon',
+ *   "Vito's Mens Salon",
+ *   'barbershop',
+ *   'https://vitosmenssalon.com',
+ * );
+ * // → 12-30 images stored at sites/vitos-mens-salon/assets/discovered/
+ * //   filenames like `vitos-mens-salon-95pct.jpg`, `unsplash-barbershop-55pct.jpg`
+ * ```
+ *
+ * @see {@link downloadAndStore} for R2 upload + filename convention.
  */
 export async function discoverBrandImages(
   env: Env,
@@ -394,6 +441,44 @@ async function fetchYelp(
 
 /**
  * Download an image from a URL and store it in R2.
+ *
+ * @param env        - Worker environment (provides `SITES_BUCKET` R2 binding).
+ * @param slug       - Site slug; namespaces the R2 key.
+ * @param imageUrl   - Absolute URL of the remote image. Must respond with a
+ *   `Content-Type: image/*` header — non-image responses are rejected.
+ * @param title      - Human-readable seed for the filename; sanitized to
+ *   `[a-z0-9-]` and truncated to 50 chars. Empty/non-ASCII falls back to
+ *   `"discovered"`.
+ * @param confidence - 0-100 quality/relevance score. Appended to the
+ *   filename as `-{N}pct.{ext}` so downstream curation can sort without
+ *   parsing R2 customMetadata.
+ * @returns Stored asset metadata (`key`, `name`, `size`, `type`,
+ *   `confidence`, `source: 'discovered'`) or `null` if the download/store
+ *   was rejected (see Size Guards below).
+ *
+ * @remarks
+ * **Size guards (both non-obvious):**
+ * - `< 1KB` → rejected (likely tracking pixel, broken icon, or
+ *   `403/redirect-page-as-image`).
+ * - `> 10MB` → rejected (R2 cost ceiling; container build won't need
+ *   anything larger after Cloudinary/sharp-cli resize).
+ *
+ * **Content-Type sniffing:** the `image/*` prefix check is the only
+ * format gate. PNG/WebP detection is inferred from the response header
+ * for the extension; everything else defaults to `.jpg`. Build-time
+ * `validate-build` re-encodes anything > 200KB to WebP/JPEG.
+ *
+ * **R2 key layout:** `sites/{slug}/assets/discovered/{safeName}-{N}pct.{ext}`
+ * mirrors the convention used by `image_generation.ts` (`...generated/`)
+ * and `move-uploaded-assets` (`...uploaded/`). All three feed the same
+ * curation step in the workflow.
+ *
+ * **User-Agent:** explicit `ProjectSites/1.0 ImageDiscovery` UA — some
+ * CDNs block default `node-fetch`/`undici` UAs. Generic-fetch failures
+ * here typically point to either rate limiting or UA blocks.
+ *
+ * @throws Never — every failure path returns `null` and logs. Caller
+ *   simply filters out nulls.
  */
 async function downloadAndStore(
   env: Env,

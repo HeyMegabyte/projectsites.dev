@@ -1,8 +1,60 @@
 /**
  * @module services/confidence
- * @description Transforms raw research data into confidence-wrapped v3 format.
- * Takes the 5 research outputs + optional Google Places data and produces
- * a SmallBizSeedV3-compatible object with every leaf wrapped in Conf<T>.
+ *
+ * @description
+ * Transforms raw research data into the confidence-wrapped **SmallBizSeedV3**
+ * payload that every downstream template + UI component reads from. Takes the
+ * 5 research bundles (`profile`, `social`, `brand`, `sellingPoints`, `images`)
+ * + optional Google Places ground-truth and produces a single object where
+ * every leaf value is wrapped in `Conf<T>` — `{ value, confidence (0-1),
+ * sources[], rationale?, lastVerifiedAt?, isPlaceholder? }`.
+ *
+ * Why this exists: the orchestrator container + the runtime UI both need to
+ * decide which fields to render *prominently* (high confidence, multiple
+ * corroborating sources), *standard* (single trustworthy source), or
+ * *placeholder* (LLM-only guess, may be wrong). Embedding confidence inline
+ * means the orchestrator never has to re-query provenance — every field
+ * carries its own pedigree.
+ *
+ * Confidence scoring algorithm (3-stage):
+ *
+ * 1. **Base score by source kind** — `BASE_CONFIDENCE` table assigns a fixed
+ *    starting score per `SourceKind` (e.g. `business_owner=0.95`,
+ *    `google_places=0.92`, `llm_generated=0.50`, `stock_photo=0.30`). Empty
+ *    or placeholder values get a -0.15 / -0.10 penalty.
+ * 2. **Graduated corroboration boost** — when `mergeConf()` combines two
+ *    `Conf<T>` instances for the same field, the unique source-kind count
+ *    drives a boost: 1 src=+0.00, 2 src=+0.08, 3 src=+0.15, 4+ src=+0.20.
+ *    Score capped at 0.98 (never absolute certainty).
+ * 3. **LLM-only inferred penalty** — fields the LLM guessed without any
+ *    confirming source (payment methods, amenities, accessibility, languages)
+ *    pass through `llmInferred()` which subtracts an extra 0.15 on top of the
+ *    base 0.50 → typical floor 0.35.
+ *
+ * Google Places precedence rule: when `placesData` is non-null for a field
+ * that has both an LLM guess and a Places value (phone, hours, website,
+ * geo, reviews, photos), the Places value wins — `mergeConf()` picks the
+ * higher-confidence source as primary and unions the source lists.
+ *
+ * Image filtering (`isImageRelevant()`): hero + gallery images are filtered
+ * against business-type keywords before inclusion. Generic terms
+ * (`shop|store|front|exterior|interior`) and business-name matches always
+ * pass; type-specific keywords (barber→`[barber, haircut, fade, ...]`,
+ * salon→`[salon, hair, beauty, ...]`) gate the rest. Unknown business types
+ * skip filtering. Filter passes are documented in the `gallery` field's
+ * `rationale`.
+ *
+ * Downstream consumers:
+ * - `services/build_context.ts` reads the SmallBizSeedV3 and writes
+ *   `_research.json` to R2 for the container to consume verbatim.
+ * - `services/ai_workflows.ts::runPrompt` uses `provenance.warnings[]` to
+ *   route around missing fields (e.g. "Missing: phone number" → skip
+ *   `tel:` rendering, render placeholder instead).
+ * - `uiPolicy.componentThresholds` is consumed by template logic to choose
+ *   between `prominent` / `standard` / `deemphasize` / `hide_or_placeholder`
+ *   rendering per field.
+ *
+ * @see {@link https://www.w3.org/TR/wcag2/ WCAG 2.2 AA} (image alt-text contract)
  */
 
 import type { PlacesResult } from './google_places.js';
@@ -179,6 +231,32 @@ function isImageRelevant(imageAltText: string, businessType: string, businessNam
 
 // ── Main Transformer ─────────────────────────────────────────
 
+/**
+ * Five raw research bundles produced by the OpenAI research pipeline
+ * (`services/openai_research.ts`). Every field is typed as
+ * `Record<string, unknown>` because the precise shape varies per business
+ * type AND per LLM call (`o3-mini` may add/drop keys between runs). Strict
+ * validation happens downstream via Zod inside
+ * {@link transformToV3} field-extraction helpers (`str`, `num`, `arr`,
+ * `strArr`) — never at this boundary, so a malformed bundle degrades
+ * gracefully into low-confidence fields rather than failing the build.
+ *
+ * @remarks
+ * - `profile`: output of `researchProfile()` — phone/email/hours/geo +
+ *   primary services + business_type + employees + price range.
+ * - `social`: output of `researchSocial()` — website + social handles
+ *   (Instagram, Facebook, X/Twitter — see `formerTwitter` backcompat).
+ * - `brand`: output of `researchBrand()` — logo URL + brand colors +
+ *   typography (heading/body fonts) + tone + visual style.
+ * - `sellingPoints`: output of `researchSellingPoints()` — 3 USPs +
+ *   hero slogan candidates + competitive differentiators.
+ * - `images`: output of `researchImages()` — hero candidates + gallery
+ *   alt-text strategies + image search queries. Filtered downstream
+ *   via {@link isImageRelevant}.
+ *
+ * @see {@link transformToV3} — primary consumer.
+ * @see {@link "services/openai_research"} — producer of all five bundles.
+ */
 export interface RawResearch {
   profile: Record<string, unknown>;
   social: Record<string, unknown>;
@@ -187,6 +265,96 @@ export interface RawResearch {
   images: Record<string, unknown>;
 }
 
+/**
+ * Transform the five raw research bundles + optional Google Places
+ * ground-truth + user-provided inputs into the canonical **SmallBizSeedV3**
+ * payload where every leaf value is wrapped in `Conf<T>` (`{ value,
+ * confidence, sources, rationale?, lastVerifiedAt?, isPlaceholder? }`).
+ *
+ * This is the single most important transformation in the pipeline:
+ * every downstream consumer (`services/build_context.ts` → `_research.json`
+ * → container orchestrator → template UI rendering decisions) reads from
+ * this output. The container never re-queries provenance — confidence
+ * scores embedded here drive whether each field renders prominent,
+ * standard, deemphasized, or as a placeholder.
+ *
+ * @param raw - Five research bundles (`profile`, `social`, `brand`,
+ *   `sellingPoints`, `images`) — see {@link RawResearch} for shape.
+ * @param placesData - Google Places verified record from
+ *   `services/google_places.ts::lookupBusiness`. When non-null, takes
+ *   precedence over LLM guesses for `phone`, `website`, `hours`, `geo`,
+ *   `google identity`, `reviews`, and `photos` via {@link mergeConf}.
+ *   When `null`, every contact/location field stays LLM-only at 0.50
+ *   base confidence.
+ * @param userInputs - User-provided values from the search/signup form.
+ *   `businessName` is required (anchor for all research). `businessAddress`
+ *   and `businessPhone` are optional; when present they merge in at
+ *   `user_provided=0.90` — second only to Google Places ground-truth.
+ *
+ * @returns SmallBizSeedV3 payload with 8 top-level sections (`identity`,
+ *   `operations`, `offerings`, `trust`, `brand`, `marketing`, `media`,
+ *   `seo`) plus `uiPolicy` (component-threshold map driving render
+ *   decisions) plus `provenance` (`overallConfidence` = mean of section
+ *   averages, `warnings[]` collected from each missing-required-field
+ *   branch, `enrichmentPipeline` listing the data sources actually used:
+ *   always `['llm_research']`, conditionally `['llm_research', 'google_places']`).
+ *
+ * @remarks
+ * Composition rules applied per-field:
+ *
+ * - **Phone**: LLM(0.50) ← user_provided(0.90) ← google_places(0.92).
+ *   Final via {@link mergeConf} — corroboration boost applies.
+ * - **Email**: LLM-only (Google Places doesn't return email). Warns
+ *   if missing — businesses without email lose Contact JSON-LD richness.
+ * - **Website**: LLM ← google_places.
+ * - **Hours**: LLM(7-day array) ← google_places (verified weekday text).
+ *   Places hours are normalized to the same `{ day, open, close, closed }`
+ *   shape upstream in `google_places.ts`, so merge is structural-compatible.
+ * - **Geo**: LLM ← google_places. Required for `LocalBusiness` JSON-LD
+ *   `geo` property and Map embed centering — warns when missing.
+ * - **Images**: Hero + gallery candidates filtered via
+ *   {@link isImageRelevant} against `businessType`. Stock-photo
+ *   prohibition: when no verified photos survive filtering, gallery
+ *   falls back to `placeholder_strategy='css_gradient'` rather than
+ *   inserting generic stock that would fail business-type semantic
+ *   match (Megabyte Labs gate `image.business_type_mismatch`).
+ * - **Amenities / payment methods / accessibility / languages**: marked
+ *   `llmInferred()` which applies the extra -0.15 penalty on top of base
+ *   0.50 → floor 0.35. These render as `hide_or_placeholder` per
+ *   `uiPolicy.componentThresholds` unless corroborated by user input.
+ *
+ * `overallConfidence` calculation: arithmetic mean of per-section average
+ * confidences (`computeSectionConfidence(section)`). Used by the orchestrator
+ * to decide whether to escalate to a deeper research pass — sites with
+ * overall <0.60 trigger a `researchProfile` re-run with broader search
+ * scope before container build.
+ *
+ * @example
+ * ```ts
+ * import { transformToV3 } from './services/confidence.js';
+ * import { lookupBusiness } from './services/google_places.js';
+ *
+ * const places = await lookupBusiness(env.GOOGLE_PLACES_API_KEY, name, addr);
+ * const seed = transformToV3(
+ *   { profile, social, brand, sellingPoints, images },
+ *   places,
+ *   { businessName: 'Vito\'s Mens Salon', businessAddress: addr, businessPhone: '+1-973-...' },
+ * );
+ * // seed.identity.phone.confidence === 0.92 (Google Places primary)
+ * // seed.provenance.overallConfidence === 0.78
+ * // seed.provenance.warnings === ['Missing: email address']
+ * // seed.provenance.enrichmentPipeline === ['llm_research', 'google_places']
+ * ```
+ *
+ * @throws Never — every field falls through to LLM-only or placeholder
+ *   rather than throwing. Missing required fields accumulate in
+ *   `provenance.warnings[]` for the orchestrator to surface.
+ *
+ * @see {@link RawResearch} - input bundle shape.
+ * @see {@link mergeConf} - graduated-corroboration merge logic.
+ * @see {@link isImageRelevant} - business-type image filter.
+ * @see {@link "services/build_context"} - downstream `_research.json` writer.
+ */
 export function transformToV3(
   raw: RawResearch,
   placesData: PlacesResult | null,

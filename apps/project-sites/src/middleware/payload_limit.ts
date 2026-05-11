@@ -1,3 +1,36 @@
+/**
+ * @module middleware/payload_limit
+ *
+ * @description
+ * Defense-in-depth gate that rejects oversized request bodies before they
+ * reach route handlers, parsers, or downstream services. Pairs with
+ * Cloudflare's edge limits — this middleware enforces our application-level
+ * policy (per-endpoint) on top of the platform's hard limit.
+ *
+ * Two tiers:
+ * - **Default:** `DEFAULT_CAPS.MAX_REQUEST_BODY_BYTES` (256 KB at time of
+ *   writing) — covers JSON APIs, form posts, magic-link verifies, etc.
+ * - **Upload tier:** 100 MB — applied only to known asset/deploy paths
+ *   (`/api/publish/bolt`, `/api/sites/:id/deploy`, `/api/sites/:slug/publish-bolt`,
+ *   `/api/assets/upload`). These accept ZIP/binary payloads from the editor
+ *   and snapshot pipeline.
+ *
+ * @remarks
+ * The bolt editor host (`editor.projectsites.dev`) is bypassed entirely —
+ * its requests are proxied to Cloudflare Pages, which owns its own limits
+ * and would otherwise double-reject large editor saves at this layer.
+ *
+ * @throws {@link AppError} `PAYLOAD_TOO_LARGE` (HTTP 413) when
+ *   `Content-Length` exceeds the resolved tier for the path. Requests
+ *   without a `Content-Length` header pass through; the downstream parser
+ *   is the final size guard.
+ *
+ * @example
+ * ```ts
+ * import { payloadLimitMiddleware } from './middleware/payload_limit.js';
+ * app.use('*', payloadLimitMiddleware);
+ * ```
+ */
 import type { MiddlewareHandler } from 'hono';
 import { DEFAULT_CAPS, payloadTooLarge } from '@project-sites/shared';
 import type { Env, Variables } from '../types/env.js';

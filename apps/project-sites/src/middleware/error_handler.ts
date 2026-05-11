@@ -1,3 +1,52 @@
+/**
+ * @module middleware/error_handler
+ *
+ * @description
+ * Terminal error funnel for every request that hits the Worker. Sits last in
+ * the middleware chain (after {@link module:middleware/request_id},
+ * {@link module:middleware/payload_limit}, {@link module:middleware/security_headers},
+ * CORS, and {@link module:middleware/auth}) so it catches anything thrown by
+ * route handlers, downstream middleware, or unhandled rejections inside Hono.
+ *
+ * @remarks
+ * Three categories of failure are normalized into a stable response shape:
+ * 1. {@link AppError} — known/typed errors thrown intentionally with a
+ *    user-safe message + RFC7807-style envelope ({@link AppError.toJSON}).
+ *    5xx variants are reported to Sentry + PostHog; 4xx is warn-logged only.
+ * 2. {@link ZodError} — boundary validation failures. Mapped to HTTP 400 with
+ *    a `details.issues[]` array of `{ path, message }`. Never bubbles raw Zod
+ *    output to humans.
+ * 3. Unknown — anything else (bare `Error`, thrown strings, runtime faults).
+ *    Mapped to HTTP 500 with the generic `INTERNAL_ERROR` code; full stack
+ *    captured to Sentry, never leaked to the response body.
+ *
+ * Response negotiation is driven by the `Accept` request header:
+ * - Browsers (`Accept: text/html...`) receive {@link brandedErrorPage} — a
+ *   self-contained HTML document with Space Grotesk + Fira Code typography,
+ *   animated gradient/grid/scanline backdrop, status-coded recovery copy,
+ *   and a `// diagnostics` block carrying the `request_id` (the join key for
+ *   ops to grep audit_logs + Sentry + PostHog).
+ * - API clients (`Accept: application/json`, `*/*`, missing, curl) receive
+ *   the canonical JSON envelope `{ error: { code, message, request_id, details? } }`.
+ *
+ * Why a custom error page instead of CF's default: branded 4xx/5xx surfaces
+ * are part of the platform promise (Mission Doctrine §5). Visitors who land
+ * on an error page still see the cinematic aesthetic + a recovery CTA, not a
+ * Cloudflare Ray ID screen.
+ *
+ * @example
+ * ```ts
+ * import { errorHandler } from './middleware/error_handler.js';
+ * app.onError(errorHandler);
+ * // Throw anywhere downstream and the response is normalized automatically.
+ * app.get('/api/example', () => { throw new AppError('NOT_FOUND', 404, 'No such record'); });
+ * ```
+ *
+ * @see {@link https://www.rfc-editor.org/rfc/rfc7807 RFC 7807 — Problem Details}
+ * @see module:middleware/request_id
+ * @see module:lib/sentry
+ * @see module:lib/posthog
+ */
 import type { ErrorHandler } from 'hono';
 import { AppError } from '@project-sites/shared';
 import { ZodError } from 'zod';

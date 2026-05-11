@@ -46,6 +46,46 @@ interface GooglePlacesResponse {
   places?: GooglePlace[];
 }
 
+/**
+ * Google Places Text Search proxy — the "Screen 1" autocomplete that powers
+ * the homepage SPA's business picker. Server-side proxy hides the
+ * `GOOGLE_PLACES_API_KEY` from the browser and lets us cap result counts +
+ * bound query length before billing fires.
+ *
+ * @route GET /api/search/businesses
+ * @public No auth required — public endpoint.
+ *
+ * @queryParam q       - Free-text business search (e.g. `"vito's salon lake hiawatha"`).
+ *   Trimmed and clamped to 200 chars to prevent abuse. Required; empty/missing → 400.
+ * @queryParam lat,lng - Optional browser geolocation pair (decimal degrees). When both
+ *   parse as finite numbers, applies a 50 km `locationBias.circle` to Google's
+ *   request body. Improves chain-disambiguation ("Starbucks" near user's city).
+ *
+ * @returns `{ data: BusinessSearchResult[] }` (max 10) — `place_id`, `name`,
+ *   `address`, `types[]`, `lat`, `lng`, `phone`, `website` per result.
+ *
+ * @throws BAD_REQUEST `'Missing required query parameter: q'` when `q` absent
+ *   or whitespace-only.
+ *
+ * @remarks
+ * Field-mask scoping: `X-Goog-FieldMask` lists only the 7 fields we actually
+ * render. Without the mask Google bills for every field on every place
+ * regardless of use ($0.017/req → $0.040/req). Mask = ~58% cost reduction.
+ *
+ * Error tolerance: Google non-2xx (rate-limit, quota exhausted, outage)
+ * does NOT throw — returns `{ data: [], _error: { status, message } }` so the
+ * homepage SPA renders an empty result list and stays usable. The error
+ * envelope lets ops debug from network panel without paging the user.
+ *
+ * @example
+ * ```bash
+ * curl 'https://projectsites.dev/api/search/businesses?q=vitos+salon&lat=40.88&lng=-74.43'
+ * # → { "data": [{ "place_id": "ChIJ...", "name": "Vito's Mens Salon", ... }] }
+ * ```
+ *
+ * @see {@link https://developers.google.com/maps/documentation/places/web-service/text-search Places Text Search}
+ * @see services/google_places.ts — server-side Place Details enrichment after pick
+ */
 search.get('/api/search/businesses', async (c) => {
   const q = c.req.query('q');
 
@@ -140,6 +180,31 @@ interface AutocompleteResponse {
   suggestions?: AutocompleteSuggestion[];
 }
 
+/**
+ * Google Places Autocomplete proxy — typeahead suggestions for the
+ * homepage SPA's "address-only" entry mode (custom-website branch where the
+ * user has no Google Business Profile and just types an address).
+ *
+ * @route GET /api/search/address
+ * @public No auth required — public endpoint.
+ *
+ * @queryParam q       - Partial address fragment (e.g. `"74 N Beverwyck"`).
+ *   Below 2 chars → returns empty `{ data: [] }` without billing Google
+ *   (avoids burning quota on single-keystroke typeahead).
+ * @queryParam lat,lng - Optional 50 km location bias circle (same pattern as
+ *   `/api/search/businesses`).
+ *
+ * @returns `{ data: AddressSuggestion[] }` (max 8) — `place_id`, `description`
+ *   (full formatted), `main_text` (line 1), `secondary_text` (line 2). Format
+ *   matches the homepage SPA's `<address-autocomplete>` consumer shape.
+ *
+ * @remarks
+ * Always returns 200 — even an `OVER_QUERY_LIMIT` from Google collapses to
+ * `{ data: [] }` so the typeahead silently degrades to manual entry rather
+ * than throwing.
+ *
+ * @see {@link https://developers.google.com/maps/documentation/places/web-service/place-autocomplete Places Autocomplete}
+ */
 search.get('/api/search/address', async (c) => {
   const q = c.req.query('q');
 
@@ -268,6 +333,33 @@ interface SiteSearchRow {
   current_build_version: string | null;
 }
 
+/**
+ * Search already-built sites on projectsites.dev by business name. Powers
+ * the homepage SPA's "we already built this — view it" panel that appears
+ * alongside Google Places results, letting returning visitors land on their
+ * existing site without re-running the build pipeline.
+ *
+ * @route GET /api/sites/search
+ * @public No auth required — public endpoint.
+ *
+ * @queryParam q - Business-name fragment (≥2 chars, clamped to 100 for the
+ *   LIKE scan). Empty or short input → empty `{ data: [] }` without DB hit.
+ *
+ * @returns `{ data: SiteSearchResult[] }` (max 5) — `site_id`, `slug`,
+ *   `business_name`, `business_address`, `google_place_id`, `status`,
+ *   `has_build` (boolean, `current_build_version IS NOT NULL`).
+ *
+ * @remarks
+ * Status-priority ordering: `published` first, then `building`, then
+ * everything else, ties broken by `created_at DESC`. Ensures the homepage
+ * SPA highlights live sites over half-built ones.
+ *
+ * D1 LIKE-scan footprint: a single bounded scan with `LIMIT 5` against
+ * `sites.business_name` (indexed) at our row counts (~10K sites) is well
+ * under 10 ms p99. No FTS5 needed yet — revisit when row count > 100K.
+ *
+ * Soft-delete aware: `deleted_at IS NULL` filter excludes archived sites.
+ */
 search.get('/api/sites/search', async (c) => {
   const q = c.req.query('q');
 
@@ -306,6 +398,32 @@ interface SiteRow {
   current_build_version: string | null;
 }
 
+/**
+ * Exact-match site existence check — used by the homepage SPA after a
+ * Google Places pick to decide whether to render "this site already exists,
+ * visit it" vs. "Sign in to build". One D1 hit per pick.
+ *
+ * @route GET /api/sites/lookup
+ * @public No auth required — public endpoint.
+ *
+ * @queryParam place_id - Google Place ID from the Text Search pick (XOR with `slug`).
+ * @queryParam slug     - Exact projectsites.dev slug (XOR with `place_id`).
+ *
+ * @returns Either `{ data: { exists: false } }` when no site matches, or
+ *   `{ data: { exists: true, site_id, slug, status, has_build } }` when one does.
+ *   Discriminated by `exists` so the SPA can branch cleanly.
+ *
+ * @throws BAD_REQUEST `'Missing required query parameter: place_id or slug'`
+ *   when both query params are absent. Caller MUST supply at least one.
+ *
+ * @remarks
+ * `place_id` lookup takes priority over `slug` when both are provided. This
+ * matches the SPA flow (place pick happens first, slug is server-generated).
+ * Both columns are indexed; both paths are O(log n) D1 lookups.
+ *
+ * Soft-delete aware: `deleted_at IS NULL` ensures archived sites don't show
+ * up as existing — a re-pick of an archived business kicks off a fresh build.
+ */
 search.get('/api/sites/lookup', async (c) => {
   const placeId = c.req.query('place_id');
   const slug = c.req.query('slug');
@@ -391,6 +509,68 @@ interface CreateFromSearchBody {
   budget_tier?: string;
 }
 
+/**
+ * Create a new `sites` row + dispatch the AI build workflow — the conversion
+ * point of the homepage funnel (Screen 3 "build my site" submit). This is
+ * the single endpoint that takes a user from "I picked my business in
+ * Google Places" to "my site is being generated" in one round-trip.
+ *
+ * @route POST /api/sites/create-from-search
+ * @auth   Bearer token required (org-scoped). Anonymous → 401.
+ *
+ * @body Supports two payload shapes for backward compatibility:
+ *   - **v1 (flat, legacy):** `{ business_name, business_address, google_place_id, additional_context, budget_tier? }`
+ *   - **v2 (nested, current SPA):** `{ mode, business: { name, address, place_id, phone, website, types }, additional_context, budget_tier? }`
+ *   v2 takes precedence when both shapes present. `business_name` is the only
+ *   required field once `mode !== 'custom'`. `additional_context` is HTML-
+ *   stripped and clamped to 5000 chars. `business_name` clamped to 200,
+ *   address to 500.
+ *
+ * @returns `201 Created` with `{ data: { site_id, slug, status: 'building', workflow_instance_id } }`.
+ *   The SPA polls `/api/sites/:id/workflow` against this instance until
+ *   status flips to `published` or `error`.
+ *
+ * @throws UNAUTHORIZED `'Must be authenticated'` when no `orgId` on context.
+ * @throws BUILD_LIMIT_REACHED `403` when the org has hit its plan cap (3 free,
+ *   50 paid). Body: `{ error: { code: 'BUILD_LIMIT_REACHED', message } }`.
+ * @throws BAD_REQUEST when `business_name` missing, oversized, or sanitized to empty.
+ *
+ * @remarks
+ * **Budget-tier gating:** `budget_tier ∈ {free, standard, plus, premium}` (Zod-
+ * validated, defaults to `free` on invalid input). Drives Sora-video / NotebookLM-
+ * podcast / immersive-infographic gates inside the orchestrator AND the
+ * `max_generated_images` cap (2 → 5 → 10 → 15). The tier travels with the
+ * workflow params so the container can read it without an extra D1 round-trip.
+ *
+ * **Slug strategy:** `generateSmartSlug` runs Workers AI Llama-3.1-8b to
+ * compress the business name + city into the shortest meaningful slug
+ * (`"Trader Joe's Denville"` → `"trader-joes-denville"`); `ensureUniqueSlug`
+ * appends `-2`, `-3`, ... if D1 OR R2 already owns it. Falls through to
+ * `crypto.randomUUID()`-suffixed slug after 10 collisions.
+ *
+ * **Workflow dispatch:** `SITE_WORKFLOW.create({ id: siteId, params })`
+ * pins the workflow instance ID to the site UUID — single source of truth
+ * for status polling. Falls back to `QUEUE.send()` only when the workflow
+ * binding is absent (legacy dev environments).
+ *
+ * **Audit-log fan-out:** Writes 4 audit entries on success — `site.created_from_search`
+ * + `workflow.queued` + 3 anticipated phases (research / generation / deployment)
+ * so the Logs modal can render the pipeline stages BEFORE the workflow starts
+ * emitting real per-step events.
+ *
+ * @example v2 payload (current SPA)
+ * ```bash
+ * curl -X POST -H "Authorization: Bearer $TOKEN" \
+ *      -d '{"mode":"business","business":{"name":"Vito'\''s Mens Salon","place_id":"ChIJ..."},"budget_tier":"plus"}' \
+ *      https://projectsites.dev/api/sites/create-from-search
+ * # → { "data": { "site_id": "...", "slug": "vitos-mens-salon", "status": "building", ... } }
+ * ```
+ *
+ * @see services/build_limits.ts — `checkBuildLimit`
+ * @see workflows/site-generation.ts — workflow params shape
+ * @see {@link generateSmartSlug}
+ * @see {@link ensureUniqueSlug}
+ */
 search.post('/api/sites/create-from-search', async (c) => {
   const orgId = c.get('orgId');
 
@@ -589,6 +769,44 @@ search.post('/api/sites/create-from-search', async (c) => {
 });
 
 // ─── Improve Prompt with AI ─────────────────────────────────
+
+/**
+ * Cheap "polish my notes" AI helper for the homepage SPA's
+ * `additional_context` textarea — takes rough business notes (or empty
+ * input) and rewrites them into a clear, well-structured profile the build
+ * pipeline can consume. Backed by Workers AI Llama-3.1-8b for sub-2s
+ * latency and zero per-call cost.
+ *
+ * @route POST /api/sites/improve-prompt
+ * @public No auth required — same anonymous funnel as the homepage SPA.
+ *
+ * @body `{ text?: string, business_name?: string, business_address?: string }`
+ *   - `text` clamped to 5000 chars (oversized → 400).
+ *   - All fields trimmed; empty `text` triggers "generate template from scratch" mode.
+ *
+ * @returns `{ data: { improved_text: string } }` — the polished copy.
+ *
+ * @throws BAD_REQUEST `'Text must not exceed 5000 characters'` on oversized input.
+ *
+ * @remarks
+ * **Three execution paths, picked in order:**
+ * 1. `text` present + `env.AI` bound → polish path: system prompt enforces grammar
+ *    + structure fixes, gaps filled with `[BRACKET]` placeholders.
+ * 2. `text` absent + `env.AI` bound → template path: generates a comprehensive
+ *    business-profile skeleton with bracketed placeholders for the owner to
+ *    fill in.
+ * 3. `env.AI` absent OR AI throws → static fallback: hand-written template
+ *    string returned with no LLM call. Keeps the SPA functional in local
+ *    dev where the AI binding is absent.
+ *
+ * **Failure tolerance:** AI errors (rate limit, model timeout, malformed
+ * response) collapse to `c.json({ data: { improved_text: text } })` — the
+ * original text is returned untouched. NEVER throws on AI failure.
+ *
+ * **Temperature 0.3** — low enough to keep edits faithful, high enough to
+ * fix grammar without parroting the input. `max_tokens: 2048` covers ~80%
+ * of inputs at our 5000-char clamp without truncation.
+ */
 search.post('/api/sites/improve-prompt', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const text = typeof body.text === 'string' ? body.text.trim() : '';
@@ -681,6 +899,80 @@ search.post('/api/sites/improve-prompt', async (c) => {
 
 // ─── Generate Expert Prompt (OpenAI Research → bolt.diy Prompt) ──
 
+/**
+ * Run the deep OpenAI `o3-mini` research pipeline to assemble a full
+ * business research dossier (profile + brand + selling points + social)
+ * and synthesize a Principal-Engineer-grade bolt.diy build prompt that
+ * downstream container builds can consume.
+ *
+ * @route POST /api/sites/generate-prompt
+ * @auth Bearer token required — `userId` AND `orgId` MUST resolve from
+ *   the session (anonymous callers → 401). Cross-org research leakage
+ *   is prevented by `WHERE id = ? AND org_id = ?` ownership check on
+ *   the optional `site_id` lookup.
+ *
+ * @body `{ business_name: string (required), business_address?: string,
+ *   business_phone?: string, google_place_id?: string,
+ *   additional_context?: string, site_id?: string }` — all fields
+ *   trimmed; only `business_name` is mandatory. When `site_id` is
+ *   provided and resolves to a site in the caller's org, the full
+ *   research blob persists to R2 at `sites/${slug}/${version}/research.json`.
+ *
+ * @returns `{ data: { prompt: string, research: { profile, brand,
+ *   sellingPoints, social } } }` — `prompt` is the synthesized expert
+ *   build prompt; `research` is the raw dossier (subset of result —
+ *   `expertPrompt` already surfaced as `prompt`, so it's omitted here).
+ *
+ * @throws UNAUTHORIZED `'Authentication required'` when session is
+ *   missing or partial (no userId/orgId).
+ * @throws BAD_REQUEST `'business_name is required'` on empty/whitespace
+ *   business name.
+ * @throws BAD_REQUEST `'OpenAI API key is not configured. Cannot run
+ *   research pipeline.'` when `env.OPENAI_API_KEY` secret absent —
+ *   no Workers-AI fallback for this route (OpenAI `o3-mini` is the
+ *   only model with the structured-output schema the research pipeline
+ *   expects).
+ *
+ * @remarks
+ * **Research pipeline** — `researchAndFormulatePrompt` (in
+ * `services/openai_research.ts`) runs a 4-step OpenAI chain:
+ *  1. Profile research (business_type, services, USPs, locale).
+ *  2. Brand extraction (logo, colors, fonts, voice).
+ *  3. Selling points + hero copy synthesis.
+ *  4. Social media + website discovery.
+ * Total wall-clock ~30-60s per call; cost ~$0.05-0.15 at `o3-mini` pricing.
+ *
+ * **R2 persistence** — `site_id` is optional; when supplied AND the
+ * site exists AND is owned by the caller's org, the full research blob
+ * (excluding `expertPrompt` to avoid double-storage) writes to R2 as
+ * pretty-printed JSON. Version key falls back to ISO timestamp when
+ * `sites.current_build_version` is null (pre-first-build state).
+ *
+ * **Audit log** — emits `research.generate_prompt` to D1 audit_logs
+ * with `{ business_name, model }` metadata. Write is best-effort
+ * (`.catch(() => {})`) so audit failures NEVER block the response —
+ * pipeline correctness wins over audit completeness here because the
+ * caller has already paid the o3-mini cost.
+ *
+ * **No fallback to Workers AI** — Llama-3.1-8b lacks the structured-
+ * output reliability the downstream container parser needs. If OpenAI
+ * is unavailable, the build CANNOT proceed; surface 400 early rather
+ * than ship a malformed prompt.
+ *
+ * @example
+ * ```bash
+ * curl -X POST https://projectsites.dev/api/sites/generate-prompt \
+ *   -H "Authorization: Bearer $TOKEN" \
+ *   -H "Content-Type: application/json" \
+ *   -d '{"business_name":"Vito'\''s Mens Salon","business_address":"74 N Beverwyck Rd, Lake Hiawatha, NJ 07034","google_place_id":"ChIJ..."}'
+ * ```
+ *
+ * @see {@link ../services/openai_research.ts | researchAndFormulatePrompt}
+ * @see {@link ../../prompts/research_profile.prompt.md}
+ * @see {@link ../../prompts/research_brand.prompt.md}
+ * @see {@link ../../prompts/research_selling_points.prompt.md}
+ * @see {@link ../../prompts/research_social.prompt.md}
+ */
 search.post('/api/sites/generate-prompt', async (c) => {
   const userId = c.get('userId');
   const orgId = c.get('orgId');

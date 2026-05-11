@@ -1,18 +1,106 @@
 /**
  * @module workflows/site-generation
- * @description Cloudflare Workflow for AI-powered site generation.
  *
- * Architecture: Heartbeat polling with async container execution.
- * 1. POST /build to container → starts Claude Code async, returns { jobId }
- * 2. Poll GET /status every 30s via tiny workflow steps (no timeout risk)
- * 3. GET /result when complete → upload files to R2 → update D1
+ * @description
+ * Production multi-page site-generation pipeline — the Cloudflare Workflow that turns a
+ * `sites.status='queued'` row into a fully published, brand-faithful website on R2 with
+ * `sites.status='published'`. This is the **only** path used by the `/api/sites/:id/reset`
+ * and `/api/sites/create-from-search` endpoints in production; the inline LLM pipelines in
+ * `src/services/ai_workflows.ts::runSiteGenerationWorkflowV2` are dev/test scaffolding,
+ * never triggered by user-facing routes.
  *
- * Claude Code handles EVERYTHING in a single run:
- * - Business research via curl + API keys
- * - Logo discovery / generation
- * - Website building from template (Vite+React+Tailwind)
- * - GPT-4o self-inspection via inspect.js
- * - Iterative fixes
+ * @remarks
+ * Five-phase pipeline, each phase a Workflow `step.do(...)` block (durable, replay-safe,
+ * timeout-isolated). Heartbeat-polled container execution keeps each step under the
+ * 30-minute Workflow step ceiling without imposing a single long-running step that would
+ * blow the budget:
+ *
+ * 1. **Pre-flight gates** (`anthropic-credit-probe` + container binding check) — 1-token
+ *    probe to `api.anthropic.com/v1/messages` catches an empty credit balance BEFORE we
+ *    spend 25–40 minutes of container time on a `claude -p` invocation that would
+ *    silently exit code=0 with a template-only `dist/` masquerading as success. Skipped
+ *    when subscription OAuth is active (Max plan has no credit-balance failure mode).
+ *
+ * 2. **Source-brand extraction** (`extract-source-brand`) — before the LLM brand pass,
+ *    the Worker deterministically extracts logo, fonts, colors, theme from the source
+ *    site (when `businessWebsite` is provided). Persists `_brand.json` + `_assets.json` +
+ *    `_scraped_content.json` to R2 under `sites/{slug}/v-{ts}/`. {@link getCanonicalBrand}
+ *    short-circuits this for "blessed" rebuilds (e.g. LMG) — applies the exact contract
+ *    from `scripts/<slug>-canonical-brand.json`, skipping LLM-based brand inference
+ *    entirely. See `apps/project-sites/CLAUDE.md` invariant #20 "Brand contract violation".
+ *
+ * 3. **Container orchestration** (`start-build` → `heartbeat-N` → `finalize-build`) —
+ *    POSTs `{ prompt, envVars, sourceBrand }` to the `SITE_BUILDER` Durable Object
+ *    container (CF Containers, `node:22-slim` base, ~2GB image with Claude Code + skills
+ *    + template pre-baked). Container runs ONE `claude -p` orchestrator session that
+ *    fans out to parallel subagents (visual-qa, seo-auditor, accessibility-auditor,
+ *    performance-profiler, content-writer, security-reviewer, domain-builder,
+ *    validator-fixer). Heartbeat polling every 30s for up to 50 minutes; container
+ *    HMAC-signs status callbacks to `/api/internal/build-status` (KV-backed so workflow
+ *    replay sees the freshest job state). `containerName` strategy: iteration=1 uses a
+ *    per-run nonce (disposable, eliminates stale-image issues); iteration>1 reuses a
+ *    stable DO name so node_modules / vite cache / template clone survive — saves
+ *    ~60-130s per warm iteration.
+ *
+ * 4. **R2 upload + brand validation** (`migrate-external-assets` + `validate-build`) —
+ *    container writes its dist files into the build directory; `node upload-to-r2.mjs`
+ *    inside the container pushes them to `sites/{slug}/{version}/` via S3-compatible
+ *    API. Worker then runs `validateBuild()` from `src/services/build_validators.ts`
+ *    against R2 (27 invariants in `apps/project-sites/CLAUDE.md`). Mode flag currently
+ *    `report` (D1 audit only); flips to `strict` once template benchmarks ship clean.
+ *
+ * 5. **Post-publish telemetry** (`source-fidelity-check` + `visual-inspection` +
+ *    `benchmark-and-learn` + `notify`) — non-blocking GPT-4o vision scoring vs the
+ *    source-site screenshot (rebuilds only), Lighthouse scoring vs `whitehouse.gov` /
+ *    `linear.app` / `stripe.com` benchmarks, owner notification email via Resend.
+ *
+ * Eviction tolerance: the workflow tolerates Durable Object restarts because every step
+ * is replay-safe — `step.do` results are cached by Workflows, so a replay returns the
+ * same values without re-running the body. Job state lives in KV (not container disk),
+ * so even a full container restart mid-build is recoverable on the next heartbeat. See
+ * `memory/project_container_eviction_tolerance.md`.
+ *
+ * Wall-clock budget: 50 minutes total (3-min research + 35-min orchestrator + 5-min
+ * upload + 7-min telemetry). Each individual `step.do` capped at 30 minutes (Workflow
+ * platform limit). Hard cap inside the orchestrator prompt: 35 min container wall-clock,
+ * MAX 3 parallel fan-out cycles, MAX 2 completeness-checker invocations, MAX 4
+ * validator-fixer rebuild loops — exceed any → ship-with-warnings.
+ *
+ * @example Trigger a rebuild from the API
+ * ```ts
+ * await env.SITE_WORKFLOW.create({
+ *   id: crypto.randomUUID(),
+ *   params: {
+ *     siteId, slug, businessName, businessAddress, businessPhone,
+ *     businessCategory, businessWebsite, orgId,
+ *     iteration: 1,
+ *     budgetTier: 'free',
+ *   } satisfies SiteGenerationParams,
+ * });
+ * ```
+ *
+ * @example Convergence-loop iteration (warm container reuse)
+ * ```ts
+ * await env.SITE_WORKFLOW.create({
+ *   id: crypto.randomUUID(),
+ *   params: {
+ *     ...baseParams,
+ *     iteration: 3,                 // warm DO reuse — node_modules survives
+ *     priorRecommendations: [       // surgical fixes from prior judge
+ *       { category: 'a11y', severity: 'high', description: '...' },
+ *     ],
+ *   },
+ * });
+ * ```
+ *
+ * @see ../services/canonical_brand_overrides.ts — blessed brand-contract short-circuit
+ * @see ../services/source_brand_extractor.ts — deterministic brand extraction
+ * @see ../services/build_validators.ts — 27 build-breaking invariants
+ * @see ../services/asset_migration.ts — external-host whitelist enforcement
+ * @see ../routes/api.ts — `/api/sites/:id/reset` and `/api/internal/build-status`
+ * @see ../../prompts/_mission_preamble.txt — HOLIEST / HIGHEST B-ORDER doctrine
+ * @see ../../CLAUDE.md — Mission Doctrine + 27-row Mandatory Invariants table
+ * @see ~/.claude/projects/-Users-apple-emdash-projects-projectsites-dev/memory/project_build_pipeline_v2.md
  *
  * @packageDocumentation
  */
@@ -25,6 +113,11 @@ import { TIER_CAPS, type BudgetTier } from '@project-sites/shared/schemas';
 import { loadBuildFromR2, validateBuild } from '../services/build_validators.js';
 import { migrateExternalAssets } from '../services/asset_migration.js';
 import { extractSourceBrand, persistSourceBrand } from '../services/source_brand_extractor.js';
+import {
+  getCanonicalBrand,
+  applyCanonicalBrandOverride,
+  canonicalBrandToSourceBrand,
+} from '../services/canonical_brand_overrides.js';
 import { lookupBusiness } from '../services/google_places.js';
 import { hasClaudeOauth, getValidClaudeOauth } from '../services/anthropic_oauth.js';
 
@@ -672,15 +765,25 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
     // defaults (Inter/Space Grotesk, dark theme, 0 source images) which
     // destroys brand identity. See feedback_brand_fidelity_regression memory.
     let brandContext: { brandJson: string; assetsJson: string; scrapedJson: string } | null = null;
+    const canonicalBrand = getCanonicalBrand(params.slug);
     if (resolvedWebsite) {
       try {
         const extracted = await step.do(
           'extract-source-brand',
           { retries: { limit: 2, delay: '5 seconds', backoff: 'exponential' }, timeout: '3 minutes' },
           async () => {
-            const brand = await extractSourceBrand(resolvedWebsite, {
+            // Canonical-brand short-circuit. When the slug has a hardcoded
+            // contract (see services/canonical_brand_overrides.ts), it MUST
+            // win over the LLM extraction. The contract is bundled at build
+            // time from the actual `_brand.json` payload of a previously-
+            // blessed reference build — see scripts/lmg-canonical-brand.json
+            // and memory pin feedback_brand_fidelity_regression.md.
+            let brand = await extractSourceBrand(resolvedWebsite, {
               openaiKey: env.OPENAI_API_KEY,
             });
+            if (canonicalBrand) {
+              brand = applyCanonicalBrandOverride(canonicalBrand, brand);
+            }
             const persisted = await persistSourceBrand(env.SITES_BUCKET, params.slug, brand);
             return JSON.stringify({
               ...persisted,
@@ -695,6 +798,7 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
                 asset_count: brand.assets.length,
                 route_count: brand.routes.length,
                 warnings: brand.warnings,
+                canonical_override: canonicalBrand ? canonicalBrand.source_build : null,
               },
             });
           },
@@ -720,6 +824,43 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           source_url: resolvedWebsite,
           error: err instanceof Error ? err.message : String(err),
           message: 'Source brand extraction failed — orchestrator will use defaults',
+        });
+      }
+    }
+
+    // When extraction failed (or source URL absent) but a canonical contract
+    // is registered, persist the synthetic payload so the orchestrator still
+    // gets a build-breaking brand contract instead of platform defaults.
+    if (!brandContext && canonicalBrand) {
+      try {
+        const synthetic = await step.do(
+          'canonical-brand-fallback',
+          { retries: { limit: 1, delay: '2 seconds' }, timeout: '30 seconds' },
+          async () => {
+            const brand = canonicalBrandToSourceBrand(canonicalBrand);
+            const persisted = await persistSourceBrand(env.SITES_BUCKET, params.slug, brand);
+            return JSON.stringify(persisted);
+          },
+        );
+        const parsed = JSON.parse(synthetic) as {
+          brandJson: string;
+          assetsJson: string;
+          scrapedJson: string;
+        };
+        brandContext = parsed;
+        await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.canonical_brand_applied', {
+          slug: params.slug,
+          source_build: canonicalBrand.source_build,
+          fonts: canonicalBrand.fonts,
+          primary: canonicalBrand.primary,
+          theme: canonicalBrand.theme,
+          message: `Canonical brand contract applied (source: ${canonicalBrand.source_build})`,
+        });
+      } catch (err) {
+        await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.canonical_brand_failed', {
+          slug: params.slug,
+          error: err instanceof Error ? err.message : String(err),
+          message: 'Canonical brand fallback failed — orchestrator will use defaults',
         });
       }
     }

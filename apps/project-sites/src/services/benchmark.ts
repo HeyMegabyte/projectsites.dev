@@ -70,7 +70,32 @@ const BANNED_WORDS = [
 
 /**
  * Tier 1: programmatic DOM/CSS heuristics. Pure HTML parsing, no network beyond
- * the initial HTML fetch. ~1-2 seconds.
+ * the initial HTML fetch. ~1-2 seconds wall-clock.
+ *
+ * @param siteUrl - Fully-qualified URL (https://{slug}.projectsites.dev or custom
+ *   hostname). MUST be live + reachable — caller should defer this call until
+ *   the workflow has flipped status to `published` and R2 → edge propagation
+ *   has had ~5 seconds to warm.
+ * @returns Findings with composite `score` in [0, 1] — each of the 10 checks
+ *   contributes 0.1 weight. See {@link parseHtmlForFindings} for the check
+ *   list; {@link ProgrammaticFindings} for field semantics.
+ *
+ * @remarks
+ * Cache bypass: passes `cf: { cacheTtl: 0 }` to force origin fetch. We score
+ * the freshly-deployed build, not a stale edge copy.
+ *
+ * UA: `project-sites-benchmark/1.0` (NOT a browser UA) — intentional so the
+ * benchmark calls don't pollute the site's analytics or trip rate-limits
+ * meant for real users. Sites that hard-block non-browser UAs need an
+ * allowlist entry; the workflow logs a `benchmark.fetch_failed` audit and
+ * continues with `psi`-only scoring.
+ *
+ * @throws {Error} `'benchmark.fetch_failed status=<n> url=<u>'` when the
+ *   origin returns non-2xx. Caller MUST catch — {@link runBenchmarks} routes
+ *   this to a structured audit log and proceeds with the PSI tier only.
+ *
+ * @see {@link parseHtmlForFindings} — pure-function variant for unit tests.
+ * @see {@link tierPsi}                — companion paid-quota tier.
  */
 export async function tierProgrammatic(siteUrl: string): Promise<ProgrammaticFindings> {
   const res = await fetch(siteUrl, {
@@ -84,7 +109,53 @@ export async function tierProgrammatic(siteUrl: string): Promise<ProgrammaticFin
   return parseHtmlForFindings(html, siteUrl);
 }
 
-/** Pure function — extracted for testability. */
+/**
+ * Pure function — extracted for testability. Runs the 10 programmatic checks
+ * against an in-memory HTML string and returns the same shape as
+ * {@link tierProgrammatic}, with no network I/O.
+ *
+ * @param html    - Raw HTML source. Must be the full `<!doctype html>` document
+ *   (we regex `<title>`, `<meta name="description">`, `<link>`, `<script>`,
+ *   etc.). Fragment HTML will produce mostly-zero findings.
+ * @param siteUrl - The URL the HTML was fetched from. Used ONLY for internal
+ *   vs external link classification (`new URL(siteUrl).host`). Pass any
+ *   parseable URL — if construction throws, host becomes `''` and every
+ *   non-`/`-rooted link counts as external.
+ * @returns Findings with composite `score` in [0, 1]. Each check is binary:
+ *   1 if it passes the per-field threshold (h1 count === 1, jsonLdBlocks ≥ 4,
+ *   title 50-60 chars, description 120-156 chars, color-scheme present, all
+ *   imgs have alt, image count ≥ 10, internal links ≥ 2, external links ≥ 1,
+ *   zero banned-word hits), 0 otherwise. Mean of the 10 = `score`.
+ *
+ * @remarks
+ * Why regex over an HTML parser: Cloudflare's `HTMLRewriter` is streaming and
+ * awkward for "count things across the whole document" — regex is fine here
+ * because we're scoring well-formed builds we just produced, not adversarial
+ * scrape targets. If a check starts producing false positives on edge cases
+ * (e.g. `<img>` inside HTML comments), upgrade THAT check to `HTMLRewriter`
+ * before rewriting the rest.
+ *
+ * Banned-word check is case-insensitive substring on body text — false positives
+ * on legitimate compound words (e.g. "robust" inside "robustly tested code")
+ * are accepted because the copy-writing rule bans these words categorically.
+ *
+ * @throws Never — all parsing operations swallow failures (e.g. malformed
+ *   `siteUrl` falls through `try { new URL() } catch { return '' }`).
+ *
+ * @example
+ * ```ts
+ * import { parseHtmlForFindings } from './benchmark.js';
+ *
+ * const findings = parseHtmlForFindings(
+ *   '<!doctype html><html><head><title>Vito\'s — Mens Salon in Lake Hiawatha NJ</title>...',
+ *   'https://vitos.projectsites.dev',
+ * );
+ * if (findings.score < 0.7) throw new Error('Regression');
+ * ```
+ *
+ * @see {@link tierProgrammatic}    — network-fetching wrapper used by the workflow.
+ * @see {@link ProgrammaticFindings} — per-field schema + thresholds.
+ */
 export function parseHtmlForFindings(html: string, siteUrl: string): ProgrammaticFindings {
   const lowercase = html.toLowerCase();
   const imageCount = (html.match(/<img\b/gi) || []).length;
@@ -176,8 +247,53 @@ export interface PsiScores {
 }
 
 /**
- * Tier 2: PageSpeed Insights API. Free up to 25k requests/day with key.
- * Returns scores in 0-1 range (PSI returns 0-100; we normalize).
+ * Tier 2: PageSpeed Insights API. Free up to 25k requests/day with key, ~1k/day
+ * without. Returns Lighthouse scores already normalized to 0-1 (PSI's
+ * `categories[].score` field is pre-normalized — we pass-through, no division).
+ *
+ * @param siteUrl - Fully-qualified URL. Must be publicly reachable by Google's
+ *   Lighthouse runners — `*.projectsites.dev` works out of the box; private
+ *   staging hostnames behind Access policies will time out.
+ * @param apiKey  - `PAGESPEED_API_KEY` Worker secret (free Google Cloud key).
+ *   When `undefined`, the call still works at the lower 1k/day anonymous
+ *   quota — useful in dev/staging where the secret isn't seeded.
+ * @returns `PsiScores` with `performance`, `accessibility`, `seo`,
+ *   `bestPractices` all in [0, 1] (or `null` per-category if Lighthouse
+ *   skipped that audit), plus `raw` containing the full PSI response body
+ *   for downstream consumers (retrospective tier introspects `audits[]` for
+ *   diff messages).
+ *
+ * @remarks
+ * Strategy: `mobile` only. PSI also supports `desktop`, but mobile is the
+ * stricter ruleset (slower CPU throttling, narrower viewport) and our
+ * sites must pass the mobile bar anyway — running both doubles cost +
+ * dilutes the regression signal.
+ *
+ * Timeout: 60s `AbortSignal.timeout`. PSI runs a real Lighthouse audit
+ * server-side which takes 20-40s; the 60s ceiling absorbs cold-start
+ * variance. Anything slower indicates Google-side outage — caller
+ * SHOULD catch and route through {@link runBenchmarks}'s PSI fallback path
+ * (continue with programmatic-only score, log audit).
+ *
+ * Side effect: 1 outbound POST to `googleapis.com/pagespeedonline/v5`.
+ * Counts against the Worker subrequest budget (1000/invocation) — at
+ * ~30s per call this is the slowest single step in the post-deploy
+ * pipeline. Defer via `ctx.waitUntil` when on the hot path.
+ *
+ * @throws {Error} `'benchmark.psi_failed status=<n> url=<u>'` when PSI returns
+ *   non-2xx (quota exhausted, Google outage, malformed siteUrl). Caller
+ *   MUST catch — {@link runBenchmarks} routes this to a structured audit
+ *   and continues without the PSI scores.
+ *
+ * @example
+ * ```ts
+ * const psi = await tierPsi('https://vitos.projectsites.dev', env.PAGESPEED_API_KEY);
+ * if (psi.performance != null && psi.performance < 0.75) {
+ *   await fireRegression(siteId, 'performance', psi.performance);
+ * }
+ * ```
+ *
+ * @see {@link https://developers.google.com/speed/docs/insights/v5/get-started PSI v5 API}
  */
 export async function tierPsi(siteUrl: string, apiKey: string | undefined): Promise<PsiScores> {
   const url = new URL('https://www.googleapis.com/pagespeedonline/v5/runPagespeed');
@@ -213,8 +329,68 @@ export interface BenchmarkResult {
 }
 
 /**
- * Run all free tiers, aggregate scores, persist to D1. Returns the result so
- * the caller can decide whether to fire the paid retrospective tier.
+ * Run all free tiers (programmatic + PSI), aggregate scores, persist to D1,
+ * and surface regression signal. Returns the result so the caller can decide
+ * whether to fire the paid tier-3 retrospective LLM diff.
+ *
+ * @param args                     - Named-args envelope.
+ * @param args.env                 - Worker `Env`. Requires `DB` (D1) for
+ *   `site_benchmarks` write and `PAGESPEED_API_KEY` (KV-seeded secret) for
+ *   tier 2. `PAGESPEED_API_KEY` is optional — its absence drops PSI into
+ *   anonymous-quota mode.
+ * @param args.siteId              - UUID of the site being benchmarked. Foreign
+ *   key into `sites.id`. Required for the `site_benchmarks` insert.
+ * @param args.slug                - Site slug (denormalized for fast joins on
+ *   the analytics dashboard — saves a 2nd D1 query per row).
+ * @param args.siteUrl             - Live URL to benchmark. Caller MUST ensure
+ *   the site is `published` AND propagated to edge; benchmarking a partial
+ *   build pollutes the regression baseline.
+ * @param args.previousMeanScore   - Optional prior `mean_score` from the
+ *   site's last successful build. Used to compute `regressedFromPrevious`
+ *   (drop > 0.1 = regression flag). Pass `null` for first builds — no
+ *   regression possible.
+ * @returns `BenchmarkResult` with the full programmatic findings, optional
+ *   PSI scores, aggregate `meanScore` in [0, 1], and `regressedFromPrevious`
+ *   boolean. Caller MUST inspect `regressedFromPrevious` to decide whether
+ *   to fire tier 3 (gpt-4o-mini retrospective diff).
+ *
+ * @remarks
+ * Aggregation: `meanScore = mean([programmatic.score, ...psiScores])` where
+ * `psiScores` is the 4 PSI category scores filtered to non-null. When PSI
+ * fails entirely (tier 2 throw), aggregation falls back to programmatic only
+ * — the single-tier score is preserved rather than zeroed, so a transient
+ * Google outage doesn't tank the regression baseline for downstream calls.
+ *
+ * Regression detection: `meanScore < previousMeanScore - 0.1`. The 0.1
+ * threshold is empirical — smaller deltas are noise (PSI variance ±0.05
+ * on identical builds); bigger deltas reliably indicate real regression
+ * (broken CSS, missing assets, copy revert). Tune by editing the constant
+ * inline; never expose as a config knob (would let users hide regressions).
+ *
+ * Side effect: 1 D1 INSERT into `site_benchmarks`. The full `psi.raw` body
+ * is serialized to `psi_raw_json` for retrospective tier introspection —
+ * D1 row size cap is 1 MB, well above PSI's ~50KB typical response.
+ *
+ * @throws Propagates programmatic-tier `Error` from {@link tierProgrammatic}
+ *   when the site is unreachable. Caller MUST `try/catch` — workflow routes
+ *   this to `audit_logs` with `action='benchmark.failed'` and continues.
+ *   PSI failures are caught internally and logged as `console.warn` — they
+ *   don't surface as throws.
+ *
+ * @example
+ * ```ts
+ * const result = await runBenchmarks({
+ *   env, siteId, slug,
+ *   siteUrl: `https://${slug}.projectsites.dev`,
+ *   previousMeanScore: priorRow?.mean_score ?? null,
+ * });
+ * if (result.regressedFromPrevious) {
+ *   await fireRetrospectiveDiff(env, result);
+ * }
+ * ```
+ *
+ * @see {@link tierProgrammatic}
+ * @see {@link tierPsi}
  */
 export async function runBenchmarks(args: {
   env: Env;

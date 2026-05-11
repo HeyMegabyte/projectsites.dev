@@ -38,8 +38,34 @@ interface OauthEnvSlice {
 }
 
 /**
- * Returns whether subscription-auth secrets are loaded. Cheap call —
- * use it to decide between subscription path and API-key fallback path.
+ * Cheap predicate: are subscription-auth secrets loaded into this Worker?
+ *
+ * @param env - Slice of `Env` containing the three Claude OAuth secrets
+ *   plus `CACHE_KV`. Wrangler exposes secrets as plain strings on `env`;
+ *   missing secrets are `undefined`.
+ * @returns `true` iff all three secrets (`CLAUDE_OAUTH_ACCESS_TOKEN`,
+ *   `CLAUDE_OAUTH_REFRESH_TOKEN`, `CLAUDE_OAUTH_EXPIRES_AT`) are present.
+ *   Empty strings count as missing (Boolean coercion).
+ *
+ * @remarks
+ * Call this BEFORE every container-build dispatch to decide between the
+ * subscription path (flat-rate Max 20x quota) and the metered-API
+ * fallback path. Performing the boolean check is ~1 microsecond — the
+ * actual {@link getValidClaudeOauth} call may hit KV + Anthropic's
+ * refresh endpoint, so guard with this first to avoid wasted work when
+ * secrets aren't seeded yet.
+ *
+ * @throws Never — pure synchronous boolean check.
+ *
+ * @example
+ * ```ts
+ * if (hasClaudeOauth(env)) {
+ *   const tokens = await getValidClaudeOauth(env);
+ *   headers['x-anthropic-oauth-token'] = tokens.accessToken;
+ * } else {
+ *   headers['x-api-key'] = env.ANTHROPIC_API_KEY;
+ * }
+ * ```
  */
 export function hasClaudeOauth(env: OauthEnvSlice): boolean {
   return Boolean(
@@ -50,13 +76,62 @@ export function hasClaudeOauth(env: OauthEnvSlice): boolean {
 }
 
 /**
- * Returns a valid (unexpired) access token + refresh token + expiry.
- * Refreshes via Anthropic's OAuth token endpoint when the cached copy is
- * within `REFRESH_SLACK_MS` of expiring. Persists rotated tokens to KV
- * so subsequent worker invocations reuse them.
+ * Resolve a valid (unexpired) Claude subscription OAuth bundle, refreshing
+ * via Anthropic's public token endpoint when the cached copy is within
+ * `REFRESH_SLACK_MS` (5 min) of expiration. Persists rotated tokens to KV
+ * (`anthropic:oauth:current`, 30-day TTL) so subsequent invocations skip
+ * the network refresh until the slack window opens again.
  *
- * @throws when no tokens are configured (caller should check `hasClaudeOauth`)
- *         or when the refresh call fails terminally (e.g. revoked token).
+ * @param env - Slice of `Env` containing the three OAuth secrets plus
+ *   `CACHE_KV`. Caller MUST gate with {@link hasClaudeOauth}.
+ * @returns Fresh `ClaudeOauthTokens` — guaranteed `expiresAt > Date.now() + 5min`
+ *   at return time. Caller should NOT cache the result across requests
+ *   (KV does that already); always re-call per invocation so a different
+ *   request that just rotated the token wins.
+ *
+ * @remarks
+ * Token-precedence rule: KV-cached copy wins over Wrangler secret seed
+ * iff its `expiresAt` is fresher. This handles the bootstrap case where
+ * `scripts/import-claude-oauth.mjs` seeded an older token via Wrangler
+ * secrets but a more recent refresh has since landed in KV. Secrets are
+ * immutable at runtime — KV is the only writable durable store the
+ * Worker has.
+ *
+ * Refresh-token rotation: Anthropic's OAuth issues a NEW refresh_token
+ * on every refresh (RFC 6749 §6 rotation pattern). We write the new
+ * pair atomically; partial failure (refresh succeeds but KV write
+ * rejects) means the next call must re-refresh with the OLD token —
+ * which Anthropic still honors for a short grace period. Don't try to
+ * eagerly invalidate the old token here.
+ *
+ * Side effect: 1 KV read worst case (cache miss → fall back to env),
+ * 0-1 outbound `POST` to `console.anthropic.com/v1/oauth/token`, 0-1
+ * KV write when refresh fires.
+ *
+ * @throws {Error} `'Claude OAuth secrets not configured ...'` when
+ *   secrets are missing — caller MUST gate with {@link hasClaudeOauth}.
+ * @throws {Error} `'Anthropic OAuth refresh failed: <status> <body>'`
+ *   when refresh endpoint returns non-2xx (revoked token, account
+ *   suspended, Anthropic outage). Caller SHOULD fall back to metered
+ *   API-key path and emit a Sentry alert — the refresh token has
+ *   likely been revoked and Brian needs to re-run
+ *   `scripts/import-claude-oauth.mjs`.
+ * @throws {Error} `'Anthropic OAuth refresh returned non-JSON ...'` or
+ *   `'... missing fields ...'` when response is malformed — typically
+ *   indicates an Anthropic-side breaking change to the token-endpoint
+ *   contract.
+ *
+ * @example
+ * ```ts
+ * if (!hasClaudeOauth(env)) {
+ *   return runWithApiKey(env);
+ * }
+ * const { accessToken } = await getValidClaudeOauth(env);
+ * await dispatchBuild(env, { authorization: `Bearer ${accessToken}` });
+ * ```
+ *
+ * @see {@link hasClaudeOauth}
+ * @see {@link https://datatracker.ietf.org/doc/html/rfc6749#section-6 RFC 6749 §6}
  */
 export async function getValidClaudeOauth(env: OauthEnvSlice): Promise<ClaudeOauthTokens> {
   if (!hasClaudeOauth(env)) {
