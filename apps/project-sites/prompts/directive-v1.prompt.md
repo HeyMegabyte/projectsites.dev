@@ -92,7 +92,7 @@ Apply `mode_inferred` wedge AFTER L1-L3. Each wedge contributes additional secti
 ### non-profit wedge
 - Donation CTA above the fold. Stripe-first GiveDirectly UX (preset $25/$50/$100/$250 + custom). `DonateAction` + `Organization.nonprofitStatus` JSON-LD.
 - Impact counters with IO+rAF roll-in (skill 11 build-breaking-rules).
-- Volunteer signup form via `forms.js` hijack.
+- Volunteer signup form via `widgets.js` hijack.
 
 ### saas wedge
 - Pricing page with 3 tiers + comparison matrix. `Product` + `Offer` JSON-LD per tier.
@@ -103,12 +103,12 @@ Apply `mode_inferred` wedge AFTER L1-L3. Each wedge contributes additional secti
 - Founder/Person JSON-LD with credentials row. Bio mentioning notable institutions = credentials row mandatory (skill 09 build-breaking).
 - Flagship work grid: 6+ entries, each with detail page + lightbox media + outcome metrics.
 
-## L5 — Static-Compat Backend (forms.js Only)
+## L5 — Static-Compat Backend (widgets.js Only)
 
-Generated sites have ZERO server-side runtime beyond `projectsites.dev` Worker. The only backend hook is `forms.js`:
+Generated sites have ZERO server-side runtime beyond `projectsites.dev` Worker. The only backend hook is the unified `widgets.js` bundle (form-hijack + audio-hero + Konami console — single IIFE, idempotent guard, ~6KB gzipped):
 
 ```html
-<script src="https://projectsites.dev/forms.js" data-slug="{{slug}}" defer></script>
+<script src="https://projectsites.dev/widgets.js" data-slug="{{slug}}" defer></script>
 <form data-projectsites-form="contact">
   <input name="email" required>
   <input name="message" required>
@@ -116,7 +116,9 @@ Generated sites have ZERO server-side runtime beyond `projectsites.dev` Worker. 
 </form>
 ```
 
-`forms.js` POSTs to `/api/v1/forms/submit` with `X-Site-Slug` header and routes submissions to the central admin dashboard at `editor.projectsites.dev`. Every newsletter signup, contact form, donation form, or RSVP form on a generated site MUST use this pattern. **No fetch calls to other origins.** No `<form action="...">`. Hijack-ready markup only.
+`widgets.js` POSTs form submissions to `/api/v1/forms/submit` with `X-Site-Slug` header and routes them to the central admin dashboard at `editor.projectsites.dev`. Every newsletter signup, contact form, donation form, or RSVP form on a generated site MUST use this pattern. **No fetch calls to other origins.** No `<form action="...">`. Hijack-ready markup only.
+
+(Legacy `/forms.js`, `/scripts/audio-hero.js`, `/scripts/konami-console.js` remain as redirect shims for already-deployed sites, but new generation MUST embed `widgets.js` directly to avoid the extra round-trip.)
 
 ## L6 — Customer Expert Injection
 

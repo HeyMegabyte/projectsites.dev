@@ -1,5 +1,6 @@
 import type { WebContainer } from '@webcontainer/api';
 import { atom } from 'nanostores';
+import { postToParent } from '~/lib/embed/embedded-mode';
 
 // Extend Window interface to include our custom property
 declare global {
@@ -26,6 +27,7 @@ export class PreviewsStore {
   #refreshTimeouts = new Map<string, NodeJS.Timeout>();
   #REFRESH_DELAY = 300;
   #storageChannel?: BroadcastChannel;
+  #appRunningNotified = false;
 
   previews = atom<PreviewInfo[]>([]);
 
@@ -176,6 +178,12 @@ export class PreviewsStore {
 
       // Initial storage sync when preview is ready
       this._broadcastStorageSync();
+
+      // Signal projectsites.dev parent that Start Application completed
+      if (!this.#appRunningNotified) {
+        this.#appRunningNotified = true;
+        postToParent({ type: 'PS_APP_RUNNING', port, url });
+      }
     });
 
     // Listen for port events

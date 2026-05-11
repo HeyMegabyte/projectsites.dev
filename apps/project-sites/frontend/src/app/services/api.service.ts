@@ -353,6 +353,38 @@ export class ApiService {
   deleteIntegration(siteId: string, id: string): Observable<void> {
     return this.delete(`/sites/${siteId}/integrations/${id}`);
   }
+
+  /** Get GitHub backup connection status for a site */
+  getGithubBackupStatus(siteId: string): Observable<{ data: GithubBackupStatus }> {
+    return this.get(`/sites/${siteId}/github/status`);
+  }
+
+  /** Start GitHub OAuth flow; returns redirect URL */
+  startGithubOAuth(siteId: string, returnUrl: string): Observable<{ url: string }> {
+    return this.get(`/sites/${siteId}/github/connect`, { return_url: returnUrl });
+  }
+
+  /** Trigger immediate backup commit (HEAD of main → snapshot commit) */
+  triggerGithubBackup(siteId: string): Observable<{ data: { commit_sha: string; html_url: string } }> {
+    return this.post(`/sites/${siteId}/github/backup`, {});
+  }
+
+  /** Disconnect GitHub integration (revokes stored OAuth token) */
+  disconnectGithub(siteId: string): Observable<void> {
+    return this.post(`/sites/${siteId}/github/disconnect`, {});
+  }
+}
+
+export interface GithubBackupStatus {
+  connected: boolean;
+  repo?: string;
+  owner?: string;
+  html_url?: string;
+  last_backup_at?: string;
+  last_commit_sha?: string;
+  commit_count?: number;
+  github_user?: string;
+  github_avatar_url?: string;
 }
 
 export type NewsletterProvider = 'mailchimp' | 'webhook' | 'resend' | 'sendgrid' | 'convertkit' | 'klaviyo';

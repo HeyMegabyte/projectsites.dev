@@ -26,7 +26,7 @@
  *   animated gradient/grid/scanline backdrop, status-coded recovery copy,
  *   and a `// diagnostics` block carrying the `request_id` (the join key for
  *   ops to grep audit_logs + Sentry + PostHog).
- * - API clients (`Accept: application/json`, `*/*`, missing, curl) receive
+ * - API clients (`Accept: application/json`, `* /*` (no space), missing, curl) receive
  *   the canonical JSON envelope `{ error: { code, message, request_id, details? } }`.
  *
  * Why a custom error page instead of CF's default: branded 4xx/5xx surfaces

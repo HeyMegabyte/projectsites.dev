@@ -46,6 +46,17 @@ export interface BoltReadyMessage {
   type: 'PS_BOLT_READY';
 }
 
+/**
+ * Fires once the WebContainer dev server emits `server-ready` — i.e.
+ * Start Application has completed and the preview URL responds with 200.
+ * Parent uses this to dismiss the Editor loading veil cleanly.
+ */
+export interface AppRunningMessage {
+  type: 'PS_APP_RUNNING';
+  port: number;
+  url: string;
+}
+
 export interface FilesReadyMessage {
   type: 'PS_FILES_READY';
   files: Record<string, string>;
@@ -55,7 +66,7 @@ export interface FilesReadyMessage {
 
 export interface GenerationStatusMessage {
   type: 'PS_GENERATION_STATUS';
-  status: 'idle' | 'generating' | 'complete' | 'error';
+  status: 'idle' | 'generating' | 'complete' | 'error' | 'app_ready' | 'preview_ready';
   error?: string;
   correlationId: string;
 }
@@ -65,7 +76,11 @@ export type ParentToChildMessage =
   | ImportFilesMessage
   | RequestFilesMessage
   | LoadBuildContextMessage;
-export type ChildToParentMessage = BoltReadyMessage | FilesReadyMessage | GenerationStatusMessage;
+export type ChildToParentMessage =
+  | BoltReadyMessage
+  | AppRunningMessage
+  | FilesReadyMessage
+  | GenerationStatusMessage;
 
 // ── Allowed origins ──────────────────────────────────────────
 

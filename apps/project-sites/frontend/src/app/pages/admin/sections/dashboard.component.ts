@@ -76,7 +76,11 @@ import { ApiService, type LogEntry } from '../../../services/api.service';
 
         <!-- ═══ Stats Row: 4 even compact cards ═══ -->
         <div class="grid grid-cols-4 gap-3 mb-5 max-md:grid-cols-2 max-[480px]:grid-cols-1">
-          <div class="stat-card cursor-pointer" (click)="goTo('/admin/domains')">
+          <div class="stat-card cursor-pointer" role="button" tabindex="0"
+               (click)="goTo('/admin/domains')"
+               (keydown.enter)="goTo('/admin/domains')"
+               (keydown.space)="$event.preventDefault(); goTo('/admin/domains')"
+               aria-label="View domains">
             <div class="stat-icon bg-primary/[0.08] text-primary">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
             </div>
@@ -86,7 +90,11 @@ import { ApiService, type LogEntry } from '../../../services/api.service';
             </div>
           </div>
 
-          <div class="stat-card cursor-pointer" (click)="goTo('/admin/billing')">
+          <div class="stat-card cursor-pointer" role="button" tabindex="0"
+               (click)="goTo('/admin/billing')"
+               (keydown.enter)="goTo('/admin/billing')"
+               (keydown.space)="$event.preventDefault(); goTo('/admin/billing')"
+               aria-label="View billing">
             <div class="stat-icon" [class]="state.subscription()?.status === 'active' ? 'bg-green-500/[0.08] text-green-400' : 'bg-white/[0.04] text-text-secondary'">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
             </div>
@@ -96,7 +104,11 @@ import { ApiService, type LogEntry } from '../../../services/api.service';
             </div>
           </div>
 
-          <div class="stat-card cursor-pointer" (click)="goTo('/admin/analytics')">
+          <div class="stat-card cursor-pointer" role="button" tabindex="0"
+               (click)="goTo('/admin/analytics')"
+               (keydown.enter)="goTo('/admin/analytics')"
+               (keydown.space)="$event.preventDefault(); goTo('/admin/analytics')"
+               aria-label="View analytics">
             <div class="stat-icon bg-primary/[0.08] text-primary">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
             </div>
@@ -106,9 +118,13 @@ import { ApiService, type LogEntry } from '../../../services/api.service';
             </div>
           </div>
 
-          <div class="stat-card cursor-pointer" (click)="goTo('/admin/email')">
+          <div class="stat-card cursor-pointer" role="button" tabindex="0"
+               (click)="goTo('/admin/forms')"
+               (keydown.enter)="goTo('/admin/forms')"
+               (keydown.space)="$event.preventDefault(); goTo('/admin/forms')"
+               aria-label="View form submissions">
             <div class="stat-icon bg-violet-500/[0.08] text-violet-400">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
             </div>
             <div class="stat-content">
               <span class="stat-value">0</span>
@@ -157,7 +173,11 @@ import { ApiService, type LogEntry } from '../../../services/api.service';
 
           <!-- Section Summaries: 2x2 grid for visual balance -->
           <div class="grid grid-cols-2 gap-3 h-full max-sm:grid-cols-1">
-            <div class="section-link-card" (click)="goTo('/admin/domains')">
+            <div class="section-link-card" role="button" tabindex="0"
+                 (click)="goTo('/admin/domains')"
+                 (keydown.enter)="goTo('/admin/domains')"
+                 (keydown.space)="$event.preventDefault(); goTo('/admin/domains')"
+                 aria-label="Manage domains">
               <div class="flex flex-col gap-2 min-w-0 flex-1">
                 <div class="w-9 h-9 rounded-xl bg-primary/[0.06] flex items-center justify-center text-primary flex-shrink-0">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
@@ -168,18 +188,26 @@ import { ApiService, type LogEntry } from '../../../services/api.service';
               <span class="text-[0.7rem] text-primary/50 self-end">Manage &rarr;</span>
             </div>
 
-            <div class="section-link-card" (click)="goTo('/admin/email')">
+            <div class="section-link-card" role="button" tabindex="0"
+                 (click)="goTo('/admin/forms')"
+                 (keydown.enter)="goTo('/admin/forms')"
+                 (keydown.space)="$event.preventDefault(); goTo('/admin/forms')"
+                 aria-label="Manage forms">
               <div class="flex flex-col gap-2 min-w-0 flex-1">
                 <div class="w-9 h-9 rounded-xl bg-violet-500/[0.06] flex items-center justify-center text-violet-400 flex-shrink-0">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
                 </div>
-                <span class="text-[0.82rem] font-semibold text-white">E-mail &amp; Forms</span>
-                <span class="text-[0.7rem] text-text-secondary">Newsletter + submissions</span>
+                <span class="text-[0.82rem] font-semibold text-white">Forms</span>
+                <span class="text-[0.7rem] text-text-secondary">Submissions + AI rules</span>
               </div>
               <span class="text-[0.7rem] text-primary/50 self-end">Manage &rarr;</span>
             </div>
 
-            <div class="section-link-card" (click)="goTo('/admin/billing')">
+            <div class="section-link-card" role="button" tabindex="0"
+                 (click)="goTo('/admin/billing')"
+                 (keydown.enter)="goTo('/admin/billing')"
+                 (keydown.space)="$event.preventDefault(); goTo('/admin/billing')"
+                 aria-label="Manage billing">
               <div class="flex flex-col gap-2 min-w-0 flex-1">
                 <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
                      [class]="state.subscription()?.status === 'active' ? 'bg-green-500/[0.06] text-green-400' : 'bg-white/[0.04] text-text-secondary'">
@@ -191,7 +219,11 @@ import { ApiService, type LogEntry } from '../../../services/api.service';
               <span class="text-[0.7rem] text-primary/50 self-end">Manage &rarr;</span>
             </div>
 
-            <div class="section-link-card" (click)="goTo('/admin/analytics')">
+            <div class="section-link-card" role="button" tabindex="0"
+                 (click)="goTo('/admin/analytics')"
+                 (keydown.enter)="goTo('/admin/analytics')"
+                 (keydown.space)="$event.preventDefault(); goTo('/admin/analytics')"
+                 aria-label="View analytics">
               <div class="flex flex-col gap-2 min-w-0 flex-1">
                 <div class="w-9 h-9 rounded-xl bg-primary/[0.06] flex items-center justify-center text-primary flex-shrink-0">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
@@ -208,7 +240,15 @@ import { ApiService, type LogEntry } from '../../../services/api.service';
     </div>
   `,
   styles: [`
+    /* HBO-cinematic transitions — standard ease + elastic for snap */
+    :host {
+      --ease-cinematic: cubic-bezier(0.4, 0, 0.2, 1);
+      --ease-elastic: cubic-bezier(0.34, 1.56, 0.64, 1);
+      --ring-cyan: 0 0 0 2px #000, 0 0 0 4px rgba(0, 229, 255, 0.5);
+    }
+
     .stat-card {
+      position: relative;
       display: flex;
       align-items: center;
       gap: 12px;
@@ -216,11 +256,49 @@ import { ApiService, type LogEntry } from '../../../services/api.service';
       background: rgba(255, 255, 255, 0.02);
       border: 1px solid rgba(255, 255, 255, 0.06);
       border-radius: 14px;
-      transition: border-color 0.2s;
+      transition:
+        transform 320ms var(--ease-cinematic),
+        background 320ms var(--ease-cinematic),
+        border-color 320ms var(--ease-cinematic),
+        box-shadow 320ms var(--ease-cinematic);
+      will-change: transform;
+      outline: none;
+    }
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 14px;
+      background: linear-gradient(135deg, rgba(0, 229, 255, 0.08), transparent 60%);
+      opacity: 0;
+      transition: opacity 320ms var(--ease-cinematic);
+      pointer-events: none;
     }
     .stat-card:hover {
-      border-color: rgba(0, 229, 255, 0.15);
+      transform: translateY(-2px);
+      border-color: rgba(0, 229, 255, 0.28);
+      background: rgba(0, 229, 255, 0.03);
+      box-shadow:
+        0 12px 32px -16px rgba(0, 229, 255, 0.35),
+        0 0 0 1px rgba(0, 229, 255, 0.12) inset;
     }
+    .stat-card:hover::before { opacity: 1; }
+    .stat-card:hover .stat-icon {
+      transform: scale(1.08) rotate(-2deg);
+    }
+    .stat-card:focus-visible {
+      transform: translateY(-2px);
+      box-shadow: var(--ring-cyan);
+      border-color: rgba(0, 229, 255, 0.4);
+    }
+    .stat-card:active {
+      transform: translateY(0) scale(0.985);
+      transition-duration: 80ms;
+      box-shadow:
+        0 4px 12px -8px rgba(0, 229, 255, 0.3),
+        0 0 0 1px rgba(0, 229, 255, 0.18) inset;
+    }
+
     .stat-icon {
       width: 36px;
       height: 36px;
@@ -229,16 +307,20 @@ import { ApiService, type LogEntry } from '../../../services/api.service';
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
+      transition: transform 320ms var(--ease-elastic);
     }
     .stat-content {
       display: flex;
       flex-direction: column;
       gap: 1px;
+      position: relative;
+      z-index: 1;
     }
     .stat-value {
       font-size: 1.15rem;
       font-weight: 700;
       color: white;
+      font-variant-numeric: tabular-nums;
     }
     .stat-label {
       font-size: 0.68rem;
@@ -246,7 +328,9 @@ import { ApiService, type LogEntry } from '../../../services/api.service';
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
+
     .section-link-card {
+      position: relative;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
@@ -256,13 +340,68 @@ import { ApiService, type LogEntry } from '../../../services/api.service';
       border: 1px solid rgba(255, 255, 255, 0.06);
       border-radius: 14px;
       cursor: pointer;
-      transition: all 0.2s;
       min-height: 140px;
+      overflow: hidden;
+      transition:
+        transform 320ms var(--ease-cinematic),
+        background 320ms var(--ease-cinematic),
+        border-color 320ms var(--ease-cinematic),
+        box-shadow 320ms var(--ease-cinematic);
+      will-change: transform;
+      outline: none;
+    }
+    .section-link-card::after {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -100%;
+      width: 75%;
+      height: 200%;
+      background: linear-gradient(
+        110deg,
+        transparent 30%,
+        rgba(0, 229, 255, 0.06) 50%,
+        transparent 70%
+      );
+      transition: left 760ms var(--ease-cinematic);
+      pointer-events: none;
     }
     .section-link-card:hover {
-      border-color: rgba(0, 229, 255, 0.15);
-      background: rgba(0, 229, 255, 0.02);
-      transform: translateY(-1px);
+      transform: translateY(-3px);
+      border-color: rgba(0, 229, 255, 0.32);
+      background: rgba(0, 229, 255, 0.035);
+      box-shadow:
+        0 18px 40px -20px rgba(0, 229, 255, 0.4),
+        0 0 0 1px rgba(0, 229, 255, 0.14) inset;
+    }
+    .section-link-card:hover::after {
+      left: 125%;
+    }
+    .section-link-card:focus-visible {
+      transform: translateY(-3px);
+      box-shadow: var(--ring-cyan);
+      border-color: rgba(0, 229, 255, 0.45);
+    }
+    .section-link-card:active {
+      transform: translateY(-1px) scale(0.99);
+      transition-duration: 80ms;
+      box-shadow:
+        0 6px 16px -10px rgba(0, 229, 255, 0.3),
+        0 0 0 1px rgba(0, 229, 255, 0.22) inset;
+    }
+
+    /* Reduced-motion: strip transforms, keep color cues */
+    @media (prefers-reduced-motion: reduce) {
+      .stat-card,
+      .stat-card::before,
+      .stat-icon,
+      .section-link-card,
+      .section-link-card::after {
+        transition: background 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
+        transform: none !important;
+        animation: none !important;
+      }
+      .section-link-card::after { display: none; }
     }
   `],
 })

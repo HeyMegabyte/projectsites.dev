@@ -412,6 +412,18 @@ function runJob(jobId, dir, prompt, envVars, timeoutMin, callbackUrl, callbackSe
       jobs[jobId].errorClass = 'claude_silent_exit';
     }
 
+    // Generic nonzero-exit catch-all: any code !== 0 that wasn't already
+    // tagged by CREDIT_LOW_RE or claude_silent_exit MUST still fail-close
+    // so we never proceed to npm install/build/R2 upload on a stub tree.
+    // Reference incident (2026-05-11): LMG job-1778511630344-q33i3h exited
+    // code=1 in 3s with stdout="You've hit your org's monthly usage limit"
+    // and the previous regex missed the phrasing — the container proceeded
+    // to ship a template-stub site. This guard makes the 3-layer defense
+    // unconditional regardless of stdout/stderr signature.
+    if (!jobs[jobId].errorClass && code !== 0) {
+      jobs[jobId].errorClass = 'claude_exit_nonzero';
+    }
+
     // Short-circuit: skip npm install/build/R2 upload entirely when claude
     // never produced real output. Prevents 5+ minutes of wasted container time
     // and a misleading "published" status on a template-only dist.
