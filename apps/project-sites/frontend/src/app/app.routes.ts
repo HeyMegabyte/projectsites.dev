@@ -69,9 +69,9 @@ export const routes: Routes = [
           import('./pages/admin/sections/audit.component').then((m) => m.AdminAuditComponent),
       },
       {
-        path: 'email',
+        path: 'github',
         loadComponent: () =>
-          import('./pages/admin/sections/email.component').then((m) => m.AdminEmailComponent),
+          import('./pages/admin/sections/github-backup.component').then((m) => m.AdminGithubBackupComponent),
       },
       {
         path: 'settings',

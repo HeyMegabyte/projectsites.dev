@@ -193,8 +193,14 @@ export class ApiService {
   }
 
   /** Billing checkout */
-  createCheckout(orgId: string, siteId: string, returnUrl: string): Observable<{ data: { client_secret: string } }> {
-    return this.post('/billing/embedded-checkout', { org_id: orgId, site_id: siteId, return_url: returnUrl });
+  createCheckout(orgId: string, siteId: string, returnUrl: string, budgetTier?: BudgetTier): Observable<{ data: { client_secret: string } }> {
+    const payload: { org_id: string; site_id: string; return_url: string; budget_tier?: BudgetTier } = {
+      org_id: orgId,
+      site_id: siteId,
+      return_url: returnUrl,
+    };
+    if (budgetTier && budgetTier !== 'free') payload.budget_tier = budgetTier;
+    return this.post('/billing/embedded-checkout', payload);
   }
 
   /** Billing portal */
@@ -233,6 +239,11 @@ export class ApiService {
   /** Generate an expert prompt using OpenAI research pipeline */
   generatePrompt(body: { site_id?: string; business_name: string; business_address?: string; google_place_id?: string; additional_context?: string }): Observable<{ data: { prompt: string; research: Record<string, unknown> } }> {
     return this.post('/sites/generate-prompt', body);
+  }
+
+  /** Improve / restructure rough notes via Workers AI (no auth required) */
+  improvePrompt(body: { text: string; business_name?: string; business_address?: string }): Observable<{ data: { improved_text: string } }> {
+    return this.post('/sites/improve-prompt', body);
   }
 
   /** Deploy ZIP to site */
@@ -342,6 +353,38 @@ export class ApiService {
   deleteIntegration(siteId: string, id: string): Observable<void> {
     return this.delete(`/sites/${siteId}/integrations/${id}`);
   }
+
+  /** Get GitHub backup connection status for a site */
+  getGithubBackupStatus(siteId: string): Observable<{ data: GithubBackupStatus }> {
+    return this.get(`/sites/${siteId}/github/status`);
+  }
+
+  /** Start GitHub OAuth flow; returns redirect URL */
+  startGithubOAuth(siteId: string, returnUrl: string): Observable<{ url: string }> {
+    return this.get(`/sites/${siteId}/github/connect`, { return_url: returnUrl });
+  }
+
+  /** Trigger immediate backup commit (HEAD of main → snapshot commit) */
+  triggerGithubBackup(siteId: string): Observable<{ data: { commit_sha: string; html_url: string } }> {
+    return this.post(`/sites/${siteId}/github/backup`, {});
+  }
+
+  /** Disconnect GitHub integration (revokes stored OAuth token) */
+  disconnectGithub(siteId: string): Observable<void> {
+    return this.post(`/sites/${siteId}/github/disconnect`, {});
+  }
+}
+
+export interface GithubBackupStatus {
+  connected: boolean;
+  repo?: string;
+  owner?: string;
+  html_url?: string;
+  last_backup_at?: string;
+  last_commit_sha?: string;
+  commit_count?: number;
+  github_user?: string;
+  github_avatar_url?: string;
 }
 
 export type NewsletterProvider = 'mailchimp' | 'webhook' | 'resend' | 'sendgrid' | 'convertkit' | 'klaviyo';
@@ -421,6 +464,15 @@ export interface Site {
   updated_at: string;
 }
 
+/**
+ * Budget tier selected at /create checkout — drives premium media gating
+ * (Sora hero video, NotebookLM podcast, immersive infographics) and the
+ * `max_generated_images` cap inside the site-generation orchestrator.
+ *
+ * Mirrors `budgetTierSchema` in `@project-sites/shared/schemas`.
+ */
+export type BudgetTier = 'free' | 'standard' | 'plus' | 'premium';
+
 export interface CreateSitePayload {
   mode: 'business' | 'custom';
   additional_context?: string;
@@ -433,11 +485,13 @@ export interface CreateSitePayload {
     types?: string[];
     category?: string;
   };
+  budget_tier?: BudgetTier;
 }
 
 export interface ResetSitePayload {
   business: { name: string; address: string; place_id?: string };
   additional_context?: string;
+  budget_tier?: BudgetTier;
 }
 
 export interface LogEntry {

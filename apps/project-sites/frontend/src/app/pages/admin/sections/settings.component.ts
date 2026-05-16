@@ -13,9 +13,9 @@ import { ToastService } from '../../../services/toast.service';
     <div class="p-7 flex-1 overflow-y-auto animate-fade-in max-md:p-4 space-y-6">
 
       <!-- ── General ─────────────────────────────────── -->
-      <div class="bg-white/[0.02] border border-white/[0.06] rounded-[14px] p-6">
+      <div class="settings-card">
         <h3 class="text-base font-semibold text-white m-0 mb-5 flex items-center gap-2">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <svg class="settings-card-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           General
         </h3>
         @if (state.selectedSite(); as site) {
@@ -38,17 +38,17 @@ import { ToastService } from '../../../services/toast.service';
       </div>
 
       <!-- ── Domains ─────────────────────────────────── -->
-      <div class="bg-white/[0.02] border border-white/[0.06] rounded-[14px] p-6">
+      <div class="settings-card">
         <h3 class="text-base font-semibold text-white m-0 mb-5 flex items-center gap-2">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          <svg class="settings-card-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
           Domains
         </h3>
 
         <!-- Tabs -->
-        <div class="flex gap-1 mb-5 p-1 bg-primary/[0.03] rounded-[10px] border border-white/[0.06]">
-          <button class="flex-1 py-2 px-4 border-none bg-transparent text-text-secondary text-[0.78rem] font-medium font-sans cursor-pointer rounded-[7px] transition-all" [class.tab-active]="domainTab() === 'existing'" (click)="domainTab.set('existing')">Your Domains</button>
-          <button class="flex-1 py-2 px-4 border-none bg-transparent text-text-secondary text-[0.78rem] font-medium font-sans cursor-pointer rounded-[7px] transition-all" [class.tab-active]="domainTab() === 'connect'" (click)="domainTab.set('connect')">Connect Domain</button>
-          <button class="flex-1 py-2 px-4 border-none bg-transparent text-text-secondary text-[0.78rem] font-medium font-sans cursor-pointer rounded-[7px] transition-all" [class.tab-active]="domainTab() === 'register'" (click)="domainTab.set('register')">Register New</button>
+        <div class="tabs-rail flex gap-1 mb-5 p-1 bg-primary/[0.03] rounded-[10px] border border-white/[0.06]">
+          <button class="tab-btn" [class.tab-active]="domainTab() === 'existing'" (click)="domainTab.set('existing')">Your Domains</button>
+          <button class="tab-btn" [class.tab-active]="domainTab() === 'connect'" (click)="domainTab.set('connect')">Connect Domain</button>
+          <button class="tab-btn" [class.tab-active]="domainTab() === 'register'" (click)="domainTab.set('register')">Register New</button>
         </div>
 
         @if (loadingHostnames()) {
@@ -79,8 +79,8 @@ import { ToastService } from '../../../services/toast.service';
                 </div>
               </div>
 
-              @for (hn of hostnames(); track hn.id) {
-                <div class="flex flex-col gap-2 p-3.5 px-4 bg-primary/[0.02] rounded-[10px] border border-white/[0.06] transition-colors hover:border-primary/[0.15]">
+              @for (hn of hostnames(); track hn.id; let i = $index) {
+                <div class="hostname-row" [style.animation-delay.ms]="i * 60">
                   <div class="flex items-center gap-2 flex-wrap">
                     <span class="w-2 h-2 rounded-full flex-shrink-0" [ngClass]="'hn-dot-' + hn.status"></span>
                     <a [href]="'https://' + hn.hostname" target="_blank" rel="noopener" class="text-[0.85rem] text-primary no-underline">{{ hn.hostname }}</a>
@@ -158,13 +158,13 @@ import { ToastService } from '../../../services/toast.service';
       </div>
 
       <!-- ── Contact Email ─────────────────────────── -->
-      <div class="bg-white/[0.02] border border-white/[0.06] rounded-[14px] p-6">
+      <div class="settings-card">
         <div class="flex items-center justify-between mb-5">
           <h3 class="text-base font-semibold text-white m-0 flex items-center gap-2">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            <svg class="settings-card-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
             Contact Email
           </h3>
-          <span class="text-[0.62rem] font-bold py-0.5 px-2.5 rounded-full uppercase bg-primary/10 text-primary">Coming soon</span>
+          <span class="coming-pill">Coming soon</span>
         </div>
         @if (state.selectedSite()) {
           <div>
@@ -176,9 +176,9 @@ import { ToastService } from '../../../services/toast.service';
       </div>
 
       <!-- ── Danger Zone ─────────────────────────────── -->
-      <div class="bg-white/[0.02] border border-red-500/[0.12] rounded-[14px] p-6">
+      <div class="settings-card settings-card-danger">
         <h3 class="text-[0.85rem] font-semibold text-red-500 m-0 mb-3 flex items-center gap-2">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <svg class="settings-card-icon danger" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           Danger Zone
         </h3>
         @if (state.selectedSite(); as site) {
@@ -201,6 +201,498 @@ import { ToastService } from '../../../services/toast.service';
 
     </div>
   `,
+  styles: [`
+    :host {
+      --ease-cinematic: cubic-bezier(0.4, 0, 0.2, 1);
+      --ease-elastic: cubic-bezier(0.34, 1.56, 0.64, 1);
+      --ring-cyan: 0 0 0 2px #000, 0 0 0 4px rgba(0, 229, 255, 0.55);
+      --ring-danger: 0 0 0 2px #000, 0 0 0 4px rgba(248, 113, 113, 0.55);
+    }
+
+    /* ── Card shell ─────────────────────────────────── */
+    .settings-card {
+      position: relative;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 14px;
+      padding: 1.5rem;
+      overflow: hidden;
+      animation: fadeUp 480ms var(--ease-cinematic) both;
+      transition:
+        transform 360ms var(--ease-cinematic),
+        border-color 360ms var(--ease-cinematic),
+        box-shadow 360ms var(--ease-cinematic),
+        background-color 360ms var(--ease-cinematic);
+    }
+    .settings-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 14px;
+      background: linear-gradient(135deg, rgba(0, 229, 255, 0.04) 0%, transparent 45%, rgba(124, 58, 237, 0.03) 100%);
+      opacity: 0;
+      transition: opacity 360ms var(--ease-cinematic);
+      pointer-events: none;
+    }
+    .settings-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(0, 229, 255, 0.22);
+      background: rgba(255, 255, 255, 0.028);
+      box-shadow:
+        0 20px 56px -28px rgba(0, 229, 255, 0.32),
+        0 0 0 1px rgba(0, 229, 255, 0.06) inset;
+    }
+    .settings-card:hover::before { opacity: 1; }
+    .settings-card-danger {
+      border-color: rgba(248, 113, 113, 0.14);
+    }
+    .settings-card-danger:hover {
+      border-color: rgba(248, 113, 113, 0.32);
+      box-shadow:
+        0 20px 56px -28px rgba(248, 113, 113, 0.32),
+        0 0 0 1px rgba(248, 113, 113, 0.08) inset;
+    }
+    .settings-card-danger::before {
+      background: linear-gradient(135deg, rgba(248, 113, 113, 0.05) 0%, transparent 50%);
+    }
+
+    /* ── Card icon ──────────────────────────────────── */
+    .settings-card-icon {
+      color: rgba(0, 229, 255, 0.85);
+      transition: transform 420ms var(--ease-elastic), color 360ms var(--ease-cinematic);
+    }
+    .settings-card:hover .settings-card-icon {
+      transform: rotate(-8deg) scale(1.12);
+      color: #00E5FF;
+    }
+    .settings-card-icon.danger { color: rgba(248, 113, 113, 0.9); }
+    .settings-card-danger:hover .settings-card-icon.danger {
+      transform: rotate(-6deg) scale(1.1);
+      color: #fb7185;
+    }
+
+    /* ── Pills ──────────────────────────────────────── */
+    .coming-pill {
+      font-size: 0.62rem;
+      font-weight: 700;
+      padding: 0.125rem 0.625rem;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      background: rgba(0, 229, 255, 0.1);
+      color: #00E5FF;
+      border: 1px solid rgba(0, 229, 255, 0.16);
+      transition: transform 240ms var(--ease-elastic), box-shadow 240ms var(--ease-cinematic);
+    }
+    .coming-pill:hover {
+      transform: scale(1.06);
+      box-shadow: 0 0 16px rgba(0, 229, 255, 0.35);
+    }
+
+    /* ── Tab rail ───────────────────────────────────── */
+    .tabs-rail {
+      position: relative;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 0.5rem 1rem;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary, rgba(255, 255, 255, 0.6));
+      font-size: 0.78rem;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      border-radius: 7px;
+      position: relative;
+      overflow: hidden;
+      transition:
+        color 280ms var(--ease-cinematic),
+        background-color 280ms var(--ease-cinematic),
+        transform 80ms var(--ease-cinematic);
+    }
+    .tab-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(0, 229, 255, 0.18), rgba(124, 58, 237, 0.12));
+      opacity: 0;
+      transition: opacity 280ms var(--ease-cinematic);
+      border-radius: inherit;
+    }
+    .tab-btn:hover {
+      color: rgba(255, 255, 255, 0.92);
+      background: rgba(255, 255, 255, 0.04);
+    }
+    .tab-btn:focus-visible {
+      outline: none;
+      box-shadow: var(--ring-cyan);
+    }
+    .tab-btn:active {
+      transform: scale(0.97);
+    }
+    .tab-btn.tab-active {
+      color: #00E5FF;
+      background: rgba(0, 229, 255, 0.08);
+      box-shadow: 0 0 0 1px rgba(0, 229, 255, 0.22), 0 8px 24px -16px rgba(0, 229, 255, 0.6);
+    }
+    .tab-btn.tab-active::before { opacity: 1; }
+    .tab-btn.tab-active::after {
+      content: '';
+      position: absolute;
+      bottom: 3px;
+      left: 20%;
+      right: 20%;
+      height: 2px;
+      border-radius: 2px;
+      background: linear-gradient(90deg, transparent, #00E5FF, transparent);
+      animation: indicatorSweep 1.8s var(--ease-cinematic) infinite;
+    }
+
+    /* ── Hostname row ───────────────────────────────── */
+    .hostname-row {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      padding: 0.875rem 1rem;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 10px;
+      animation: slideIn 460ms var(--ease-cinematic) both;
+      transition:
+        transform 280ms var(--ease-cinematic),
+        border-color 280ms var(--ease-cinematic),
+        background-color 280ms var(--ease-cinematic),
+        box-shadow 280ms var(--ease-cinematic);
+    }
+    .hostname-row:hover {
+      transform: translateX(3px);
+      border-color: rgba(0, 229, 255, 0.2);
+      background: rgba(0, 229, 255, 0.025);
+      box-shadow: 0 10px 28px -18px rgba(0, 229, 255, 0.28);
+    }
+    .hostname-row:focus-within {
+      border-color: rgba(0, 229, 255, 0.3);
+      box-shadow: var(--ring-cyan);
+    }
+
+    /* ── Hostname status dot/chip ───────────────────── */
+    :host ::ng-deep .hn-dot-active {
+      background: #22c55e;
+      box-shadow: 0 0 8px rgba(34, 197, 94, 0.55);
+    }
+    :host ::ng-deep .hn-dot-pending {
+      background: #f59e0b;
+      box-shadow: 0 0 8px rgba(245, 158, 11, 0.55);
+      animation: pulseDot 1.8s var(--ease-cinematic) infinite;
+    }
+    :host ::ng-deep .hn-dot-failed,
+    :host ::ng-deep .hn-dot-error {
+      background: #f87171;
+      box-shadow: 0 0 8px rgba(248, 113, 113, 0.55);
+    }
+    :host ::ng-deep .hn-chip-active {
+      background: rgba(34, 197, 94, 0.12);
+      color: #22c55e;
+    }
+    :host ::ng-deep .hn-chip-pending {
+      background: rgba(245, 158, 11, 0.12);
+      color: #f59e0b;
+    }
+    :host ::ng-deep .hn-chip-failed,
+    :host ::ng-deep .hn-chip-error {
+      background: rgba(248, 113, 113, 0.12);
+      color: #f87171;
+    }
+
+    /* ── Inputs ─────────────────────────────────────── */
+    :host ::ng-deep .input-field {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      color: #fff;
+      padding: 0.55rem 0.75rem;
+      font-size: 0.85rem;
+      outline: none;
+      transition:
+        border-color 240ms var(--ease-cinematic),
+        background-color 240ms var(--ease-cinematic),
+        box-shadow 240ms var(--ease-cinematic);
+    }
+    :host ::ng-deep .input-field:hover:not(:disabled) {
+      border-color: rgba(0, 229, 255, 0.2);
+    }
+    :host ::ng-deep .input-field:focus {
+      border-color: rgba(0, 229, 255, 0.55);
+      background: rgba(0, 0, 0, 0.4);
+      box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.12);
+    }
+    :host ::ng-deep .input-field:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* ── Buttons ────────────────────────────────────── */
+    :host ::ng-deep .btn-ghost-sm {
+      background: rgba(0, 229, 255, 0.06);
+      border: 1px solid rgba(0, 229, 255, 0.16);
+      color: #00E5FF;
+      padding: 0.4rem 0.85rem;
+      font-size: 0.74rem;
+      font-weight: 600;
+      border-radius: 7px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition:
+        transform 80ms var(--ease-cinematic),
+        background-color 240ms var(--ease-cinematic),
+        border-color 240ms var(--ease-cinematic),
+        box-shadow 240ms var(--ease-cinematic);
+    }
+    :host ::ng-deep .btn-ghost-sm:hover {
+      background: rgba(0, 229, 255, 0.12);
+      border-color: rgba(0, 229, 255, 0.32);
+      box-shadow: 0 6px 18px -8px rgba(0, 229, 255, 0.6);
+    }
+    :host ::ng-deep .btn-ghost-sm:focus-visible {
+      outline: none;
+      box-shadow: var(--ring-cyan);
+    }
+    :host ::ng-deep .btn-ghost-sm:active {
+      transform: scale(0.96);
+      background: rgba(0, 229, 255, 0.18);
+    }
+
+    :host ::ng-deep .btn-ghost-sm-danger {
+      background: rgba(248, 113, 113, 0.06);
+      border: 1px solid rgba(248, 113, 113, 0.16);
+      color: #f87171;
+      padding: 0.4rem 0.85rem;
+      font-size: 0.74rem;
+      font-weight: 600;
+      border-radius: 7px;
+      cursor: pointer;
+      transition:
+        transform 80ms var(--ease-cinematic),
+        background-color 240ms var(--ease-cinematic),
+        border-color 240ms var(--ease-cinematic),
+        box-shadow 240ms var(--ease-cinematic);
+    }
+    :host ::ng-deep .btn-ghost-sm-danger:hover {
+      background: rgba(248, 113, 113, 0.14);
+      border-color: rgba(248, 113, 113, 0.34);
+      box-shadow: 0 6px 18px -8px rgba(248, 113, 113, 0.55);
+    }
+    :host ::ng-deep .btn-ghost-sm-danger:focus-visible {
+      outline: none;
+      box-shadow: var(--ring-danger);
+    }
+    :host ::ng-deep .btn-ghost-sm-danger:active { transform: scale(0.96); }
+
+    :host ::ng-deep .btn-accent {
+      background: linear-gradient(135deg, #00E5FF 0%, #50AAE3 100%);
+      color: #061018;
+      border: none;
+      padding: 0.55rem 1.1rem;
+      font-size: 0.82rem;
+      font-weight: 700;
+      border-radius: 8px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition:
+        transform 120ms var(--ease-cinematic),
+        box-shadow 280ms var(--ease-cinematic),
+        filter 240ms var(--ease-cinematic);
+    }
+    :host ::ng-deep .btn-accent::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+      transition: left 600ms var(--ease-cinematic);
+    }
+    :host ::ng-deep .btn-accent:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.08);
+      box-shadow: 0 14px 36px -16px rgba(0, 229, 255, 0.7);
+    }
+    :host ::ng-deep .btn-accent:hover::before { left: 100%; }
+    :host ::ng-deep .btn-accent:focus-visible {
+      outline: none;
+      box-shadow: var(--ring-cyan);
+    }
+    :host ::ng-deep .btn-accent:active { transform: translateY(0) scale(0.98); }
+    :host ::ng-deep .btn-accent:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    :host ::ng-deep .btn-ghost {
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: rgba(255, 255, 255, 0.8);
+      padding: 0.5rem 1rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      transition:
+        transform 80ms var(--ease-cinematic),
+        background-color 240ms var(--ease-cinematic),
+        border-color 240ms var(--ease-cinematic);
+    }
+    :host ::ng-deep .btn-ghost:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.24);
+    }
+    :host ::ng-deep .btn-ghost:focus-visible {
+      outline: none;
+      box-shadow: var(--ring-cyan);
+    }
+    :host ::ng-deep .btn-ghost:active { transform: scale(0.97); }
+
+    :host ::ng-deep .btn-ghost-danger {
+      background: rgba(248, 113, 113, 0.06);
+      border: 1px solid rgba(248, 113, 113, 0.2);
+      color: #f87171;
+      padding: 0.55rem 1.1rem;
+      font-size: 0.82rem;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      position: relative;
+      overflow: hidden;
+      transition:
+        transform 120ms var(--ease-cinematic),
+        background-color 240ms var(--ease-cinematic),
+        border-color 240ms var(--ease-cinematic),
+        box-shadow 280ms var(--ease-cinematic);
+    }
+    :host ::ng-deep .btn-ghost-danger:hover {
+      background: rgba(248, 113, 113, 0.16);
+      border-color: rgba(248, 113, 113, 0.42);
+      box-shadow: 0 12px 32px -14px rgba(248, 113, 113, 0.55);
+    }
+    :host ::ng-deep .btn-ghost-danger:focus-visible {
+      outline: none;
+      box-shadow: var(--ring-danger);
+    }
+    :host ::ng-deep .btn-ghost-danger:active { transform: scale(0.97); }
+
+    :host ::ng-deep .icon-btn-sm {
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: rgba(255, 255, 255, 0.6);
+      width: 28px;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      cursor: pointer;
+      transition:
+        transform 240ms var(--ease-elastic),
+        background-color 240ms var(--ease-cinematic),
+        border-color 240ms var(--ease-cinematic),
+        color 240ms var(--ease-cinematic);
+    }
+    :host ::ng-deep .icon-btn-sm:hover {
+      transform: rotate(-6deg) scale(1.1);
+      background: rgba(0, 229, 255, 0.08);
+      border-color: rgba(0, 229, 255, 0.3);
+      color: #00E5FF;
+    }
+    :host ::ng-deep .icon-btn-sm:focus-visible {
+      outline: none;
+      box-shadow: var(--ring-cyan);
+    }
+    :host ::ng-deep .icon-btn-sm:active { transform: scale(0.94); }
+
+    /* ── Domain availability card ──────────────────── */
+    :host ::ng-deep .domain-available {
+      animation: pulseAvailable 1.6s var(--ease-cinematic) infinite;
+      border-color: rgba(34, 197, 94, 0.25) !important;
+      background: rgba(34, 197, 94, 0.04) !important;
+    }
+
+    /* ── Loading spinner ───────────────────────────── */
+    :host ::ng-deep .loading-spinner {
+      width: 28px;
+      height: 28px;
+      border: 2px solid rgba(0, 229, 255, 0.16);
+      border-top-color: #00E5FF;
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+
+    /* ── Keyframes ──────────────────────────────────── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(-12px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes indicatorSweep {
+      0%, 100% { opacity: 0.4; transform: scaleX(0.6); }
+      50% { opacity: 1; transform: scaleX(1); }
+    }
+    @keyframes pulseDot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(0.85); }
+    }
+    @keyframes pulseAvailable {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.18); }
+      50% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .settings-card,
+      .hostname-row,
+      :host ::ng-deep .input-field,
+      :host ::ng-deep .btn-ghost-sm,
+      :host ::ng-deep .btn-ghost-sm-danger,
+      :host ::ng-deep .btn-accent,
+      :host ::ng-deep .btn-ghost,
+      :host ::ng-deep .btn-ghost-danger,
+      :host ::ng-deep .icon-btn-sm,
+      .tab-btn,
+      .coming-pill,
+      .settings-card-icon {
+        animation: none !important;
+        transition-duration: 0ms !important;
+      }
+      .settings-card:hover,
+      .hostname-row:hover,
+      :host ::ng-deep .btn-accent:hover,
+      :host ::ng-deep .icon-btn-sm:hover,
+      .settings-card:hover .settings-card-icon {
+        transform: none !important;
+      }
+      .tab-btn.tab-active::after,
+      :host ::ng-deep .hn-dot-pending,
+      :host ::ng-deep .domain-available {
+        animation: none !important;
+      }
+      :host ::ng-deep .loading-spinner {
+        animation-duration: 3s;
+      }
+    }
+  `],
 })
 export class AdminSettingsComponent implements OnInit {
   state = inject(AdminStateService);

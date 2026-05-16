@@ -1,0 +1,95 @@
+name: Container Deploy (fast-path)
+
+# Repeatable cloud build for the SiteBuilderContainer image + Worker.
+# Wrangler builds the Dockerfile on the runner and pushes the image to
+# Cloudflare's container registry as part of `wrangler deploy`. No local
+# Docker daemon required — the runner provides one.
+#
+# Triggers:
+#   - Manual via UI / `gh workflow run container-deploy.yaml`
+#   - Auto when apps/project-sites/Dockerfile or container scripts change on main
+#
+# Use this instead of the full project-sites.yaml when you only need to
+# rebuild + redeploy the container (skips lint/test/E2E for speed).
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Deploy target'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+  push:
+    branches: [main]
+    paths:
+      - 'apps/project-sites/Dockerfile'
+      - 'apps/project-sites/scripts/container-server.mjs'
+      - 'apps/project-sites/scripts/inspect.js'
+      - 'apps/project-sites/scripts/upload-to-r2.mjs'
+      - 'apps/project-sites/scripts/run-validators.mjs'
+
+env:
+  NODE_VERSION: '20.18.0'
+
+jobs:
+  deploy:
+    name: Build container + deploy Worker
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'production' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Verify Docker available on runner
+        run: docker version
+
+      - name: Install worker deps
+        working-directory: apps/project-sites
+        run: npm ci --legacy-peer-deps
+
+      - name: Deploy Worker (builds container image remotely)
+        working-directory: apps/project-sites
+        run: |
+          TARGET="${{ github.event_name == 'workflow_dispatch' && inputs.target || 'production' }}"
+          echo "Deploying to: $TARGET"
+          npx wrangler deploy --env "$TARGET" 2>&1 | tee deploy.log
+          DEPLOY_ID=$(grep -oE 'Current Version ID: [a-f0-9-]+' deploy.log | head -1 | awk '{print $NF}')
+          echo "deploy_id=${DEPLOY_ID:-unknown}" >> "$GITHUB_OUTPUT"
+        id: deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+
+      - name: Smoke test — homepage 200
+        run: |
+          TARGET="${{ github.event_name == 'workflow_dispatch' && inputs.target || 'production' }}"
+          if [ "$TARGET" = "production" ]; then
+            URL="https://projectsites.dev"
+          else
+            URL="https://sites-staging.megabyte.space"
+          fi
+          echo "Probing: $URL"
+          for i in 1 2 3 4 5; do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" -L "$URL")
+            echo "Attempt $i: HTTP $CODE"
+            if [ "$CODE" = "200" ]; then exit 0; fi
+            sleep 5
+          done
+          echo "::error::Homepage failed to return 200 after 5 attempts"
+          exit 1
+
+      - name: Smoke test — /health endpoint
+        run: |
+          TARGET="${{ github.event_name == 'workflow_dispatch' && inputs.target || 'production' }}"
+          if [ "$TARGET" = "production" ]; then
+            URL="https://projectsites.dev/health"
+          else
+            URL="https://sites-staging.megabyte.space/health"
+          fi
+          curl -fsSL "$URL" | head -20

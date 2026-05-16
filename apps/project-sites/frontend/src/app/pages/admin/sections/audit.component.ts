@@ -10,34 +10,46 @@ import { ToastService } from '../../../services/toast.service';
   imports: [NgClass],
   template: `
     <div class="p-5 flex-1 overflow-y-auto animate-fade-in">
-      <div class="flex items-center justify-between mb-3 gap-2">
-        <span class="text-[0.72rem] text-text-secondary">{{ logs().length }} log {{ logs().length === 1 ? 'entry' : 'entries' }}</span>
+      <div class="audit-header flex items-center justify-between mb-3 gap-2">
+        <span class="text-[0.72rem] text-text-secondary inline-flex items-center gap-1.5">
+          <span class="pulse-dot" aria-hidden="true"></span>
+          {{ logs().length }} log {{ logs().length === 1 ? 'entry' : 'entries' }}
+        </span>
         <div class="flex items-center gap-1">
-          <button class="icon-btn-sm" (click)="copyLogsForAI()" title="Copy logs for AI">
+          <button class="icon-btn-sm" (click)="copyLogsForAI()" title="Copy logs for AI" aria-label="Copy logs for AI">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
           </button>
-          <button class="icon-btn-sm" (click)="refreshLogs()" title="Refresh logs">
+          <button class="icon-btn-sm" (click)="refreshLogs()" title="Refresh logs" aria-label="Refresh logs">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
           </button>
         </div>
       </div>
       @if (loadingLogs()) {
-        <div class="flex flex-col items-center justify-center gap-3 py-[60px] text-text-secondary text-[0.85rem]"><div class="loading-spinner"></div><span>Loading logs...</span></div>
+        <div class="flex flex-col items-center justify-center gap-3 py-[60px] text-text-secondary text-[0.85rem]">
+          <div class="audit-spinner" aria-hidden="true"></div>
+          <span>Loading logs<span class="dots-ellipsis"></span></span>
+        </div>
       } @else if (logs().length === 0) {
-        <div class="flex flex-col items-center justify-center text-center py-10 px-5 text-text-secondary"><p class="m-0">No logs yet for this site.</p></div>
+        <div class="audit-empty flex flex-col items-center justify-center text-center py-10 px-5 text-text-secondary gap-3">
+          <div class="empty-glyph" aria-hidden="true">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
+          </div>
+          <p class="m-0 text-[0.85rem]">No logs yet for this site.</p>
+          <p class="m-0 text-[0.72rem] text-text-secondary/50">Actions will appear here as they happen.</p>
+        </div>
       } @else {
-        <div class="bg-[rgba(6,6,18,0.85)] border border-primary/[0.06] rounded-xl overflow-y-auto overflow-x-hidden max-h-[calc(100vh-200px)] font-mono text-[0.72rem] leading-relaxed sidebar-scrollbar">
-          @for (log of logs(); track log.id) {
-            <div class="grid grid-cols-[3px_28px_1fr] border-b border-white/[0.025] items-stretch transition-colors hover:bg-primary/[0.025] last:border-b-0" [ngClass]="getLogColorClass(log.action)">
-              <div class="log-edge rounded-l"></div>
-              <div class="flex items-center justify-center py-2 px-0.5 opacity-70" [innerHTML]="getLogIcon(log.action)"></div>
-              <div class="py-[7px] pr-3 pl-1.5 min-w-0">
+        <div class="log-stream sidebar-scrollbar">
+          @for (log of logs(); track log.id; let i = $index) {
+            <div class="log-row" [ngClass]="getLogColorClass(log.action)" [style.animation-delay.ms]="i * 18">
+              <div class="log-edge" aria-hidden="true"></div>
+              <div class="log-icon" [innerHTML]="getLogIcon(log.action)" aria-hidden="true"></div>
+              <div class="log-body">
                 <div class="flex items-baseline gap-2 flex-wrap">
-                  <span class="font-semibold text-[0.72rem] whitespace-nowrap log-action">{{ formatLogAction(log.action) }}</span>
-                  <span class="text-text-secondary/50 text-[0.62rem] whitespace-nowrap ml-auto">{{ formatLogTimestamp(log.created_at) }}</span>
+                  <span class="log-action">{{ formatLogAction(log.action) }}</span>
+                  <span class="log-time">{{ formatLogTimestamp(log.created_at) }}</span>
                 </div>
                 @if (log.metadata_json) {
-                  <div class="text-text-secondary/[0.55] text-[0.65rem] mt-0.5 break-words leading-snug log-meta-html" [innerHTML]="formatLogMeta(log.metadata_json, log.action)"></div>
+                  <div class="log-meta" [innerHTML]="formatLogMeta(log.metadata_json, log.action)"></div>
                 }
               </div>
             </div>
@@ -46,6 +58,231 @@ import { ToastService } from '../../../services/toast.service';
       }
     </div>
   `,
+  styles: [`
+    :host {
+      --ease-cinematic: cubic-bezier(0.4, 0, 0.2, 1);
+      --ease-elastic: cubic-bezier(0.34, 1.56, 0.64, 1);
+      --ring-cyan: 0 0 0 2px #000, 0 0 0 4px rgba(0, 229, 255, 0.55);
+      display: block;
+    }
+
+    .audit-header {
+      animation: fadeUp 420ms var(--ease-cinematic);
+    }
+
+    .pulse-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 9999px;
+      background: rgba(0,229,255,0.85);
+      box-shadow: 0 0 8px rgba(0,229,255,0.7);
+      animation: pulseDot 1.8s ease-in-out infinite;
+    }
+
+    .audit-spinner {
+      width: 22px;
+      height: 22px;
+      border-radius: 9999px;
+      border: 2px solid rgba(0,229,255,0.18);
+      border-top-color: #00E5FF;
+      animation: spin 0.9s linear infinite;
+    }
+
+    .audit-empty {
+      animation: fadeUp 540ms var(--ease-cinematic);
+    }
+
+    .empty-glyph {
+      width: 64px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 16px;
+      background: linear-gradient(135deg, rgba(0,229,255,0.08), rgba(124,58,237,0.05));
+      border: 1px solid rgba(0,229,255,0.12);
+      color: rgba(0,229,255,0.6);
+      animation: pulseGlyph 3.6s var(--ease-cinematic) infinite;
+    }
+
+    .log-stream {
+      background: rgba(6,6,18,0.85);
+      border: 1px solid rgba(0,229,255,0.06);
+      border-radius: 12px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      max-height: calc(100vh - 200px);
+      font-family: ui-monospace, 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      line-height: 1.55;
+      animation: fadeUp 480ms var(--ease-cinematic);
+    }
+
+    .log-row {
+      display: grid;
+      grid-template-columns: 3px 28px 1fr;
+      border-bottom: 1px solid rgba(255,255,255,0.025);
+      align-items: stretch;
+      animation: slideIn 360ms var(--ease-cinematic) both;
+      transition: background 220ms var(--ease-cinematic), transform 220ms var(--ease-cinematic);
+      position: relative;
+    }
+    .log-row:last-child { border-bottom: 0; }
+    .log-row:hover {
+      background: rgba(0,229,255,0.025);
+      transform: translateX(2px);
+    }
+    .log-row::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, currentColor 0%, transparent 12%);
+      opacity: 0;
+      transition: opacity 220ms var(--ease-cinematic);
+      pointer-events: none;
+    }
+    .log-row:hover::before { opacity: 0.05; }
+
+    .log-edge {
+      border-radius: 4px 0 0 4px;
+      background: currentColor;
+    }
+
+    .log-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.5rem 0.125rem;
+      opacity: 0.7;
+      color: currentColor;
+      transition: transform 280ms var(--ease-elastic), opacity 220ms var(--ease-cinematic);
+    }
+    .log-row:hover .log-icon {
+      opacity: 1;
+      transform: scale(1.15) rotate(-4deg);
+    }
+
+    .log-body {
+      padding: 7px 12px 7px 6px;
+      min-width: 0;
+    }
+
+    .log-action {
+      font-weight: 600;
+      font-size: 0.72rem;
+      white-space: nowrap;
+      color: #fff;
+      transition: color 220ms var(--ease-cinematic);
+    }
+    .log-row:hover .log-action { color: currentColor; }
+
+    .log-time {
+      color: rgba(255,255,255,0.45);
+      font-size: 0.62rem;
+      white-space: nowrap;
+      margin-left: auto;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .log-meta {
+      color: rgba(255,255,255,0.55);
+      font-size: 0.65rem;
+      margin-top: 0.125rem;
+      word-break: break-word;
+      line-height: 1.4;
+    }
+
+    :host ::ng-deep .icon-btn-sm {
+      width: 28px;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 8px;
+      color: rgba(255,255,255,0.65);
+      cursor: pointer;
+      transition: all 220ms var(--ease-cinematic);
+    }
+    :host ::ng-deep .icon-btn-sm:hover {
+      color: #00E5FF;
+      background: rgba(0,229,255,0.08);
+      border-color: rgba(0,229,255,0.32);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px -8px rgba(0,229,255,0.5);
+    }
+    :host ::ng-deep .icon-btn-sm:hover svg {
+      transform: rotate(-8deg) scale(1.10);
+    }
+    :host ::ng-deep .icon-btn-sm:active { transform: scale(0.92); }
+    :host ::ng-deep .icon-btn-sm:focus-visible {
+      outline: none;
+      box-shadow: var(--ring-cyan);
+    }
+    :host ::ng-deep .icon-btn-sm svg {
+      transition: transform 320ms var(--ease-elastic);
+    }
+
+    .log-c-green { color: #4ade80; }
+    .log-c-red { color: #f87171; }
+    .log-c-amber { color: #fbbf24; }
+    .log-c-purple { color: #c084fc; }
+    .log-c-cyan { color: #00E5FF; }
+    .log-c-blue { color: #60a5fa; }
+    .log-c-muted { color: rgba(255,255,255,0.4); }
+
+    .dots-ellipsis::after {
+      content: '';
+      display: inline-block;
+      width: 1.5ch;
+      text-align: left;
+      animation: dotsBlink 1.4s steps(4) infinite;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(-6px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    @keyframes pulseDot {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 8px rgba(0,229,255,0.7); }
+      50% { transform: scale(1.3); box-shadow: 0 0 14px rgba(0,229,255,0.9); }
+    }
+    @keyframes pulseGlyph {
+      0%, 100% {
+        box-shadow: 0 12px 36px -16px rgba(0,229,255,0.25);
+        border-color: rgba(0,229,255,0.12);
+      }
+      50% {
+        box-shadow: 0 16px 44px -16px rgba(0,229,255,0.40);
+        border-color: rgba(0,229,255,0.22);
+      }
+    }
+    @keyframes dotsBlink {
+      0%, 20% { content: ''; }
+      40% { content: '.'; }
+      60% { content: '..'; }
+      80%, 100% { content: '...'; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .audit-header, .audit-empty, .log-stream, .log-row {
+        animation: none !important;
+      }
+      .log-row:hover { transform: none; }
+      .log-row:hover .log-icon { transform: none; }
+      :host ::ng-deep .icon-btn-sm:hover { transform: none; }
+      :host ::ng-deep .icon-btn-sm:hover svg { transform: none; }
+      .pulse-dot, .empty-glyph, .audit-spinner { animation: none; }
+    }
+  `],
 })
 export class AdminAuditComponent implements OnInit, OnDestroy {
   state = inject(AdminStateService);
@@ -144,7 +381,7 @@ export class AdminAuditComponent implements OnInit, OnDestroy {
     } catch { return iso; }
   }
 
-  formatLogMeta(metaJson: string, action?: string): string {
+  formatLogMeta(metaJson: string, _action?: string): string {
     if (!metaJson) return '';
     let m: Record<string, unknown>;
     try { m = typeof metaJson === 'string' ? JSON.parse(metaJson) : metaJson; } catch { return ''; }

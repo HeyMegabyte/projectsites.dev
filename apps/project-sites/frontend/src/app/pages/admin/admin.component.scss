@@ -158,6 +158,145 @@
 .hn-chip-pending { background: rgba(251, 191, 36, 0.1); color: #fbbf24; }
 .hn-chip-failed { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
 
+// ═══════════════════════════════════════════════
+// Cinematic Snapshot Action Buttons (HBO-soul)
+// ═══════════════════════════════════════════════
+
+@keyframes shimmer { 0% { transform: translateX(-100%) } 100% { transform: translateX(200%) } }
+@keyframes pulseGlow { 0%, 100% { opacity: 0.4 } 50% { opacity: 0.85 } }
+
+%snap-base {
+  position: relative; isolation: isolate; overflow: hidden;
+  display: inline-flex; align-items: center; gap: 5px;
+  min-height: 26px; padding: 5px 10px;
+  border-radius: 7px; font-size: 0.7rem; font-weight: 600;
+  font-family: inherit; letter-spacing: 0.01em;
+  cursor: pointer; white-space: nowrap; user-select: none;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  transition:
+    transform 220ms cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 220ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 180ms ease,
+    background 180ms ease,
+    color 180ms ease;
+  &::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(110deg, transparent 35%, rgba(255, 255, 255, 0.18) 50%, transparent 65%);
+    transform: translateX(-100%); pointer-events: none; z-index: 1;
+  }
+  &:hover::after { animation: shimmer 700ms cubic-bezier(0.4, 0, 0.2, 1); }
+  .btn-snap-icon, .btn-snap-label { position: relative; z-index: 2; }
+  .btn-snap-icon { transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+  &:hover .btn-snap-icon { transform: translateX(1px) scale(1.08); }
+  &:active { transform: translateY(0) scale(0.96); transition-duration: 80ms; }
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px #0a0a1a, 0 0 0 4px var(--snap-ring, #00E5FF), 0 8px 24px -8px var(--snap-shadow, rgba(0, 229, 255, 0.4));
+  }
+  &:disabled { opacity: 0.45; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
+  &:disabled:hover::after { animation: none; }
+}
+
+.btn-snap-view {
+  @extend %snap-base;
+  --snap-ring: #00E5FF;
+  --snap-shadow: rgba(0, 229, 255, 0.45);
+  border-color: rgba(0, 229, 255, 0.22);
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.10) 0%, rgba(0, 229, 255, 0.04) 100%);
+  color: #7feef9;
+  &:hover {
+    transform: translateY(-1.5px);
+    border-color: rgba(0, 229, 255, 0.5);
+    background: linear-gradient(135deg, rgba(0, 229, 255, 0.22) 0%, rgba(0, 229, 255, 0.10) 100%);
+    color: #ccfafd;
+    box-shadow: 0 6px 18px -6px rgba(0, 229, 255, 0.55), 0 0 0 1px rgba(0, 229, 255, 0.18) inset;
+  }
+}
+.btn-snap-view-glow {
+  position: absolute; inset: -1px; border-radius: inherit; z-index: 0;
+  background: radial-gradient(circle at 30% 50%, rgba(0, 229, 255, 0.35), transparent 70%);
+  opacity: 0; transition: opacity 220ms ease;
+}
+.btn-snap-view:hover .btn-snap-view-glow { opacity: 1; animation: pulseGlow 2.4s ease-in-out infinite; }
+
+.btn-snap-revert {
+  @extend %snap-base;
+  --snap-ring: #fbbf24;
+  --snap-shadow: rgba(251, 191, 36, 0.45);
+  border-color: rgba(251, 191, 36, 0.25);
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.10) 0%, rgba(251, 191, 36, 0.04) 100%);
+  color: #fbbf24;
+  &:hover {
+    transform: translateY(-1.5px);
+    border-color: rgba(251, 191, 36, 0.55);
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.22) 0%, rgba(251, 191, 36, 0.10) 100%);
+    color: #fde68a;
+    box-shadow: 0 6px 18px -6px rgba(251, 191, 36, 0.55), 0 0 0 1px rgba(251, 191, 36, 0.20) inset;
+  }
+  &:hover .btn-snap-icon { transform: rotate(-45deg) scale(1.08); }
+}
+.btn-snap-revert-glow {
+  position: absolute; inset: -1px; border-radius: inherit; z-index: 0;
+  background: radial-gradient(circle at 30% 50%, rgba(251, 191, 36, 0.35), transparent 70%);
+  opacity: 0; transition: opacity 220ms ease;
+}
+.btn-snap-revert:hover .btn-snap-revert-glow { opacity: 1; animation: pulseGlow 2.4s ease-in-out infinite; }
+
+.btn-snap-trash {
+  @extend %snap-base;
+  --snap-ring: #ef4444;
+  --snap-shadow: rgba(239, 68, 68, 0.45);
+  padding: 5px; min-width: 26px; justify-content: center;
+  border-color: rgba(239, 68, 68, 0.18);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.06) 0%, rgba(239, 68, 68, 0.02) 100%);
+  color: #fca5a5;
+  &:hover {
+    transform: translateY(-1.5px);
+    border-color: rgba(239, 68, 68, 0.55);
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.25) 0%, rgba(239, 68, 68, 0.10) 100%);
+    color: #fff;
+    box-shadow: 0 6px 18px -6px rgba(239, 68, 68, 0.6), 0 0 0 1px rgba(239, 68, 68, 0.25) inset;
+  }
+  &:hover .btn-snap-icon { transform: scale(1.12) rotate(-3deg); }
+}
+.btn-snap-trash-glow {
+  position: absolute; inset: -1px; border-radius: inherit; z-index: 0;
+  background: radial-gradient(circle at 50% 60%, rgba(239, 68, 68, 0.4), transparent 70%);
+  opacity: 0; transition: opacity 220ms ease;
+}
+.btn-snap-trash:hover .btn-snap-trash-glow { opacity: 1; animation: pulseGlow 1.8s ease-in-out infinite; }
+
+// ═══════════════════════════════════════════════
+// Universal :active / :focus-visible polish across admin buttons
+// ═══════════════════════════════════════════════
+
+.nav-item {
+  &:active { transform: translateX(1px) scale(0.985); transition-duration: 80ms; }
+  &:focus-visible { outline: none; box-shadow: 0 0 0 2px #0a0a1a, 0 0 0 3px rgba(0, 229, 255, 0.55); }
+}
+.top-btn, .btn-ghost, .btn-ghost-sm, .btn-accent, .btn-accent-sm, .icon-btn-sm {
+  &:focus-visible { outline: none; box-shadow: 0 0 0 2px #0a0a1a, 0 0 0 3px rgba(0, 229, 255, 0.5); }
+  &:active { transform: scale(0.97); transition-duration: 80ms; }
+}
+.icon-btn-sm-danger {
+  &:focus-visible { box-shadow: 0 0 0 2px #0a0a1a, 0 0 0 3px rgba(239, 68, 68, 0.55); }
+}
+.input-field {
+  &:focus-visible { outline: none; }
+  &:hover { border-color: rgba(255, 255, 255, 0.12); }
+}
+
+// Honor prefers-reduced-motion across cinematic states
+@media (prefers-reduced-motion: reduce) {
+  .btn-snap-view, .btn-snap-revert, .btn-snap-trash, .nav-item, .top-btn, .btn-ghost, .btn-ghost-sm, .btn-accent, .btn-accent-sm, .icon-btn-sm {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+  .btn-snap-view::after, .btn-snap-revert::after, .btn-snap-trash::after { animation: none !important; }
+  .btn-snap-view:hover, .btn-snap-revert:hover, .btn-snap-trash:hover { transform: none !important; }
+}
+
 // Log Colors
 .log-c-green .log-edge { background: #22c55e; }
 .log-c-green .log-action { color: #22c55e; }

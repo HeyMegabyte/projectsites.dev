@@ -36,7 +36,8 @@ export class AdminComponent implements OnInit, OnDestroy {
     const labels: Record<string, string> = {
       '': 'Dashboard', 'admin': 'Dashboard', 'editor': 'Editor',
       'snapshots': 'Snapshots', 'analytics': 'Analytics',
-      'email': 'Email', 'social': 'Social', 'forms': 'Forms', 'integrations': 'Integrations',
+      'social': 'Social', 'forms': 'Forms', 'integrations': 'Integrations',
+      'github': 'GitHub Backup',
       'billing': 'Billing', 'audit': 'Audit Log', 'settings': 'Settings',
     };
     this.currentSection.set(labels[segment] || 'Dashboard');

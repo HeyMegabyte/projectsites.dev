@@ -23,7 +23,19 @@ interface Snapshot {
       <!-- Header -->
       <div>
         <h2 class="text-lg font-bold text-white m-0">Snapshots</h2>
-        <p class="text-[0.78rem] text-text-secondary m-0 mt-1">Version history for <span class="text-primary/70 font-mono">{{ state.selectedSite()?.slug }}.projectsites.dev</span></p>
+        <p class="text-[0.78rem] text-text-secondary m-0 mt-1">
+          Version history for
+          <a
+            class="text-primary font-mono no-underline hover:underline transition-colors duration-150 inline-flex items-center gap-1 group/sitelink"
+            [href]="'https://' + state.selectedSite()?.slug + '.projectsites.dev'"
+            target="_blank"
+            rel="noopener noreferrer"
+            [title]="'Open live site ' + state.selectedSite()?.slug + '.projectsites.dev in new tab'"
+          >
+            {{ state.selectedSite()?.slug }}.projectsites.dev
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="opacity-60 group-hover/sitelink:opacity-100 transition-opacity"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          </a>
+        </p>
       </div>
 
       <!-- Create Snapshot -->
@@ -94,19 +106,22 @@ interface Snapshot {
                       }
                       <span class="text-[0.68rem] text-text-secondary/50">{{ snap.created_at | date:'medium' }}</span>
                     </div>
-                    <div class="flex items-center gap-1 flex-shrink-0">
+                    <div class="flex items-center gap-1.5 flex-shrink-0">
+                      <button class="btn-snap-view group" (click)="viewSnapshot(snap)" title="Open this snapshot in a new tab" [attr.aria-label]="'Open snapshot ' + snap.snapshot_name + ' in new tab'">
+                        <span class="btn-snap-view-glow" aria-hidden="true"></span>
+                        <svg class="btn-snap-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                        <span class="btn-snap-label">View</span>
+                      </button>
                       @if (!first) {
-                        <button class="btn-ghost-sm text-amber-400 border-amber-400/20 hover:bg-amber-400/10" (click)="revertToSnapshot(snap)" [disabled]="reverting()" title="Revert site to this version">
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-                          {{ reverting() ? 'Reverting...' : 'Revert' }}
+                        <button class="btn-snap-revert group" (click)="revertToSnapshot(snap)" [disabled]="reverting()" title="Revert site to this version" [attr.aria-label]="'Revert site to snapshot ' + snap.snapshot_name">
+                          <span class="btn-snap-revert-glow" aria-hidden="true"></span>
+                          <svg class="btn-snap-icon" [class.animate-spin]="reverting()" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                          <span class="btn-snap-label">{{ reverting() ? 'Reverting' : 'Revert' }}</span>
                         </button>
                       }
-                      <button class="btn-ghost-sm" title="View this snapshot">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                        View
-                      </button>
-                      <button class="icon-btn-sm-danger" (click)="deleteSnapshot(snap.id)" title="Delete snapshot">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                      <button class="btn-snap-trash group" (click)="confirmDelete(snap)" title="Delete this snapshot" [attr.aria-label]="'Delete snapshot ' + snap.snapshot_name">
+                        <span class="btn-snap-trash-glow" aria-hidden="true"></span>
+                        <svg class="btn-snap-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                       </button>
                     </div>
                   </div>
@@ -165,6 +180,18 @@ export class AdminSnapshotsComponent implements OnInit {
         this.creatingSnapshot.set(false);
       },
     });
+  }
+
+  viewSnapshot(snap: Snapshot): void {
+    const site = this.state.selectedSite();
+    if (!site) return;
+    const url = `https://${site.slug}-${snap.snapshot_name}.projectsites.dev`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
+  confirmDelete(snap: Snapshot): void {
+    if (!window.confirm(`Permanently delete snapshot "${snap.snapshot_name}"? This cannot be undone.`)) return;
+    this.deleteSnapshot(snap.id);
   }
 
   deleteSnapshot(snapshotId: string): void {

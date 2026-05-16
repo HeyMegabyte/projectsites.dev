@@ -13,6 +13,21 @@ on:
       - 'apps/project-sites/**'
       - 'packages/shared/**'
       - 'supabase/migrations/**'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Deploy target'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      skip_e2e:
+        description: 'Skip E2E shards (fast container-only deploy)'
+        required: false
+        default: false
+        type: boolean
 
 env:
   NODE_VERSION: '20.18.0'
@@ -104,7 +119,10 @@ jobs:
   deploy-staging:
     name: Deploy to Staging
     needs: [test-unit]
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging'
+    if: |
+      github.ref == 'refs/heads/main' ||
+      github.ref == 'refs/heads/staging' ||
+      (github.event_name == 'workflow_dispatch' && inputs.target == 'staging')
     runs-on: ubuntu-latest
     environment: staging
     outputs:
@@ -133,6 +151,7 @@ jobs:
   e2e-staging:
     name: 'E2E Staging ${{ matrix.shard }}/3'
     needs: [deploy-staging]
+    if: github.event_name != 'workflow_dispatch' || inputs.skip_e2e != true
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -172,8 +191,15 @@ jobs:
   # ─── Stage 5: Deploy to Production ─────────────────────────
   deploy-production:
     name: Deploy to Production
-    needs: [e2e-staging]
-    if: github.ref == 'refs/heads/main'
+    needs: [deploy-staging, e2e-staging]
+    if: |
+      always() &&
+      needs.deploy-staging.result == 'success' &&
+      (needs.e2e-staging.result == 'success' || needs.e2e-staging.result == 'skipped') &&
+      (
+        github.ref == 'refs/heads/main' ||
+        (github.event_name == 'workflow_dispatch' && inputs.target == 'production')
+      )
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -197,6 +223,7 @@ jobs:
   e2e-production:
     name: 'E2E Production ${{ matrix.shard }}/3'
     needs: [deploy-production]
+    if: github.event_name != 'workflow_dispatch' || inputs.skip_e2e != true
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
