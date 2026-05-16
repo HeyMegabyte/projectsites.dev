@@ -41,11 +41,15 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'production' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            packages/shared/package-lock.json
+            apps/project-sites/package-lock.json
 
       - name: Verify Docker available on runner
         run: docker version
@@ -109,6 +113,16 @@ jobs:
             echo "$RESP" | jq . 2>/dev/null || echo "$RESP" | head -c 500
             exit 1
           fi
+
+      - name: Verify latest deployment via wrangler
+        working-directory: apps/project-sites
+        env:
+          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+        run: |
+          TARGET="${{ github.event_name == 'workflow_dispatch' && inputs.target || 'production' }}"
+          echo "Listing recent deployments for env: $TARGET"
+          npx wrangler deployments list --env "$TARGET" | head -20
 
       - name: Smoke test — homepage (best effort, tolerates CF Bot Fight 403)
         env:
