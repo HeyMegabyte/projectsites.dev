@@ -8,8 +8,9 @@
     "build:prod": "ng build --configuration production",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "deploy:staging": "npm run build:prod && cd .. && node -e \"const{execSync:e}=require('child_process');const fs=require('fs');const p='frontend/dist/project-sites-frontend/browser';fs.readdirSync(p).forEach(f=>{const ct=f.endsWith('.html')?'text/html':f.endsWith('.js')?'application/javascript':f.endsWith('.css')?'text/css':f.endsWith('.ico')?'image/x-icon':'application/octet-stream';e('npx wrangler r2 object put project-sites-staging/marketing/'+f+' --file '+p+'/'+f+' --content-type '+ct+' --remote',{stdio:'inherit'})})\"",
-    "deploy:production": "npm run build:prod && cd .. && node -e \"const{execSync:e}=require('child_process');const fs=require('fs');const p='frontend/dist/project-sites-frontend/browser';fs.readdirSync(p).forEach(f=>{const ct=f.endsWith('.html')?'text/html':f.endsWith('.js')?'application/javascript':f.endsWith('.css')?'text/css':f.endsWith('.ico')?'image/x-icon':'application/octet-stream';e('npx wrangler r2 object put project-sites/marketing/'+f+' --file '+p+'/'+f+' --content-type '+ct+' --remote',{stdio:'inherit'})})\""
+    "deploy:staging": "npm run build:prod && node scripts/deploy-r2.mjs staging",
+    "deploy:production": "npm run build:prod && node scripts/deploy-r2.mjs production",
+    "verify:production": "node scripts/verify-deploy.mjs https://projectsites.dev"
   },
   "private": true,
   "dependencies": {
