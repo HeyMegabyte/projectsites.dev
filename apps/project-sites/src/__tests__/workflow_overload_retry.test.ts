@@ -53,15 +53,11 @@ describe('SITE_BUILDER overloaded retry contract', () => {
   it('production retry config (limit=2) self-heals one overloaded error', async () => {
     let calls = 0;
 
-    const result = await simulateStepDo(
-      'start-build',
-      { retries: { limit: 2 } },
-      async () => {
-        calls++;
-        if (calls === 1) throw makeOverloadedError();
-        return { jobId: 'job-abc-123' };
-      },
-    );
+    const result = await simulateStepDo('start-build', { retries: { limit: 2 } }, async () => {
+      calls++;
+      if (calls === 1) throw makeOverloadedError();
+      return { jobId: 'job-abc-123' };
+    });
 
     expect(calls).toBe(2);
     expect(result).toEqual({ jobId: 'job-abc-123' });
@@ -70,15 +66,11 @@ describe('SITE_BUILDER overloaded retry contract', () => {
   it('production retry config (limit=2) self-heals two consecutive overloaded errors', async () => {
     let calls = 0;
 
-    const result = await simulateStepDo(
-      'start-build',
-      { retries: { limit: 2 } },
-      async () => {
-        calls++;
-        if (calls <= 2) throw makeOverloadedError();
-        return { jobId: 'job-after-2-failures' };
-      },
-    );
+    const result = await simulateStepDo('start-build', { retries: { limit: 2 } }, async () => {
+      calls++;
+      if (calls <= 2) throw makeOverloadedError();
+      return { jobId: 'job-after-2-failures' };
+    });
 
     expect(calls).toBe(3);
     expect(result).toEqual({ jobId: 'job-after-2-failures' });
@@ -192,7 +184,9 @@ describe('SITE_BUILDER source regression guards', () => {
     expect(mintBlock).not.toBeNull();
     expect(mintBlock![0]).toMatch(/new Date\(\)\.toISOString\(\)\.replace/);
     // The bare line must not exist anywhere — version MUST come from the step.
-    const bareVersionLines = src.match(/^\s*const version = new Date\(\)\.toISOString\(\)\.replace/m);
+    const bareVersionLines = src.match(
+      /^\s*const version = new Date\(\)\.toISOString\(\)\.replace/m,
+    );
     expect(bareVersionLines).toBeNull();
   });
 

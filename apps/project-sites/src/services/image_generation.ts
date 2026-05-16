@@ -37,7 +37,7 @@ async function callDallE3(
     const res = await fetch('https://api.openai.com/v1/images/generations', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -79,18 +79,27 @@ export async function generateLogo(
   slug: string,
   businessName: string,
   businessType: string,
-  brand: { primary_color?: string; accent_color?: string; font_heading?: string; personality?: string },
+  brand: {
+    primary_color?: string;
+    accent_color?: string;
+    font_heading?: string;
+    personality?: string;
+  },
 ): Promise<GeneratedImage | null> {
   const prompt = [
     `Professional minimalist logo design for "${businessName}", a ${businessType} business.`,
     `The logo should have a clean symbol/icon representing the brand alongside the business name text.`,
-    brand.font_heading ? `Use a ${brand.font_heading}-inspired modern font style for the text.` : '',
+    brand.font_heading
+      ? `Use a ${brand.font_heading}-inspired modern font style for the text.`
+      : '',
     brand.primary_color ? `Primary color: ${brand.primary_color}.` : '',
     brand.accent_color ? `Accent color: ${brand.accent_color}.` : '',
     brand.personality ? `Brand personality: ${brand.personality}.` : '',
     `Clean white or transparent background. Modern, trending design suitable for web and print.`,
     `No mockups, no watermarks, just the logo itself centered in the image.`,
-  ].filter(Boolean).join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   const imageData = await callDallE3(env, prompt);
   if (!imageData) return null;
@@ -166,25 +175,43 @@ export async function generateFaviconSet(
   await env.SITES_BUCKET.put(icon512Key, sourcePngBytes, {
     httpMetadata: { contentType: 'image/png' },
   });
-  results.push({ key: icon512Key, name: 'icon-512.png', size: sourcePngBytes.byteLength, type: 'image/png', confidence: 95, source: 'generated' });
+  results.push({
+    key: icon512Key,
+    name: 'icon-512.png',
+    size: sourcePngBytes.byteLength,
+    type: 'image/png',
+    confidence: 95,
+    source: 'generated',
+  });
 
   // Generate site.webmanifest
-  const manifest = JSON.stringify({
-    name: slug.replace(/-/g, ' '),
-    short_name: slug.replace(/-/g, ' '),
-    icons: [
-      { src: '/assets/icon-512.png', sizes: '512x512', type: 'image/png' },
-      { src: '/assets/icon-512.png', sizes: '192x192', type: 'image/png' },
-    ],
-    theme_color: '#1a1a2e',
-    background_color: '#0a0a1a',
-    display: 'standalone',
-  }, null, 2);
+  const manifest = JSON.stringify(
+    {
+      name: slug.replace(/-/g, ' '),
+      short_name: slug.replace(/-/g, ' '),
+      icons: [
+        { src: '/assets/icon-512.png', sizes: '512x512', type: 'image/png' },
+        { src: '/assets/icon-512.png', sizes: '192x192', type: 'image/png' },
+      ],
+      theme_color: '#1a1a2e',
+      background_color: '#0a0a1a',
+      display: 'standalone',
+    },
+    null,
+    2,
+  );
   const manifestKey = `${assetBase}/site.webmanifest`;
   await env.SITES_BUCKET.put(manifestKey, manifest, {
     httpMetadata: { contentType: 'application/manifest+json' },
   });
-  results.push({ key: manifestKey, name: 'site.webmanifest', size: manifest.length, type: 'application/manifest+json', confidence: 100, source: 'generated' });
+  results.push({
+    key: manifestKey,
+    name: 'site.webmanifest',
+    size: manifest.length,
+    type: 'application/manifest+json',
+    confidence: 100,
+    source: 'generated',
+  });
 
   // Generate browserconfig.xml
   const browserconfig = `<?xml version="1.0" encoding="utf-8"?>
@@ -200,7 +227,14 @@ export async function generateFaviconSet(
   await env.SITES_BUCKET.put(browserconfigKey, browserconfig, {
     httpMetadata: { contentType: 'application/xml' },
   });
-  results.push({ key: browserconfigKey, name: 'browserconfig.xml', size: browserconfig.length, type: 'application/xml', confidence: 100, source: 'generated' });
+  results.push({
+    key: browserconfigKey,
+    name: 'browserconfig.xml',
+    size: browserconfig.length,
+    type: 'application/xml',
+    confidence: 100,
+    source: 'generated',
+  });
 
   // Generate favicon.ico (PNG-in-ICO wrapper)
   // ICO format: 6-byte header + 16-byte directory entry + PNG data
@@ -209,7 +243,14 @@ export async function generateFaviconSet(
   await env.SITES_BUCKET.put(icoKey, ico, {
     httpMetadata: { contentType: 'image/x-icon' },
   });
-  results.push({ key: icoKey, name: 'favicon.ico', size: ico.byteLength, type: 'image/x-icon', confidence: 90, source: 'generated' });
+  results.push({
+    key: icoKey,
+    name: 'favicon.ico',
+    size: ico.byteLength,
+    type: 'image/x-icon',
+    confidence: 90,
+    source: 'generated',
+  });
 
   return results;
 }
@@ -233,14 +274,14 @@ function buildPngIco(pngBytes: ArrayBuffer): ArrayBuffer {
   view.setUint16(4, 1, true);
 
   // Directory entry
-  out[6] = 0;  // width (0 = 256+)
-  out[7] = 0;  // height
-  out[8] = 0;  // color palette
-  out[9] = 0;  // reserved
-  view.setUint16(10, 1, true);  // color planes
+  out[6] = 0; // width (0 = 256+)
+  out[7] = 0; // height
+  out[8] = 0; // color palette
+  out[9] = 0; // reserved
+  view.setUint16(10, 1, true); // color planes
   view.setUint16(12, 32, true); // bits per pixel
   view.setUint32(14, size, true); // image size
-  view.setUint32(18, 22, true);  // offset to image data
+  view.setUint32(18, 22, true); // offset to image data
 
   // PNG data
   out.set(png, 22);

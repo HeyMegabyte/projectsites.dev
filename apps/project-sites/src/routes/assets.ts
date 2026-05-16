@@ -30,11 +30,18 @@ assets.post('/api/assets/upload', async (c) => {
 
   const uploadId = crypto.randomUUID();
   const formData = await c.req.formData();
-  const uploadedAssets: { key: string; name: string; size: number; type: string; url: string }[] = [];
+  const uploadedAssets: { key: string; name: string; size: number; type: string; url: string }[] =
+    [];
 
   const allowedTypes = new Set([
-    'image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/svg+xml',
-    'image/webp', 'image/x-icon', 'image/ico',
+    'image/png',
+    'image/jpeg',
+    'image/jpg',
+    'image/gif',
+    'image/svg+xml',
+    'image/webp',
+    'image/x-icon',
+    'image/ico',
   ]);
   const maxFileSize = 10 * 1024 * 1024; // 10MB per file
   const maxFiles = 25;
@@ -42,7 +49,8 @@ assets.post('/api/assets/upload', async (c) => {
   const processFile = async (file: File, category: string): Promise<void> => {
     if (uploadedAssets.length >= maxFiles) return;
     if (file.size > maxFileSize) return;
-    if (!allowedTypes.has(file.type) && !file.name.match(/\.(png|jpe?g|gif|svg|webp|ico)$/i)) return;
+    if (!allowedTypes.has(file.type) && !file.name.match(/\.(png|jpe?g|gif|svg|webp|ico)$/i))
+      return;
 
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 100);
     const key = `uploads/${uploadId}/${category}/${safeName}`;
@@ -70,7 +78,12 @@ assets.post('/api/assets/upload', async (c) => {
 
   // Process favicon
   const favicon = formData.get('favicon');
-  if (typeof favicon === 'object' && favicon !== null && 'size' in favicon && (favicon as File).size > 0) {
+  if (
+    typeof favicon === 'object' &&
+    favicon !== null &&
+    'size' in favicon &&
+    (favicon as File).size > 0
+  ) {
     await processFile(favicon as File, 'favicon');
   }
 
@@ -104,7 +117,9 @@ assets.get('/api/sites/:id/build-assets', async (c) => {
   // Look up site to get slug
   const site = await c.env.DB.prepare(
     'SELECT slug FROM sites WHERE id = ? AND org_id = ? AND deleted_at IS NULL',
-  ).bind(siteId, orgId).first<{ slug: string }>();
+  )
+    .bind(siteId, orgId)
+    .first<{ slug: string }>();
 
   if (!site) {
     return c.json({ error: { code: 'NOT_FOUND', message: 'Site not found' } }, 404);
@@ -115,7 +130,9 @@ assets.get('/api/sites/:id/build-assets', async (c) => {
   const listed = await c.env.SITES_BUCKET.list({ prefix, limit: 100 });
 
   const assets = listed.objects
-    .filter((obj) => !obj.key.endsWith('/_build-context.json') && !obj.key.endsWith('/_manifest.json'))
+    .filter(
+      (obj) => !obj.key.endsWith('/_build-context.json') && !obj.key.endsWith('/_manifest.json'),
+    )
     .map((obj) => {
       const name = obj.key.split('/').pop() || obj.key;
       const ext = name.split('.').pop()?.toLowerCase() || '';

@@ -127,10 +127,7 @@ export async function fetchSheetData(
  *
  * @see https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/get
  */
-export async function fetchSheetMeta(
-  sheetId: string,
-  apiKey?: string,
-): Promise<SheetTabMeta[]> {
+export async function fetchSheetMeta(sheetId: string, apiKey?: string): Promise<SheetTabMeta[]> {
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?key=${apiKey || ''}&fields=sheets.properties`;
 
   const res = await fetch(url);

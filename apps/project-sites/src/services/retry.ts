@@ -92,7 +92,7 @@ export function classifyError(error: unknown): ErrorCategory {
 
     // Network errors
     if (
-      name === 'typeerror' && (msg.includes('fetch') || msg.includes('network')) ||
+      (name === 'typeerror' && (msg.includes('fetch') || msg.includes('network'))) ||
       msg.includes('econnrefused') ||
       msg.includes('econnreset') ||
       msg.includes('enotfound') ||
@@ -184,10 +184,7 @@ export function isTransientError(error: unknown): boolean {
  * );
  * ```
  */
-export async function withRetry<T>(
-  fn: () => Promise<T>,
-  options?: RetryOptions,
-): Promise<T> {
+export async function withRetry<T>(fn: () => Promise<T>, options?: RetryOptions): Promise<T> {
   const maxRetries = options?.maxRetries ?? 3;
   const baseDelayMs = options?.baseDelayMs ?? 1000;
   const maxDelayMs = options?.maxDelayMs ?? 30_000;

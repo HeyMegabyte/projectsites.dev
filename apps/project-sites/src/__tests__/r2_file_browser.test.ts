@@ -383,11 +383,7 @@ describe('PUT /api/sites/:id/files/:path', () => {
       SITES_BUCKET: mockBucket as unknown as R2Bucket,
     });
     mockDbQueryOne.mockResolvedValueOnce({ slug: TEST_SLUG });
-    const res = await app.request(
-      `/api/sites/${TEST_SITE_ID}/files/index.html%00.jpg`,
-      {},
-      env,
-    );
+    const res = await app.request(`/api/sites/${TEST_SITE_ID}/files/index.html%00.jpg`, {}, env);
     expect(res.status).toBe(403);
     expect(mockBucket.get).not.toHaveBeenCalled();
   });

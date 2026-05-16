@@ -177,19 +177,21 @@ api.post('/api/auth/magic-link', async (c) => {
   posthog.trackAuth(c.env, c.executionCtx, 'magic_link', 'requested', validated.email);
 
   // Audit: magic link requested (no org_id yet since user may not exist)
-  auditService.writeAuditLog(c.env.DB, {
-    org_id: 'system',
-    actor_id: null,
-    action: 'auth.magic_link_requested',
-    target_type: 'auth',
-    target_id: validated.email,
-    metadata_json: {
-      email: validated.email,
-      expires_at: result.expires_at,
-      message: 'Magic link email sent to ' + validated.email,
-    },
-    request_id: c.get('requestId'),
-  }).catch(() => {});
+  auditService
+    .writeAuditLog(c.env.DB, {
+      org_id: 'system',
+      actor_id: null,
+      action: 'auth.magic_link_requested',
+      target_type: 'auth',
+      target_id: validated.email,
+      metadata_json: {
+        email: validated.email,
+        expires_at: result.expires_at,
+        message: 'Magic link email sent to ' + validated.email,
+      },
+      request_id: c.get('requestId'),
+    })
+    .catch(() => {});
 
   return c.json({ data: { expires_at: result.expires_at } });
 });
@@ -255,8 +257,11 @@ api.get('/api/auth/magic-link/verify', async (c) => {
       // Strict redirect validation — only allow exact known domains and single-level subdomains
       const allowedDomains = ['projectsites.dev', 'megabyte.space'];
       const hostname = redirectTarget.hostname;
-      const isAllowed = allowedDomains.some(domain =>
-        hostname === domain || (hostname.endsWith('.' + domain) && hostname.split('.').length <= domain.split('.').length + 1),
+      const isAllowed = allowedDomains.some(
+        (domain) =>
+          hostname === domain ||
+          (hostname.endsWith('.' + domain) &&
+            hostname.split('.').length <= domain.split('.').length + 1),
       );
       if (!isAllowed || redirectTarget.protocol !== 'https:') {
         return c.redirect('/?error=invalid_redirect');
@@ -363,18 +368,20 @@ api.get('/api/auth/google', async (c) => {
   const result = await authService.createGoogleOAuthState(c.env.DB, c.env, redirectUrl);
 
   // Audit: Google OAuth initiated
-  auditService.writeAuditLog(c.env.DB, {
-    org_id: 'system',
-    actor_id: null,
-    action: 'auth.google_oauth_started',
-    target_type: 'auth',
-    target_id: 'google',
-    metadata_json: {
-      redirect_url: redirectUrl || '/',
-      message: 'Google OAuth sign-in flow initiated',
-    },
-    request_id: c.get('requestId'),
-  }).catch(() => {});
+  auditService
+    .writeAuditLog(c.env.DB, {
+      org_id: 'system',
+      actor_id: null,
+      action: 'auth.google_oauth_started',
+      target_type: 'auth',
+      target_id: 'google',
+      metadata_json: {
+        redirect_url: redirectUrl || '/',
+        message: 'Google OAuth sign-in flow initiated',
+      },
+      request_id: c.get('requestId'),
+    })
+    .catch(() => {});
 
   return c.redirect(result.authUrl);
 });
@@ -441,8 +448,11 @@ api.get('/api/auth/google/callback', async (c) => {
   // Strict redirect validation — only allow exact known domains and single-level subdomains
   const oauthAllowedDomains = ['projectsites.dev', 'megabyte.space'];
   const oauthHostname = redirectTarget.hostname;
-  const oauthAllowed = oauthAllowedDomains.some(domain =>
-    oauthHostname === domain || (oauthHostname.endsWith('.' + domain) && oauthHostname.split('.').length <= domain.split('.').length + 1),
+  const oauthAllowed = oauthAllowedDomains.some(
+    (domain) =>
+      oauthHostname === domain ||
+      (oauthHostname.endsWith('.' + domain) &&
+        oauthHostname.split('.').length <= domain.split('.').length + 1),
   );
   if (!oauthAllowed || redirectTarget.protocol !== 'https:') {
     return c.redirect(`${baseUrl}/?error=invalid_redirect`);
@@ -476,18 +486,20 @@ api.get('/api/auth/github', async (c) => {
   const redirectUrl = c.req.query('redirect_url');
   const result = await authService.createGitHubOAuthState(c.env.DB, c.env, redirectUrl);
 
-  auditService.writeAuditLog(c.env.DB, {
-    org_id: 'system',
-    actor_id: null,
-    action: 'auth.github_oauth_started',
-    target_type: 'auth',
-    target_id: 'github',
-    metadata_json: {
-      redirect_url: redirectUrl || '/',
-      message: 'GitHub OAuth sign-in flow initiated',
-    },
-    request_id: c.get('requestId'),
-  }).catch(() => {});
+  auditService
+    .writeAuditLog(c.env.DB, {
+      org_id: 'system',
+      actor_id: null,
+      action: 'auth.github_oauth_started',
+      target_type: 'auth',
+      target_id: 'github',
+      metadata_json: {
+        redirect_url: redirectUrl || '/',
+        message: 'GitHub OAuth sign-in flow initiated',
+      },
+      request_id: c.get('requestId'),
+    })
+    .catch(() => {});
 
   return c.redirect(result.authUrl);
 });
@@ -547,8 +559,11 @@ api.get('/api/auth/github/callback', async (c) => {
   const redirectTarget = new URL(rawRedirect);
   const ghAllowedDomains = ['projectsites.dev', 'megabyte.space'];
   const ghHostname = redirectTarget.hostname;
-  const ghAllowed = ghAllowedDomains.some(domain =>
-    ghHostname === domain || (ghHostname.endsWith('.' + domain) && ghHostname.split('.').length <= domain.split('.').length + 1),
+  const ghAllowed = ghAllowedDomains.some(
+    (domain) =>
+      ghHostname === domain ||
+      (ghHostname.endsWith('.' + domain) &&
+        ghHostname.split('.').length <= domain.split('.').length + 1),
   );
   if (!ghAllowed || redirectTarget.protocol !== 'https:') {
     return c.redirect(`${baseUrl}/?error=invalid_redirect`);
@@ -667,17 +682,44 @@ api.post('/api/sites', async (c) => {
     slug = validated.slug;
   } else {
     try {
-      const result = await c.env.AI.run('@cf/meta/llama-3.1-8b-instruct' as Parameters<typeof c.env.AI.run>[0], {
-        messages: [
-          { role: 'system', content: 'Generate the shortest URL slug for this business. Output ONLY the slug (lowercase, hyphens, no explanation). Max 40 chars. Remove possessives, articles, taglines.' },
-          { role: 'user', content: `Business: "${validated.business_name}"${validated.business_address ? ` at "${validated.business_address}"` : ''}` },
-        ],
-        max_tokens: 50,
-      });
-      const aiSlug = ((result as { response?: string }).response ?? '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/--+/g, '-').replace(/^-|-$/g, '').substring(0, 63);
-      slug = (aiSlug && aiSlug.length >= 3) ? aiSlug : validated.business_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').substring(0, 63);
+      const result = await c.env.AI.run(
+        '@cf/meta/llama-3.1-8b-instruct' as Parameters<typeof c.env.AI.run>[0],
+        {
+          messages: [
+            {
+              role: 'system',
+              content:
+                'Generate the shortest URL slug for this business. Output ONLY the slug (lowercase, hyphens, no explanation). Max 40 chars. Remove possessives, articles, taglines.',
+            },
+            {
+              role: 'user',
+              content: `Business: "${validated.business_name}"${validated.business_address ? ` at "${validated.business_address}"` : ''}`,
+            },
+          ],
+          max_tokens: 50,
+        },
+      );
+      const aiSlug = ((result as { response?: string }).response ?? '')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, '')
+        .replace(/--+/g, '-')
+        .replace(/^-|-$/g, '')
+        .substring(0, 63);
+      slug =
+        aiSlug && aiSlug.length >= 3
+          ? aiSlug
+          : validated.business_name
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '-')
+              .replace(/^-|-$/g, '')
+              .substring(0, 63);
     } catch {
-      slug = validated.business_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').substring(0, 63);
+      slug = validated.business_name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
+        .substring(0, 63);
     }
   }
 
@@ -715,12 +757,20 @@ api.post('/api/sites', async (c) => {
       site_id: site.id,
       slug,
       business_name: validated.business_name,
-      message: 'New site created: ' + validated.business_name + ' (' + slug + DOMAINS.SITES_SUFFIX + ')',
+      message:
+        'New site created: ' + validated.business_name + ' (' + slug + DOMAINS.SITES_SUFFIX + ')',
     },
     request_id: c.get('requestId'),
   });
 
-  try { posthog.trackSite(c.env, c.executionCtx, 'created', c.get('userId') || orgId, { site_id: site.id, slug: site.slug }); } catch { /* fire-and-forget */ }
+  try {
+    posthog.trackSite(c.env, c.executionCtx, 'created', c.get('userId') || orgId, {
+      site_id: site.id,
+      slug: site.slug,
+    });
+  } catch {
+    /* fire-and-forget */
+  }
 
   return c.json({ data: site }, 201);
 });
@@ -776,7 +826,9 @@ api.get('/api/slug/check', async (c) => {
   }
 
   if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(normalized)) {
-    return c.json({ data: { available: false, reason: 'Slug must start and end with a letter or number' } });
+    return c.json({
+      data: { available: false, reason: 'Slug must start and end with a letter or number' },
+    });
   }
 
   const query = excludeId
@@ -937,7 +989,11 @@ api.get('/api/sites/:id/workflow', async (c) => {
   }
 
   // Fetch recent audit logs for this site's workflow (best-effort)
-  let recentLogs: Array<{ action: string; metadata: Record<string, unknown> | null; created_at: string }> = [];
+  let recentLogs: Array<{
+    action: string;
+    metadata: Record<string, unknown> | null;
+    created_at: string;
+  }> = [];
   try {
     const logsResult = await auditService.getSiteAuditLogs(c.env.DB, orgId, siteId, { limit: 50 });
     recentLogs = (logsResult.data as Array<Record<string, unknown>>)
@@ -946,8 +1002,13 @@ api.get('/api/sites/:id/workflow', async (c) => {
         let metadata: Record<string, unknown> | null = null;
         if (l.metadata_json) {
           try {
-            metadata = typeof l.metadata_json === 'string' ? JSON.parse(l.metadata_json as string) : l.metadata_json as Record<string, unknown>;
-          } catch { /* ignore parse errors */ }
+            metadata =
+              typeof l.metadata_json === 'string'
+                ? JSON.parse(l.metadata_json as string)
+                : (l.metadata_json as Record<string, unknown>);
+          } catch {
+            /* ignore parse errors */
+          }
         }
         return {
           action: l.action as string,
@@ -955,7 +1016,9 @@ api.get('/api/sites/:id/workflow', async (c) => {
           created_at: l.created_at as string,
         };
       });
-  } catch { /* audit log fetch is best-effort */ }
+  } catch {
+    /* audit log fetch is best-effort */
+  }
 
   try {
     const instance = await c.env.SITE_WORKFLOW.get(siteId);
@@ -972,7 +1035,8 @@ api.get('/api/sites/:id/workflow', async (c) => {
         workflowError = status.error.message;
       } else if (typeof status.error === 'object') {
         const errObj = status.error as Record<string, unknown>;
-        workflowError = (errObj.message as string) ?? (errObj.name as string) ?? JSON.stringify(status.error);
+        workflowError =
+          (errObj.message as string) ?? (errObj.name as string) ?? JSON.stringify(status.error);
       } else {
         workflowError = String(status.error);
       }
@@ -1067,21 +1131,29 @@ api.post('/api/billing/checkout', async (c) => {
   });
 
   // Audit: billing checkout session created
-  auditService.writeAuditLog(c.env.DB, {
-    org_id: orgId,
-    actor_id: c.get('userId') ?? null,
-    action: 'billing.checkout_created',
-    target_type: 'billing',
-    target_id: validated.site_id || orgId,
-    metadata_json: {
-      site_id: validated.site_id,
-      session_id: result.session_id || null,
-      message: 'Stripe checkout session created for plan upgrade',
-    },
-    request_id: c.get('requestId'),
-  }).catch(() => {});
+  auditService
+    .writeAuditLog(c.env.DB, {
+      org_id: orgId,
+      actor_id: c.get('userId') ?? null,
+      action: 'billing.checkout_created',
+      target_type: 'billing',
+      target_id: validated.site_id || orgId,
+      metadata_json: {
+        site_id: validated.site_id,
+        session_id: result.session_id || null,
+        message: 'Stripe checkout session created for plan upgrade',
+      },
+      request_id: c.get('requestId'),
+    })
+    .catch(() => {});
 
-  try { posthog.trackSite(c.env, c.executionCtx, 'checkout_created', c.get('userId') || orgId, { site_id: validated.site_id }); } catch { /* fire-and-forget */ }
+  try {
+    posthog.trackSite(c.env, c.executionCtx, 'checkout_created', c.get('userId') || orgId, {
+      site_id: validated.site_id,
+    });
+  } catch {
+    /* fire-and-forget */
+  }
 
   return c.json({ data: result });
 });
@@ -1136,23 +1208,37 @@ api.post('/api/billing/embedded-checkout', async (c) => {
     budgetTier: validated.budget_tier,
   });
 
-  auditService.writeAuditLog(c.env.DB, {
-    org_id: orgId,
-    actor_id: c.get('userId') ?? null,
-    action: 'billing.embedded_checkout_created',
-    target_type: 'billing',
-    target_id: validated.site_id || orgId,
-    metadata_json: {
-      site_id: validated.site_id,
-      session_id: result.session_id || null,
-      message: 'Stripe embedded checkout session created for plan upgrade',
-    },
-    request_id: c.get('requestId'),
-  }).catch(() => {});
+  auditService
+    .writeAuditLog(c.env.DB, {
+      org_id: orgId,
+      actor_id: c.get('userId') ?? null,
+      action: 'billing.embedded_checkout_created',
+      target_type: 'billing',
+      target_id: validated.site_id || orgId,
+      metadata_json: {
+        site_id: validated.site_id,
+        session_id: result.session_id || null,
+        message: 'Stripe embedded checkout session created for plan upgrade',
+      },
+      request_id: c.get('requestId'),
+    })
+    .catch(() => {});
 
-  try { posthog.trackSite(c.env, c.executionCtx, 'embedded_checkout_created', c.get('userId') || orgId, { site_id: validated.site_id }); } catch { /* fire-and-forget */ }
+  try {
+    posthog.trackSite(
+      c.env,
+      c.executionCtx,
+      'embedded_checkout_created',
+      c.get('userId') || orgId,
+      { site_id: validated.site_id },
+    );
+  } catch {
+    /* fire-and-forget */
+  }
 
-  return c.json({ data: { client_secret: result.client_secret, publishable_key: c.env.STRIPE_PUBLISHABLE_KEY } });
+  return c.json({
+    data: { client_secret: result.client_secret, publishable_key: c.env.STRIPE_PUBLISHABLE_KEY },
+  });
 });
 
 /**
@@ -1299,7 +1385,7 @@ api.post('/api/sites/:siteId/hostnames', async (c) => {
     if (!cnameTarget || cnameTarget !== DOMAINS.SITES_BASE) {
       throw badRequest(
         `The domain "${validated.hostname}" does not have a CNAME record pointing to ${DOMAINS.SITES_BASE}. ` +
-        `Please add a CNAME record for "${validated.hostname}" pointing to "${DOMAINS.SITES_BASE}" in your DNS settings, then try again.`,
+          `Please add a CNAME record for "${validated.hostname}" pointing to "${DOMAINS.SITES_BASE}" in your DNS settings, then try again.`,
       );
     }
 
@@ -1321,12 +1407,23 @@ api.post('/api/sites/:siteId/hostnames', async (c) => {
       site_id: siteId,
       hostname: result.hostname,
       type: validated.type,
-      message: 'Domain added: ' + result.hostname + (validated.type === 'custom_cname' ? ' (custom CNAME)' : ''),
+      message:
+        'Domain added: ' +
+        result.hostname +
+        (validated.type === 'custom_cname' ? ' (custom CNAME)' : ''),
     },
     request_id: c.get('requestId'),
   });
 
-  try { posthog.trackDomain(c.env, c.executionCtx, 'provisioned', c.get('userId') || orgId, { hostname: result.hostname, type: validated.type, site_id: siteId }); } catch { /* fire-and-forget */ }
+  try {
+    posthog.trackDomain(c.env, c.executionCtx, 'provisioned', c.get('userId') || orgId, {
+      hostname: result.hostname,
+      type: validated.type,
+      site_id: siteId,
+    });
+  } catch {
+    /* fire-and-forget */
+  }
 
   return c.json({ data: result }, 201);
 });
@@ -1381,7 +1478,11 @@ api.delete('/api/sites/:id', async (c) => {
   const cancelSubscription = body && (body as Record<string, unknown>).cancel_subscription === true;
 
   // Soft-delete
-  await c.env.DB.prepare("UPDATE sites SET deleted_at = datetime('now'), status = 'archived' WHERE id = ?").bind(siteId).run();
+  await c.env.DB.prepare(
+    "UPDATE sites SET deleted_at = datetime('now'), status = 'archived' WHERE id = ?",
+  )
+    .bind(siteId)
+    .run();
 
   // Invalidate KV cache for the site's subdomain
   const slug = site.slug as string;
@@ -1402,7 +1503,7 @@ api.delete('/api/sites/:id', async (c) => {
         await fetch(`https://api.stripe.com/v1/subscriptions/${sub.stripe_subscription_id}`, {
           method: 'POST',
           headers: {
-            'Authorization': `Basic ${btoa(c.env.STRIPE_SECRET_KEY + ':')}`,
+            Authorization: `Basic ${btoa(c.env.STRIPE_SECRET_KEY + ':')}`,
             'Content-Type': 'application/x-www-form-urlencoded',
           },
           body: 'cancel_at_period_end=true',
@@ -1424,12 +1525,22 @@ api.delete('/api/sites/:id', async (c) => {
       site_id: siteId,
       slug,
       subscription_canceled: subscriptionCanceled,
-      message: 'Site deleted: ' + slug + (subscriptionCanceled ? ' (subscription cancellation requested)' : ''),
+      message:
+        'Site deleted: ' +
+        slug +
+        (subscriptionCanceled ? ' (subscription cancellation requested)' : ''),
     },
     request_id: c.get('requestId'),
   });
 
-  try { posthog.trackSite(c.env, c.executionCtx, 'deleted', c.get('userId') || orgId, { site_id: siteId, slug }); } catch { /* analytics fire-and-forget */ }
+  try {
+    posthog.trackSite(c.env, c.executionCtx, 'deleted', c.get('userId') || orgId, {
+      site_id: siteId,
+      slug,
+    });
+  } catch {
+    /* analytics fire-and-forget */
+  }
 
   return c.json({ data: { deleted: true, subscription_canceled: subscriptionCanceled } });
 });
@@ -1522,8 +1633,7 @@ api.post('/api/sites/:siteId/hostnames/reset-primary', async (c) => {
   if (!site) throw notFound('Site not found');
 
   // Clear is_primary on all hostnames for this site
-  await c.env.DB
-    .prepare('UPDATE hostnames SET is_primary = 0 WHERE site_id = ?')
+  await c.env.DB.prepare('UPDATE hostnames SET is_primary = 0 WHERE site_id = ?')
     .bind(siteId)
     .run();
 
@@ -1594,7 +1704,11 @@ api.delete('/api/sites/:siteId/hostnames/:hostnameId', async (c) => {
     action: 'hostname.deleted',
     target_type: 'hostname',
     target_id: hostnameId,
-    metadata_json: { hostname: hostname.hostname, site_id: siteId, message: 'Domain removed: ' + hostname.hostname },
+    metadata_json: {
+      hostname: hostname.hostname,
+      site_id: siteId,
+      message: 'Domain removed: ' + hostname.hostname,
+    },
     request_id: c.get('requestId'),
   });
 
@@ -1664,7 +1778,12 @@ api.post('/api/sites/:siteId/hostnames/:hostnameId/unsubscribe', async (c) => {
     action: 'hostname.unsubscribed',
     target_type: 'hostname',
     target_id: hostnameId,
-    metadata_json: { site_id: siteId, hostname: hostname.hostname, type: hostname.type, message: 'Domain unsubscribed: ' + hostname.hostname },
+    metadata_json: {
+      site_id: siteId,
+      hostname: hostname.hostname,
+      type: hostname.type,
+      message: 'Domain unsubscribed: ' + hostname.hostname,
+    },
     request_id: c.get('requestId'),
   });
 
@@ -1714,17 +1833,26 @@ api.post('/api/billing/portal', async (c) => {
     throw badRequest('No billing account found. Please subscribe first.');
   }
 
-  const result = await billingService.createBillingPortalSession(c.env, sub.stripe_customer_id, returnUrl);
+  const result = await billingService.createBillingPortalSession(
+    c.env,
+    sub.stripe_customer_id,
+    returnUrl,
+  );
 
-  auditService.writeAuditLog(c.env.DB, {
-    org_id: orgId,
-    actor_id: c.get('userId') ?? null,
-    action: 'billing.portal_opened',
-    target_type: 'billing',
-    target_id: orgId,
-    metadata_json: { stripe_customer_id: sub.stripe_customer_id, message: 'Billing portal session opened' },
-    request_id: c.get('requestId'),
-  }).catch(() => {});
+  auditService
+    .writeAuditLog(c.env.DB, {
+      org_id: orgId,
+      actor_id: c.get('userId') ?? null,
+      action: 'billing.portal_opened',
+      target_type: 'billing',
+      target_id: orgId,
+      metadata_json: {
+        stripe_customer_id: sub.stripe_customer_id,
+        message: 'Billing portal session opened',
+      },
+      request_id: c.get('requestId'),
+    })
+    .catch(() => {});
 
   return c.json({ data: result });
 });
@@ -1865,7 +1993,11 @@ api.get('/api/sites/:id/logs', async (c) => {
  */
 api.post('/api/publish/bolt', async (c) => {
   const body = await c.req.json();
-  const { files, chat, slug: existingSlug } = body as {
+  const {
+    files,
+    chat,
+    slug: existingSlug,
+  } = body as {
     files: { path: string; content: string }[];
     chat: { messages: unknown[]; description?: string; exportDate: string };
     slug: string | null;
@@ -1915,11 +2047,9 @@ api.post('/api/publish/bolt', async (c) => {
     const ext = f.path.split('.').pop()?.toLowerCase() ?? '';
     const contentType = mimeTypes[ext] ?? 'application/octet-stream';
 
-    return c.env.SITES_BUCKET.put(
-      `sites/${slug}/${version}/${f.path}`,
-      f.content,
-      { httpMetadata: { contentType } },
-    );
+    return c.env.SITES_BUCKET.put(`sites/${slug}/${version}/${f.path}`, f.content, {
+      httpMetadata: { contentType },
+    });
   });
 
   // Store chat export as meta file (not publicly served)
@@ -1954,31 +2084,43 @@ api.post('/api/publish/bolt', async (c) => {
   const siteUrl = `https://${slug}${DOMAINS.SITES_SUFFIX}`;
 
   // Audit: bolt.diy project published (no auth — system-level log)
-  auditService.writeAuditLog(c.env.DB, {
-    org_id: 'bolt',
-    actor_id: null,
-    action: 'site.published_from_bolt',
-    target_type: 'site',
-    target_id: slug,
-    metadata_json: {
-      slug,
-      version,
-      files_uploaded: files.length,
-      url: siteUrl,
-      had_existing_slug: !!existingSlug,
-      message: 'bolt.diy project published — ' + files.length + ' files → ' + slug + ' (version ' + version + ')',
-    },
-    request_id: c.get('requestId'),
-  }).catch(() => {});
+  auditService
+    .writeAuditLog(c.env.DB, {
+      org_id: 'bolt',
+      actor_id: null,
+      action: 'site.published_from_bolt',
+      target_type: 'site',
+      target_id: slug,
+      metadata_json: {
+        slug,
+        version,
+        files_uploaded: files.length,
+        url: siteUrl,
+        had_existing_slug: !!existingSlug,
+        message:
+          'bolt.diy project published — ' +
+          files.length +
+          ' files → ' +
+          slug +
+          ' (version ' +
+          version +
+          ')',
+      },
+      request_id: c.get('requestId'),
+    })
+    .catch(() => {});
 
-  return c.json({
-    data: {
-      slug,
-      version,
-      url: siteUrl,
-      files_uploaded: files.length,
+  return c.json(
+    {
+      data: {
+        slug,
+        version,
+        url: siteUrl,
+        files_uploaded: files.length,
+      },
     },
-  }, 201);
+    201,
+  );
 });
 
 /**
@@ -2009,19 +2151,23 @@ async function generateSlugFromChat(
     const messages = (chat?.messages ?? []) as { role?: string; content?: string }[];
     const firstUserMsg = messages.find((m) => m.role === 'user')?.content ?? '';
 
-    const result = await env.AI.run('@cf/meta/llama-3.1-8b-instruct' as Parameters<typeof env.AI.run>[0], {
-      messages: [
-        {
-          role: 'system',
-          content: 'Generate a short URL slug for a website. Output ONLY the slug, nothing else. Use lowercase letters, numbers, and hyphens. Maximum 3-4 words. Examples: vitos-mens-salon, pizza-palace, janes-bakery',
-        },
-        {
-          role: 'user',
-          content: `Project: ${chat?.description ?? 'Unknown'}\nContext: ${firstUserMsg.substring(0, 300)}`,
-        },
-      ],
-      max_tokens: 50,
-    });
+    const result = await env.AI.run(
+      '@cf/meta/llama-3.1-8b-instruct' as Parameters<typeof env.AI.run>[0],
+      {
+        messages: [
+          {
+            role: 'system',
+            content:
+              'Generate a short URL slug for a website. Output ONLY the slug, nothing else. Use lowercase letters, numbers, and hyphens. Maximum 3-4 words. Examples: vitos-mens-salon, pizza-palace, janes-bakery',
+          },
+          {
+            role: 'user',
+            content: `Project: ${chat?.description ?? 'Unknown'}\nContext: ${firstUserMsg.substring(0, 300)}`,
+          },
+        ],
+        max_tokens: 50,
+      },
+    );
 
     const response = (result as { response?: string }).response ?? '';
     const aiSlug = response
@@ -2184,16 +2330,39 @@ api.get('/api/sites/by-slug/:slug/chat', async (c) => {
   const isVite = manifestData.is_vite_project === true;
 
   // For Vite projects, serve source files from _src/ so the editor can run the dev server
-  const prefix = isVite
-    ? `sites/${slug}/${version}/_src/`
-    : `sites/${slug}/${version}/`;
+  const prefix = isVite ? `sites/${slug}/${version}/_src/` : `sites/${slug}/${version}/`;
 
   // Extensions safe to read as text and embed in boltArtifact
   const TEXT_EXTENSIONS = new Set([
-    '.html', '.htm', '.css', '.js', '.mjs', '.cjs', '.ts', '.tsx', '.jsx',
-    '.json', '.xml', '.txt', '.svg', '.md', '.mdx', '.yaml', '.yml',
-    '.toml', '.env', '.gitignore', '.npmrc', '.prettierrc', '.eslintrc',
-    '.map', '.webmanifest', '.csv', '.tsv', '.graphql', '.gql',
+    '.html',
+    '.htm',
+    '.css',
+    '.js',
+    '.mjs',
+    '.cjs',
+    '.ts',
+    '.tsx',
+    '.jsx',
+    '.json',
+    '.xml',
+    '.txt',
+    '.svg',
+    '.md',
+    '.mdx',
+    '.yaml',
+    '.yml',
+    '.toml',
+    '.env',
+    '.gitignore',
+    '.npmrc',
+    '.prettierrc',
+    '.eslintrc',
+    '.map',
+    '.webmanifest',
+    '.csv',
+    '.tsv',
+    '.graphql',
+    '.gql',
   ]);
 
   const isTextFile = (filePath: string): boolean => {
@@ -2240,8 +2409,9 @@ api.get('/api/sites/by-slug/:slug/chat', async (c) => {
   // Look up business name from D1
   let businessName = slug.replace(/-/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase());
   try {
-    const site = await c.env.DB
-      .prepare('SELECT business_name FROM sites WHERE slug = ? AND deleted_at IS NULL')
+    const site = await c.env.DB.prepare(
+      'SELECT business_name FROM sites WHERE slug = ? AND deleted_at IS NULL',
+    )
       .bind(slug)
       .first<{ business_name: string }>();
     if (site?.business_name) businessName = site.business_name;
@@ -2257,8 +2427,8 @@ api.get('/api/sites/by-slug/:slug/chat', async (c) => {
     return a.path.localeCompare(b.path);
   });
 
-  const fileActions = sortedFiles.map((f) =>
-    `<boltAction type="file" filePath="${f.path}">\n${f.content}\n</boltAction>`,
+  const fileActions = sortedFiles.map(
+    (f) => `<boltAction type="file" filePath="${f.path}">\n${f.content}\n</boltAction>`,
   );
 
   // For Vite projects, add install + start actions so the dev server starts
@@ -2362,9 +2532,7 @@ api.get('/api/sites/by-slug/:slug/files', async (c) => {
 
   // For Vite projects, list source files from _src/ prefix (for the editor)
   // For legacy static sites, list the serving files directly
-  const prefix = isVite
-    ? `sites/${slug}/${version}/_src/`
-    : `sites/${slug}/${version}/`;
+  const prefix = isVite ? `sites/${slug}/${version}/_src/` : `sites/${slug}/${version}/`;
 
   // List all files from R2
   const listed = await c.env.SITES_BUCKET.list({ prefix, limit: 500 });
@@ -2433,7 +2601,10 @@ api.get('/api/sites/by-slug/:slug/research.json', async (c) => {
 
   if (!isPublic) {
     const orgId = c.get('orgId');
-    if (!orgId) throw unauthorized('Research data requires authentication (or set RESEARCH_JSON_PUBLIC=true)');
+    if (!orgId)
+      throw unauthorized(
+        'Research data requires authentication (or set RESEARCH_JSON_PUBLIC=true)',
+      );
 
     // Verify the site belongs to the user's org
     const site = await dbQueryOne<{ id: string }>(
@@ -2616,19 +2787,27 @@ api.patch('/api/sites/:id', async (c) => {
         await c.env.CACHE_KV.delete(`host:${site.slug}${DOMAINS.SITES_SUFFIX}`).catch(() => {});
 
         // Audit: KV cache invalidated for old hostname
-        auditService.writeAuditLog(c.env.DB, {
-          org_id: orgId,
-          actor_id: c.get('userId') ?? null,
-          action: 'site.cache_invalidated',
-          target_type: 'site',
-          target_id: siteId,
-          metadata_json: {
-            cache_key: `host:${site.slug}${DOMAINS.SITES_SUFFIX}`,
-            reason: 'slug_change',
-            message: 'KV cache invalidated for ' + site.slug + DOMAINS.SITES_SUFFIX + ' (slug renamed to ' + newSlug + ')',
-          },
-          request_id: c.get('requestId'),
-        }).catch(() => {});
+        auditService
+          .writeAuditLog(c.env.DB, {
+            org_id: orgId,
+            actor_id: c.get('userId') ?? null,
+            action: 'site.cache_invalidated',
+            target_type: 'site',
+            target_id: siteId,
+            metadata_json: {
+              cache_key: `host:${site.slug}${DOMAINS.SITES_SUFFIX}`,
+              reason: 'slug_change',
+              message:
+                'KV cache invalidated for ' +
+                site.slug +
+                DOMAINS.SITES_SUFFIX +
+                ' (slug renamed to ' +
+                newSlug +
+                ')',
+            },
+            request_id: c.get('requestId'),
+          })
+          .catch(() => {});
       }
 
       // Copy R2 files from old slug to new slug
@@ -2637,20 +2816,29 @@ api.patch('/api/sites/:id', async (c) => {
         const listed = await c.env.SITES_BUCKET.list({ prefix: oldPrefix, limit: 500 });
 
         // Audit: R2 migration started
-        auditService.writeAuditLog(c.env.DB, {
-          org_id: orgId,
-          actor_id: c.get('userId') ?? null,
-          action: 'site.r2_migration_started',
-          target_type: 'site',
-          target_id: siteId,
-          metadata_json: {
-            old_prefix: oldPrefix,
-            new_prefix: `sites/${newSlug}/`,
-            file_count: listed.objects.length,
-            message: 'Migrating R2 files from sites/' + site.slug + '/ to sites/' + newSlug + '/ (' + listed.objects.length + ' objects)',
-          },
-          request_id: c.get('requestId'),
-        }).catch(() => {});
+        auditService
+          .writeAuditLog(c.env.DB, {
+            org_id: orgId,
+            actor_id: c.get('userId') ?? null,
+            action: 'site.r2_migration_started',
+            target_type: 'site',
+            target_id: siteId,
+            metadata_json: {
+              old_prefix: oldPrefix,
+              new_prefix: `sites/${newSlug}/`,
+              file_count: listed.objects.length,
+              message:
+                'Migrating R2 files from sites/' +
+                site.slug +
+                '/ to sites/' +
+                newSlug +
+                '/ (' +
+                listed.objects.length +
+                ' objects)',
+            },
+            request_id: c.get('requestId'),
+          })
+          .catch(() => {});
 
         let migratedCount = 0;
         for (const obj of listed.objects) {
@@ -2665,41 +2853,58 @@ api.patch('/api/sites/:id', async (c) => {
         }
 
         // Audit: R2 migration completed
-        auditService.writeAuditLog(c.env.DB, {
-          org_id: orgId,
-          actor_id: c.get('userId') ?? null,
-          action: 'site.r2_migration_complete',
-          target_type: 'site',
-          target_id: siteId,
-          metadata_json: {
-            old_slug: site.slug,
-            new_slug: newSlug,
-            files_migrated: migratedCount,
-            total_objects: listed.objects.length,
-            message: 'R2 migration complete — ' + migratedCount + '/' + listed.objects.length + ' files copied to sites/' + newSlug + '/',
-          },
-          request_id: c.get('requestId'),
-        }).catch(() => {});
+        auditService
+          .writeAuditLog(c.env.DB, {
+            org_id: orgId,
+            actor_id: c.get('userId') ?? null,
+            action: 'site.r2_migration_complete',
+            target_type: 'site',
+            target_id: siteId,
+            metadata_json: {
+              old_slug: site.slug,
+              new_slug: newSlug,
+              files_migrated: migratedCount,
+              total_objects: listed.objects.length,
+              message:
+                'R2 migration complete — ' +
+                migratedCount +
+                '/' +
+                listed.objects.length +
+                ' files copied to sites/' +
+                newSlug +
+                '/',
+            },
+            request_id: c.get('requestId'),
+          })
+          .catch(() => {});
       } catch (migrationErr) {
         // R2 migration failure should not block the slug update
-        const migErrMsg = migrationErr instanceof Error ? migrationErr.message : String(migrationErr);
-        console.warn(`Failed to migrate R2 files from sites/${site.slug}/ to sites/${newSlug}/: ${migErrMsg}`);
+        const migErrMsg =
+          migrationErr instanceof Error ? migrationErr.message : String(migrationErr);
+        console.warn(
+          `Failed to migrate R2 files from sites/${site.slug}/ to sites/${newSlug}/: ${migErrMsg}`,
+        );
 
         // Audit: R2 migration failed
-        auditService.writeAuditLog(c.env.DB, {
-          org_id: orgId,
-          actor_id: c.get('userId') ?? null,
-          action: 'site.r2_migration_failed',
-          target_type: 'site',
-          target_id: siteId,
-          metadata_json: {
-            old_slug: site.slug,
-            new_slug: newSlug,
-            error: migErrMsg,
-            message: 'R2 file migration failed: ' + migErrMsg + ' — slug updated but old files may still exist',
-          },
-          request_id: c.get('requestId'),
-        }).catch(() => {});
+        auditService
+          .writeAuditLog(c.env.DB, {
+            org_id: orgId,
+            actor_id: c.get('userId') ?? null,
+            action: 'site.r2_migration_failed',
+            target_type: 'site',
+            target_id: siteId,
+            metadata_json: {
+              old_slug: site.slug,
+              new_slug: newSlug,
+              error: migErrMsg,
+              message:
+                'R2 file migration failed: ' +
+                migErrMsg +
+                ' — slug updated but old files may still exist',
+            },
+            request_id: c.get('requestId'),
+          })
+          .catch(() => {});
       }
       // Release migration lock
       await c.env.CACHE_KV.delete(`slug_migration:${siteId}`).catch(() => {});
@@ -2710,7 +2915,7 @@ api.patch('/api/sites/:id', async (c) => {
     return c.json({ data: { updated: false } });
   }
 
-  updates.push('updated_at = datetime(\'now\')');
+  updates.push("updated_at = datetime('now')");
   params.push(siteId);
 
   await c.env.DB.prepare(`UPDATE sites SET ${updates.join(', ')} WHERE id = ?`)
@@ -2719,37 +2924,53 @@ api.patch('/api/sites/:id', async (c) => {
 
   // Write specific audit logs for slug and name changes
   if (body.slug && body.slug.trim()) {
-    const newSlug = body.slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/--+/g, '-').replace(/^-|-$/g, '').slice(0, 100);
+    const newSlug = body.slug
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, '-')
+      .replace(/--+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 100);
     if (newSlug && newSlug !== site.slug) {
-      await auditService.writeAuditLog(c.env.DB, {
-        org_id: orgId,
-        actor_id: c.get('userId') ?? null,
-        action: 'site.slug_changed',
-        target_type: 'site',
-        target_id: siteId,
-        metadata_json: {
-          old_slug: site.slug,
-          new_slug: newSlug,
-          message: 'URL changed from ' + site.slug + DOMAINS.SITES_SUFFIX + ' to ' + newSlug + DOMAINS.SITES_SUFFIX,
-        },
-        request_id: c.get('requestId'),
-      }).catch(() => {});
+      await auditService
+        .writeAuditLog(c.env.DB, {
+          org_id: orgId,
+          actor_id: c.get('userId') ?? null,
+          action: 'site.slug_changed',
+          target_type: 'site',
+          target_id: siteId,
+          metadata_json: {
+            old_slug: site.slug,
+            new_slug: newSlug,
+            message:
+              'URL changed from ' +
+              site.slug +
+              DOMAINS.SITES_SUFFIX +
+              ' to ' +
+              newSlug +
+              DOMAINS.SITES_SUFFIX,
+          },
+          request_id: c.get('requestId'),
+        })
+        .catch(() => {});
     }
   }
 
   if (body.business_name && body.business_name.trim()) {
-    await auditService.writeAuditLog(c.env.DB, {
-      org_id: orgId,
-      actor_id: c.get('userId') ?? null,
-      action: 'site.name_changed',
-      target_type: 'site',
-      target_id: siteId,
-      metadata_json: {
-        new_name: body.business_name.trim().slice(0, 200),
-        message: 'Site name updated to "' + body.business_name.trim().slice(0, 200) + '"',
-      },
-      request_id: c.get('requestId'),
-    }).catch(() => {});
+    await auditService
+      .writeAuditLog(c.env.DB, {
+        org_id: orgId,
+        actor_id: c.get('userId') ?? null,
+        action: 'site.name_changed',
+        target_type: 'site',
+        target_id: siteId,
+        metadata_json: {
+          new_name: body.business_name.trim().slice(0, 200),
+          message: 'Site name updated to "' + body.business_name.trim().slice(0, 200) + '"',
+        },
+        request_id: c.get('requestId'),
+      })
+      .catch(() => {});
   }
 
   await auditService.writeAuditLog(c.env.DB, {
@@ -2885,9 +3106,10 @@ api.post('/api/sites/:id/reset', async (c) => {
     // Empty or malformed body is acceptable — reset with defaults
   }
 
-  const iteration = typeof body.directive_version === 'number' && body.directive_version > 0
-    ? Math.floor(body.directive_version)
-    : undefined;
+  const iteration =
+    typeof body.directive_version === 'number' && body.directive_version > 0
+      ? Math.floor(body.directive_version)
+      : undefined;
 
   // Resolve budget tier: explicit body override > persisted site row > 'free' default.
   // Validate via Zod so invalid values silently fall through to the safe baseline.
@@ -2911,7 +3133,7 @@ api.post('/api/sites/:id/reset', async (c) => {
     : undefined;
 
   // Update business info if provided
-  const updates: string[] = ['status = \'building\'', 'updated_at = datetime(\'now\')'];
+  const updates: string[] = ["status = 'building'", "updated_at = datetime('now')"];
   const params: unknown[] = [];
 
   if (body.business?.name) {
@@ -2978,39 +3200,48 @@ api.post('/api/sites/:id/reset', async (c) => {
         workflowInstanceId = instance.id;
 
         // Log that we had to use a retry ID
-        auditService.writeAuditLog(c.env.DB, {
-          org_id: orgId,
-          actor_id: c.get('userId') ?? null,
-          action: 'workflow.retry_created',
-          target_type: 'site',
-          target_id: siteId,
-          metadata_json: {
-            site_id: siteId,
-            slug: site.slug,
-            first_error: firstErrMsg,
-            retry_id: resetId,
-            message: 'Workflow instance recreated with new ID (original ID was in use)',
-          },
-          request_id: c.get('requestId'),
-        }).catch(() => {});
+        auditService
+          .writeAuditLog(c.env.DB, {
+            org_id: orgId,
+            actor_id: c.get('userId') ?? null,
+            action: 'workflow.retry_created',
+            target_type: 'site',
+            target_id: siteId,
+            metadata_json: {
+              site_id: siteId,
+              slug: site.slug,
+              first_error: firstErrMsg,
+              retry_id: resetId,
+              message: 'Workflow instance recreated with new ID (original ID was in use)',
+            },
+            request_id: c.get('requestId'),
+          })
+          .catch(() => {});
       } catch (retryErr) {
         // Workflow not available — log it
         const retryErrMsg = retryErr instanceof Error ? retryErr.message : String(retryErr);
-        auditService.writeAuditLog(c.env.DB, {
-          org_id: orgId,
-          actor_id: c.get('userId') ?? null,
-          action: 'workflow.creation_failed',
-          target_type: 'site',
-          target_id: siteId,
-          metadata_json: {
-            site_id: siteId,
-            slug: site.slug,
-            first_error: firstErrMsg,
-            retry_error: retryErrMsg,
-            message: 'Workflow creation failed: ' + retryErrMsg + ' (first attempt: ' + firstErrMsg + ')',
-          },
-          request_id: c.get('requestId'),
-        }).catch(() => {});
+        auditService
+          .writeAuditLog(c.env.DB, {
+            org_id: orgId,
+            actor_id: c.get('userId') ?? null,
+            action: 'workflow.creation_failed',
+            target_type: 'site',
+            target_id: siteId,
+            metadata_json: {
+              site_id: siteId,
+              slug: site.slug,
+              first_error: firstErrMsg,
+              retry_error: retryErrMsg,
+              message:
+                'Workflow creation failed: ' +
+                retryErrMsg +
+                ' (first attempt: ' +
+                firstErrMsg +
+                ')',
+            },
+            request_id: c.get('requestId'),
+          })
+          .catch(() => {});
       }
     }
   }
@@ -3052,25 +3283,36 @@ api.post('/api/sites/:id/reset', async (c) => {
 
   // Log anticipated build phases
   const resetPhases = [
-    { action: 'workflow.phase.research', message: 'Phase 1: Re-analyzing business profile & gathering fresh data' },
-    { action: 'workflow.phase.generation', message: 'Phase 2: Regenerating website HTML with updated information' },
-    { action: 'workflow.phase.deployment', message: 'Phase 3: Uploading new files & publishing updated site' },
+    {
+      action: 'workflow.phase.research',
+      message: 'Phase 1: Re-analyzing business profile & gathering fresh data',
+    },
+    {
+      action: 'workflow.phase.generation',
+      message: 'Phase 2: Regenerating website HTML with updated information',
+    },
+    {
+      action: 'workflow.phase.deployment',
+      message: 'Phase 3: Uploading new files & publishing updated site',
+    },
   ];
   for (const phase of resetPhases) {
-    await auditService.writeAuditLog(c.env.DB, {
-      org_id: orgId,
-      actor_id: c.get('userId') ?? null,
-      action: phase.action,
-      target_type: 'site',
-      target_id: siteId,
-      metadata_json: {
-        site_id: siteId,
-        slug: site.slug,
-        workflow_instance_id: workflowInstanceId ?? null,
-        message: phase.message,
-      },
-      request_id: c.get('requestId'),
-    }).catch(() => {});
+    await auditService
+      .writeAuditLog(c.env.DB, {
+        org_id: orgId,
+        actor_id: c.get('userId') ?? null,
+        action: phase.action,
+        target_type: 'site',
+        target_id: siteId,
+        metadata_json: {
+          site_id: siteId,
+          slug: site.slug,
+          workflow_instance_id: workflowInstanceId ?? null,
+          message: phase.message,
+        },
+        request_id: c.get('requestId'),
+      })
+      .catch(() => {});
   }
 
   return c.json({
@@ -3223,14 +3465,18 @@ api.post('/api/sites/:id/deploy', async (c) => {
   }
 
   // Update manifest
-  const manifest = { current_version: version, updated_at: new Date().toISOString(), files: uploadedFiles };
+  const manifest = {
+    current_version: version,
+    updated_at: new Date().toISOString(),
+    files: uploadedFiles,
+  };
   await c.env.SITES_BUCKET.put(`sites/${slug}/_manifest.json`, JSON.stringify(manifest), {
     httpMetadata: { contentType: 'application/json' },
   });
 
   // Update site status to published
   await c.env.DB.prepare(
-    'UPDATE sites SET status = \'published\', current_build_version = ?, updated_at = datetime(\'now\') WHERE id = ?',
+    "UPDATE sites SET status = 'published', current_build_version = ?, updated_at = datetime('now') WHERE id = ?",
   )
     .bind(version, siteId)
     .run();
@@ -3239,25 +3485,47 @@ api.post('/api/sites/:id/deploy', async (c) => {
   try {
     // Count existing snapshots to determine naming
     const { dbQuery: snpQuery } = await import('../services/db.js');
-    const existingSnaps = await snpQuery<{ snapshot_name: string }>(c.env.DB, 'SELECT snapshot_name FROM site_snapshots WHERE site_id = ? AND deleted_at IS NULL', [siteId]);
+    const existingSnaps = await snpQuery<{ snapshot_name: string }>(
+      c.env.DB,
+      'SELECT snapshot_name FROM site_snapshots WHERE site_id = ? AND deleted_at IS NULL',
+      [siteId],
+    );
     const snapCount = existingSnaps.data.length;
 
     let snapshotName = `edit-${snapCount + 1}`;
     // Try AI-generated snapshot name
     try {
-      const aiResult = await c.env.AI.run('@cf/meta/llama-3.1-8b-instruct' as Parameters<typeof c.env.AI.run>[0], {
-        messages: [
-          { role: 'system', content: 'Generate a 1-3 word URL-safe snapshot name for a website version. Output ONLY the name. Use lowercase, hyphens. Examples: hero-redesign, color-update, new-menu, layout-v2, spring-refresh' },
-          { role: 'user', content: `This is edit #${snapCount + 1} of "${slug}". ${uploadedFiles.length} files changed.` },
-        ],
-        max_tokens: 20,
-      });
-      const aiName = ((aiResult as { response?: string }).response ?? '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/--+/g, '-').replace(/^-|-$/g, '').substring(0, 25);
+      const aiResult = await c.env.AI.run(
+        '@cf/meta/llama-3.1-8b-instruct' as Parameters<typeof c.env.AI.run>[0],
+        {
+          messages: [
+            {
+              role: 'system',
+              content:
+                'Generate a 1-3 word URL-safe snapshot name for a website version. Output ONLY the name. Use lowercase, hyphens. Examples: hero-redesign, color-update, new-menu, layout-v2, spring-refresh',
+            },
+            {
+              role: 'user',
+              content: `This is edit #${snapCount + 1} of "${slug}". ${uploadedFiles.length} files changed.`,
+            },
+          ],
+          max_tokens: 20,
+        },
+      );
+      const aiName = ((aiResult as { response?: string }).response ?? '')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, '')
+        .replace(/--+/g, '-')
+        .replace(/^-|-$/g, '')
+        .substring(0, 25);
       if (aiName && aiName.length >= 2) snapshotName = aiName;
-    } catch { /* fall back to edit-N */ }
+    } catch {
+      /* fall back to edit-N */
+    }
 
     // Ensure uniqueness
-    const existing = existingSnaps.data.find(s => s.snapshot_name === snapshotName);
+    const existing = existingSnaps.data.find((s) => s.snapshot_name === snapshotName);
     if (existing) snapshotName = `${snapshotName}-${Date.now().toString(36).slice(-4)}`;
 
     const { dbInsert: snpInsert } = await import('../services/db.js');
@@ -3381,7 +3649,11 @@ api.post('/api/sites/:id/publish-bolt', async (c) => {
   if (!orgId) throw unauthorized('Not authenticated');
 
   const body = await c.req.json();
-  const { files, chat, slug: providedSlug } = body as {
+  const {
+    files,
+    chat,
+    slug: providedSlug,
+  } = body as {
     files: { path: string; content: string }[];
     chat?: { messages: unknown[]; description?: string; exportDate?: string };
     slug?: string;
@@ -3403,12 +3675,23 @@ api.post('/api/sites/:id/publish-bolt', async (c) => {
   const version = new Date().toISOString().replace(/[:.]/g, '-');
 
   const mimeTypes: Record<string, string> = {
-    html: 'text/html', css: 'text/css', js: 'application/javascript',
-    mjs: 'application/javascript', json: 'application/json',
-    png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
-    gif: 'image/gif', svg: 'image/svg+xml', ico: 'image/x-icon',
-    webp: 'image/webp', woff: 'font/woff', woff2: 'font/woff2',
-    ttf: 'font/ttf', xml: 'application/xml', txt: 'text/plain',
+    html: 'text/html',
+    css: 'text/css',
+    js: 'application/javascript',
+    mjs: 'application/javascript',
+    json: 'application/json',
+    png: 'image/png',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    gif: 'image/gif',
+    svg: 'image/svg+xml',
+    ico: 'image/x-icon',
+    webp: 'image/webp',
+    woff: 'font/woff',
+    woff2: 'font/woff2',
+    ttf: 'font/ttf',
+    xml: 'application/xml',
+    txt: 'text/plain',
     webmanifest: 'application/manifest+json',
   };
 
@@ -3416,11 +3699,9 @@ api.post('/api/sites/:id/publish-bolt', async (c) => {
   const uploads: Promise<R2Object>[] = files.map((f) => {
     const ext = f.path.split('.').pop()?.toLowerCase() ?? '';
     const contentType = mimeTypes[ext] ?? 'application/octet-stream';
-    return c.env.SITES_BUCKET.put(
-      `sites/${slug}/${version}/${f.path}`,
-      f.content,
-      { httpMetadata: { contentType } },
-    );
+    return c.env.SITES_BUCKET.put(`sites/${slug}/${version}/${f.path}`, f.content, {
+      httpMetadata: { contentType },
+    });
   });
 
   // Store chat export if provided
@@ -3452,8 +3733,10 @@ api.post('/api/sites/:id/publish-bolt', async (c) => {
 
   // Update site status in D1
   await c.env.DB.prepare(
-    'UPDATE sites SET status = \'published\', current_build_version = ?, updated_at = datetime(\'now\') WHERE id = ?',
-  ).bind(version, siteId).run();
+    "UPDATE sites SET status = 'published', current_build_version = ?, updated_at = datetime('now') WHERE id = ?",
+  )
+    .bind(version, siteId)
+    .run();
 
   // Invalidate KV cache
   const SITES_SUFFIX = '.projectsites.dev';
@@ -3543,10 +3826,19 @@ api.get('/api/domains/search', async (c) => {
     return c.json({ data: [] });
   }
 
-  const domain = query.trim().toLowerCase().replace(/[^a-z0-9.-]/g, '');
+  const domain = query
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9.-]/g, '');
   const baseName = domain.replace(/\.[^.]+$/, '').replace(/\./g, '');
 
-  const results: Array<{ domain: string; available: boolean; price: number; zone: string; path: string }> = [];
+  const results: Array<{
+    domain: string;
+    available: boolean;
+    price: number;
+    zone: string;
+    path: string;
+  }> = [];
 
   try {
     // Step 1: Get domain suggestions from Domainr Search API
@@ -3559,11 +3851,37 @@ api.get('/api/domains/search', async (c) => {
     });
 
     if (!searchRes.ok) {
-      console.warn(JSON.stringify({ level: 'warn', service: 'domain_search', message: 'Domainr search failed', status: searchRes.status }));
+      console.warn(
+        JSON.stringify({
+          level: 'warn',
+          service: 'domain_search',
+          message: 'Domainr search failed',
+          status: searchRes.status,
+        }),
+      );
       // Fall back to generated candidates
-      const tlds = ['.com', '.net', '.org', '.io', '.co', '.dev', '.app', '.site', '.online', '.store', '.shop', '.biz'];
+      const tlds = [
+        '.com',
+        '.net',
+        '.org',
+        '.io',
+        '.co',
+        '.dev',
+        '.app',
+        '.site',
+        '.online',
+        '.store',
+        '.shop',
+        '.biz',
+      ];
       for (const tld of tlds) {
-        results.push({ domain: baseName + tld, available: false, price: 0, zone: tld.slice(1), path: '' });
+        results.push({
+          domain: baseName + tld,
+          available: false,
+          price: 0,
+          zone: tld.slice(1),
+          path: '',
+        });
       }
       return c.json({ data: results });
     }
@@ -3603,7 +3921,10 @@ api.get('/api/domains/search', async (c) => {
       if (statusData.status) {
         for (const s of statusData.status) {
           // Domainr status field: "undelegated" = available, "active" = taken
-          const isAvailable = s.summary === 'inactive' || s.status.includes('undelegated') || s.status.includes('inactive');
+          const isAvailable =
+            s.summary === 'inactive' ||
+            s.status.includes('undelegated') ||
+            s.status.includes('inactive');
           statusMap.set(s.domain, {
             available: isAvailable,
             price: s.price ? Math.round(s.price * 100) : 0, // cents
@@ -3624,11 +3945,24 @@ api.get('/api/domains/search', async (c) => {
       });
     }
   } catch (err) {
-    console.warn(JSON.stringify({ level: 'error', service: 'domain_search', message: 'Domain search error', error: String(err) }));
+    console.warn(
+      JSON.stringify({
+        level: 'error',
+        service: 'domain_search',
+        message: 'Domain search error',
+        error: String(err),
+      }),
+    );
     // Fallback: return TLD candidates as unknown
     const tlds = ['.com', '.net', '.org', '.io', '.co', '.dev', '.app', '.site', '.online'];
     for (const tld of tlds) {
-      results.push({ domain: baseName + tld, available: false, price: 0, zone: tld.slice(1), path: '' });
+      results.push({
+        domain: baseName + tld,
+        available: false,
+        price: 0,
+        zone: tld.slice(1),
+        path: '',
+      });
     }
   }
 
@@ -3733,10 +4067,10 @@ api.post('/api/domains/purchase', async (c) => {
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     body: new URLSearchParams({
-      'mode': 'subscription',
-      'success_url': body.success_url,
-      'cancel_url': body.cancel_url,
-      'customer_email': user?.email || '',
+      mode: 'subscription',
+      success_url: body.success_url,
+      cancel_url: body.cancel_url,
+      customer_email: user?.email || '',
       'line_items[0][price_data][currency]': 'usd',
       'line_items[0][price_data][recurring][interval]': 'year',
       'line_items[0][price_data][unit_amount]': '1500', // $15/yr default
@@ -3758,20 +4092,22 @@ api.post('/api/domains/purchase', async (c) => {
   const session = (await stripeRes.json()) as { url: string; id: string };
 
   // Audit: domain purchase checkout initiated
-  auditService.writeAuditLog(c.env.DB, {
-    org_id: orgId,
-    actor_id: c.get('userId') ?? null,
-    action: 'domain.purchase_initiated',
-    target_type: 'domain',
-    target_id: body.site_id,
-    metadata_json: {
-      domain: body.domain,
-      site_id: body.site_id,
-      stripe_session_id: session.id,
-      message: 'Domain purchase started for ' + body.domain + ' — Stripe checkout created',
-    },
-    request_id: c.get('requestId'),
-  }).catch(() => {});
+  auditService
+    .writeAuditLog(c.env.DB, {
+      org_id: orgId,
+      actor_id: c.get('userId') ?? null,
+      action: 'domain.purchase_initiated',
+      target_type: 'domain',
+      target_id: body.site_id,
+      metadata_json: {
+        domain: body.domain,
+        site_id: body.site_id,
+        stripe_session_id: session.id,
+        message: 'Domain purchase started for ' + body.domain + ' — Stripe checkout created',
+      },
+      request_id: c.get('requestId'),
+    })
+    .catch(() => {});
 
   return c.json({
     data: {
@@ -3896,7 +4232,14 @@ api.get('/api/admin/domains/summary', async (c) => {
     [orgId],
   );
 
-  const stats = data[0] ?? { total: 0, active: 0, pending: 0, failed: 0, free_subdomain: 0, custom_cname: 0 };
+  const stats = data[0] ?? {
+    total: 0,
+    active: 0,
+    pending: 0,
+    failed: 0,
+    free_subdomain: 0,
+    custom_cname: 0,
+  };
 
   return c.json({
     data: {
@@ -4026,7 +4369,14 @@ api.post('/api/admin/domains/:hostnameId/verify', async (c) => {
       previous_status: hostname.status,
       new_status: newStatus,
       ssl_status: cfStatus.ssl_status,
-      message: 'Domain verification: ' + hostname.hostname + ' — ' + hostname.status + ' → ' + newStatus + (cfStatus.ssl_status ? ' (SSL: ' + cfStatus.ssl_status + ')' : ''),
+      message:
+        'Domain verification: ' +
+        hostname.hostname +
+        ' — ' +
+        hostname.status +
+        ' → ' +
+        newStatus +
+        (cfStatus.ssl_status ? ' (SSL: ' + cfStatus.ssl_status + ')' : ''),
     },
     request_id: c.get('requestId'),
   });
@@ -4060,19 +4410,21 @@ api.post('/api/admin/domains/:hostnameId/verify', async (c) => {
           defaultDomain,
           siteName: site?.business_name || defaultDomain,
         });
-        auditService.writeAuditLog(c.env.DB, {
-          org_id: orgId,
-          actor_id: c.get('userId') ?? null,
-          action: 'notification.domain_verified_sent',
-          target_type: 'hostname',
-          target_id: hostnameId,
-          metadata_json: {
-            email: owner.email,
-            hostname: hostname.hostname,
-            message: 'Domain verification email sent to ' + owner.email,
-          },
-          request_id: c.get('requestId'),
-        }).catch(() => {});
+        auditService
+          .writeAuditLog(c.env.DB, {
+            org_id: orgId,
+            actor_id: c.get('userId') ?? null,
+            action: 'notification.domain_verified_sent',
+            target_type: 'hostname',
+            target_id: hostnameId,
+            metadata_json: {
+              email: owner.email,
+              hostname: hostname.hostname,
+              message: 'Domain verification email sent to ' + owner.email,
+            },
+            request_id: c.get('requestId'),
+          })
+          .catch(() => {});
       }
     } catch {
       // Email failure should not break verification
@@ -4250,13 +4602,15 @@ api.delete('/api/admin/domains/:hostnameId', async (c) => {
       await domainService.deleteCustomHostname(c.env, hostname.cf_custom_hostname_id);
     } catch {
       // Log but don't block — the CF resource may already be gone
-      console.warn(JSON.stringify({
-        level: 'warn',
-        service: 'domains',
-        message: 'Failed to delete CF custom hostname during deprovision',
-        hostname: hostname.hostname,
-        cf_id: hostname.cf_custom_hostname_id,
-      }));
+      console.warn(
+        JSON.stringify({
+          level: 'warn',
+          service: 'domains',
+          message: 'Failed to delete CF custom hostname during deprovision',
+          hostname: hostname.hostname,
+          cf_id: hostname.cf_custom_hostname_id,
+        }),
+      );
     }
   }
 
@@ -4285,7 +4639,10 @@ api.delete('/api/admin/domains/:hostnameId', async (c) => {
       type: hostname.type,
       had_cf_id: !!hostname.cf_custom_hostname_id,
       site_id: hostname.site_id,
-      message: 'Domain deprovisioned: ' + hostname.hostname + (hostname.cf_custom_hostname_id ? ' (CF hostname removed)' : ''),
+      message:
+        'Domain deprovisioned: ' +
+        hostname.hostname +
+        (hostname.cf_custom_hostname_id ? ' (CF hostname removed)' : ''),
     },
     request_id: c.get('requestId'),
   });
@@ -4324,18 +4681,21 @@ api.post('/api/contact', async (c) => {
   const body = await c.req.json();
   await contactService.handleContactForm(c.env, body);
 
-  auditService.writeAuditLog(c.env.DB, {
-    org_id: 'system',
-    actor_id: c.get('userId') ?? null,
-    action: 'contact.form_submitted',
-    target_type: 'contact',
-    target_id: 'system',
-    metadata_json: {
-      email: typeof body.email === 'string' ? body.email : 'unknown',
-      message: 'Contact form submitted by ' + (typeof body.email === 'string' ? body.email : 'unknown'),
-    },
-    request_id: c.get('requestId'),
-  }).catch(() => {});
+  auditService
+    .writeAuditLog(c.env.DB, {
+      org_id: 'system',
+      actor_id: c.get('userId') ?? null,
+      action: 'contact.form_submitted',
+      target_type: 'contact',
+      target_id: 'system',
+      metadata_json: {
+        email: typeof body.email === 'string' ? body.email : 'unknown',
+        message:
+          'Contact form submitted by ' + (typeof body.email === 'string' ? body.email : 'unknown'),
+      },
+      request_id: c.get('requestId'),
+    })
+    .catch(() => {});
 
   return c.json({ data: { success: true } });
 });
@@ -4424,13 +4784,17 @@ Respond with EXACTLY one JSON object (no markdown, no extra text):
 Response:`;
 
   try {
-    const aiResult = await c.env.AI.run('@cf/meta/llama-3.1-8b-instruct' as Parameters<typeof c.env.AI.run>[0], {
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 100,
-      temperature: 0.1,
-    });
+    const aiResult = await c.env.AI.run(
+      '@cf/meta/llama-3.1-8b-instruct' as Parameters<typeof c.env.AI.run>[0],
+      {
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 100,
+        temperature: 0.1,
+      },
+    );
 
-    const text = typeof aiResult === 'string' ? aiResult : (aiResult as { response?: string }).response || '';
+    const text =
+      typeof aiResult === 'string' ? aiResult : (aiResult as { response?: string }).response || '';
     // Extract JSON from AI response
     const jsonMatch = text.match(/\{[^}]+\}/);
     if (jsonMatch) {
@@ -4544,7 +4908,10 @@ api.get('/api/sites/:id/files', async (c) => {
   if (!site) throw notFound('Site not found');
 
   const prefix = `sites/${site.slug}/`;
-  const version = (c.req.query('version') || site.current_build_version || '').replace(/[^a-zA-Z0-9._-]/g, '');
+  const version = (c.req.query('version') || site.current_build_version || '').replace(
+    /[^a-zA-Z0-9._-]/g,
+    '',
+  );
   const fullPrefix = version ? `${prefix}${version}/` : prefix;
 
   const listed = await c.env.SITES_BUCKET.list({ prefix: fullPrefix, limit: 500 });
@@ -4606,7 +4973,20 @@ api.get('/api/sites/:id/files-export', async (c) => {
   const prefix = version ? `sites/${site.slug}/${version}/` : `sites/${site.slug}/`;
 
   const listed = await c.env.SITES_BUCKET.list({ prefix, limit: 200 });
-  const textExtensions = new Set(['html', 'css', 'js', 'json', 'txt', 'md', 'xml', 'svg', 'mjs', 'ts', 'jsx', 'tsx']);
+  const textExtensions = new Set([
+    'html',
+    'css',
+    'js',
+    'json',
+    'txt',
+    'md',
+    'xml',
+    'svg',
+    'mjs',
+    'ts',
+    'jsx',
+    'tsx',
+  ]);
   const files: Record<string, string> = {};
 
   await Promise.all(
@@ -4753,10 +5133,20 @@ api.put('/api/sites/:id/files/:path{.+}', async (c) => {
     throw forbidden('Access denied to this file path');
   }
 
-  const body = await c.req.json() as { content: string; content_type?: string };
+  const body = (await c.req.json()) as { content: string; content_type?: string };
   if (typeof body.content !== 'string') throw badRequest('Content must be a string');
 
-  const contentType = body.content_type || (fullKey.endsWith('.html') ? 'text/html' : fullKey.endsWith('.json') ? 'application/json' : fullKey.endsWith('.css') ? 'text/css' : fullKey.endsWith('.js') ? 'application/javascript' : 'text/plain');
+  const contentType =
+    body.content_type ||
+    (fullKey.endsWith('.html')
+      ? 'text/html'
+      : fullKey.endsWith('.json')
+        ? 'application/json'
+        : fullKey.endsWith('.css')
+          ? 'text/css'
+          : fullKey.endsWith('.js')
+            ? 'application/javascript'
+            : 'text/plain');
 
   // Check if file already exists (to differentiate create vs update)
   const existingFile = await c.env.SITES_BUCKET.head(fullKey);
@@ -4783,7 +5173,8 @@ api.put('/api/sites/:id/files/:path{.+}', async (c) => {
       key: fullKey,
       file_name: fileName,
       size: body.content.length,
-      message: (isNewFile ? 'File created: ' : 'File updated: ') + fileName + ' (' + fileSizeKb + ' KB)',
+      message:
+        (isNewFile ? 'File created: ' : 'File updated: ') + fileName + ' (' + fileSizeKb + ' KB)',
     },
     request_id: c.get('requestId'),
   });
@@ -4915,14 +5306,27 @@ api.get('/api/sites/:siteId/snapshots', async (c) => {
   );
 
   const { dbQuery: dbq } = await import('../services/db.js');
-  const result = await dbq<{ id: string; snapshot_name: string; build_version: string; description: string | null; created_at: string }>(
+  const result = await dbq<{
+    id: string;
+    snapshot_name: string;
+    build_version: string;
+    description: string | null;
+    created_at: string;
+  }>(
     c.env.DB,
     'SELECT id, snapshot_name, build_version, description, created_at FROM site_snapshots WHERE site_id = ? AND deleted_at IS NULL ORDER BY created_at DESC',
     [siteId],
   );
 
   // Also fetch git commit history if site exists
-  let gitHistory: Array<{ sha: string; message: string; date: string; author: string; fileCount: number; buildVersion?: string }> = [];
+  let gitHistory: Array<{
+    sha: string;
+    message: string;
+    date: string;
+    author: string;
+    fileCount: number;
+    buildVersion?: string;
+  }> = [];
   if (site) {
     const { getHistory } = await import('../services/git.js');
     gitHistory = await getHistory(c.env.SITES_BUCKET, site.slug);
@@ -4968,14 +5372,23 @@ api.post('/api/sites/:siteId/snapshots', async (c) => {
   const userId = c.get('userId');
   if (!orgId) throw unauthorized('Must be authenticated');
   const siteId = c.req.param('siteId');
-  const body = await c.req.json() as { name: string; description?: string; build_version?: string };
+  const body = (await c.req.json()) as {
+    name: string;
+    description?: string;
+    build_version?: string;
+  };
 
   if (!body.name?.trim()) {
     throw badRequest('Snapshot name is required');
   }
 
   // Normalize snapshot name to URL-safe slug
-  const snapshotName = body.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').substring(0, 30);
+  const snapshotName = body.name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .substring(0, 30);
   if (!snapshotName || snapshotName.length < 1) {
     throw badRequest('Invalid snapshot name');
   }
@@ -5013,14 +5426,17 @@ api.post('/api/sites/:siteId/snapshots', async (c) => {
 
   const snapshotUrl = `https://${site.slug}-${snapshotName}${DOMAINS.SITES_SUFFIX}`;
 
-  return c.json({
-    data: {
-      id,
-      snapshot_name: snapshotName,
-      build_version: buildVersion,
-      url: snapshotUrl,
+  return c.json(
+    {
+      data: {
+        id,
+        snapshot_name: snapshotName,
+        build_version: buildVersion,
+        url: snapshotUrl,
+      },
     },
-  }, 201);
+    201,
+  );
 });
 
 /**
@@ -5074,7 +5490,9 @@ api.delete('/api/sites/:siteId/snapshots/:snapshotId', async (c) => {
   const snapshotId = c.req.param('snapshotId');
 
   const { dbUpdate: dbUpd } = await import('../services/db.js');
-  await dbUpd(c.env.DB, 'site_snapshots', { deleted_at: new Date().toISOString() }, 'id = ?', [snapshotId]);
+  await dbUpd(c.env.DB, 'site_snapshots', { deleted_at: new Date().toISOString() }, 'id = ?', [
+    snapshotId,
+  ]);
 
   return c.json({ data: { deleted: true } });
 });
@@ -5154,7 +5572,7 @@ api.post('/api/sites/:siteId/snapshots/revert', async (c) => {
   const userId = c.get('userId');
   if (!orgId) throw unauthorized('Must be authenticated');
   const siteId = c.req.param('siteId');
-  const body = await c.req.json() as { commit_id: string };
+  const body = (await c.req.json()) as { commit_id: string };
 
   if (!body.commit_id?.trim()) {
     throw badRequest('commit_id is required');
@@ -5193,16 +5611,16 @@ api.post('/api/sites/:siteId/snapshots/revert', async (c) => {
     updated_at: new Date().toISOString(),
     files: result.files.map((f) => `sites/${site.slug}/${version}/${f.name}`),
   };
-  await c.env.SITES_BUCKET.put(
-    `sites/${site.slug}/_manifest.json`,
-    JSON.stringify(manifest),
-    { httpMetadata: { contentType: 'application/json' } },
-  );
+  await c.env.SITES_BUCKET.put(`sites/${site.slug}/_manifest.json`, JSON.stringify(manifest), {
+    httpMetadata: { contentType: 'application/json' },
+  });
 
   // Update D1 site record
   await c.env.DB.prepare(
     "UPDATE sites SET current_build_version = ?, status = 'published', updated_at = datetime('now') WHERE id = ?",
-  ).bind(version, siteId).run();
+  )
+    .bind(version, siteId)
+    .run();
 
   // Create a D1 snapshot record for the revert
   const { dbInsert: dbIns } = await import('../services/db.js');
@@ -5220,20 +5638,22 @@ api.post('/api/sites/:siteId/snapshots/revert', async (c) => {
   await c.env.CACHE_KV.delete(`host:${site.slug}${DOMAINS.SITES_SUFFIX}`).catch(() => {});
 
   // Audit log
-  await auditService.writeAuditLog(c.env.DB, {
-    org_id: orgId,
-    actor_id: userId ?? null,
-    action: 'site.snapshot_reverted',
-    target_type: 'site',
-    target_id: siteId,
-    metadata_json: {
-      commit_id: body.commit_id,
-      new_commit_id: result.commitId,
-      new_version: version,
-      files_restored: result.files.length,
-    },
-    request_id: c.get('requestId'),
-  }).catch(() => {});
+  await auditService
+    .writeAuditLog(c.env.DB, {
+      org_id: orgId,
+      actor_id: userId ?? null,
+      action: 'site.snapshot_reverted',
+      target_type: 'site',
+      target_id: siteId,
+      metadata_json: {
+        commit_id: body.commit_id,
+        new_commit_id: result.commitId,
+        new_version: version,
+        files_restored: result.files.length,
+      },
+      request_id: c.get('requestId'),
+    })
+    .catch(() => {});
 
   return c.json({
     data: {
@@ -5580,7 +6000,10 @@ api.post('/api/feedback', async (c) => {
     const body = await c.req.json();
     const rating = Number(body.rating);
     if (!rating || rating < 1 || rating > 5) {
-      return c.json({ error: { code: 'BAD_REQUEST', message: 'Rating must be 1-5', request_id: requestId } }, 400);
+      return c.json(
+        { error: { code: 'BAD_REQUEST', message: 'Rating must be 1-5', request_id: requestId } },
+        400,
+      );
     }
     const comment = typeof body.comment === 'string' ? body.comment.slice(0, 2000) : null;
     const pageUrl = typeof body.page_url === 'string' ? body.page_url.slice(0, 500) : null;
@@ -5602,15 +6025,26 @@ api.post('/api/feedback', async (c) => {
     // Re-throw known error types for the global error handler
     if (err && typeof err === 'object' && 'code' in err) throw err;
     const category = classifyError(err);
-    console.warn(JSON.stringify({
-      level: 'error',
-      service: 'api',
-      route: 'POST /api/feedback',
-      error_category: category,
-      request_id: requestId,
-      error: err instanceof Error ? err.message : String(err),
-    }));
-    return c.json({ error: { code: 'INTERNAL_ERROR', message: 'Failed to submit feedback', request_id: requestId } }, 500);
+    console.warn(
+      JSON.stringify({
+        level: 'error',
+        service: 'api',
+        route: 'POST /api/feedback',
+        error_category: category,
+        request_id: requestId,
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
+    return c.json(
+      {
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Failed to submit feedback',
+          request_id: requestId,
+        },
+      },
+      500,
+    );
   }
 });
 
@@ -5654,7 +6088,11 @@ api.get('/api/feedback', async (c) => {
   try {
     const limit = Math.min(Number(c.req.query('limit') || '20'), 50);
     const result = await dbQuery<{
-      id: string; rating: number; comment: string; page_url: string; created_at: string;
+      id: string;
+      rating: number;
+      comment: string;
+      page_url: string;
+      created_at: string;
     }>(
       c.env.DB,
       `SELECT id, rating, comment, page_url, created_at FROM feedback
@@ -5666,15 +6104,26 @@ api.get('/api/feedback', async (c) => {
   } catch (err) {
     if (err && typeof err === 'object' && 'code' in err) throw err;
     const category = classifyError(err);
-    console.warn(JSON.stringify({
-      level: 'error',
-      service: 'api',
-      route: 'GET /api/feedback',
-      error_category: category,
-      request_id: requestId,
-      error: err instanceof Error ? err.message : String(err),
-    }));
-    return c.json({ error: { code: 'INTERNAL_ERROR', message: 'Failed to load feedback', request_id: requestId } }, 500);
+    console.warn(
+      JSON.stringify({
+        level: 'error',
+        service: 'api',
+        route: 'GET /api/feedback',
+        error_category: category,
+        request_id: requestId,
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
+    return c.json(
+      {
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Failed to load feedback',
+          request_id: requestId,
+        },
+      },
+      500,
+    );
   }
 });
 
@@ -5713,13 +6162,22 @@ api.get('/api/feedback', async (c) => {
 api.get('/api/notifications', async (c) => {
   const requestId = c.get('requestId');
   const userId = c.get('userId');
-  if (!userId) return c.json({ error: { code: 'UNAUTHORIZED', message: 'Not authenticated', request_id: requestId } }, 401);
+  if (!userId)
+    return c.json(
+      { error: { code: 'UNAUTHORIZED', message: 'Not authenticated', request_id: requestId } },
+      401,
+    );
 
   try {
     const limit = Math.min(Number(c.req.query('limit') || '30'), 100);
     const result = await dbQuery<{
-      id: string; type: string; title: string; message: string;
-      action_url: string; read: number; created_at: string;
+      id: string;
+      type: string;
+      title: string;
+      message: string;
+      action_url: string;
+      read: number;
+      created_at: string;
     }>(
       c.env.DB,
       `SELECT id, type, title, message, action_url, read, created_at
@@ -5732,15 +6190,26 @@ api.get('/api/notifications', async (c) => {
   } catch (err) {
     if (err && typeof err === 'object' && 'code' in err) throw err;
     const category = classifyError(err);
-    console.warn(JSON.stringify({
-      level: 'error',
-      service: 'api',
-      route: 'GET /api/notifications',
-      error_category: category,
-      request_id: requestId,
-      error: err instanceof Error ? err.message : String(err),
-    }));
-    return c.json({ error: { code: 'INTERNAL_ERROR', message: 'Failed to load notifications', request_id: requestId } }, 500);
+    console.warn(
+      JSON.stringify({
+        level: 'error',
+        service: 'api',
+        route: 'GET /api/notifications',
+        error_category: category,
+        request_id: requestId,
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
+    return c.json(
+      {
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Failed to load notifications',
+          request_id: requestId,
+        },
+      },
+      500,
+    );
   }
 });
 
@@ -5770,27 +6239,42 @@ api.get('/api/notifications', async (c) => {
 api.patch('/api/notifications/:id/read', async (c) => {
   const requestId = c.get('requestId');
   const userId = c.get('userId');
-  if (!userId) return c.json({ error: { code: 'UNAUTHORIZED', message: 'Not authenticated', request_id: requestId } }, 401);
+  if (!userId)
+    return c.json(
+      { error: { code: 'UNAUTHORIZED', message: 'Not authenticated', request_id: requestId } },
+      401,
+    );
 
   try {
     const notifId = c.req.param('id');
-    await c.env.DB.prepare(
-      'UPDATE notifications SET read = 1 WHERE id = ? AND user_id = ?',
-    ).bind(notifId, userId).run();
+    await c.env.DB.prepare('UPDATE notifications SET read = 1 WHERE id = ? AND user_id = ?')
+      .bind(notifId, userId)
+      .run();
 
     return c.json({ data: { read: true } });
   } catch (err) {
     if (err && typeof err === 'object' && 'code' in err) throw err;
     const category = classifyError(err);
-    console.warn(JSON.stringify({
-      level: 'error',
-      service: 'api',
-      route: 'PATCH /api/notifications/:id/read',
-      error_category: category,
-      request_id: requestId,
-      error: err instanceof Error ? err.message : String(err),
-    }));
-    return c.json({ error: { code: 'INTERNAL_ERROR', message: 'Failed to mark notification as read', request_id: requestId } }, 500);
+    console.warn(
+      JSON.stringify({
+        level: 'error',
+        service: 'api',
+        route: 'PATCH /api/notifications/:id/read',
+        error_category: category,
+        request_id: requestId,
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
+    return c.json(
+      {
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Failed to mark notification as read',
+          request_id: requestId,
+        },
+      },
+      500,
+    );
   }
 });
 
@@ -5819,26 +6303,41 @@ api.patch('/api/notifications/:id/read', async (c) => {
 api.post('/api/notifications/read-all', async (c) => {
   const requestId = c.get('requestId');
   const userId = c.get('userId');
-  if (!userId) return c.json({ error: { code: 'UNAUTHORIZED', message: 'Not authenticated', request_id: requestId } }, 401);
+  if (!userId)
+    return c.json(
+      { error: { code: 'UNAUTHORIZED', message: 'Not authenticated', request_id: requestId } },
+      401,
+    );
 
   try {
-    await c.env.DB.prepare(
-      'UPDATE notifications SET read = 1 WHERE user_id = ? AND read = 0',
-    ).bind(userId).run();
+    await c.env.DB.prepare('UPDATE notifications SET read = 1 WHERE user_id = ? AND read = 0')
+      .bind(userId)
+      .run();
 
     return c.json({ data: { read_all: true } });
   } catch (err) {
     if (err && typeof err === 'object' && 'code' in err) throw err;
     const category = classifyError(err);
-    console.warn(JSON.stringify({
-      level: 'error',
-      service: 'api',
-      route: 'POST /api/notifications/read-all',
-      error_category: category,
-      request_id: requestId,
-      error: err instanceof Error ? err.message : String(err),
-    }));
-    return c.json({ error: { code: 'INTERNAL_ERROR', message: 'Failed to mark all notifications as read', request_id: requestId } }, 500);
+    console.warn(
+      JSON.stringify({
+        level: 'error',
+        service: 'api',
+        route: 'POST /api/notifications/read-all',
+        error_category: category,
+        request_id: requestId,
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
+    return c.json(
+      {
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Failed to mark all notifications as read',
+          request_id: requestId,
+        },
+      },
+      500,
+    );
   }
 });
 
@@ -5873,26 +6372,78 @@ api.get('/api/changelog', async (c) => {
   const requestId = c.get('requestId');
   try {
     const entries = [
-      { version: '1.5.0', date: '2026-04-20', type: 'feat', title: 'Full skill implementation — 50 agent skills', description: 'Error pages, command palette, easter eggs, blog, changelog, status page, feedback widget, notifications, onboarding, accessibility improvements, i18n switcher, empty states.' },
-      { version: '1.4.0', date: '2026-04-19', type: 'feat', title: 'Comprehensive multimedia pipeline', description: '7 parallel image/video sources, DALL-E generation, WebP optimization, brand image discovery.' },
-      { version: '1.3.0', date: '2026-04-14', type: 'feat', title: 'Complete admin dashboard', description: 'All 11 sections polished: dashboard, editor, snapshots, analytics, email, social, forms, integrations, billing, audit, settings.' },
-      { version: '1.2.0', date: '2026-04-10', type: 'feat', title: '41 Playwright E2E tests', description: 'End-to-end tests across 3 user journeys with parallel execution.' },
-      { version: '1.1.0', date: '2026-04-09', type: 'feat', title: 'Google Sheets + PostHog + Sentry', description: 'Full observability stack with analytics, error tracking, and data integration.' },
-      { version: '1.0.0', date: '2026-03-25', type: 'feat', title: 'Initial production launch', description: 'AI-powered site generation with Claude, Stripe billing, magic link auth, custom domains.' },
+      {
+        version: '1.5.0',
+        date: '2026-04-20',
+        type: 'feat',
+        title: 'Full skill implementation — 50 agent skills',
+        description:
+          'Error pages, command palette, easter eggs, blog, changelog, status page, feedback widget, notifications, onboarding, accessibility improvements, i18n switcher, empty states.',
+      },
+      {
+        version: '1.4.0',
+        date: '2026-04-19',
+        type: 'feat',
+        title: 'Comprehensive multimedia pipeline',
+        description:
+          '7 parallel image/video sources, DALL-E generation, WebP optimization, brand image discovery.',
+      },
+      {
+        version: '1.3.0',
+        date: '2026-04-14',
+        type: 'feat',
+        title: 'Complete admin dashboard',
+        description:
+          'All 11 sections polished: dashboard, editor, snapshots, analytics, email, social, forms, integrations, billing, audit, settings.',
+      },
+      {
+        version: '1.2.0',
+        date: '2026-04-10',
+        type: 'feat',
+        title: '41 Playwright E2E tests',
+        description: 'End-to-end tests across 3 user journeys with parallel execution.',
+      },
+      {
+        version: '1.1.0',
+        date: '2026-04-09',
+        type: 'feat',
+        title: 'Google Sheets + PostHog + Sentry',
+        description:
+          'Full observability stack with analytics, error tracking, and data integration.',
+      },
+      {
+        version: '1.0.0',
+        date: '2026-03-25',
+        type: 'feat',
+        title: 'Initial production launch',
+        description:
+          'AI-powered site generation with Claude, Stripe billing, magic link auth, custom domains.',
+      },
     ];
     return c.json({ data: entries });
   } catch (err) {
     if (err && typeof err === 'object' && 'code' in err) throw err;
     const category = classifyError(err);
-    console.warn(JSON.stringify({
-      level: 'error',
-      service: 'api',
-      route: 'GET /api/changelog',
-      error_category: category,
-      request_id: requestId,
-      error: err instanceof Error ? err.message : String(err),
-    }));
-    return c.json({ error: { code: 'INTERNAL_ERROR', message: 'Failed to load changelog', request_id: requestId } }, 500);
+    console.warn(
+      JSON.stringify({
+        level: 'error',
+        service: 'api',
+        route: 'GET /api/changelog',
+        error_category: category,
+        request_id: requestId,
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
+    return c.json(
+      {
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Failed to load changelog',
+          request_id: requestId,
+        },
+      },
+      500,
+    );
   }
 });
 
@@ -5955,18 +6506,40 @@ api.get('/api/changelog', async (c) => {
 api.get('/api/analytics/:siteId', async (c) => {
   const requestId = c.get('requestId') ?? crypto.randomUUID();
   const userId = c.get('userId');
-  if (!userId) return c.json({ error: { code: 'UNAUTHORIZED', message: 'Authentication required', request_id: requestId } }, 401);
+  if (!userId)
+    return c.json(
+      {
+        error: { code: 'UNAUTHORIZED', message: 'Authentication required', request_id: requestId },
+      },
+      401,
+    );
 
   const siteId = c.req.param('siteId');
   const period = c.req.query('period') || '7'; // days
 
   // Look up the site to get slug
-  const site = await dbQueryOne<{ slug: string; org_id: string }>(c.env.DB, 'SELECT slug, org_id FROM sites WHERE id = ? AND deleted_at IS NULL', [siteId]);
-  if (!site) return c.json({ error: { code: 'NOT_FOUND', message: 'Site not found', request_id: requestId } }, 404);
+  const site = await dbQueryOne<{ slug: string; org_id: string }>(
+    c.env.DB,
+    'SELECT slug, org_id FROM sites WHERE id = ? AND deleted_at IS NULL',
+    [siteId],
+  );
+  if (!site)
+    return c.json(
+      { error: { code: 'NOT_FOUND', message: 'Site not found', request_id: requestId } },
+      404,
+    );
 
   // Verify user belongs to the org
-  const membership = await dbQueryOne(c.env.DB, 'SELECT id FROM memberships WHERE org_id = ? AND user_id = ? AND deleted_at IS NULL', [site.org_id, userId]);
-  if (!membership) return c.json({ error: { code: 'FORBIDDEN', message: 'Access denied', request_id: requestId } }, 403);
+  const membership = await dbQueryOne(
+    c.env.DB,
+    'SELECT id FROM memberships WHERE org_id = ? AND user_id = ? AND deleted_at IS NULL',
+    [site.org_id, userId],
+  );
+  if (!membership)
+    return c.json(
+      { error: { code: 'FORBIDDEN', message: 'Access denied', request_id: requestId } },
+      403,
+    );
 
   const propertyId = c.env.GA4_PROPERTY_ID;
   const serviceAccountJson = c.env.GA4_SERVICE_ACCOUNT_JSON;
@@ -5974,14 +6547,23 @@ api.get('/api/analytics/:siteId', async (c) => {
   // If GA4 is fully configured, query the Data API
   if (propertyId && serviceAccountJson) {
     try {
-      const analyticsData = await queryGa4DataApi(propertyId, serviceAccountJson, site.slug, parseInt(period));
+      const analyticsData = await queryGa4DataApi(
+        propertyId,
+        serviceAccountJson,
+        site.slug,
+        parseInt(period),
+      );
       return c.json({ data: analyticsData });
     } catch (err) {
-      console.warn(JSON.stringify({
-        level: 'warn', service: 'api', route: 'GET /api/analytics/:siteId',
-        error: err instanceof Error ? err.message : String(err),
-        request_id: requestId,
-      }));
+      console.warn(
+        JSON.stringify({
+          level: 'warn',
+          service: 'api',
+          route: 'GET /api/analytics/:siteId',
+          error: err instanceof Error ? err.message : String(err),
+          request_id: requestId,
+        }),
+      );
       // Fall through to basic data
     }
   }
@@ -5990,10 +6572,13 @@ api.get('/api/analytics/:siteId', async (c) => {
   const dayCount = parseInt(period) || 7;
   const since = new Date(Date.now() - dayCount * 86_400_000).toISOString();
 
-  const logCounts = await dbQuery<{ day: string; cnt: number }>(c.env.DB,
+  const logCounts = await dbQuery<{ day: string; cnt: number }>(
+    c.env.DB,
     `SELECT DATE(created_at) as day, COUNT(*) as cnt FROM audit_logs
      WHERE target_id = ? AND action LIKE 'site.%' AND created_at >= ?
-     GROUP BY DATE(created_at) ORDER BY day`, [siteId, since]);
+     GROUP BY DATE(created_at) ORDER BY day`,
+    [siteId, since],
+  );
 
   return c.json({
     data: {
@@ -6008,7 +6593,7 @@ api.get('/api/analytics/:siteId', async (c) => {
         avgSessionDuration: '0s',
         bounceRate: 0,
       },
-      chartData: (logCounts.data || []).map(r => ({ date: r.day, views: r.cnt })),
+      chartData: (logCounts.data || []).map((r) => ({ date: r.day, views: r.cnt })),
       trafficSources: [],
       topPages: [],
     },
@@ -6080,13 +6665,15 @@ async function queryGa4DataApi(
   // Build a JWT for Google OAuth2
   const now = Math.floor(Date.now() / 1000);
   const header = btoa(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
-  const payload = btoa(JSON.stringify({
-    iss: saJson.client_email,
-    scope: 'https://www.googleapis.com/auth/analytics.readonly',
-    aud: 'https://oauth2.googleapis.com/token',
-    iat: now,
-    exp: now + 3600,
-  }));
+  const payload = btoa(
+    JSON.stringify({
+      iss: saJson.client_email,
+      scope: 'https://www.googleapis.com/auth/analytics.readonly',
+      aud: 'https://oauth2.googleapis.com/token',
+      iat: now,
+      exp: now + 3600,
+    }),
+  );
 
   // Import the private key and sign
   const pemContents = saJson.private_key
@@ -6094,11 +6681,19 @@ async function queryGa4DataApi(
     .replace(/-----END PRIVATE KEY-----/, '')
     .replace(/\s/g, '');
   const keyData = Uint8Array.from(atob(pemContents), (c: string) => c.charCodeAt(0));
-  const cryptoKey = await crypto.subtle.importKey('pkcs8', keyData, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
+  const cryptoKey = await crypto.subtle.importKey(
+    'pkcs8',
+    keyData,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
   const signatureInput = new TextEncoder().encode(`${header}.${payload}`);
   const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', cryptoKey, signatureInput);
   const signatureB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
-    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
   const jwt = `${header}.${payload}.${signatureB64}`;
 
   // Exchange JWT for access token
@@ -6107,7 +6702,7 @@ async function queryGa4DataApi(
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
   });
-  const tokenData = await tokenRes.json() as { access_token: string };
+  const tokenData = (await tokenRes.json()) as { access_token: string };
 
   // Run GA4 Data API report
   const reportRes = await fetch(
@@ -6120,7 +6715,11 @@ async function queryGa4DataApi(
       },
       body: JSON.stringify({
         dateRanges: [{ startDate: `${days}daysAgo`, endDate: 'today' }],
-        dimensions: [{ name: 'date' }, { name: 'pagePath' }, { name: 'sessionDefaultChannelGroup' }],
+        dimensions: [
+          { name: 'date' },
+          { name: 'pagePath' },
+          { name: 'sessionDefaultChannelGroup' },
+        ],
         metrics: [
           { name: 'screenPageViews' },
           { name: 'totalUsers' },
@@ -6137,7 +6736,9 @@ async function queryGa4DataApi(
       }),
     },
   );
-  const report = await reportRes.json() as { rows?: { dimensionValues: { value: string }[]; metricValues: { value: string }[] }[] };
+  const report = (await reportRes.json()) as {
+    rows?: { dimensionValues: { value: string }[]; metricValues: { value: string }[] }[];
+  };
 
   // Aggregate the report data
   let totalPageViews = 0;
@@ -6286,7 +6887,12 @@ api.post('/api/admin/sites/:slug/migrate-assets', async (c) => {
     return c.json({ error: 'invalid slug' }, 400);
   }
 
-  const site = await dbQueryOne<{ id: string; slug: string; current_build_version: string | null; org_id: string }>(
+  const site = await dbQueryOne<{
+    id: string;
+    slug: string;
+    current_build_version: string | null;
+    org_id: string;
+  }>(
     c.env.DB,
     'SELECT id, slug, current_build_version, org_id FROM sites WHERE slug = ? AND deleted_at IS NULL LIMIT 1',
     [slug],
@@ -6304,21 +6910,23 @@ api.post('/api/admin/sites/:slug/migrate-assets', async (c) => {
   try {
     await c.env.DB.prepare(
       "INSERT INTO audit_logs (id, org_id, site_id, action, metadata, created_at) VALUES (?, ?, ?, 'admin.asset_migration', ?, datetime('now'))",
-    ).bind(
-      crypto.randomUUID(),
-      site.org_id,
-      site.id,
-      JSON.stringify({
-        slug,
-        version: site.current_build_version,
-        scanned_files: report.scanned_files,
-        unique_urls: report.unique_urls,
-        uploaded: report.uploaded,
-        rewritten_files: report.rewritten_files,
-        failed_count: report.failed.length,
-        elapsed_ms: elapsedMs,
-      }),
-    ).run();
+    )
+      .bind(
+        crypto.randomUUID(),
+        site.org_id,
+        site.id,
+        JSON.stringify({
+          slug,
+          version: site.current_build_version,
+          scanned_files: report.scanned_files,
+          unique_urls: report.unique_urls,
+          uploaded: report.uploaded,
+          rewritten_files: report.rewritten_files,
+          failed_count: report.failed.length,
+          elapsed_ms: elapsedMs,
+        }),
+      )
+      .run();
   } catch {
     // audit insert is best-effort
   }
@@ -6514,9 +7122,7 @@ api.get('/api/sites/:id/github/callback', async (c) => {
   if (orgId && stateRow.org_id !== orgId) return redirectFail('state_org_mismatch');
 
   // Single-use state — delete BEFORE the network calls so a retry can't replay it.
-  await c.env.DB.prepare('DELETE FROM github_backup_states WHERE id = ?')
-    .bind(stateRow.id)
-    .run();
+  await c.env.DB.prepare('DELETE FROM github_backup_states WHERE id = ?').bind(stateRow.id).run();
 
   // Reload site to get the slug for repo derivation.
   const site = await dbQueryOne<Record<string, unknown>>(
@@ -6544,7 +7150,9 @@ api.get('/api/sites/:id/github/callback', async (c) => {
   const accessToken = tokenJson.access_token;
 
   // Identify the user.
-  const userRes = await fetch('https://api.github.com/user', { headers: githubHeaders(accessToken) });
+  const userRes = await fetch('https://api.github.com/user', {
+    headers: githubHeaders(accessToken),
+  });
   if (!userRes.ok) return redirectFail('user_fetch_failed');
   const ghUser = (await userRes.json()) as { login: string; id: number; avatar_url: string | null };
 
@@ -6722,14 +7330,11 @@ api.post('/api/sites/:id/github/backup', async (c) => {
       const buf = await r2Obj.arrayBuffer();
       const base64 = arrayBufferToBase64(buf);
 
-      const blobRes = await fetch(
-        `https://api.github.com/repos/${owner}/${repo}/git/blobs`,
-        {
-          method: 'POST',
-          headers: { ...githubHeaders(token), 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: base64, encoding: 'base64' }),
-        },
-      );
+      const blobRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/blobs`, {
+        method: 'POST',
+        headers: { ...githubHeaders(token), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: base64, encoding: 'base64' }),
+      });
       if (!blobRes.ok) throw badRequest(`GitHub blob create failed for ${obj.key}`);
       const blob = (await blobRes.json()) as { sha: string };
       return {
@@ -6742,30 +7347,24 @@ api.post('/api/sites/:id/github/backup', async (c) => {
   );
 
   // Create tree.
-  const treeRes = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/git/trees`,
-    {
-      method: 'POST',
-      headers: { ...githubHeaders(token), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ base_tree: baseTreeSha, tree: treeEntries }),
-    },
-  );
+  const treeRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees`, {
+    method: 'POST',
+    headers: { ...githubHeaders(token), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ base_tree: baseTreeSha, tree: treeEntries }),
+  });
   if (!treeRes.ok) throw badRequest('GitHub tree create failed');
   const tree = (await treeRes.json()) as { sha: string };
 
   // Create commit.
-  const commitRes = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/git/commits`,
-    {
-      method: 'POST',
-      headers: { ...githubHeaders(token), 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message: `Backup build ${buildVersion} — ${new Date().toISOString()}`,
-        tree: tree.sha,
-        parents: [baseCommitSha],
-      }),
-    },
-  );
+  const commitRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/commits`, {
+    method: 'POST',
+    headers: { ...githubHeaders(token), 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      message: `Backup build ${buildVersion} — ${new Date().toISOString()}`,
+      tree: tree.sha,
+      parents: [baseCommitSha],
+    }),
+  });
   if (!commitRes.ok) throw badRequest('GitHub commit create failed');
   const commit = (await commitRes.json()) as { sha: string; html_url: string };
 
@@ -6893,11 +7492,21 @@ function arrayBufferToBase64(buf: ArrayBuffer): string {
 function guessContentTypeForRevert(filename: string): string {
   const ext = filename.split('.').pop()?.toLowerCase();
   const types: Record<string, string> = {
-    html: 'text/html', css: 'text/css', js: 'application/javascript',
-    json: 'application/json', svg: 'image/svg+xml', png: 'image/png',
-    jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif',
-    webp: 'image/webp', ico: 'image/x-icon', txt: 'text/plain',
-    xml: 'text/xml', woff: 'font/woff', woff2: 'font/woff2',
+    html: 'text/html',
+    css: 'text/css',
+    js: 'application/javascript',
+    json: 'application/json',
+    svg: 'image/svg+xml',
+    png: 'image/png',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    gif: 'image/gif',
+    webp: 'image/webp',
+    ico: 'image/x-icon',
+    txt: 'text/plain',
+    xml: 'text/xml',
+    woff: 'font/woff',
+    woff2: 'font/woff2',
   };
   return types[ext ?? ''] ?? 'application/octet-stream';
 }

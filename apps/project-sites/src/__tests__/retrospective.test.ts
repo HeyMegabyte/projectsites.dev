@@ -8,17 +8,24 @@ if (!globalThis.crypto?.subtle) {
   (globalThis as any).crypto = webcrypto;
 }
 
-import { shouldGenerate, renderRetroPrompt, buildRetrospective } from '../services/retrospective.js';
+import {
+  shouldGenerate,
+  renderRetroPrompt,
+  buildRetrospective,
+} from '../services/retrospective.js';
 import type { Env } from '../types/env.js';
 import type { BenchmarkResult } from '../services/benchmark.js';
 
 function mockAnthropicFetch(responseText: string): typeof fetch {
   return (async (input: RequestInfo | URL) => {
     if (String(input).includes('api.anthropic.com')) {
-      return new Response(JSON.stringify({
-        content: [{ type: 'text', text: responseText }],
-        usage: { input_tokens: 200, output_tokens: 300 },
-      }), { status: 200 });
+      return new Response(
+        JSON.stringify({
+          content: [{ type: 'text', text: responseText }],
+          usage: { input_tokens: 200, output_tokens: 300 },
+        }),
+        { status: 200 },
+      );
     }
     throw new Error('unexpected fetch ' + String(input));
   }) as typeof fetch;
@@ -81,8 +88,28 @@ describe('renderRetroPrompt', () => {
       },
     });
     const priors = [
-      { id: '1', slug: 'a', run_at: '2026-04-29 10:00:00', mean_score: 0.9, score_programmatic: 0.9, score_perf: 0.85, score_a11y: 0.95, score_seo: 0.9, programmatic_findings_json: null },
-      { id: '2', slug: 'b', run_at: '2026-04-28 10:00:00', mean_score: 0.88, score_programmatic: 0.88, score_perf: 0.8, score_a11y: 0.95, score_seo: 0.9, programmatic_findings_json: null },
+      {
+        id: '1',
+        slug: 'a',
+        run_at: '2026-04-29 10:00:00',
+        mean_score: 0.9,
+        score_programmatic: 0.9,
+        score_perf: 0.85,
+        score_a11y: 0.95,
+        score_seo: 0.9,
+        programmatic_findings_json: null,
+      },
+      {
+        id: '2',
+        slug: 'b',
+        run_at: '2026-04-28 10:00:00',
+        mean_score: 0.88,
+        score_programmatic: 0.88,
+        score_perf: 0.8,
+        score_a11y: 0.95,
+        score_seo: 0.9,
+        programmatic_findings_json: null,
+      },
     ];
     const prompt = renderRetroPrompt(result, priors);
     expect(prompt).toContain('njsk');
@@ -101,7 +128,9 @@ describe('renderRetroPrompt', () => {
 
 describe('buildRetrospective', () => {
   const originalFetch = globalThis.fetch;
-  afterEach(() => { globalThis.fetch = originalFetch; });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
 
   const stubDb = {
     DB: {
@@ -124,7 +153,9 @@ describe('buildRetrospective', () => {
   });
 
   it('generates markdown for regressed build', async () => {
-    globalThis.fetch = mockAnthropicFetch('**Trigger:** when X / **Mitigation:** do Y / **Confidence:** 0.85');
+    globalThis.fetch = mockAnthropicFetch(
+      '**Trigger:** when X / **Mitigation:** do Y / **Confidence:** 0.85',
+    );
     const out = await buildRetrospective({
       env: stubDb,
       current: makeResult({ regressedFromPrevious: true, meanScore: 0.7 }),

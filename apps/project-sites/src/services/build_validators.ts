@@ -86,20 +86,26 @@ const ALLOWED_EXTERNAL_HOSTS = new Set([
 
 const HTML_EXTENSIONS = ['.html', '.htm'];
 const TEXT_EXTENSIONS = [
-  '.html', '.htm', '.css', '.js', '.mjs', '.json',
-  '.xml', '.txt', '.svg', '.webmanifest',
+  '.html',
+  '.htm',
+  '.css',
+  '.js',
+  '.mjs',
+  '.json',
+  '.xml',
+  '.txt',
+  '.svg',
+  '.webmanifest',
 ];
 
-const isHtml = (p: string) => HTML_EXTENSIONS.some(e => p.toLowerCase().endsWith(e));
-const isText = (p: string) => TEXT_EXTENSIONS.some(e => p.toLowerCase().endsWith(e));
+const isHtml = (p: string) => HTML_EXTENSIONS.some((e) => p.toLowerCase().endsWith(e));
+const isText = (p: string) => TEXT_EXTENSIONS.some((e) => p.toLowerCase().endsWith(e));
 const isPng = (p: string) => p.toLowerCase().endsWith('.png');
 const isFavicon = (p: string) => /favicon|apple-touch-icon|icon-\d+x\d+/i.test(p);
 const isOgImage = (p: string) => /og-image|opengraph|social-card/i.test(p);
 
 const stripScripts = (html: string) =>
-  html
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?<\/style>/gi, '');
+  html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '');
 
 const matchAll = (html: string, re: RegExp): string[] => {
   const out: string[] = [];
@@ -110,8 +116,10 @@ const matchAll = (html: string, re: RegExp): string[] => {
 };
 
 const isInternalRef = (ref: string): boolean => {
-  if (!ref || ref.startsWith('data:') || ref.startsWith('blob:') || ref.startsWith('#')) return false;
-  if (ref.startsWith('mailto:') || ref.startsWith('tel:') || ref.startsWith('javascript:')) return false;
+  if (!ref || ref.startsWith('data:') || ref.startsWith('blob:') || ref.startsWith('#'))
+    return false;
+  if (ref.startsWith('mailto:') || ref.startsWith('tel:') || ref.startsWith('javascript:'))
+    return false;
   if (ref.startsWith('//') || ref.match(/^https?:\/\//i)) return false;
   return true;
 };
@@ -130,7 +138,12 @@ const externalHost = (ref: string): string | null => {
 
 const collectRefs = (html: string): string[] => {
   const refs: string[] = [];
-  refs.push(...matchAll(html, /<(?:img|source|video|audio|iframe|script|link)[^>]+(?:src|href)=["']([^"']+)["']/gi));
+  refs.push(
+    ...matchAll(
+      html,
+      /<(?:img|source|video|audio|iframe|script|link)[^>]+(?:src|href)=["']([^"']+)["']/gi,
+    ),
+  );
   refs.push(...matchAll(html, /url\(["']?([^"')]+)["']?\)/gi));
   return refs;
 };
@@ -138,7 +151,7 @@ const collectRefs = (html: string): string[] => {
 /** Asset existence — every internal ref MUST have a matching file. */
 export const validateAssetExistence = (files: BuildFile[]): Violation[] => {
   const out: Violation[] = [];
-  const fileSet = new Set(files.map(f => f.path));
+  const fileSet = new Set(files.map((f) => f.path));
   for (const file of files) {
     if (!isHtml(file.path) || !file.text) continue;
     const refs = collectRefs(file.text);
@@ -176,8 +189,8 @@ export const validateAssetExistence = (files: BuildFile[]): Violation[] => {
 /** Image format vs size — PNG > 200KB must be re-encoded WebP/JPEG. */
 export const validateImageFormat = (files: BuildFile[]): Violation[] =>
   files
-    .filter(f => isPng(f.path) && !isFavicon(f.path) && f.size > 200 * 1024)
-    .map(f => ({
+    .filter((f) => isPng(f.path) && !isFavicon(f.path) && f.size > 200 * 1024)
+    .map((f) => ({
       code: 'image.png_too_large',
       severity: 'error' as Severity,
       message: `PNG > 200KB must be WebP/JPEG: ${f.path} (${Math.round(f.size / 1024)}KB)`,
@@ -187,7 +200,7 @@ export const validateImageFormat = (files: BuildFile[]): Violation[] =>
 /** OG image — must exist, ≤100KB, branded card (not raw photo). */
 export const validateOgImage = (files: BuildFile[]): Violation[] => {
   const out: Violation[] = [];
-  const og = files.find(f => isOgImage(f.path));
+  const og = files.find((f) => isOgImage(f.path));
   if (!og) {
     out.push({
       code: 'og.missing',
@@ -209,12 +222,16 @@ export const validateOgImage = (files: BuildFile[]): Violation[] => {
 
 /** apple-touch-icon — 180×180 mandatory at root. */
 export const validateAppleTouchIcon = (files: BuildFile[]): Violation[] => {
-  const has = files.some(f => f.path === 'apple-touch-icon.png');
-  return has ? [] : [{
-    code: 'icon.apple_touch_missing',
-    severity: 'error',
-    message: 'apple-touch-icon.png (180×180) required at root',
-  }];
+  const has = files.some((f) => f.path === 'apple-touch-icon.png');
+  return has
+    ? []
+    : [
+        {
+          code: 'icon.apple_touch_missing',
+          severity: 'error',
+          message: 'apple-touch-icon.png (180×180) required at root',
+        },
+      ];
 };
 
 const titleLength = (html: string): number => {
@@ -310,12 +327,15 @@ export const validateColorScheme = (files: BuildFile[]): Violation[] => {
 
 /** Sitemap — every <url> must have <lastmod>. */
 export const validateSitemapLastmod = (files: BuildFile[]): Violation[] => {
-  const sitemap = files.find(f => f.path === 'sitemap.xml');
-  if (!sitemap?.text) return [{
-    code: 'sitemap.missing',
-    severity: 'error',
-    message: 'sitemap.xml not found in build output',
-  }];
+  const sitemap = files.find((f) => f.path === 'sitemap.xml');
+  if (!sitemap?.text)
+    return [
+      {
+        code: 'sitemap.missing',
+        severity: 'error',
+        message: 'sitemap.xml not found in build output',
+      },
+    ];
   const urlBlocks = sitemap.text.match(/<url>[\s\S]*?<\/url>/g) || [];
   const out: Violation[] = [];
   for (const block of urlBlocks) {
@@ -373,9 +393,9 @@ export const validateJsBundleSize = (files: BuildFile[]): Violation[] => {
 
 /** Lightbox presence — bundle must contain data-zoomable AND data-gallery markers. */
 export const validateLightboxPresence = (files: BuildFile[]): Violation[] => {
-  const jsFiles = files.filter(f => f.path.toLowerCase().endsWith('.js') && f.text);
+  const jsFiles = files.filter((f) => f.path.toLowerCase().endsWith('.js') && f.text);
   if (!jsFiles.length) return [];
-  const haystack = jsFiles.map(f => f.text || '').join('\n');
+  const haystack = jsFiles.map((f) => f.text || '').join('\n');
   const hasZoomable = haystack.includes('data-zoomable');
   const hasGallery = haystack.includes('data-gallery');
   const out: Violation[] = [];
@@ -410,10 +430,10 @@ export const validateRequiredFiles = (files: BuildFile[]): Violation[] => {
     'favicon-32x32.png',
     'apple-touch-icon.png',
   ];
-  const set = new Set(files.map(f => f.path));
+  const set = new Set(files.map((f) => f.path));
   return required
-    .filter(p => !set.has(p))
-    .map(p => ({
+    .filter((p) => !set.has(p))
+    .map((p) => ({
       code: 'manifest.required_file_missing',
       severity: 'error' as Severity,
       message: `Required file missing: ${p}`,
@@ -431,14 +451,11 @@ export const validateRequiredFiles = (files: BuildFile[]): Violation[] => {
  * Floor: thin sources (< 4 routes) skip the check — the 4-page floor handles those.
  * Ceiling: sourceRouteCount > 1000 is clamped to 1000 (sanity cap).
  */
-export const validateRouteCount = (
-  files: BuildFile[],
-  sourceRouteCount: number,
-): Violation[] => {
+export const validateRouteCount = (files: BuildFile[], sourceRouteCount: number): Violation[] => {
   if (sourceRouteCount < 4) return [];
   const expected = Math.min(sourceRouteCount, 1000);
   const builtRoutes = files.filter(
-    f =>
+    (f) =>
       f.path.endsWith('.html') &&
       !/(^|\/)(404|500|offline)\.html$/i.test(f.path) &&
       !f.path.startsWith('admin/'),
@@ -477,9 +494,9 @@ export const validateBuild = (
       ? validateRouteCount(files, opts.sourceRouteCount)
       : []),
   ];
-  const errors = all.filter(v => v.severity === 'error');
-  const warnings = all.filter(v => v.severity === 'warn');
-  const infos = all.filter(v => v.severity === 'info');
+  const errors = all.filter((v) => v.severity === 'error');
+  const warnings = all.filter((v) => v.severity === 'warn');
+  const infos = all.filter((v) => v.severity === 'info');
   return {
     ok: errors.length === 0,
     errors,
@@ -497,10 +514,7 @@ export const validateBuild = (
  * Decodes text-ish files (HTML/JS/CSS/JSON/XML/SVG/TXT) with TextDecoder; binary files
  * (PNG/JPG/WebP/etc.) are returned with `text: undefined` and only their byte size.
  */
-export const loadBuildFromR2 = async (
-  bucket: R2Bucket,
-  prefix: string,
-): Promise<BuildFile[]> => {
+export const loadBuildFromR2 = async (bucket: R2Bucket, prefix: string): Promise<BuildFile[]> => {
   const files: BuildFile[] = [];
   let cursor: string | undefined;
   const decoder = new TextDecoder();
@@ -508,7 +522,9 @@ export const loadBuildFromR2 = async (
     const list = await bucket.list({ prefix, cursor, limit: 1000 });
     cursor = list.truncated ? list.cursor : undefined;
     for (const obj of list.objects) {
-      const path = obj.key.startsWith(prefix) ? obj.key.slice(prefix.length).replace(/^\/+/, '') : obj.key;
+      const path = obj.key.startsWith(prefix)
+        ? obj.key.slice(prefix.length).replace(/^\/+/, '')
+        : obj.key;
       const size = obj.size;
       let text: string | undefined;
       if (isText(path) && size < 1.5 * 1024 * 1024) {

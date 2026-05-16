@@ -72,10 +72,7 @@ function createMockEnv(overrides: Partial<Env> = {}): Env {
  * Creates an authenticated Hono app with the given user/org context variables.
  * Mounts the api routes and the error handler.
  */
-function createAuthenticatedApp(
-  vars: Partial<Variables> = {},
-  envOverrides: Partial<Env> = {},
-) {
+function createAuthenticatedApp(vars: Partial<Variables> = {}, envOverrides: Partial<Env> = {}) {
   const app = new Hono<{ Bindings: Env; Variables: Variables }>();
   app.onError(errorHandler);
   app.use('*', async (c, next) => {

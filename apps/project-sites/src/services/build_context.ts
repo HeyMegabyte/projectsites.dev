@@ -44,7 +44,13 @@ interface BuildContext {
  */
 export function generateBuildContext(
   business: { name: string; address?: string; phone?: string; website?: string; category?: string },
-  research: { profile?: unknown; brand?: unknown; sellingPoints?: unknown; social?: unknown; images?: unknown },
+  research: {
+    profile?: unknown;
+    brand?: unknown;
+    sellingPoints?: unknown;
+    social?: unknown;
+    images?: unknown;
+  },
   assets: AssetInfo[],
   slug: string,
 ): BuildContext {
@@ -65,7 +71,9 @@ export function generateBuildContext(
       `Build a complete, gorgeous, animated portfolio website for "${business.name}".`,
       'Use the provided brand colors, fonts, and design style from the research data.',
       'Reference the asset URLs directly in <img> tags — they are already hosted and accessible.',
-      enrichedAssets.some((a) => a.name.includes('logo')) ? 'Use the provided logo in the header and favicon references.' : 'Generate a text-based logo using the brand fonts and colors.',
+      enrichedAssets.some((a) => a.name.includes('logo'))
+        ? 'Use the provided logo in the header and favicon references.'
+        : 'Generate a text-based logo using the brand fonts and colors.',
       'Include smooth scroll animations, hover micro-interactions, and responsive mobile-first layout.',
       'Create all pages: index.html, privacy.html, terms.html, plus any relevant section pages.',
       'Include favicon references in the <head> linking to the provided favicon assets.',

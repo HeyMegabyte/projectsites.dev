@@ -78,7 +78,8 @@ search.get('/api/search/businesses', async (c) => {
     headers: {
       'Content-Type': 'application/json',
       'X-Goog-Api-Key': c.env.GOOGLE_PLACES_API_KEY,
-      'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.id,places.types,places.location,places.nationalPhoneNumber,places.websiteUri',
+      'X-Goog-FieldMask':
+        'places.displayName,places.formattedAddress,places.id,places.types,places.location,places.nationalPhoneNumber,places.websiteUri',
     },
     body: JSON.stringify(requestBody),
   });
@@ -279,7 +280,7 @@ search.get('/api/sites/search', async (c) => {
   const searchTerm = `%${bounded}%`;
   const { data } = await dbQuery<SiteSearchRow>(
     c.env.DB,
-    'SELECT id, slug, business_name, business_address, google_place_id, status, current_build_version FROM sites WHERE business_name LIKE ? AND deleted_at IS NULL ORDER BY CASE WHEN status = \'published\' THEN 0 WHEN status = \'building\' THEN 1 ELSE 2 END, created_at DESC LIMIT 5',
+    "SELECT id, slug, business_name, business_address, google_place_id, status, current_build_version FROM sites WHERE business_name LIKE ? AND deleted_at IS NULL ORDER BY CASE WHEN status = 'published' THEN 0 WHEN status = 'building' THEN 1 ELSE 2 END, created_at DESC LIMIT 5",
     [searchTerm],
   );
 
@@ -393,22 +394,30 @@ search.post('/api/sites/create-from-search', async (c) => {
   // Check build limits (3 free, 50 paid)
   const { checkBuildLimit } = await import('../services/build_limits.js');
   const { dbQueryOne } = await import('../services/db.js');
-  const sub = await dbQueryOne<{ plan: string }>(c.env.DB, 'SELECT plan FROM subscriptions WHERE org_id = ? AND status = \'active\'', [orgId]);
+  const sub = await dbQueryOne<{ plan: string }>(
+    c.env.DB,
+    "SELECT plan FROM subscriptions WHERE org_id = ? AND status = 'active'",
+    [orgId],
+  );
   const limitCheck = await checkBuildLimit(c.env.DB, orgId, sub?.plan ?? null);
   if (!limitCheck.allowed) {
-    return c.json({
-      error: {
-        code: 'BUILD_LIMIT_REACHED',
-        message: `You've used ${limitCheck.used} of ${limitCheck.limit} builds. ${limitCheck.limit === 3 ? 'Upgrade to a paid plan for 50 builds.' : 'Contact support for additional builds.'}`,
+    return c.json(
+      {
+        error: {
+          code: 'BUILD_LIMIT_REACHED',
+          message: `You've used ${limitCheck.used} of ${limitCheck.limit} builds. ${limitCheck.limit === 3 ? 'Upgrade to a paid plan for 50 builds.' : 'Contact support for additional builds.'}`,
+        },
       },
-    }, 403);
+      403,
+    );
   }
 
   const body = (await c.req.json()) as CreateFromSearchBody;
 
   // Normalize: support both v1 (flat) and v2 (nested business object) payload formats
   const mode = body.mode ?? null;
-  const businessName = body.business?.name || body.business_name || (mode === 'custom' ? 'Custom Website' : null);
+  const businessName =
+    body.business?.name || body.business_name || (mode === 'custom' ? 'Custom Website' : null);
   const businessAddress = body.business?.address || body.business_address;
   const googlePlaceId = body.business?.place_id || body.google_place_id;
   const businessPhone = body.business?.phone ?? null;
@@ -539,8 +548,14 @@ search.post('/api/sites/create-from-search', async (c) => {
 
   // Log anticipated build phases so the Logs modal shows pipeline stages
   const buildPhases = [
-    { action: 'workflow.phase.research', message: 'Phase 1: Business profile research & data collection' },
-    { action: 'workflow.phase.generation', message: 'Phase 2: AI website HTML generation & content creation' },
+    {
+      action: 'workflow.phase.research',
+      message: 'Phase 1: Business profile research & data collection',
+    },
+    {
+      action: 'workflow.phase.generation',
+      message: 'Phase 2: AI website HTML generation & content creation',
+    },
     { action: 'workflow.phase.deployment', message: 'Phase 3: Upload to CDN & publish live site' },
   ];
   for (const phase of buildPhases) {
@@ -577,7 +592,8 @@ search.post('/api/sites/improve-prompt', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const text = typeof body.text === 'string' ? body.text.trim() : '';
   const businessName = typeof body.business_name === 'string' ? body.business_name.trim() : '';
-  const businessAddress = typeof body.business_address === 'string' ? body.business_address.trim() : '';
+  const businessAddress =
+    typeof body.business_address === 'string' ? body.business_address.trim() : '';
 
   if (text.length > 5000) {
     throw badRequest('Text must not exceed 5000 characters');
@@ -598,7 +614,8 @@ search.post('/api/sites/improve-prompt', async (c) => {
       'and any unique selling points. Make it professional and ready to customize. ' +
       'Return ONLY the template text, nothing else.';
 
-    userPrompt = 'Generate a business profile template with placeholders for a small business website.';
+    userPrompt =
+      'Generate a business profile template with placeholders for a small business website.';
     if (businessName) {
       userPrompt += '\n\nBusiness name: ' + businessName;
     }
@@ -629,16 +646,17 @@ search.post('/api/sites/improve-prompt', async (c) => {
     const ai = c.env.AI;
     if (!ai) {
       // Fallback: return a static template if AI binding not available
-      const fallbackText = text || (
+      const fallbackText =
+        text ||
         (businessName ? businessName + ' — ' : '[Business Name] — ') +
-        'Welcome to our business!\n\n' +
-        '[Brief description of what your business does]\n\n' +
-        'Services:\n- [Service 1]\n- [Service 2]\n- [Service 3]\n\n' +
-        'Hours: [Mon-Fri 9AM-5PM]\n' +
-        'Phone: [Your phone number]\n' +
-        'Email: [Your email address]\n' +
-        'Address: ' + (businessAddress || '[Your business address]')
-      );
+          'Welcome to our business!\n\n' +
+          '[Brief description of what your business does]\n\n' +
+          'Services:\n- [Service 1]\n- [Service 2]\n- [Service 3]\n\n' +
+          'Hours: [Mon-Fri 9AM-5PM]\n' +
+          'Phone: [Your phone number]\n' +
+          'Email: [Your email address]\n' +
+          'Address: ' +
+          (businessAddress || '[Your business address]');
       return c.json({ data: { improved_text: fallbackText } });
     }
 
@@ -675,10 +693,12 @@ search.post('/api/sites/generate-prompt', async (c) => {
 
   const body = await c.req.json().catch(() => ({}));
   const businessName = typeof body.business_name === 'string' ? body.business_name.trim() : '';
-  const businessAddress = typeof body.business_address === 'string' ? body.business_address.trim() : '';
+  const businessAddress =
+    typeof body.business_address === 'string' ? body.business_address.trim() : '';
   const businessPhone = typeof body.business_phone === 'string' ? body.business_phone.trim() : '';
   const googlePlaceId = typeof body.google_place_id === 'string' ? body.google_place_id.trim() : '';
-  const additionalContext = typeof body.additional_context === 'string' ? body.additional_context.trim() : '';
+  const additionalContext =
+    typeof body.additional_context === 'string' ? body.additional_context.trim() : '';
   const siteId = typeof body.site_id === 'string' ? body.site_id.trim() : '';
 
   if (!businessName) {
@@ -711,7 +731,16 @@ search.post('/api/sites/generate-prompt', async (c) => {
       const version = site.current_build_version || new Date().toISOString().replace(/[:.]/g, '-');
       await c.env.SITES_BUCKET.put(
         `sites/${site.slug}/${version}/research.json`,
-        JSON.stringify({ profile: result.profile, brand: result.brand, sellingPoints: result.sellingPoints, social: result.social }, null, 2),
+        JSON.stringify(
+          {
+            profile: result.profile,
+            brand: result.brand,
+            sellingPoints: result.sellingPoints,
+            social: result.social,
+          },
+          null,
+          2,
+        ),
         { httpMetadata: { contentType: 'application/json' } },
       );
     }
@@ -725,7 +754,9 @@ search.post('/api/sites/generate-prompt', async (c) => {
     target_type: 'site',
     target_id: siteId || null,
     metadata_json: { business_name: businessName, model: c.env.RESEARCH_MODEL || 'o3-mini' },
-  }).catch(() => { /* best-effort */ });
+  }).catch(() => {
+    /* best-effort */
+  });
 
   return c.json({
     data: {
@@ -759,22 +790,29 @@ search.post('/api/sites/generate-prompt', async (c) => {
  *
  * Falls back to simple slugification if AI is unavailable.
  */
-async function generateSmartSlug(env: Env, businessName: string, address?: string): Promise<string> {
+async function generateSmartSlug(
+  env: Env,
+  businessName: string,
+  address?: string,
+): Promise<string> {
   // Simple slugification as fallback
-  const simpleSlug = businessName
-    .toLowerCase()
-    .replace(/'/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-    .substring(0, 63) || `site-${Date.now().toString(36)}`;
+  const simpleSlug =
+    businessName
+      .toLowerCase()
+      .replace(/'/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .substring(0, 63) || `site-${Date.now().toString(36)}`;
 
   // Try AI-powered slug generation
   try {
-    const result = await env.AI.run('@cf/meta/llama-3.1-8b-instruct' as Parameters<typeof env.AI.run>[0], {
-      messages: [
-        {
-          role: 'system',
-          content: `Generate the shortest, simplest URL slug for a business website. Rules:
+    const result = await env.AI.run(
+      '@cf/meta/llama-3.1-8b-instruct' as Parameters<typeof env.AI.run>[0],
+      {
+        messages: [
+          {
+            role: 'system',
+            content: `Generate the shortest, simplest URL slug for a business website. Rules:
 - Output ONLY the slug, nothing else. No explanation.
 - Use lowercase letters, numbers, and hyphens only.
 - Remove possessives ('s → s), articles (the, a, an), and filler words.
@@ -790,14 +828,15 @@ Examples:
 "Vito's Mens Salon" at "74 N Beverwyck Rd, Lake Hiawatha, NJ" → vitos-mens-salon
 "The White House" at "1600 Pennsylvania Ave, DC" → the-white-house
 "McDonald's" at "789 Broadway, New York, NY" → mcdonalds-broadway-nyc`,
-        },
-        {
-          role: 'user',
-          content: `Business: "${businessName}"${address ? `\nAddress: "${address}"` : ''}`,
-        },
-      ],
-      max_tokens: 50,
-    });
+          },
+          {
+            role: 'user',
+            content: `Business: "${businessName}"${address ? `\nAddress: "${address}"` : ''}`,
+          },
+        ],
+        max_tokens: 50,
+      },
+    );
 
     const response = ((result as { response?: string }).response ?? '').trim();
     // Clean and validate AI output
@@ -849,17 +888,26 @@ async function ensureUniqueSlug(env: Env, slug: string): Promise<string> {
  * Uses Workers AI to classify a business into one of the predefined categories.
  */
 search.post('/api/ai/categorize', async (c) => {
-  const body = await c.req.json() as { name: string; address?: string; types?: string[] };
+  const body = (await c.req.json()) as { name: string; address?: string; types?: string[] };
   if (!body.name) {
     return c.json({ data: { category: '' } });
   }
 
   const categories = [
-    'Restaurant / Café', 'Salon / Barbershop', 'Legal / Law Firm',
-    'Medical / Healthcare', 'Retail / Shop', 'Technology / SaaS',
-    'Construction / Home Services', 'Fitness / Gym', 'Real Estate',
-    'Photography / Creative', 'Automotive', 'Education / Tutoring',
-    'Financial / Accounting', 'Other',
+    'Restaurant / Café',
+    'Salon / Barbershop',
+    'Legal / Law Firm',
+    'Medical / Healthcare',
+    'Retail / Shop',
+    'Technology / SaaS',
+    'Construction / Home Services',
+    'Fitness / Gym',
+    'Real Estate',
+    'Photography / Creative',
+    'Automotive',
+    'Education / Tutoring',
+    'Financial / Accounting',
+    'Other',
   ];
 
   try {
@@ -871,15 +919,16 @@ Categories: ${categories.join(', ')}
 
 Category:`;
 
-    const result = await c.env.AI.run('@cf/meta/llama-3.1-8b-instruct' as any, {
+    const result = (await c.env.AI.run('@cf/meta/llama-3.1-8b-instruct' as any, {
       messages: [{ role: 'user', content: prompt }],
       max_tokens: 30,
       temperature: 0,
-    }) as { response?: string };
+    })) as { response?: string };
 
     const raw = (result.response || '').trim();
     // Find the best matching category from the response
-    const matched = categories.find((cat) => raw.includes(cat)) ||
+    const matched =
+      categories.find((cat) => raw.includes(cat)) ||
       categories.find((cat) => raw.toLowerCase().includes(cat.toLowerCase().split(' / ')[0])) ||
       '';
 
@@ -896,12 +945,18 @@ Category:`;
  */
 search.post('/api/contact-form/:slug', async (c) => {
   const slug = c.req.param('slug');
-  const body = await c.req.json().catch(() => ({})) as {
-    name?: string; email?: string; phone?: string; message?: string;
+  const body = (await c.req.json().catch(() => ({}))) as {
+    name?: string;
+    email?: string;
+    phone?: string;
+    message?: string;
   };
 
   if (!body.name || !body.email || !body.message) {
-    return c.json({ error: { code: 'BAD_REQUEST', message: 'Name, email, and message are required' } }, 400);
+    return c.json(
+      { error: { code: 'BAD_REQUEST', message: 'Name, email, and message are required' } },
+      400,
+    );
   }
 
   try {
@@ -914,14 +969,21 @@ search.post('/api/contact-form/:slug', async (c) => {
     if (!site) return c.json({ error: { code: 'NOT_FOUND', message: 'Site not found' } }, 404);
 
     const toEmail = site.contact_email || '';
-    if (!toEmail) return c.json({ error: { code: 'CONFIG_ERROR', message: 'No contact email configured' } }, 400);
+    if (!toEmail)
+      return c.json(
+        { error: { code: 'CONFIG_ERROR', message: 'No contact email configured' } },
+        400,
+      );
 
     const htmlBody = `<h2>New Contact Form Submission</h2><p><strong>From:</strong> ${body.name} (${body.email})</p>${body.phone ? `<p><strong>Phone:</strong> ${body.phone}</p>` : ''}<p><strong>Message:</strong></p><p>${body.message.replace(/\n/g, '<br>')}</p><hr><p style="color:#888;font-size:12px;">Sent via ${site.business_name} on projectsites.dev</p>`;
 
     if (c.env.SENDGRID_API_KEY) {
       await fetch('https://api.sendgrid.com/v3/mail/send', {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${c.env.SENDGRID_API_KEY}`, 'Content-Type': 'application/json' },
+        headers: {
+          Authorization: `Bearer ${c.env.SENDGRID_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           personalizations: [{ to: [{ email: toEmail }] }],
           from: { email: 'noreply@megabyte.space', name: `${site.business_name} Website` },
@@ -933,7 +995,10 @@ search.post('/api/contact-form/:slug', async (c) => {
     } else if (c.env.RESEND_API_KEY) {
       await fetch('https://api.resend.com/emails', {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${c.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+        headers: {
+          Authorization: `Bearer ${c.env.RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           from: `${site.business_name} <noreply@megabyte.space>`,
           to: [toEmail],
@@ -965,7 +1030,7 @@ search.get('/api/sites/:slug/preview', async (c) => {
     if (!manifest) {
       return c.text('Site not found', 404);
     }
-    const manifestData = await manifest.json() as { current_version?: string };
+    const manifestData = (await manifest.json()) as { current_version?: string };
     const version = manifestData.current_version;
     if (!version) return c.text('No published version', 404);
 
@@ -975,7 +1040,10 @@ search.get('/api/sites/:slug/preview', async (c) => {
 
     let content = await html.text();
     // Inject base tag so relative URLs resolve correctly
-    content = content.replace('<head>', `<head><base href="https://${slug}.${DOMAINS.SITES_SUFFIX}/">`);
+    content = content.replace(
+      '<head>',
+      `<head><base href="https://${slug}.${DOMAINS.SITES_SUFFIX}/">`,
+    );
 
     return new Response(content, {
       headers: {
@@ -991,12 +1059,11 @@ search.get('/api/sites/:slug/preview', async (c) => {
 });
 
 const TRANSPARENT_PIXEL = new Uint8Array([
-  0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
-  0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-  0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00,
-  0x0A, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x62, 0x00, 0x00, 0x00, 0x02,
-  0x00, 0x01, 0xE5, 0x27, 0xDE, 0xFC, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45,
-  0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+  0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
+  0x89, 0x00, 0x00, 0x00, 0x0a, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x62, 0x00, 0x00, 0x00, 0x02,
+  0x00, 0x01, 0xe5, 0x27, 0xde, 0xfc, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42,
+  0x60, 0x82,
 ]);
 
 /**
@@ -1014,8 +1081,8 @@ search.get('/api/image-proxy', async (c) => {
     const res = await fetch(imageUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; ProjectSites/1.0; +https://projectsites.dev)',
-        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-        'Referer': imageUrl,
+        Accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+        Referer: imageUrl,
       },
       redirect: 'follow',
     });
@@ -1023,7 +1090,11 @@ search.get('/api/image-proxy', async (c) => {
     if (!res.ok) {
       // Return 1x1 transparent PNG instead of 502 so the img element doesn't break
       return new Response(TRANSPARENT_PIXEL, {
-        headers: { 'Content-Type': 'image/png', 'Access-Control-Allow-Origin': '*', 'X-Proxy-Status': 'failed' },
+        headers: {
+          'Content-Type': 'image/png',
+          'Access-Control-Allow-Origin': '*',
+          'X-Proxy-Status': 'failed',
+        },
       });
     }
 
@@ -1031,7 +1102,11 @@ search.get('/api/image-proxy', async (c) => {
     // Validate it's actually an image
     if (!ct.startsWith('image/') && !ct.includes('octet-stream')) {
       return new Response(TRANSPARENT_PIXEL, {
-        headers: { 'Content-Type': 'image/png', 'Access-Control-Allow-Origin': '*', 'X-Proxy-Status': 'not-image' },
+        headers: {
+          'Content-Type': 'image/png',
+          'Access-Control-Allow-Origin': '*',
+          'X-Proxy-Status': 'not-image',
+        },
       });
     }
 
@@ -1039,7 +1114,11 @@ search.get('/api/image-proxy', async (c) => {
     // Reject tiny responses (likely error pages, 1x1 tracking pixels, or loading placeholders)
     if (body.byteLength < 500) {
       return new Response(TRANSPARENT_PIXEL, {
-        headers: { 'Content-Type': 'image/png', 'Access-Control-Allow-Origin': '*', 'X-Proxy-Status': 'too-small' },
+        headers: {
+          'Content-Type': 'image/png',
+          'Access-Control-Allow-Origin': '*',
+          'X-Proxy-Status': 'too-small',
+        },
       });
     }
 
@@ -1060,7 +1139,11 @@ search.get('/api/image-proxy', async (c) => {
     // Reject images smaller than 4x4 (tracking pixels, spacers)
     if (imgW > 0 && imgH > 0 && (imgW < 4 || imgH < 4)) {
       return new Response(TRANSPARENT_PIXEL, {
-        headers: { 'Content-Type': 'image/png', 'Access-Control-Allow-Origin': '*', 'X-Proxy-Status': 'too-small-dimensions' },
+        headers: {
+          'Content-Type': 'image/png',
+          'Access-Control-Allow-Origin': '*',
+          'X-Proxy-Status': 'too-small-dimensions',
+        },
       });
     }
 
@@ -1076,7 +1159,11 @@ search.get('/api/image-proxy', async (c) => {
     });
   } catch {
     return new Response(TRANSPARENT_PIXEL, {
-      headers: { 'Content-Type': 'image/png', 'Access-Control-Allow-Origin': '*', 'X-Proxy-Status': 'error' },
+      headers: {
+        'Content-Type': 'image/png',
+        'Access-Control-Allow-Origin': '*',
+        'X-Proxy-Status': 'error',
+      },
     });
   }
 });
@@ -1100,12 +1187,14 @@ async function isImageReachable(url: string): Promise<boolean> {
  * Fetch actual image dimensions by downloading the first bytes and reading the header.
  * Returns { width, height, byteLength } or null if unable to determine.
  */
-async function getImageDimensions(url: string): Promise<{ width: number; height: number; byteLength: number } | null> {
+async function getImageDimensions(
+  url: string,
+): Promise<{ width: number; height: number; byteLength: number } | null> {
   try {
     const r = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; ProjectSites/1.0)',
-        'Range': 'bytes=0-65535',
+        Range: 'bytes=0-65535',
       },
       redirect: 'follow',
     });
@@ -1114,7 +1203,7 @@ async function getImageDimensions(url: string): Promise<{ width: number; height:
     const cl = parseInt(r.headers.get('content-length') || '0') || buf.byteLength;
 
     // PNG: dimensions at bytes 16-23 (IHDR chunk)
-    if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47) {
+    if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) {
       if (buf.byteLength >= 24) {
         const w = (buf[16] << 24) | (buf[17] << 16) | (buf[18] << 8) | buf[19];
         const h = (buf[20] << 24) | (buf[21] << 16) | (buf[22] << 8) | buf[23];
@@ -1123,13 +1212,16 @@ async function getImageDimensions(url: string): Promise<{ width: number; height:
     }
 
     // JPEG: scan for SOF0/SOF2 markers
-    if (buf[0] === 0xFF && buf[1] === 0xD8) {
+    if (buf[0] === 0xff && buf[1] === 0xd8) {
       let i = 2;
       while (i < buf.byteLength - 9) {
-        if (buf[i] !== 0xFF) { i++; continue; }
+        if (buf[i] !== 0xff) {
+          i++;
+          continue;
+        }
         const marker = buf[i + 1];
         // SOF0 (0xC0) or SOF2 (0xC2) — contains dimensions
-        if (marker === 0xC0 || marker === 0xC2) {
+        if (marker === 0xc0 || marker === 0xc2) {
           const h = (buf[i + 5] << 8) | buf[i + 6];
           const w = (buf[i + 7] << 8) | buf[i + 8];
           return { width: w, height: h, byteLength: cl };
@@ -1150,11 +1242,17 @@ async function getImageDimensions(url: string): Promise<{ width: number; height:
     }
 
     // WebP: RIFF header, VP8 chunk
-    if (buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 && buf.byteLength >= 30) {
+    if (
+      buf[0] === 0x52 &&
+      buf[1] === 0x49 &&
+      buf[2] === 0x46 &&
+      buf[3] === 0x46 &&
+      buf.byteLength >= 30
+    ) {
       // VP8 lossy
       if (buf[12] === 0x56 && buf[13] === 0x50 && buf[14] === 0x38 && buf[15] === 0x20) {
-        const w = ((buf[26]) | (buf[27] << 8)) & 0x3FFF;
-        const h = ((buf[28]) | (buf[29] << 8)) & 0x3FFF;
+        const w = (buf[26] | (buf[27] << 8)) & 0x3fff;
+        const h = (buf[28] | (buf[29] << 8)) & 0x3fff;
         return { width: w, height: h, byteLength: cl };
       }
     }
@@ -1201,7 +1299,7 @@ async function inspectImageWithVision(
   try {
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'gpt-4o',
         messages: [
@@ -1231,7 +1329,10 @@ REJECT if: has_padding is true AND quality is below 60, OR is_generic_rendering 
           {
             role: 'user',
             content: [
-              { type: 'text', text: `Assess this ${context.imageRole} image for "${context.businessName}":` },
+              {
+                type: 'text',
+                text: `Assess this ${context.imageRole} image for "${context.businessName}":`,
+              },
               { type: 'image_url', image_url: { url: imageUrl, detail: 'low' } },
             ],
           },
@@ -1242,10 +1343,13 @@ REJECT if: has_padding is true AND quality is below 60, OR is_generic_rendering 
     });
 
     if (!res.ok) return null;
-    const data = await res.json() as { choices: { message: { content: string } }[] };
+    const data = (await res.json()) as { choices: { message: { content: string } }[] };
     const content = data.choices?.[0]?.message?.content || '';
     // Parse JSON from response (strip any markdown code fences)
-    const jsonStr = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const jsonStr = content
+      .replace(/```json\n?/g, '')
+      .replace(/```\n?/g, '')
+      .trim();
     const result = JSON.parse(jsonStr) as ImageQualityResult;
     // Normalize
     result.quality_score = Math.max(0, Math.min(100, result.quality_score));
@@ -1332,7 +1436,7 @@ interface DiscoveredImage {
  * 4. Annotated with a quality score and usage recommendation
  */
 search.post('/api/ai/discover-images', async (c) => {
-  const body = await c.req.json() as { name: string; address?: string; website?: string };
+  const body = (await c.req.json()) as { name: string; address?: string; website?: string };
   if (!body.name) {
     return c.json({ data: { logo: null, favicon: null, images: [], brand_assessment: null } });
   }
@@ -1341,8 +1445,11 @@ search.post('/api/ai/discover-images', async (c) => {
   const website = body.website || '';
   let domain = '';
   try {
-    if (website) domain = new URL(website.startsWith('http') ? website : `https://${website}`).hostname;
-  } catch { /* ignore */ }
+    if (website)
+      domain = new URL(website.startsWith('http') ? website : `https://${website}`).hostname;
+  } catch {
+    /* ignore */
+  }
 
   const baseProxy = `https://${DOMAINS.SITES_BASE}/api/image-proxy?url=`;
   const proxy = (url: string) => `${baseProxy}${encodeURIComponent(url)}`;
@@ -1368,12 +1475,17 @@ search.post('/api/ai/discover-images', async (c) => {
   let favicon: DiscoveredImage | null = null;
   if (domain && scrapedHtml) {
     // Try og:image first (usually highest quality brand image)
-    const ogMatch = scrapedHtml.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
-      || scrapedHtml.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+    const ogMatch =
+      scrapedHtml.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
+      scrapedHtml.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
     // Try apple-touch-icon (usually the logo at 180px+)
-    const appleMatch = scrapedHtml.match(/<link[^>]+rel=["']apple-touch-icon["'][^>]+href=["']([^"']+)["']/i);
+    const appleMatch = scrapedHtml.match(
+      /<link[^>]+rel=["']apple-touch-icon["'][^>]+href=["']([^"']+)["']/i,
+    );
     // Try any large favicon
-    const iconMatch = scrapedHtml.match(/<link[^>]+rel=["']icon["'][^>]+sizes=["'](\d+)x\d+["'][^>]+href=["']([^"']+)["']/i);
+    const iconMatch = scrapedHtml.match(
+      /<link[^>]+rel=["']icon["'][^>]+sizes=["'](\d+)x\d+["'][^>]+href=["']([^"']+)["']/i,
+    );
 
     let logoUrl = '';
     if (ogMatch?.[1]) {
@@ -1411,18 +1523,25 @@ search.post('/api/ai/discover-images', async (c) => {
           source: 'website-scrape',
         };
       }
-    } catch { /* non-critical */ }
+    } catch {
+      /* non-critical */
+    }
   }
 
   // Try Brandfetch API for full brand kit
-  let brandfetchData: { logo_url?: string; icon_url?: string; colors?: string[]; fonts?: string[] } | null = null;
+  let brandfetchData: {
+    logo_url?: string;
+    icon_url?: string;
+    colors?: string[];
+    fonts?: string[];
+  } | null = null;
   if (domain && c.env.BRANDFETCH_API_KEY) {
     try {
       const bfRes = await fetch(`https://api.brandfetch.io/v2/brands/${domain}`, {
-        headers: { 'Authorization': `Bearer ${c.env.BRANDFETCH_API_KEY}` },
+        headers: { Authorization: `Bearer ${c.env.BRANDFETCH_API_KEY}` },
       });
       if (bfRes.ok) {
-        const bfData = await bfRes.json() as {
+        const bfData = (await bfRes.json()) as {
           logos?: { formats?: { src: string; format: string }[]; type?: string }[];
           icons?: { formats?: { src: string }[] }[];
           colors?: { hex: string; type: string }[];
@@ -1430,9 +1549,10 @@ search.post('/api/ai/discover-images', async (c) => {
         };
         // Extract best logo
         const bfLogos = bfData.logos || [];
-        const primaryLogo = bfLogos.find(l => l.type === 'logo') || bfLogos[0];
-        const logoSrc = primaryLogo?.formats?.find(f => f.format === 'svg')?.src
-          || primaryLogo?.formats?.find(f => f.format === 'png')?.src;
+        const primaryLogo = bfLogos.find((l) => l.type === 'logo') || bfLogos[0];
+        const logoSrc =
+          primaryLogo?.formats?.find((f) => f.format === 'svg')?.src ||
+          primaryLogo?.formats?.find((f) => f.format === 'png')?.src;
         if (logoSrc && !logo) {
           logo = {
             url: proxy(logoSrc),
@@ -1460,11 +1580,13 @@ search.post('/api/ai/discover-images', async (c) => {
         brandfetchData = {
           logo_url: logoSrc || undefined,
           icon_url: bfIcon || undefined,
-          colors: bfData.colors?.map(c => c.hex) || [],
-          fonts: bfData.fonts?.map(f => f.name) || [],
+          colors: bfData.colors?.map((c) => c.hex) || [],
+          fonts: bfData.fonts?.map((f) => f.name) || [],
         };
       }
-    } catch { /* non-critical */ }
+    } catch {
+      /* non-critical */
+    }
   }
 
   // Fallback: Google's faviconV2 at max resolution
@@ -1482,7 +1604,9 @@ search.post('/api/ai/discover-images', async (c) => {
   // ── Step 3: Extract favicon with dimension validation ──
   if (domain && scrapedHtml) {
     // Look for large icons: 512px, 384px, 256px, 192px
-    const largeIconMatch = scrapedHtml.match(/<link[^>]+rel=["'](?:apple-touch-icon|icon)["'][^>]+sizes=["'](\d+)x\d+["'][^>]+href=["']([^"']+)["']/gi);
+    const largeIconMatch = scrapedHtml.match(
+      /<link[^>]+rel=["'](?:apple-touch-icon|icon)["'][^>]+sizes=["'](\d+)x\d+["'][^>]+href=["']([^"']+)["']/gi,
+    );
     let bestUrl = '';
     let bestSize = 0;
     if (largeIconMatch) {
@@ -1491,14 +1615,22 @@ search.post('/api/ai/discover-images', async (c) => {
         const hrefM = tag.match(/href=["']([^"']+)["']/i);
         if (sizeM && hrefM) {
           const s = parseInt(sizeM[1]);
-          if (s > bestSize) { bestSize = s; bestUrl = hrefM[1]; }
+          if (s > bestSize) {
+            bestSize = s;
+            bestUrl = hrefM[1];
+          }
         }
       }
     }
     // Also try apple-touch-icon without sizes (usually 180px)
     if (!bestUrl || bestSize < 180) {
-      const appleM = scrapedHtml.match(/<link[^>]+rel=["']apple-touch-icon["'][^>]+href=["']([^"']+)["']/i);
-      if (appleM?.[1] && bestSize < 180) { bestUrl = appleM[1]; bestSize = 180; }
+      const appleM = scrapedHtml.match(
+        /<link[^>]+rel=["']apple-touch-icon["'][^>]+href=["']([^"']+)["']/i,
+      );
+      if (appleM?.[1] && bestSize < 180) {
+        bestUrl = appleM[1];
+        bestSize = 180;
+      }
     }
 
     if (bestUrl) {
@@ -1518,14 +1650,27 @@ search.post('/api/ai/discover-images', async (c) => {
         };
       } else if (dims) {
         console.warn(
-          JSON.stringify({ level: 'warn', service: 'discover-images', message: 'Rejected tiny favicon', domain, width: dims.width, height: dims.height, url: bestUrl }),
+          JSON.stringify({
+            level: 'warn',
+            service: 'discover-images',
+            message: 'Rejected tiny favicon',
+            domain,
+            width: dims.width,
+            height: dims.height,
+            url: bestUrl,
+          }),
         );
       }
     }
 
     // If no valid favicon from HTML tags, try the standard /favicon.ico and /favicon.png paths
     if (!favicon) {
-      for (const path of ['/apple-touch-icon.png', '/favicon-32x32.png', '/favicon.png', '/favicon.ico']) {
+      for (const path of [
+        '/apple-touch-icon.png',
+        '/favicon-32x32.png',
+        '/favicon.png',
+        '/favicon.ico',
+      ]) {
         const candidateUrl = `https://${domain}${path}`;
         const dims = await getImageDimensions(candidateUrl);
         if (dims && dims.width >= 64 && dims.height >= 64) {
@@ -1582,7 +1727,7 @@ search.post('/api/ai/discover-images', async (c) => {
     );
     const validScraped = scraped.filter((s): s is NonNullable<typeof s> => s !== null);
     // Sort by area (largest first) — best content images tend to be large
-    validScraped.sort((a, b) => (b.width * b.height) - (a.width * a.height));
+    validScraped.sort((a, b) => b.width * b.height - a.width * a.height);
     for (let i = 0; i < Math.min(validScraped.length, 5); i++) {
       images.push({
         url: proxy(validScraped[i].url),
@@ -1598,7 +1743,8 @@ search.post('/api/ai/discover-images', async (c) => {
   // 4b: Google Custom Search for additional images
   if (cseKey && cseCx) {
     try {
-      const blocked = /shutterstock|gettyimages|istockphoto|alamy|dreamstime|123rf|depositphotos|stock\.adobe|loopnet|zillow/i;
+      const blocked =
+        /shutterstock|gettyimages|istockphoto|alamy|dreamstime|123rf|depositphotos|stock\.adobe|loopnet|zillow/i;
       const addr = body.address || '';
       const city = addr.split(',').slice(1, 2).join('').trim();
       const locationCtx = city ? ` ${city}` : '';
@@ -1614,15 +1760,22 @@ search.post('/api/ai/discover-images', async (c) => {
       ];
 
       const allCandidates: { url: string; title: string }[] = [];
-      const seenFromScrape = new Set(images.map(img => img.originalUrl || ''));
+      const seenFromScrape = new Set(images.map((img) => img.originalUrl || ''));
 
       const searchPromises = queries.map(async (q) => {
         try {
           const cseUrl = `https://www.googleapis.com/customsearch/v1?key=${cseKey}&cx=${cseCx}&q=${encodeURIComponent(q)}&searchType=image&num=4&imgSize=xlarge&imgType=photo&safe=active`;
           const cseRes = await fetch(cseUrl);
           if (cseRes.ok) {
-            const cseData = await cseRes.json() as { items?: { link: string; title: string; displayLink?: string; image?: { width?: number; height?: number } }[] };
-            for (const item of (cseData.items || [])) {
+            const cseData = (await cseRes.json()) as {
+              items?: {
+                link: string;
+                title: string;
+                displayLink?: string;
+                image?: { width?: number; height?: number };
+              }[];
+            };
+            for (const item of cseData.items || []) {
               if (blocked.test(item.displayLink || '') || blocked.test(item.link)) continue;
               if (/watermark|preview|thumb|editorial|icon|logo|badge/i.test(item.link)) continue;
               if (seenFromScrape.has(item.link)) continue;
@@ -1633,24 +1786,38 @@ search.post('/api/ai/discover-images', async (c) => {
               allCandidates.push({ url: item.link, title: item.title || '' });
             }
           }
-        } catch { /* skip */ }
+        } catch {
+          /* skip */
+        }
       });
       await Promise.all(searchPromises);
 
       // Deduplicate (also dedup against scraped images)
       const seen = new Set<string>(seenFromScrape);
-      const unique = allCandidates.filter(item => { if (seen.has(item.url)) return false; seen.add(item.url); return true; });
+      const unique = allCandidates.filter((item) => {
+        if (seen.has(item.url)) return false;
+        seen.add(item.url);
+        return true;
+      });
 
       // Validate reachability + minimum size
       const validated: typeof unique = [];
-      await Promise.all(unique.slice(0, 20).map(async (item) => {
-        try {
-          const r = await fetch(item.url, { method: 'HEAD', headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ProjectSites/1.0)' }, redirect: 'follow' });
-          const ct = r.headers.get('content-type') || '';
-          const cl = parseInt(r.headers.get('content-length') || '0');
-          if (r.ok && ct.startsWith('image/') && (cl === 0 || cl > 20000)) validated.push(item);
-        } catch { /* skip */ }
-      }));
+      await Promise.all(
+        unique.slice(0, 20).map(async (item) => {
+          try {
+            const r = await fetch(item.url, {
+              method: 'HEAD',
+              headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ProjectSites/1.0)' },
+              redirect: 'follow',
+            });
+            const ct = r.headers.get('content-type') || '';
+            const cl = parseInt(r.headers.get('content-length') || '0');
+            if (r.ok && ct.startsWith('image/') && (cl === 0 || cl > 20000)) validated.push(item);
+          } catch {
+            /* skip */
+          }
+        }),
+      );
 
       const maxCse = Math.max(0, 14 - images.length);
       for (let i = 0; i < Math.min(validated.length, maxCse); i++) {
@@ -1671,13 +1838,23 @@ search.post('/api/ai/discover-images', async (c) => {
   const unsplashKey = c.env.UNSPLASH_ACCESS_KEY;
   if (unsplashKey && images.length < 14) {
     try {
-      const unsplashQuery = `${bizName} ${body.address?.split(',').slice(1, 2).join('').trim() || ''}`.trim();
-      const uRes = await fetch(`https://api.unsplash.com/search/photos?query=${encodeURIComponent(unsplashQuery)}&per_page=4&orientation=landscape`, {
-        headers: { 'Authorization': `Client-ID ${unsplashKey}` },
-      });
+      const unsplashQuery =
+        `${bizName} ${body.address?.split(',').slice(1, 2).join('').trim() || ''}`.trim();
+      const uRes = await fetch(
+        `https://api.unsplash.com/search/photos?query=${encodeURIComponent(unsplashQuery)}&per_page=4&orientation=landscape`,
+        {
+          headers: { Authorization: `Client-ID ${unsplashKey}` },
+        },
+      );
       if (uRes.ok) {
-        const uData = await uRes.json() as { results?: { urls: { regular: string }; alt_description?: string; user: { name: string } }[] };
-        const seenUrls = new Set(images.map(img => img.originalUrl || ''));
+        const uData = (await uRes.json()) as {
+          results?: {
+            urls: { regular: string };
+            alt_description?: string;
+            user: { name: string };
+          }[];
+        };
+        const seenUrls = new Set(images.map((img) => img.originalUrl || ''));
         for (const photo of (uData.results || []).slice(0, 4)) {
           if (!seenUrls.has(photo.urls.regular) && images.length < 14) {
             images.push({
@@ -1690,7 +1867,9 @@ search.post('/api/ai/discover-images', async (c) => {
           }
         }
       }
-    } catch { /* non-critical */ }
+    } catch {
+      /* non-critical */
+    }
   }
 
   // 4d: Foursquare — venue photos
@@ -1699,19 +1878,25 @@ search.post('/api/ai/discover-images', async (c) => {
     try {
       const fsQuery = encodeURIComponent(bizName);
       const fsNear = encodeURIComponent(body.address || '');
-      const fsSearchRes = await fetch(`https://api.foursquare.com/v3/places/search?query=${fsQuery}&near=${fsNear}&limit=1`, {
-        headers: { 'Authorization': foursquareKey, 'Accept': 'application/json' },
-      });
+      const fsSearchRes = await fetch(
+        `https://api.foursquare.com/v3/places/search?query=${fsQuery}&near=${fsNear}&limit=1`,
+        {
+          headers: { Authorization: foursquareKey, Accept: 'application/json' },
+        },
+      );
       if (fsSearchRes.ok) {
-        const fsSearchData = await fsSearchRes.json() as { results?: { fsq_id: string }[] };
+        const fsSearchData = (await fsSearchRes.json()) as { results?: { fsq_id: string }[] };
         const fsqId = fsSearchData.results?.[0]?.fsq_id;
         if (fsqId) {
-          const fsPhotosRes = await fetch(`https://api.foursquare.com/v3/places/${fsqId}/photos?limit=4`, {
-            headers: { 'Authorization': foursquareKey, 'Accept': 'application/json' },
-          });
+          const fsPhotosRes = await fetch(
+            `https://api.foursquare.com/v3/places/${fsqId}/photos?limit=4`,
+            {
+              headers: { Authorization: foursquareKey, Accept: 'application/json' },
+            },
+          );
           if (fsPhotosRes.ok) {
-            const fsPhotos = await fsPhotosRes.json() as { prefix: string; suffix: string }[];
-            const seenUrls = new Set(images.map(img => img.originalUrl || ''));
+            const fsPhotos = (await fsPhotosRes.json()) as { prefix: string; suffix: string }[];
+            const seenUrls = new Set(images.map((img) => img.originalUrl || ''));
             for (const p of (Array.isArray(fsPhotos) ? fsPhotos : []).slice(0, 3)) {
               const photoUrl = `${p.prefix}original${p.suffix}`;
               if (!seenUrls.has(photoUrl) && images.length < 14) {
@@ -1727,7 +1912,9 @@ search.post('/api/ai/discover-images', async (c) => {
           }
         }
       }
-    } catch { /* non-critical */ }
+    } catch {
+      /* non-critical */
+    }
   }
 
   // 4e: Yelp — business photos
@@ -1736,14 +1923,19 @@ search.post('/api/ai/discover-images', async (c) => {
     try {
       const yelpQuery = encodeURIComponent(bizName);
       const yelpLocation = encodeURIComponent(body.address || '');
-      const yRes = await fetch(`https://api.yelp.com/v3/businesses/search?term=${yelpQuery}&location=${yelpLocation}&limit=1`, {
-        headers: { 'Authorization': `Bearer ${yelpKey}` },
-      });
+      const yRes = await fetch(
+        `https://api.yelp.com/v3/businesses/search?term=${yelpQuery}&location=${yelpLocation}&limit=1`,
+        {
+          headers: { Authorization: `Bearer ${yelpKey}` },
+        },
+      );
       if (yRes.ok) {
-        const yData = await yRes.json() as { businesses?: { id: string; image_url?: string; photos?: string[] }[] };
+        const yData = (await yRes.json()) as {
+          businesses?: { id: string; image_url?: string; photos?: string[] }[];
+        };
         const biz = yData.businesses?.[0];
         if (biz) {
-          const seenUrls = new Set(images.map(img => img.originalUrl || ''));
+          const seenUrls = new Set(images.map((img) => img.originalUrl || ''));
           const yelpPhotos = biz.photos || (biz.image_url ? [biz.image_url] : []);
           for (const photoUrl of yelpPhotos.slice(0, 3)) {
             if (photoUrl && !seenUrls.has(photoUrl) && images.length < 14) {
@@ -1758,7 +1950,9 @@ search.post('/api/ai/discover-images', async (c) => {
           }
         }
       }
-    } catch { /* non-critical */ }
+    } catch {
+      /* non-critical */
+    }
   }
 
   // ── Step 5: Validate logo and favicon reachability ──
@@ -1776,16 +1970,26 @@ search.post('/api/ai/discover-images', async (c) => {
     if (logo) {
       const logoRef = logo;
       inspectionTasks.push(
-        inspectImageWithVision(logoRef.originalUrl || logoRef.url, { businessName: bizName, imageRole: 'logo' }, openaiKey)
-          .then(result => { logoRef.quality = result; }),
+        inspectImageWithVision(
+          logoRef.originalUrl || logoRef.url,
+          { businessName: bizName, imageRole: 'logo' },
+          openaiKey,
+        ).then((result) => {
+          logoRef.quality = result;
+        }),
       );
     }
 
     if (favicon) {
       const favRef = favicon;
       inspectionTasks.push(
-        inspectImageWithVision(favRef.originalUrl || favRef.url, { businessName: bizName, imageRole: 'favicon' }, openaiKey)
-          .then(result => { favRef.quality = result; }),
+        inspectImageWithVision(
+          favRef.originalUrl || favRef.url,
+          { businessName: bizName, imageRole: 'favicon' },
+          openaiKey,
+        ).then((result) => {
+          favRef.quality = result;
+        }),
       );
     }
 
@@ -1793,8 +1997,13 @@ search.post('/api/ai/discover-images', async (c) => {
     for (let batch = 0; batch < images.length; batch += 6) {
       const batchImages = images.slice(batch, batch + 6);
       const batchTasks = batchImages.map((img) =>
-        inspectImageWithVision(img.originalUrl || img.url, { businessName: bizName, imageRole: 'photo' }, openaiKey)
-          .then(result => { img.quality = result; }),
+        inspectImageWithVision(
+          img.originalUrl || img.url,
+          { businessName: bizName, imageRole: 'photo' },
+          openaiKey,
+        ).then((result) => {
+          img.quality = result;
+        }),
       );
       inspectionTasks.push(...batchTasks);
     }
@@ -1802,28 +2011,48 @@ search.post('/api/ai/discover-images', async (c) => {
     // Wait for all inspections (with a 15s timeout so we don't block forever)
     await Promise.race([
       Promise.allSettled(inspectionTasks),
-      new Promise(resolve => setTimeout(resolve, 15000)),
+      new Promise((resolve) => setTimeout(resolve, 15000)),
     ]);
 
     // Filter out unsafe or rejected images
     if (logo?.quality && (!logo.quality.is_safe || logo.quality.recommendation === 'reject')) {
-      console.warn(JSON.stringify({ level: 'warn', service: 'discover-images', message: 'Logo rejected by vision', domain, issues: logo.quality.issues }));
+      console.warn(
+        JSON.stringify({
+          level: 'warn',
+          service: 'discover-images',
+          message: 'Logo rejected by vision',
+          domain,
+          issues: logo.quality.issues,
+        }),
+      );
       logo = null;
     }
-    if (favicon?.quality && (!favicon.quality.is_safe || favicon.quality.recommendation === 'reject')) {
-      console.warn(JSON.stringify({ level: 'warn', service: 'discover-images', message: 'Favicon rejected by vision', domain, issues: favicon.quality.issues }));
+    if (
+      favicon?.quality &&
+      (!favicon.quality.is_safe || favicon.quality.recommendation === 'reject')
+    ) {
+      console.warn(
+        JSON.stringify({
+          level: 'warn',
+          service: 'discover-images',
+          message: 'Favicon rejected by vision',
+          domain,
+          issues: favicon.quality.issues,
+        }),
+      );
       favicon = null;
     }
 
     // Remove unsafe, rejected, padded, or irrelevant images
-    const filteredImages = images.filter(img => {
+    const filteredImages = images.filter((img) => {
       if (!img.quality) return true; // Vision unavailable — keep
       if (!img.quality.is_safe) return false; // Unsafe — remove
       if (img.quality.recommendation === 'reject') return false; // Explicitly rejected
       // Reject images with excessive padding and low quality
       if (img.quality.has_padding && img.quality.quality_score < 60) return false;
       // Reject generic CAD renderings with low business relevance
-      if (img.quality.is_generic_rendering && (img.quality.business_relevance ?? 0) < 0.5) return false;
+      if (img.quality.is_generic_rendering && (img.quality.business_relevance ?? 0) < 0.5)
+        return false;
       return true;
     });
     images.length = 0;
@@ -1865,7 +2094,11 @@ search.post('/api/ai/discover-images', async (c) => {
       if (imgCount >= 3) siteScore += 10;
       if (pageTitle && pageTitle.length > 5) siteScore += 10;
 
-      const hasProfessionalLogo = !!(logo?.quality && logo.quality.quality_score >= 70 && logo.quality.is_professional);
+      const hasProfessionalLogo = !!(
+        logo?.quality &&
+        logo.quality.quality_score >= 70 &&
+        logo.quality.is_professional
+      );
       const hasQualityFavicon = !!(favicon?.dimensions && favicon.dimensions.width >= 256);
 
       let maturity: 'established' | 'developing' | 'minimal' = 'minimal';
@@ -1881,7 +2114,8 @@ search.post('/api/ai/discover-images', async (c) => {
         strategy = 'Use original assets as inspiration. Enhance colors, typography, and imagery.';
         recommendation = 'Build a polished, professional site that elevates the existing brand.';
       } else {
-        strategy = 'Original assets are low quality. Use as inspiration only. Generate professional AI alternatives.';
+        strategy =
+          'Original assets are low quality. Use as inspiration only. Generate professional AI alternatives.';
         recommendation = 'Create a gorgeous, modern site that reimagines the brand professionally.';
       }
 
@@ -1936,7 +2170,7 @@ search.post('/api/ai/discover-images', async (c) => {
  * All videos include attribution data for the `/attribution` page.
  */
 search.post('/api/ai/discover-videos', async (c) => {
-  const body = await c.req.json() as { name: string; address?: string; business_type?: string };
+  const body = (await c.req.json()) as { name: string; address?: string; business_type?: string };
   if (!body.name) {
     return c.json({ data: { videos: [], attribution: [] } });
   }
@@ -1969,15 +2203,24 @@ search.post('/api/ai/discover-videos', async (c) => {
         const ytUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&maxResults=3&q=${encodeURIComponent(q)}&key=${youtubeKey}`;
         const ytRes = await fetch(ytUrl);
         if (ytRes.ok) {
-          const ytData = await ytRes.json() as {
-            items?: { id: { videoId: string }; snippet: { title: string; thumbnails: { high?: { url: string } }; channelTitle: string } }[]
+          const ytData = (await ytRes.json()) as {
+            items?: {
+              id: { videoId: string };
+              snippet: {
+                title: string;
+                thumbnails: { high?: { url: string } };
+                channelTitle: string;
+              };
+            }[];
           };
-          for (const item of (ytData.items || [])) {
+          for (const item of ytData.items || []) {
             const videoId = item.id.videoId;
             videos.push({
               url: `https://www.youtube.com/watch?v=${videoId}`,
               embed_url: `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&loop=1&playlist=${videoId}&controls=0`,
-              thumbnail: item.snippet.thumbnails?.high?.url || `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+              thumbnail:
+                item.snippet.thumbnails?.high?.url ||
+                `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
               title: item.snippet.title,
               source: 'youtube',
               duration_seconds: 0,
@@ -2001,16 +2244,25 @@ search.post('/api/ai/discover-videos', async (c) => {
   if (pexelsKey && videos.length < 5) {
     try {
       const pexelsQuery = bizType || bizName;
-      const pxRes = await fetch(`https://api.pexels.com/videos/search?query=${encodeURIComponent(pexelsQuery)}&per_page=3&size=large`, {
-        headers: { 'Authorization': pexelsKey },
-      });
+      const pxRes = await fetch(
+        `https://api.pexels.com/videos/search?query=${encodeURIComponent(pexelsQuery)}&per_page=3&size=large`,
+        {
+          headers: { Authorization: pexelsKey },
+        },
+      );
       if (pxRes.ok) {
-        const pxData = await pxRes.json() as {
-          videos?: { id: number; url: string; duration: number; image: string; user: { name: string; url: string };
-            video_files?: { link: string; quality: string; width: number }[] }[]
+        const pxData = (await pxRes.json()) as {
+          videos?: {
+            id: number;
+            url: string;
+            duration: number;
+            image: string;
+            user: { name: string; url: string };
+            video_files?: { link: string; quality: string; width: number }[];
+          }[];
         };
-        for (const v of (pxData.videos || [])) {
-          const hdFile = v.video_files?.find(f => f.quality === 'hd' || f.width >= 1280);
+        for (const v of pxData.videos || []) {
+          const hdFile = v.video_files?.find((f) => f.quality === 'hd' || f.width >= 1280);
           if (hdFile) {
             videos.push({
               url: v.url,
@@ -2039,13 +2291,20 @@ search.post('/api/ai/discover-videos', async (c) => {
   if (pixabayKey && videos.length < 3) {
     try {
       const pbQuery = bizType || bizName;
-      const pbRes = await fetch(`https://pixabay.com/api/videos/?key=${pixabayKey}&q=${encodeURIComponent(pbQuery)}&per_page=3&safesearch=true`);
+      const pbRes = await fetch(
+        `https://pixabay.com/api/videos/?key=${pixabayKey}&q=${encodeURIComponent(pbQuery)}&per_page=3&safesearch=true`,
+      );
       if (pbRes.ok) {
-        const pbData = await pbRes.json() as {
-          hits?: { id: number; pageURL: string; duration: number; user: string;
-            videos?: { large?: { url: string; thumbnail: string } } }[]
+        const pbData = (await pbRes.json()) as {
+          hits?: {
+            id: number;
+            pageURL: string;
+            duration: number;
+            user: string;
+            videos?: { large?: { url: string; thumbnail: string } };
+          }[];
         };
-        for (const h of (pbData.hits || [])) {
+        for (const h of pbData.hits || []) {
           if (h.videos?.large?.url) {
             videos.push({
               url: h.pageURL,
@@ -2071,7 +2330,11 @@ search.post('/api/ai/discover-videos', async (c) => {
 
   // Deduplicate by embed URL
   const seen = new Set<string>();
-  const unique = videos.filter(v => { if (seen.has(v.embed_url)) return false; seen.add(v.embed_url); return true; });
+  const unique = videos.filter((v) => {
+    if (seen.has(v.embed_url)) return false;
+    seen.add(v.embed_url);
+    return true;
+  });
 
   // Sort: business-specific first, then by source priority
   unique.sort((a, b) => {
@@ -2080,7 +2343,7 @@ search.post('/api/ai/discover-videos', async (c) => {
     return srcOrder[a.source] - srcOrder[b.source];
   });
 
-  const attribution = unique.map(v => v.attribution);
+  const attribution = unique.map((v) => v.attribution);
 
   return c.json({
     data: {
@@ -2095,14 +2358,17 @@ search.post('/api/ai/discover-videos', async (c) => {
  * Returns a proxied URL to the generated image.
  */
 search.post('/api/ai/edit-image', async (c) => {
-  const body = await c.req.json() as { prompt: string; originalUrl?: string };
+  const body = (await c.req.json()) as { prompt: string; originalUrl?: string };
   if (!body.prompt?.trim()) {
     return c.json({ error: { code: 'BAD_REQUEST', message: 'Prompt is required' } }, 400);
   }
 
   const openaiKey = c.env.OPENAI_API_KEY;
   if (!openaiKey) {
-    return c.json({ error: { code: 'CONFIG_ERROR', message: 'OpenAI API key not configured' } }, 500);
+    return c.json(
+      { error: { code: 'CONFIG_ERROR', message: 'OpenAI API key not configured' } },
+      500,
+    );
   }
 
   try {
@@ -2112,32 +2378,42 @@ search.post('/api/ai/edit-image', async (c) => {
       try {
         const descRes = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
-          headers: { 'Authorization': `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+          headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
             model: 'gpt-4o-mini',
             messages: [
-              { role: 'user', content: [
-                { type: 'text', text: 'Describe this image in detail — subject, colors, composition, style, setting. Be specific.' },
-                { type: 'image_url', image_url: { url: body.originalUrl } },
-              ] },
+              {
+                role: 'user',
+                content: [
+                  {
+                    type: 'text',
+                    text: 'Describe this image in detail — subject, colors, composition, style, setting. Be specific.',
+                  },
+                  { type: 'image_url', image_url: { url: body.originalUrl } },
+                ],
+              },
             ],
             max_tokens: 300,
           }),
         });
         if (descRes.ok) {
-          const descData = await descRes.json() as { choices: { message: { content: string } }[] };
+          const descData = (await descRes.json()) as {
+            choices: { message: { content: string } }[];
+          };
           const description = descData.choices?.[0]?.message?.content || '';
           if (description) {
             editPrompt = `Starting from this image: ${description}\n\nNow apply this edit: ${body.prompt}\n\nGenerate the modified version of this same image with the edit applied.`;
           }
         }
-      } catch { /* fall through to raw prompt */ }
+      } catch {
+        /* fall through to raw prompt */
+      }
     }
 
     const res = await fetch('https://api.openai.com/v1/images/generations', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openaiKey}`,
+        Authorization: `Bearer ${openaiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -2155,7 +2431,7 @@ search.post('/api/ai/edit-image', async (c) => {
       return c.json({ error: { code: 'AI_ERROR', message: 'Image generation failed' } }, 502);
     }
 
-    const data = await res.json() as { data?: { url: string }[] };
+    const data = (await res.json()) as { data?: { url: string }[] };
     const imageUrl = data.data?.[0]?.url;
     if (!imageUrl) {
       return c.json({ error: { code: 'AI_ERROR', message: 'No image returned' } }, 502);
@@ -2177,9 +2453,16 @@ search.post('/api/ai/edit-image', async (c) => {
 
 // ── Domain Availability (public, for conversion flow) ──────────────
 search.get('/api/domains/availability', async (c) => {
-  const name = c.req.query('name')?.trim().replace(/[^a-z0-9-]/gi, '').toLowerCase();
+  const name = c.req
+    .query('name')
+    ?.trim()
+    .replace(/[^a-z0-9-]/gi, '')
+    .toLowerCase();
   if (!name || name.length < 2) {
-    return c.json({ error: { code: 'BAD_REQUEST', message: 'Name must be at least 2 characters' } }, 400);
+    return c.json(
+      { error: { code: 'BAD_REQUEST', message: 'Name must be at least 2 characters' } },
+      400,
+    );
   }
 
   const apiKey = c.env.WHOISXML_API_KEY;
@@ -2248,7 +2531,9 @@ search.get('/api/domains/availability', async (c) => {
       // If no API key, go straight to RDAP fallback
       if (!apiKey) {
         const result = await checkViaRdap(domain);
-        await c.env.CACHE_KV.put(cacheKey, result.available ? '1' : '0', { expirationTtl: 300 }).catch(() => {});
+        await c.env.CACHE_KV.put(cacheKey, result.available ? '1' : '0', {
+          expirationTtl: 300,
+        }).catch(() => {});
         return result;
       }
 
@@ -2274,21 +2559,28 @@ search.get('/api/domains/availability', async (c) => {
           `[domain-availability] WhoisXML failed for ${domain} (status=${res.status}, code=${data.code}, msg=${data.messages}), using RDAP fallback`,
         );
         const result = await checkViaRdap(domain);
-        await c.env.CACHE_KV.put(cacheKey, result.available ? '1' : '0', { expirationTtl: 300 }).catch(() => {});
+        await c.env.CACHE_KV.put(cacheKey, result.available ? '1' : '0', {
+          expirationTtl: 300,
+        }).catch(() => {});
         return result;
       }
 
       const available = data.DomainInfo.domainAvailability === 'AVAILABLE';
 
       // Cache for 5 minutes
-      await c.env.CACHE_KV.put(cacheKey, available ? '1' : '0', { expirationTtl: 300 }).catch(() => {});
+      await c.env.CACHE_KV.put(cacheKey, available ? '1' : '0', { expirationTtl: 300 }).catch(
+        () => {},
+      );
 
       return { domain, available };
     }),
   );
 
   const data = results
-    .filter((r): r is PromiseFulfilledResult<{ domain: string; available: boolean }> => r.status === 'fulfilled')
+    .filter(
+      (r): r is PromiseFulfilledResult<{ domain: string; available: boolean }> =>
+        r.status === 'fulfilled',
+    )
     .map((r) => r.value);
 
   return c.json({ data });
@@ -2307,7 +2599,12 @@ search.post('/api/conversion/checkout', async (c) => {
   }
 
   const { dbQueryOne } = await import('../services/db.js');
-  const site = await dbQueryOne<{ id: string; slug: string; org_id: string; business_name: string }>(
+  const site = await dbQueryOne<{
+    id: string;
+    slug: string;
+    org_id: string;
+    business_name: string;
+  }>(
     c.env.DB,
     'SELECT id, slug, org_id, business_name FROM sites WHERE slug = ? AND deleted_at IS NULL',
     [body.slug],
@@ -2322,8 +2619,14 @@ search.post('/api/conversion/checkout', async (c) => {
     params.set('line_items[0][price_data][currency]', 'usd');
     params.set('line_items[0][price_data][recurring][interval]', 'month');
     params.set('line_items[0][price_data][unit_amount]', '5000');
-    params.set('line_items[0][price_data][product_data][name]', `${site.business_name} Website — Pro Plan`);
-    params.set('line_items[0][price_data][product_data][description]', `Custom domain, AI editing, analytics, priority support`);
+    params.set(
+      'line_items[0][price_data][product_data][name]',
+      `${site.business_name} Website — Pro Plan`,
+    );
+    params.set(
+      'line_items[0][price_data][product_data][description]',
+      `Custom domain, AI editing, analytics, priority support`,
+    );
     params.set('line_items[0][quantity]', '1');
     params.set('metadata[site_id]', site.id);
     params.set('metadata[slug]', site.slug);
@@ -2368,9 +2671,21 @@ search.post('/api/conversion/checkout', async (c) => {
  * social_links, specials, products, classes, listings, amenities, reviews
  */
 const ALLOWED_PUBLIC_TABLES = new Set([
-  'services', 'team_members', 'business_hours', 'faq', 'menu_items',
-  'gallery', 'social_links', 'specials', 'products', 'classes',
-  'listings', 'amenities', 'reviews', 'brand_config', 'policies',
+  'services',
+  'team_members',
+  'business_hours',
+  'faq',
+  'menu_items',
+  'gallery',
+  'social_links',
+  'specials',
+  'products',
+  'classes',
+  'listings',
+  'amenities',
+  'reviews',
+  'brand_config',
+  'policies',
 ]);
 
 search.get('/api/public-data/:table', async (c) => {
@@ -2391,7 +2706,9 @@ search.get('/api/public-data/:table', async (c) => {
   try {
     const result = await c.env.DB.prepare(
       `SELECT * FROM site_data WHERE site_id = ? AND table_name = ? AND deleted_at IS NULL ORDER BY sort_order ASC, created_at ASC`,
-    ).bind(site.site_id, table).all();
+    )
+      .bind(site.site_id, table)
+      .all();
 
     // Parse the JSON data column for each row
     const rows = (result.results || []).map((row: any) => {
@@ -2417,7 +2734,8 @@ search.get('/api/public-data/:table', async (c) => {
 /** Authenticated endpoint for admin to read/write site data */
 search.get('/api/sites/:siteId/data/:table', async (c) => {
   const orgId = c.get('orgId');
-  if (!orgId) return c.json({ error: { code: 'UNAUTHORIZED', message: 'Must be authenticated' } }, 401);
+  if (!orgId)
+    return c.json({ error: { code: 'UNAUTHORIZED', message: 'Must be authenticated' } }, 401);
   const { siteId, table } = c.req.param();
   if (!ALLOWED_PUBLIC_TABLES.has(table)) {
     return c.json({ error: { code: 'BAD_REQUEST', message: 'Unknown table' } }, 400);
@@ -2425,7 +2743,9 @@ search.get('/api/sites/:siteId/data/:table', async (c) => {
 
   const result = await c.env.DB.prepare(
     `SELECT * FROM site_data WHERE site_id = ? AND table_name = ? AND deleted_at IS NULL ORDER BY sort_order ASC, created_at ASC`,
-  ).bind(siteId, table).all();
+  )
+    .bind(siteId, table)
+    .all();
 
   const rows = (result.results || []).map((row: any) => {
     try {
@@ -2441,7 +2761,8 @@ search.get('/api/sites/:siteId/data/:table', async (c) => {
 /** Upsert a row in a site data table */
 search.put('/api/sites/:siteId/data/:table/:rowId', async (c) => {
   const orgId = c.get('orgId');
-  if (!orgId) return c.json({ error: { code: 'UNAUTHORIZED', message: 'Must be authenticated' } }, 401);
+  if (!orgId)
+    return c.json({ error: { code: 'UNAUTHORIZED', message: 'Must be authenticated' } }, 401);
   const { siteId, table, rowId } = c.req.param();
   if (!ALLOWED_PUBLIC_TABLES.has(table)) {
     return c.json({ error: { code: 'BAD_REQUEST', message: 'Unknown table' } }, 400);
@@ -2454,7 +2775,9 @@ search.put('/api/sites/:siteId/data/:table/:rowId', async (c) => {
     `INSERT INTO site_data (id, site_id, table_name, data_json, sort_order, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))
      ON CONFLICT(id) DO UPDATE SET data_json = ?, sort_order = ?, updated_at = datetime('now')`,
-  ).bind(rowId, siteId, table, dataJson, body.sort_order ?? 0, dataJson, body.sort_order ?? 0).run();
+  )
+    .bind(rowId, siteId, table, dataJson, body.sort_order ?? 0, dataJson, body.sort_order ?? 0)
+    .run();
 
   return c.json({ data: { id: rowId, updated: true } });
 });
@@ -2462,12 +2785,15 @@ search.put('/api/sites/:siteId/data/:table/:rowId', async (c) => {
 /** Delete a row from a site data table */
 search.delete('/api/sites/:siteId/data/:table/:rowId', async (c) => {
   const orgId = c.get('orgId');
-  if (!orgId) return c.json({ error: { code: 'UNAUTHORIZED', message: 'Must be authenticated' } }, 401);
+  if (!orgId)
+    return c.json({ error: { code: 'UNAUTHORIZED', message: 'Must be authenticated' } }, 401);
   const { siteId, table, rowId } = c.req.param();
 
   await c.env.DB.prepare(
     `UPDATE site_data SET deleted_at = datetime('now') WHERE id = ? AND site_id = ? AND table_name = ?`,
-  ).bind(rowId, siteId, table).run();
+  )
+    .bind(rowId, siteId, table)
+    .run();
 
   return c.json({ data: { id: rowId, deleted: true } });
 });
@@ -2475,12 +2801,15 @@ search.delete('/api/sites/:siteId/data/:table/:rowId', async (c) => {
 /** List all tables for a site (for admin AG Grid) */
 search.get('/api/sites/:siteId/data', async (c) => {
   const orgId = c.get('orgId');
-  if (!orgId) return c.json({ error: { code: 'UNAUTHORIZED', message: 'Must be authenticated' } }, 401);
+  if (!orgId)
+    return c.json({ error: { code: 'UNAUTHORIZED', message: 'Must be authenticated' } }, 401);
   const siteId = c.req.param('siteId');
 
   const result = await c.env.DB.prepare(
     `SELECT DISTINCT table_name, COUNT(*) as row_count FROM site_data WHERE site_id = ? AND deleted_at IS NULL GROUP BY table_name ORDER BY table_name`,
-  ).bind(siteId).all();
+  )
+    .bind(siteId)
+    .all();
 
   return c.json({ data: result.results || [] });
 });
@@ -2513,7 +2842,7 @@ search.post('/api/container-query', async (c) => {
   if (secret !== c.env.ANTHROPIC_API_KEY?.slice(0, 16)) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
-  const body = await c.req.json() as { sql: string; params?: unknown[] };
+  const body = (await c.req.json()) as { sql: string; params?: unknown[] };
   const stmt = c.env.DB.prepare(body.sql);
   const result = body.params ? await stmt.bind(...body.params).run() : await stmt.run();
   return c.json({ ok: true, meta: result.meta });
@@ -2540,9 +2869,9 @@ search.get('/api/container-script', async (c) => {
  * Returns: { url } — redirect the user to this Stripe Checkout URL
  */
 search.post('/api/donate', async (c) => {
-  const body = await c.req.json() as {
+  const body = (await c.req.json()) as {
     slug: string;
-    amount: number;       // in cents (e.g., 5000 = $50)
+    amount: number; // in cents (e.g., 5000 = $50)
     interval?: 'month' | 'year' | 'one_time';
     donorName?: string;
     donorEmail?: string;
@@ -2560,7 +2889,9 @@ search.post('/api/donate', async (c) => {
   }
 
   // Look up the site to get business name
-  const site = await c.env.DB.prepare('SELECT business_name FROM sites WHERE slug = ?').bind(body.slug).first() as { business_name: string } | null;
+  const site = (await c.env.DB.prepare('SELECT business_name FROM sites WHERE slug = ?')
+    .bind(body.slug)
+    .first()) as { business_name: string } | null;
   const businessName = site?.business_name || body.slug;
 
   const isRecurring = body.interval && body.interval !== 'one_time';
@@ -2574,10 +2905,16 @@ search.post('/api/donate', async (c) => {
   params.append('line_items[0][price_data][currency]', 'usd');
   params.append('line_items[0][price_data][unit_amount]', String(body.amount));
   params.append('line_items[0][price_data][product_data][name]', `Donation to ${businessName}`);
-  params.append('line_items[0][price_data][product_data][description]', `Thank you for supporting ${businessName}`);
+  params.append(
+    'line_items[0][price_data][product_data][description]',
+    `Thank you for supporting ${businessName}`,
+  );
   params.append('line_items[0][quantity]', '1');
   if (isRecurring) {
-    params.append('line_items[0][price_data][recurring][interval]', body.interval === 'year' ? 'year' : 'month');
+    params.append(
+      'line_items[0][price_data][recurring][interval]',
+      body.interval === 'year' ? 'year' : 'month',
+    );
   }
   if (body.donorEmail) {
     params.append('customer_email', body.donorEmail);
@@ -2590,7 +2927,7 @@ search.post('/api/donate', async (c) => {
     const stripeRes = await fetch('https://api.stripe.com/v1/checkout/sessions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${stripeKey}`,
+        Authorization: `Bearer ${stripeKey}`,
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: params.toString(),
@@ -2602,7 +2939,7 @@ search.post('/api/donate', async (c) => {
       return c.json({ error: 'Payment setup failed' }, 502);
     }
 
-    const session = await stripeRes.json() as { url: string; id: string };
+    const session = (await stripeRes.json()) as { url: string; id: string };
     return c.json({ url: session.url, sessionId: session.id });
   } catch (e) {
     console.warn('[donate] Error:', e instanceof Error ? e.message : String(e));

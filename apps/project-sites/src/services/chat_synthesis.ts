@@ -71,16 +71,14 @@ export function synthesizeChatJson(input: SynthesisInput): SynthesizedChat {
 
   // Build the assistant message with boltArtifact format
   const fileActions = input.files.map((f) => {
-    const escaped = f.content
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
+    const escaped = f.content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     return `<boltAction type="file" filePath="${f.path}">${escaped}</boltAction>`;
   });
 
   const planSummary = input.structurePlan
     ? `I've planned a ${input.files.length}-page website with the following structure:\n\n` +
-      JSON.stringify(input.structurePlan, null, 2).substring(0, 500) + '\n\n'
+      JSON.stringify(input.structurePlan, null, 2).substring(0, 500) +
+      '\n\n'
     : '';
 
   const assistantContent = [

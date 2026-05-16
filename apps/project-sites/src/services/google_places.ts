@@ -46,7 +46,12 @@ export async function lookupBusiness(
     if (!searchRes.ok) return null;
 
     const searchData = (await searchRes.json()) as {
-      results: Array<{ place_id: string; name: string; formatted_address: string; geometry: { location: { lat: number; lng: number } } }>;
+      results: Array<{
+        place_id: string;
+        name: string;
+        formatted_address: string;
+        geometry: { location: { lat: number; lng: number } };
+      }>;
       status: string;
     };
 
@@ -76,10 +81,20 @@ export async function lookupBusiness(
           weekday_text?: string[];
         };
         geometry?: { location: { lat: number; lng: number } };
-        photos?: Array<{ photo_reference: string; width: number; height: number; html_attributions: string[] }>;
+        photos?: Array<{
+          photo_reference: string;
+          width: number;
+          height: number;
+          html_attributions: string[];
+        }>;
         types?: string[];
         price_level?: number;
-        reviews?: Array<{ text: string; author_name: string; rating: number; relative_time_description: string }>;
+        reviews?: Array<{
+          text: string;
+          author_name: string;
+          rating: number;
+          relative_time_description: string;
+        }>;
         url?: string;
         business_status?: string;
       };
@@ -95,7 +110,13 @@ export async function lookupBusiness(
     if (d.opening_hours?.periods) {
       hours = DAY_NAMES.map((dayName, idx) => {
         const period = d.opening_hours!.periods!.find((p) => p.open.day === idx);
-        if (!period) return { day: dayName, open: null as string | null, close: null as string | null, closed: true };
+        if (!period)
+          return {
+            day: dayName,
+            open: null as string | null,
+            close: null as string | null,
+            closed: true,
+          };
         const openTime = formatTime(period.open.time);
         const closeTime = period.close ? formatTime(period.close.time) : null;
         return { day: dayName, open: openTime, close: closeTime, closed: false };
@@ -136,12 +157,14 @@ export async function lookupBusiness(
       business_status: d.business_status ?? null,
     };
   } catch (err) {
-    console.warn(JSON.stringify({
-      level: 'warn',
-      service: 'google_places',
-      message: 'Google Places lookup failed',
-      error: err instanceof Error ? err.message : String(err),
-    }));
+    console.warn(
+      JSON.stringify({
+        level: 'warn',
+        service: 'google_places',
+        message: 'Google Places lookup failed',
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
     return null;
   }
 }

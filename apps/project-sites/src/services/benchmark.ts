@@ -90,12 +90,15 @@ export function parseHtmlForFindings(html: string, siteUrl: string): Programmati
   const imageCount = (html.match(/<img\b/gi) || []).length;
   const imagesMissingAlt = (html.match(/<img\b(?![^>]*\balt=)[^>]*>/gi) || []).length;
   const h1Count = (html.match(/<h1\b/gi) || []).length;
-  const jsonLdBlocks = (html.match(/<script\b[^>]*type=["']application\/ld\+json["']/gi) || []).length;
+  const jsonLdBlocks = (html.match(/<script\b[^>]*type=["']application\/ld\+json["']/gi) || [])
+    .length;
 
   const titleMatch = html.match(/<title\b[^>]*>([^<]*)<\/title>/i);
   const titleLength = titleMatch ? titleMatch[1].trim().length : 0;
 
-  const metaDescMatch = html.match(/<meta\b[^>]*name=["']description["'][^>]*content=["']([^"']*)["']/i);
+  const metaDescMatch = html.match(
+    /<meta\b[^>]*name=["']description["'][^>]*content=["']([^"']*)["']/i,
+  );
   const metaDescriptionLength = metaDescMatch ? metaDescMatch[1].trim().length : 0;
 
   const hasColorScheme = /<meta\b[^>]*name=["']color-scheme["']/i.test(html);
@@ -192,7 +195,9 @@ export async function tierPsi(siteUrl: string, apiKey: string | undefined): Prom
   if (!res.ok) {
     throw new Error(`benchmark.psi_failed status=${res.status} url=${siteUrl}`);
   }
-  const body = (await res.json()) as { lighthouseResult?: { categories?: Record<string, { score: number | null }> } };
+  const body = (await res.json()) as {
+    lighthouseResult?: { categories?: Record<string, { score: number | null }> };
+  };
   const cats = body.lighthouseResult?.categories || {};
   return {
     performance: cats.performance?.score ?? null,
@@ -231,15 +236,21 @@ export async function runBenchmarks(args: {
   try {
     psi = await tierPsi(siteUrl, env.PAGESPEED_API_KEY);
   } catch (err) {
-    console.warn(JSON.stringify({
-      level: 'warn',
-      service: 'benchmark',
-      message: 'PSI tier failed, continuing without it',
-      error: err instanceof Error ? err.message : String(err),
-    }));
+    console.warn(
+      JSON.stringify({
+        level: 'warn',
+        service: 'benchmark',
+        message: 'PSI tier failed, continuing without it',
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
   }
 
-  const psiScores = psi ? [psi.performance, psi.accessibility, psi.seo, psi.bestPractices].filter((n): n is number => n !== null) : [];
+  const psiScores = psi
+    ? [psi.performance, psi.accessibility, psi.seo, psi.bestPractices].filter(
+        (n): n is number => n !== null,
+      )
+    : [];
   const allScores = [programmatic.score, ...psiScores];
   const meanScore = allScores.length ? allScores.reduce((a, b) => a + b, 0) / allScores.length : 0;
 

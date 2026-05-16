@@ -80,71 +80,191 @@ const WHEN_DOODY_CALLS_HTML = `
 
 // 16x16 PNG header (for tiny favicon simulation)
 const TINY_PNG_HEADER = new Uint8Array([
-  0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
-  0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, // IHDR chunk
-  0x00, 0x00, 0x00, 0x10, // width: 16
-  0x00, 0x00, 0x00, 0x10, // height: 16
-  0x08, 0x06, 0x00, 0x00, 0x00, // bit depth, color type
-  0x1F, 0x15, 0xC4, 0x89, // CRC
-  0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41, 0x54, // IDAT chunk
-  0x78, 0x9C, 0x62, 0x00, 0x00, 0x00, 0x02, 0x00,
-  0x01, 0xE5, 0x27, 0xDE, 0xFC, 0x00, 0x00, 0x00,
-  0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+  0x89,
+  0x50,
+  0x4e,
+  0x47,
+  0x0d,
+  0x0a,
+  0x1a,
+  0x0a, // PNG signature
+  0x00,
+  0x00,
+  0x00,
+  0x0d,
+  0x49,
+  0x48,
+  0x44,
+  0x52, // IHDR chunk
+  0x00,
+  0x00,
+  0x00,
+  0x10, // width: 16
+  0x00,
+  0x00,
+  0x00,
+  0x10, // height: 16
+  0x08,
+  0x06,
+  0x00,
+  0x00,
+  0x00, // bit depth, color type
+  0x1f,
+  0x15,
+  0xc4,
+  0x89, // CRC
+  0x00,
+  0x00,
+  0x00,
+  0x0a,
+  0x49,
+  0x44,
+  0x41,
+  0x54, // IDAT chunk
+  0x78,
+  0x9c,
+  0x62,
+  0x00,
+  0x00,
+  0x00,
+  0x02,
+  0x00,
+  0x01,
+  0xe5,
+  0x27,
+  0xde,
+  0xfc,
+  0x00,
+  0x00,
+  0x00,
+  0x00,
+  0x49,
+  0x45,
+  0x4e,
+  0x44,
+  0xae,
+  0x42,
+  0x60,
+  0x82,
 ]);
 
 // 800x300 PNG header (for banner simulation)
 const LARGE_PNG_HEADER = new Uint8Array([
-  0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
-  0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, // IHDR chunk
-  0x00, 0x00, 0x03, 0x20, // width: 800
-  0x00, 0x00, 0x01, 0x2C, // height: 300
-  0x08, 0x06, 0x00, 0x00, 0x00,
-  0x1F, 0x15, 0xC4, 0x89,
+  0x89,
+  0x50,
+  0x4e,
+  0x47,
+  0x0d,
+  0x0a,
+  0x1a,
+  0x0a, // PNG signature
+  0x00,
+  0x00,
+  0x00,
+  0x0d,
+  0x49,
+  0x48,
+  0x44,
+  0x52, // IHDR chunk
+  0x00,
+  0x00,
+  0x03,
+  0x20, // width: 800
+  0x00,
+  0x00,
+  0x01,
+  0x2c, // height: 300
+  0x08,
+  0x06,
+  0x00,
+  0x00,
+  0x00,
+  0x1f,
+  0x15,
+  0xc4,
+  0x89,
   // Pad to > 15000 bytes to pass size checks
   ...new Array(20000).fill(0),
 ]);
 
 // 256x256 PNG header (for Google favicon simulation)
 const MEDIUM_PNG_HEADER = new Uint8Array([
-  0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
-  0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
-  0x00, 0x00, 0x01, 0x00, // width: 256
-  0x00, 0x00, 0x01, 0x00, // height: 256
-  0x08, 0x06, 0x00, 0x00, 0x00,
-  0x1F, 0x15, 0xC4, 0x89,
+  0x89,
+  0x50,
+  0x4e,
+  0x47,
+  0x0d,
+  0x0a,
+  0x1a,
+  0x0a,
+  0x00,
+  0x00,
+  0x00,
+  0x0d,
+  0x49,
+  0x48,
+  0x44,
+  0x52,
+  0x00,
+  0x00,
+  0x01,
+  0x00, // width: 256
+  0x00,
+  0x00,
+  0x01,
+  0x00, // height: 256
+  0x08,
+  0x06,
+  0x00,
+  0x00,
+  0x00,
+  0x1f,
+  0x15,
+  0xc4,
+  0x89,
   ...new Array(5000).fill(0),
 ]);
 
 // GPT-4o vision quality response for a professional banner
 const VISION_QUALITY_BANNER = {
-  choices: [{
-    message: {
-      content: JSON.stringify({
-        quality_score: 55,
-        is_professional: false,
-        is_safe: true,
-        description: 'A banner image for When Doody Calls pet waste removal service showing their logo with a phone number overlay. Low resolution, dated design.',
-        recommendation: 'use_as_inspiration',
-        issues: ['Low resolution', 'Phone number overlaid on image', 'Dated design aesthetic'],
-      }),
+  choices: [
+    {
+      message: {
+        content: JSON.stringify({
+          quality_score: 55,
+          is_professional: false,
+          is_safe: true,
+          description:
+            'A banner image for When Doody Calls pet waste removal service showing their logo with a phone number overlay. Low resolution, dated design.',
+          recommendation: 'use_as_inspiration',
+          issues: ['Low resolution', 'Phone number overlaid on image', 'Dated design aesthetic'],
+        }),
+      },
     },
-  }],
+  ],
 };
 
 // GPT-4o vision quality response for the tiny favicon
 const VISION_QUALITY_FAVICON = {
-  choices: [{
-    message: {
-      content: JSON.stringify({
-        quality_score: 15,
-        is_professional: false,
-        is_safe: true,
-        description: 'Extremely small favicon, appears to be a simplified dog poop icon. Very pixelated at this size.',
-        recommendation: 'use_as_inspiration',
-        issues: ['Extremely low resolution (16x16)', 'Pixelated', 'Unprofessional at any display size'],
-      }),
+  choices: [
+    {
+      message: {
+        content: JSON.stringify({
+          quality_score: 15,
+          is_professional: false,
+          is_safe: true,
+          description:
+            'Extremely small favicon, appears to be a simplified dog poop icon. Very pixelated at this size.',
+          recommendation: 'use_as_inspiration',
+          issues: [
+            'Extremely low resolution (16x16)',
+            'Pixelated',
+            'Unprofessional at any display size',
+          ],
+        }),
+      },
     },
-  }],
+  ],
 };
 
 /**
@@ -188,7 +308,11 @@ function setupWhenDoodyCalls(): void {
     }
 
     // Standard favicon paths (404 — site doesn't have them)
-    if (urlStr.includes('apple-touch-icon.png') || urlStr.includes('favicon-32x32.png') || urlStr.match(/\/favicon\.(png|ico)$/)) {
+    if (
+      urlStr.includes('apple-touch-icon.png') ||
+      urlStr.includes('favicon-32x32.png') ||
+      urlStr.match(/\/favicon\.(png|ico)$/)
+    ) {
       return new Response('Not Found', { status: 404 });
     }
 
@@ -214,17 +338,29 @@ function setupWhenDoodyCalls(): void {
     // Google CSE search — return the Web_Banner3.jpg as the only real result
     if (urlStr.includes('googleapis.com/customsearch')) {
       // Only return results for queries about the business's own domain
-      if (urlStr.includes('site%3Awhendoodycalls.com') || urlStr.includes('When+Doody+Calls') || urlStr.includes('When%20Doody%20Calls')) {
-        return new Response(JSON.stringify({
-          items: [{
-            link: 'https://whendoodycalls.com/wp-content/uploads/2017/02/Web_Banner3.jpg',
-            title: 'When Doody Calls Banner',
-            displayLink: 'whendoodycalls.com',
-            image: { width: 800, height: 300 },
-          }],
-        }), { status: 200, headers: { 'content-type': 'application/json' } });
+      if (
+        urlStr.includes('site%3Awhendoodycalls.com') ||
+        urlStr.includes('When+Doody+Calls') ||
+        urlStr.includes('When%20Doody%20Calls')
+      ) {
+        return new Response(
+          JSON.stringify({
+            items: [
+              {
+                link: 'https://whendoodycalls.com/wp-content/uploads/2017/02/Web_Banner3.jpg',
+                title: 'When Doody Calls Banner',
+                displayLink: 'whendoodycalls.com',
+                image: { width: 800, height: 300 },
+              },
+            ],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
       }
-      return new Response(JSON.stringify({ items: [] }), { status: 200, headers: { 'content-type': 'application/json' } });
+      return new Response(JSON.stringify({ items: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
     }
 
     // OpenAI GPT-4o vision calls
@@ -380,7 +516,9 @@ describe('POST /api/ai/discover-images', () => {
       // Brand assessment should exist
       expect(body.data.brand_assessment).not.toBeNull();
       expect(body.data.brand_assessment.brand_maturity).toBeDefined();
-      expect(['established', 'developing', 'minimal']).toContain(body.data.brand_assessment.brand_maturity);
+      expect(['established', 'developing', 'minimal']).toContain(
+        body.data.brand_assessment.brand_maturity,
+      );
       expect(body.data.brand_assessment.website_quality_score).toBeDefined();
       expect(typeof body.data.brand_assessment.website_quality_score).toBe('number');
       expect(body.data.brand_assessment.recommendation).toBeTruthy();
@@ -391,25 +529,31 @@ describe('POST /api/ai/discover-images', () => {
       const originalImpl = mockFetch.getMockImplementation();
       let visionCallCount = 0;
       mockFetch.mockImplementation(async (url: string | URL | Request, init?: RequestInit) => {
-        const urlStr = typeof url === 'string' ? url : url instanceof URL ? url.toString() : url.url;
+        const urlStr =
+          typeof url === 'string' ? url : url instanceof URL ? url.toString() : url.url;
         if (urlStr.includes('api.openai.com/v1/chat/completions')) {
           visionCallCount++;
           // Make the 3rd vision call return "unsafe"
           if (visionCallCount === 3) {
-            return new Response(JSON.stringify({
-              choices: [{
-                message: {
-                  content: JSON.stringify({
-                    quality_score: 10,
-                    is_professional: false,
-                    is_safe: false,
-                    description: 'Inappropriate content detected',
-                    recommendation: 'reject',
-                    issues: ['Content safety violation'],
-                  }),
-                },
-              }],
-            }), { status: 200, headers: { 'content-type': 'application/json' } });
+            return new Response(
+              JSON.stringify({
+                choices: [
+                  {
+                    message: {
+                      content: JSON.stringify({
+                        quality_score: 10,
+                        is_professional: false,
+                        is_safe: false,
+                        description: 'Inappropriate content detected',
+                        recommendation: 'reject',
+                        issues: ['Content safety violation'],
+                      }),
+                    },
+                  },
+                ],
+              }),
+              { status: 200, headers: { 'content-type': 'application/json' } },
+            );
           }
         }
         // Fall through to original
@@ -440,25 +584,56 @@ describe('POST /api/ai/discover-images', () => {
   describe('Image dimension validation', () => {
     it('rejects sub-64px favicons from website scraping', async () => {
       mockFetch.mockImplementation(async (url: string | URL | Request) => {
-        const urlStr = typeof url === 'string' ? url : url instanceof URL ? url.toString() : url.url;
+        const urlStr =
+          typeof url === 'string' ? url : url instanceof URL ? url.toString() : url.url;
 
         if (urlStr === 'https://example.com') {
-          return new Response(`
+          return new Response(
+            `
             <html><head>
               <link rel="icon" href="/small-icon.png" sizes="32x32">
             </head><body></body></html>
-          `, { status: 200, headers: { 'content-type': 'text/html' } });
+          `,
+            { status: 200, headers: { 'content-type': 'text/html' } },
+          );
         }
 
         // 32x32 icon
         if (urlStr.includes('small-icon.png')) {
           const buf = new Uint8Array([
-            0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
-            0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
-            0x00, 0x00, 0x00, 0x20, // width: 32
-            0x00, 0x00, 0x00, 0x20, // height: 32
-            0x08, 0x06, 0x00, 0x00, 0x00,
-            0x1F, 0x15, 0xC4, 0x89,
+            0x89,
+            0x50,
+            0x4e,
+            0x47,
+            0x0d,
+            0x0a,
+            0x1a,
+            0x0a,
+            0x00,
+            0x00,
+            0x00,
+            0x0d,
+            0x49,
+            0x48,
+            0x44,
+            0x52,
+            0x00,
+            0x00,
+            0x00,
+            0x20, // width: 32
+            0x00,
+            0x00,
+            0x00,
+            0x20, // height: 32
+            0x08,
+            0x06,
+            0x00,
+            0x00,
+            0x00,
+            0x1f,
+            0x15,
+            0xc4,
+            0x89,
             ...new Array(500).fill(0),
           ]);
           return new Response(buf.buffer, {
@@ -476,23 +651,34 @@ describe('POST /api/ai/discover-images', () => {
         if (urlStr.includes('faviconV2')) {
           return new Response(MEDIUM_PNG_HEADER.buffer, {
             status: 200,
-            headers: { 'content-type': 'image/png', 'content-length': String(MEDIUM_PNG_HEADER.byteLength) },
+            headers: {
+              'content-type': 'image/png',
+              'content-length': String(MEDIUM_PNG_HEADER.byteLength),
+            },
           });
         }
 
         return new Response('Not Found', { status: 404 });
       });
 
-      const envWithoutOpenai = { ...mockEnv, OPENAI_API_KEY: undefined, GOOGLE_CSE_KEY: undefined } as unknown as Env;
+      const envWithoutOpenai = {
+        ...mockEnv,
+        OPENAI_API_KEY: undefined,
+        GOOGLE_CSE_KEY: undefined,
+      } as unknown as Env;
       const appNoVision = new Hono<{ Bindings: Env; Variables: Variables }>();
       appNoVision.onError(errorHandler);
       appNoVision.route('/', search);
 
-      const res = await appNoVision.request('/api/ai/discover-images', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'Test Biz', website: 'https://example.com' }),
-      }, envWithoutOpenai);
+      const res = await appNoVision.request(
+        '/api/ai/discover-images',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'Test Biz', website: 'https://example.com' }),
+        },
+        envWithoutOpenai,
+      );
 
       expect(res.status).toBe(200);
       const body = await res.json();
@@ -510,17 +696,21 @@ describe('POST /api/ai/discover-images', () => {
   describe('Homepage image scraping', () => {
     it('discovers large <img> tags from the business homepage', async () => {
       mockFetch.mockImplementation(async (url: string | URL | Request, init?: RequestInit) => {
-        const urlStr = typeof url === 'string' ? url : url instanceof URL ? url.toString() : url.url;
+        const urlStr =
+          typeof url === 'string' ? url : url instanceof URL ? url.toString() : url.url;
 
         if (urlStr === 'https://example-biz.com') {
-          return new Response(`
+          return new Response(
+            `
             <html><head><title>Example Biz</title></head><body>
               <img src="/hero-banner.jpg" width="1200" height="600" alt="Hero" />
               <img src="/team-photo.jpg" width="800" height="500" alt="Team" />
               <img src="/tiny-icon.png" width="24" height="24" alt="Icon" />
               <img src="/spacer.gif" width="1" height="1" alt="" />
             </body></html>
-          `, { status: 200, headers: { 'content-type': 'text/html' } });
+          `,
+            { status: 200, headers: { 'content-type': 'text/html' } },
+          );
         }
 
         // Large images — return valid dimensions
@@ -528,12 +718,39 @@ describe('POST /api/ai/discover-images', () => {
           const w = urlStr.includes('hero') ? 1200 : 800;
           const h = urlStr.includes('hero') ? 600 : 500;
           const buf = new Uint8Array([
-            0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
-            0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
-            (w >> 24) & 0xFF, (w >> 16) & 0xFF, (w >> 8) & 0xFF, w & 0xFF,
-            (h >> 24) & 0xFF, (h >> 16) & 0xFF, (h >> 8) & 0xFF, h & 0xFF,
-            0x08, 0x06, 0x00, 0x00, 0x00,
-            0x1F, 0x15, 0xC4, 0x89,
+            0x89,
+            0x50,
+            0x4e,
+            0x47,
+            0x0d,
+            0x0a,
+            0x1a,
+            0x0a,
+            0x00,
+            0x00,
+            0x00,
+            0x0d,
+            0x49,
+            0x48,
+            0x44,
+            0x52,
+            (w >> 24) & 0xff,
+            (w >> 16) & 0xff,
+            (w >> 8) & 0xff,
+            w & 0xff,
+            (h >> 24) & 0xff,
+            (h >> 16) & 0xff,
+            (h >> 8) & 0xff,
+            h & 0xff,
+            0x08,
+            0x06,
+            0x00,
+            0x00,
+            0x00,
+            0x1f,
+            0x15,
+            0xc4,
+            0x89,
             ...new Array(20000).fill(0),
           ]);
           return new Response(buf.buffer, {
@@ -557,20 +774,25 @@ describe('POST /api/ai/discover-images', () => {
 
         // Vision API — return good scores
         if (urlStr.includes('api.openai.com')) {
-          return new Response(JSON.stringify({
-            choices: [{
-              message: {
-                content: JSON.stringify({
-                  quality_score: 80,
-                  is_professional: true,
-                  is_safe: true,
-                  description: 'Professional business photo',
-                  recommendation: 'use_as_is',
-                  issues: [],
-                }),
-              },
-            }],
-          }), { status: 200, headers: { 'content-type': 'application/json' } });
+          return new Response(
+            JSON.stringify({
+              choices: [
+                {
+                  message: {
+                    content: JSON.stringify({
+                      quality_score: 80,
+                      is_professional: true,
+                      is_safe: true,
+                      description: 'Professional business photo',
+                      recommendation: 'use_as_is',
+                      issues: [],
+                    }),
+                  },
+                },
+              ],
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } },
+          );
         }
 
         return new Response('Not Found', { status: 404 });
@@ -581,11 +803,15 @@ describe('POST /api/ai/discover-images', () => {
       appNoCSE.onError(errorHandler);
       appNoCSE.route('/', search);
 
-      const res = await appNoCSE.request('/api/ai/discover-images', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'Example Biz', website: 'https://example-biz.com' }),
-      }, envNoCSE);
+      const res = await appNoCSE.request(
+        '/api/ai/discover-images',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'Example Biz', website: 'https://example-biz.com' }),
+        },
+        envNoCSE,
+      );
 
       expect(res.status).toBe(200);
       const body = await res.json();
@@ -600,7 +826,9 @@ describe('POST /api/ai/discover-images', () => {
       expect(imageUrls.some((u: string) => u.includes('spacer.gif'))).toBe(false);
 
       // Images from website scraping should have source 'website-img'
-      const scrapedImages = body.data.images.filter((img: { source: string }) => img.source === 'website-img');
+      const scrapedImages = body.data.images.filter(
+        (img: { source: string }) => img.source === 'website-img',
+      );
       expect(scrapedImages.length).toBeGreaterThanOrEqual(2);
     });
   });

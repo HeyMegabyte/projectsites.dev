@@ -101,14 +101,16 @@ function recordFailure(provider: 'openai' | 'anthropic'): void {
 
   if (state.failures >= CIRCUIT_FAILURE_THRESHOLD) {
     state.openUntil = now + CIRCUIT_OPEN_DURATION_MS;
-    console.warn(JSON.stringify({
-      level: 'warn',
-      service: 'external_llm',
-      event: 'circuit_open',
-      provider,
-      open_until: new Date(state.openUntil).toISOString(),
-      message: `Circuit breaker opened for ${provider} after ${state.failures} failures`,
-    }));
+    console.warn(
+      JSON.stringify({
+        level: 'warn',
+        service: 'external_llm',
+        event: 'circuit_open',
+        provider,
+        open_until: new Date(state.openUntil).toISOString(),
+        message: `Circuit breaker opened for ${provider} after ${state.failures} failures`,
+      }),
+    );
   }
 }
 
@@ -131,13 +133,16 @@ function recordSuccess(provider: 'openai' | 'anthropic'): void {
  * The old A/B split randomness has been removed. OpenAI is deterministically
  * primary because GPT-4o provides better vision and research results.
  */
-function chooseProvider(env: Env, preference?: 'openai' | 'anthropic' | 'auto'): 'openai' | 'anthropic' {
+function chooseProvider(
+  env: Env,
+  preference?: 'openai' | 'anthropic' | 'auto',
+): 'openai' | 'anthropic' {
   if (preference === 'openai') return 'openai';
   if (preference === 'anthropic') return 'anthropic';
 
   // GPT-4o is always primary (no more A/B split)
-  const hasOpenAI = !!(env.OPENAI_API_KEY);
-  const hasAnthropic = !!(env.ANTHROPIC_API_KEY);
+  const hasOpenAI = !!env.OPENAI_API_KEY;
+  const hasAnthropic = !!env.ANTHROPIC_API_KEY;
 
   if (hasOpenAI) return 'openai';
   if (hasAnthropic) return 'anthropic';
@@ -188,7 +193,7 @@ async function callOpenAI(
     res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
@@ -203,7 +208,7 @@ async function callOpenAI(
     throw new Error(`OpenAI API error ${res.status}: ${text}`);
   }
 
-  const data = await res.json() as {
+  const data = (await res.json()) as {
     choices: Array<{ message: { content: string } }>;
     usage?: { total_tokens: number };
   };
@@ -226,9 +231,7 @@ async function callAnthropic(
   const body: Record<string, unknown> = {
     model,
     system: options.system,
-    messages: messages ?? [
-      { role: 'user', content: options.user },
-    ],
+    messages: messages ?? [{ role: 'user', content: options.user }],
     temperature: options.temperature ?? 0.3,
     max_tokens: options.maxTokens ?? 8192,
   };
@@ -258,7 +261,7 @@ async function callAnthropic(
     throw new Error(`Anthropic API error ${res.status}: ${text}`);
   }
 
-  const data = await res.json() as {
+  const data = (await res.json()) as {
     content: Array<{ type: string; text?: string }>;
     usage?: { input_tokens: number; output_tokens: number };
   };
@@ -328,19 +331,20 @@ export async function callExternalLLM(
   for (const provider of providers) {
     // Circuit breaker: skip provider if circuit is open
     if (isCircuitOpen(provider)) {
-      console.warn(JSON.stringify({
-        level: 'info',
-        service: 'external_llm',
-        event: 'circuit_open_skip',
-        provider,
-        message: `Skipping ${provider} — circuit breaker is open`,
-      }));
+      console.warn(
+        JSON.stringify({
+          level: 'info',
+          service: 'external_llm',
+          event: 'circuit_open_skip',
+          provider,
+          message: `Skipping ${provider} — circuit breaker is open`,
+        }),
+      );
       continue;
     }
 
-    const apiKey = provider === 'openai'
-      ? env.OPENAI_API_KEY
-      : env.ANTHROPIC_API_KEY as string | undefined;
+    const apiKey =
+      provider === 'openai' ? env.OPENAI_API_KEY : (env.ANTHROPIC_API_KEY as string | undefined);
 
     if (!apiKey) continue;
 
@@ -349,24 +353,27 @@ export async function callExternalLLM(
 
     try {
       const result = await withRetry(
-        () => provider === 'openai'
-          ? callOpenAI(apiKey, model, options)
-          : callAnthropic(apiKey, model, options),
+        () =>
+          provider === 'openai'
+            ? callOpenAI(apiKey, model, options)
+            : callAnthropic(apiKey, model, options),
         {
           maxRetries: 3,
           baseDelayMs: 1000,
           onRetry: (attempt, err, delayMs) => {
-            console.warn(JSON.stringify({
-              level: 'warn',
-              service: 'external_llm',
-              event: 'retry',
-              provider,
-              model,
-              attempt,
-              delay_ms: delayMs,
-              error_category: classifyError(err),
-              error: err instanceof Error ? err.message : String(err),
-            }));
+            console.warn(
+              JSON.stringify({
+                level: 'warn',
+                service: 'external_llm',
+                event: 'retry',
+                provider,
+                model,
+                attempt,
+                delay_ms: delayMs,
+                error_category: classifyError(err),
+                error: err instanceof Error ? err.message : String(err),
+              }),
+            );
           },
         },
       );
@@ -374,16 +381,18 @@ export async function callExternalLLM(
       const latency = Date.now() - start;
       recordSuccess(provider);
 
-      console.warn(JSON.stringify({
-        level: 'info',
-        service: 'external_llm',
-        event: 'call_success',
-        provider,
-        model,
-        latency_ms: latency,
-        tokens: result.tokens,
-        output_length: result.text.length,
-      }));
+      console.warn(
+        JSON.stringify({
+          level: 'info',
+          service: 'external_llm',
+          event: 'call_success',
+          provider,
+          model,
+          latency_ms: latency,
+          tokens: result.tokens,
+          output_length: result.text.length,
+        }),
+      );
 
       return {
         output: result.text,
@@ -398,19 +407,22 @@ export async function callExternalLLM(
       const errorCategory = classifyError(err);
       recordFailure(provider);
 
-      console.warn(JSON.stringify({
-        level: 'warn',
-        service: 'external_llm',
-        event: 'provider_exhausted',
-        provider,
-        model,
-        latency_ms: latency,
-        error_category: errorCategory,
-        error: err instanceof Error ? err.message : String(err),
-        message: provider === fallback
-          ? `Both providers failed`
-          : `${provider} failed after retries, trying ${fallback}`,
-      }));
+      console.warn(
+        JSON.stringify({
+          level: 'warn',
+          service: 'external_llm',
+          event: 'provider_exhausted',
+          provider,
+          model,
+          latency_ms: latency,
+          error_category: errorCategory,
+          error: err instanceof Error ? err.message : String(err),
+          message:
+            provider === fallback
+              ? `Both providers failed`
+              : `${provider} failed after retries, trying ${fallback}`,
+        }),
+      );
 
       // If this is the fallback too, rethrow
       if (provider === fallback) throw err;
@@ -463,19 +475,20 @@ export async function callExternalLLMWithVision(
 
   for (const provider of providers) {
     if (isCircuitOpen(provider)) {
-      console.warn(JSON.stringify({
-        level: 'info',
-        service: 'external_llm',
-        event: 'circuit_open_skip_vision',
-        provider,
-        message: `Skipping ${provider} vision — circuit breaker is open`,
-      }));
+      console.warn(
+        JSON.stringify({
+          level: 'info',
+          service: 'external_llm',
+          event: 'circuit_open_skip_vision',
+          provider,
+          message: `Skipping ${provider} vision — circuit breaker is open`,
+        }),
+      );
       continue;
     }
 
-    const apiKey = provider === 'openai'
-      ? env.OPENAI_API_KEY
-      : env.ANTHROPIC_API_KEY as string | undefined;
+    const apiKey =
+      provider === 'openai' ? env.OPENAI_API_KEY : (env.ANTHROPIC_API_KEY as string | undefined);
 
     if (!apiKey) continue;
 
@@ -494,17 +507,19 @@ export async function callExternalLLMWithVision(
           maxRetries: 3,
           baseDelayMs: 1000,
           onRetry: (attempt, err, delayMs) => {
-            console.warn(JSON.stringify({
-              level: 'warn',
-              service: 'external_llm',
-              event: 'retry_vision',
-              provider,
-              model,
-              attempt,
-              delay_ms: delayMs,
-              error_category: classifyError(err),
-              error: err instanceof Error ? err.message : String(err),
-            }));
+            console.warn(
+              JSON.stringify({
+                level: 'warn',
+                service: 'external_llm',
+                event: 'retry_vision',
+                provider,
+                model,
+                attempt,
+                delay_ms: delayMs,
+                error_category: classifyError(err),
+                error: err instanceof Error ? err.message : String(err),
+              }),
+            );
           },
         },
       );
@@ -512,16 +527,18 @@ export async function callExternalLLMWithVision(
       const latency = Date.now() - start;
       recordSuccess(provider);
 
-      console.warn(JSON.stringify({
-        level: 'info',
-        service: 'external_llm',
-        event: 'vision_call_success',
-        provider,
-        model,
-        latency_ms: latency,
-        tokens: result.tokens,
-        output_length: result.text.length,
-      }));
+      console.warn(
+        JSON.stringify({
+          level: 'info',
+          service: 'external_llm',
+          event: 'vision_call_success',
+          provider,
+          model,
+          latency_ms: latency,
+          tokens: result.tokens,
+          output_length: result.text.length,
+        }),
+      );
 
       return {
         output: result.text,
@@ -536,19 +553,22 @@ export async function callExternalLLMWithVision(
       const errorCategory = classifyError(err);
       recordFailure(provider);
 
-      console.warn(JSON.stringify({
-        level: 'warn',
-        service: 'external_llm',
-        event: 'vision_provider_exhausted',
-        provider,
-        model,
-        latency_ms: latency,
-        error_category: errorCategory,
-        error: err instanceof Error ? err.message : String(err),
-        message: provider === fallback
-          ? `Both vision providers failed`
-          : `${provider} vision failed after retries, trying ${fallback}`,
-      }));
+      console.warn(
+        JSON.stringify({
+          level: 'warn',
+          service: 'external_llm',
+          event: 'vision_provider_exhausted',
+          provider,
+          model,
+          latency_ms: latency,
+          error_category: errorCategory,
+          error: err instanceof Error ? err.message : String(err),
+          message:
+            provider === fallback
+              ? `Both vision providers failed`
+              : `${provider} vision failed after retries, trying ${fallback}`,
+        }),
+      );
 
       if (provider === fallback) throw err;
     }
@@ -569,16 +589,16 @@ async function callOpenAIWithVision(
 ): Promise<{ text: string; tokens: number }> {
   const imageContent: Record<string, unknown> = options.imageUrl
     ? { type: 'image_url', image_url: { url: options.imageUrl, detail: 'high' } }
-    : { type: 'image_url', image_url: { url: `data:image/png;base64,${options.imageBase64}`, detail: 'high' } };
+    : {
+        type: 'image_url',
+        image_url: { url: `data:image/png;base64,${options.imageBase64}`, detail: 'high' },
+      };
 
   const messages = [
     { role: 'system', content: options.system },
     {
       role: 'user',
-      content: [
-        { type: 'text', text: options.user },
-        imageContent,
-      ],
+      content: [{ type: 'text', text: options.user }, imageContent],
     },
   ];
 

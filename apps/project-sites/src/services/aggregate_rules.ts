@@ -51,7 +51,8 @@ const MIN_CONFIDENCE = 0.85;
 export function parseRetrospective(markdown: string, source: string): ExtractedPattern[] {
   const patterns: ExtractedPattern[] = [];
 
-  const slashRe = /\*\*Trigger:\*\*\s*([^/\n]+?)\s*\/\s*\*\*Mitigation:\*\*\s*([^/\n]+?)\s*\/\s*\*\*Confidence:\*\*\s*([0-9.]+)/gi;
+  const slashRe =
+    /\*\*Trigger:\*\*\s*([^/\n]+?)\s*\/\s*\*\*Mitigation:\*\*\s*([^/\n]+?)\s*\/\s*\*\*Confidence:\*\*\s*([0-9.]+)/gi;
   let m;
   while ((m = slashRe.exec(markdown)) !== null) {
     const conf = Number.parseFloat(m[3]);
@@ -66,13 +67,20 @@ export function parseRetrospective(markdown: string, source: string): ExtractedP
   }
 
   if (patterns.length === 0) {
-    const blockRe = /\*\*Trigger:\*\*\s*([\s\S]+?)\s*\*\*Mitigation:\*\*\s*([\s\S]+?)\s*\*\*Confidence:\*\*\s*([0-9.]+)/gi;
+    const blockRe =
+      /\*\*Trigger:\*\*\s*([\s\S]+?)\s*\*\*Mitigation:\*\*\s*([\s\S]+?)\s*\*\*Confidence:\*\*\s*([0-9.]+)/gi;
     while ((m = blockRe.exec(markdown)) !== null) {
       const conf = Number.parseFloat(m[3]);
       if (Number.isFinite(conf)) {
         patterns.push({
-          trigger: m[1].replace(/\n+/g, ' ').replace(/^[-\s]+|[-\s]+$/g, '').trim(),
-          mitigation: m[2].replace(/\n+/g, ' ').replace(/^[-\s]+|[-\s]+$/g, '').trim(),
+          trigger: m[1]
+            .replace(/\n+/g, ' ')
+            .replace(/^[-\s]+|[-\s]+$/g, '')
+            .trim(),
+          mitigation: m[2]
+            .replace(/\n+/g, ' ')
+            .replace(/^[-\s]+|[-\s]+$/g, '')
+            .trim(),
           confidence: conf,
           source,
         });
@@ -85,11 +93,13 @@ export function parseRetrospective(markdown: string, source: string): ExtractedP
 
 /** Slug-ish id from trigger text — lowercase alphanumerics + hyphens, max 60 chars. */
 export function ruleIdFromTrigger(trigger: string): string {
-  return trigger
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 60) || 'unnamed-rule';
+  return (
+    trigger
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 60) || 'unnamed-rule'
+  );
 }
 
 /**
@@ -105,9 +115,12 @@ export async function clusterPatterns(
 ): Promise<CandidateRule[]> {
   if (patterns.length === 0) return [];
 
-  const lines = patterns.map((p, i) =>
-    `${i + 1}. trigger="${p.trigger}" mitigation="${p.mitigation}" confidence=${p.confidence.toFixed(2)} source=${p.source}`,
-  ).join('\n');
+  const lines = patterns
+    .map(
+      (p, i) =>
+        `${i + 1}. trigger="${p.trigger}" mitigation="${p.mitigation}" confidence=${p.confidence.toFixed(2)} source=${p.source}`,
+    )
+    .join('\n');
 
   const prompt = [
     'Below are extracted Trigger/Mitigation pairs from per-build retrospectives.',
@@ -141,7 +154,9 @@ export async function clusterPatterns(
 
   const candidates: CandidateRule[] = [];
   for (const cluster of parsed.clusters) {
-    const indices = (cluster.patternIndices || []).filter((i): i is number => Number.isInteger(i) && i >= 1 && i <= patterns.length);
+    const indices = (cluster.patternIndices || []).filter(
+      (i): i is number => Number.isInteger(i) && i >= 1 && i <= patterns.length,
+    );
     if (indices.length < 2) continue;
 
     const matched = indices.map((i) => patterns[i - 1]);
@@ -208,8 +223,12 @@ export async function aggregateRules(args: {
   }
 
   const allCandidates = await clusterPatterns(env, allPatterns);
-  const promoted = allCandidates.filter((c) => c.evidence >= minEvidence && c.confidence >= minConfidence);
-  const accumulating = allCandidates.filter((c) => !(c.evidence >= minEvidence && c.confidence >= minConfidence));
+  const promoted = allCandidates.filter(
+    (c) => c.evidence >= minEvidence && c.confidence >= minConfidence,
+  );
+  const accumulating = allCandidates.filter(
+    (c) => !(c.evidence >= minEvidence && c.confidence >= minConfidence),
+  );
 
   return {
     candidates: promoted,
@@ -227,21 +246,32 @@ export async function aggregateRules(args: {
 export function renderRulesMarkdown(result: AggregateResult): string {
   const today = new Date().toISOString().slice(0, 10);
 
-  const activeBlock = result.candidates.length === 0
-    ? '_No promoted rules yet. Patterns are still accumulating evidence._'
-    : result.candidates.map((c) => [
-        `### ${c.id}`,
-        `- **Trigger:** ${c.trigger}`,
-        `- **Mitigation:** ${c.mitigation}`,
-        `- **Evidence:** ${c.evidence} retrospectives`,
-        `- **Confidence:** ${c.confidence.toFixed(2)}`,
-        `- **First seen:** ${c.firstSeen}`,
-        `- **Sources:** ${c.sources.slice(0, 3).join(', ')}${c.sources.length > 3 ? ` (+${c.sources.length - 3} more)` : ''}`,
-      ].join('\n')).join('\n\n');
+  const activeBlock =
+    result.candidates.length === 0
+      ? '_No promoted rules yet. Patterns are still accumulating evidence._'
+      : result.candidates
+          .map((c) =>
+            [
+              `### ${c.id}`,
+              `- **Trigger:** ${c.trigger}`,
+              `- **Mitigation:** ${c.mitigation}`,
+              `- **Evidence:** ${c.evidence} retrospectives`,
+              `- **Confidence:** ${c.confidence.toFixed(2)}`,
+              `- **First seen:** ${c.firstSeen}`,
+              `- **Sources:** ${c.sources.slice(0, 3).join(', ')}${c.sources.length > 3 ? ` (+${c.sources.length - 3} more)` : ''}`,
+            ].join('\n'),
+          )
+          .join('\n\n');
 
-  const retiredBlock = result.retired.length === 0
-    ? '_No rules retired this cycle._'
-    : result.retired.map((c) => `### ${c.id}\n- **Trigger:** ${c.trigger}\n- **Reason retired:** Disproven by later evidence`).join('\n\n');
+  const retiredBlock =
+    result.retired.length === 0
+      ? '_No rules retired this cycle._'
+      : result.retired
+          .map(
+            (c) =>
+              `### ${c.id}\n- **Trigger:** ${c.trigger}\n- **Reason retired:** Disproven by later evidence`,
+          )
+          .join('\n\n');
 
   return [
     '---',

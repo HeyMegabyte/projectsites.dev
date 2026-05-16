@@ -21,14 +21,16 @@ describe('extractJsonFromText', () => {
   });
 
   it('extracts JSON preceded by explanatory text', () => {
-    const input = 'Based on the information provided, here is the result:\n\n{"business_type": "restaurant", "description": "A fine dining establishment"}';
+    const input =
+      'Based on the information provided, here is the result:\n\n{"business_type": "restaurant", "description": "A fine dining establishment"}';
     const result = extractJsonFromText(input) as Record<string, unknown>;
     expect(result.business_type).toBe('restaurant');
     expect(result.description).toBe('A fine dining establishment');
   });
 
   it('extracts JSON from markdown code fences', () => {
-    const input = 'Here is the output:\n\n```json\n{"score": 85, "issues": []}\n```\n\nLet me know if you need more.';
+    const input =
+      'Here is the output:\n\n```json\n{"score": 85, "issues": []}\n```\n\nLet me know if you need more.';
     const result = extractJsonFromText(input) as Record<string, unknown>;
     expect(result.score).toBe(85);
     expect(result.issues).toEqual([]);
@@ -82,7 +84,8 @@ describe('extractJsonFromText', () => {
   });
 
   it('handles the exact error case: "Based on t..." prefix', () => {
-    const input = 'Based on the business information provided, here is the research profile:\n\n{"business_type": "local_service", "description": "Express delivery service", "services": [{"name": "delivery"}], "email": null, "address": {"street": "123 Main St", "city": "Springfield", "state": "IL", "zip": "62701"}}';
+    const input =
+      'Based on the business information provided, here is the research profile:\n\n{"business_type": "local_service", "description": "Express delivery service", "services": [{"name": "delivery"}], "email": null, "address": {"street": "123 Main St", "city": "Springfield", "state": "IL", "zip": "62701"}}';
     const result = extractJsonFromText(input) as Record<string, unknown>;
     expect(result.business_type).toBe('local_service');
   });

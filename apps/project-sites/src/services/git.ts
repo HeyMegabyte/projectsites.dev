@@ -232,11 +232,9 @@ export async function createSnapshot(
   await Promise.all(uploads);
 
   // Store commit metadata
-  await bucket.put(
-    `${prefix}commits/${id}.json`,
-    JSON.stringify(commit, null, 2),
-    { httpMetadata: { contentType: 'application/json' } },
-  );
+  await bucket.put(`${prefix}commits/${id}.json`, JSON.stringify(commit, null, 2), {
+    httpMetadata: { contentType: 'application/json' },
+  });
 
   // Update HEAD
   await bucket.put(`${prefix}HEAD`, id);
@@ -533,10 +531,7 @@ export async function diffSnapshots(
  * }
  * ```
  */
-export async function getHead(
-  bucket: R2Bucket,
-  slug: string,
-): Promise<string | null> {
+export async function getHead(bucket: R2Bucket, slug: string): Promise<string | null> {
   try {
     const obj = await bucket.get(`${gitPrefix(slug)}HEAD`);
     if (!obj) return null;

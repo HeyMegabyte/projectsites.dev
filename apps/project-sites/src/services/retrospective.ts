@@ -90,7 +90,8 @@ export async function buildRetrospective(args: {
   let llmFindings = '';
   try {
     const llm = await callExternalLLM(env, {
-      system: 'You are a senior web engineer reviewing a site build. Identify 1-3 specific, actionable patterns worth encoding as rules. Be concrete. No fluff.',
+      system:
+        'You are a senior web engineer reviewing a site build. Identify 1-3 specific, actionable patterns worth encoding as rules. Be concrete. No fluff.',
       user: prompt,
       maxTokens: 1200,
       provider: 'anthropic',
@@ -110,19 +111,25 @@ export async function buildRetrospective(args: {
 export function renderRetroPrompt(current: BenchmarkResult, priors: PriorBenchmark[]): string {
   const priorRows = priors
     .slice(0, 10)
-    .map((p) => `- ${p.run_at} ${p.slug}: mean=${(p.mean_score ?? 0).toFixed(2)} prog=${(p.score_programmatic ?? 0).toFixed(2)} perf=${(p.score_perf ?? 0).toFixed(2)} a11y=${(p.score_a11y ?? 0).toFixed(2)} seo=${(p.score_seo ?? 0).toFixed(2)}`)
+    .map(
+      (p) =>
+        `- ${p.run_at} ${p.slug}: mean=${(p.mean_score ?? 0).toFixed(2)} prog=${(p.score_programmatic ?? 0).toFixed(2)} perf=${(p.score_perf ?? 0).toFixed(2)} a11y=${(p.score_a11y ?? 0).toFixed(2)} seo=${(p.score_seo ?? 0).toFixed(2)}`,
+    )
     .join('\n');
 
   const findings = current.programmatic;
   const issues: string[] = [];
   if (findings.h1Count !== 1) issues.push(`h1Count=${findings.h1Count} (target: 1)`);
   if (findings.jsonLdBlocks < 4) issues.push(`jsonLdBlocks=${findings.jsonLdBlocks} (target: >=4)`);
-  if (findings.titleLength < 50 || findings.titleLength > 60) issues.push(`titleLength=${findings.titleLength} (target: 50-60)`);
-  if (findings.metaDescriptionLength < 120 || findings.metaDescriptionLength > 156) issues.push(`metaDescriptionLength=${findings.metaDescriptionLength} (target: 120-156)`);
+  if (findings.titleLength < 50 || findings.titleLength > 60)
+    issues.push(`titleLength=${findings.titleLength} (target: 50-60)`);
+  if (findings.metaDescriptionLength < 120 || findings.metaDescriptionLength > 156)
+    issues.push(`metaDescriptionLength=${findings.metaDescriptionLength} (target: 120-156)`);
   if (!findings.hasColorScheme) issues.push('color-scheme meta missing');
   if (findings.imagesMissingAlt > 0) issues.push(`imagesMissingAlt=${findings.imagesMissingAlt}`);
   if (findings.imageCount < 10) issues.push(`imageCount=${findings.imageCount} (target: >=10)`);
-  if (findings.bannedWordHits.length) issues.push(`bannedWords: ${findings.bannedWordHits.join(', ')}`);
+  if (findings.bannedWordHits.length)
+    issues.push(`bannedWords: ${findings.bannedWordHits.join(', ')}`);
 
   return [
     `Current build: ${current.slug}`,
@@ -130,7 +137,9 @@ export function renderRetroPrompt(current: BenchmarkResult, priors: PriorBenchma
     `Regressed: ${current.regressedFromPrevious}`,
     '',
     'Specific issues this build:',
-    issues.length ? issues.map((i) => `- ${i}`).join('\n') : '- (none — score low for non-checklist reasons)',
+    issues.length
+      ? issues.map((i) => `- ${i}`).join('\n')
+      : '- (none — score low for non-checklist reasons)',
     '',
     'Last 10 builds:',
     priorRows || '- (no history)',
@@ -191,6 +200,10 @@ ${llmFindings}
 }
 
 /** Update the site_benchmarks row with the retrospective path once written. */
-export async function recordRetrospectivePath(env: Env, benchmarkId: string, path: string): Promise<void> {
+export async function recordRetrospectivePath(
+  env: Env,
+  benchmarkId: string,
+  path: string,
+): Promise<void> {
   await dbUpdate(env.DB, 'site_benchmarks', { retrospective_path: path }, 'id = ?', [benchmarkId]);
 }

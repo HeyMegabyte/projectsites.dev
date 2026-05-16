@@ -427,13 +427,9 @@ describe('provisionCustomDomain', () => {
     );
 
     // Auto-primary dbUpdate calls
-    expect(mockUpdate).toHaveBeenCalledWith(
-      mockDb,
-      'hostnames',
-      { is_primary: 0 },
-      'site_id = ?',
-      ['site-3'],
-    );
+    expect(mockUpdate).toHaveBeenCalledWith(mockDb, 'hostnames', { is_primary: 0 }, 'site_id = ?', [
+      'site-3',
+    ]);
     expect(mockUpdate).toHaveBeenCalledWith(
       mockDb,
       'hostnames',
@@ -646,22 +642,14 @@ describe('setPrimaryHostname', () => {
     );
 
     // First call: clear all primary
-    expect(mockUpdate).toHaveBeenCalledWith(
-      mockDb,
-      'hostnames',
-      { is_primary: 0 },
-      'site_id = ?',
-      ['site-1'],
-    );
+    expect(mockUpdate).toHaveBeenCalledWith(mockDb, 'hostnames', { is_primary: 0 }, 'site_id = ?', [
+      'site-1',
+    ]);
 
     // Second call: set primary
-    expect(mockUpdate).toHaveBeenCalledWith(
-      mockDb,
-      'hostnames',
-      { is_primary: 1 },
-      'id = ?',
-      ['h-123'],
-    );
+    expect(mockUpdate).toHaveBeenCalledWith(mockDb, 'hostnames', { is_primary: 1 }, 'id = ?', [
+      'h-123',
+    ]);
   });
 
   it('throws notFound if hostname does not belong to site', async () => {

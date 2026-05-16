@@ -61,7 +61,13 @@ async function sendEmail(env: Env, opts: EmailOpts): Promise<void> {
     return;
   }
 
-  console.warn(JSON.stringify({ level: 'warn', service: 'notifications', message: 'No email provider configured' }));
+  console.warn(
+    JSON.stringify({
+      level: 'warn',
+      service: 'notifications',
+      message: 'No email provider configured',
+    }),
+  );
 }
 
 /**
@@ -181,7 +187,14 @@ export async function notifyDomainVerified(
     subject: `Domain connected: ${opts.hostname}`,
     html,
   }).catch((err) => {
-    console.warn(JSON.stringify({ level: 'warn', service: 'notifications', message: 'Failed to send domain verified email', error: String(err) }));
+    console.warn(
+      JSON.stringify({
+        level: 'warn',
+        service: 'notifications',
+        message: 'Failed to send domain verified email',
+        error: String(err),
+      }),
+    );
   });
 }
 
@@ -227,6 +240,13 @@ export async function notifySiteBuilt(
     subject: `Site published: ${opts.siteName}`,
     html,
   }).catch((err) => {
-    console.warn(JSON.stringify({ level: 'warn', service: 'notifications', message: 'Failed to send site built email', error: String(err) }));
+    console.warn(
+      JSON.stringify({
+        level: 'warn',
+        service: 'notifications',
+        message: 'Failed to send site built email',
+        error: String(err),
+      }),
+    );
   });
 }

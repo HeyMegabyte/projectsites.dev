@@ -23,21 +23,31 @@ import type { CommitMetadata } from '../services/git.js';
  * Stores objects as key → { body, httpMetadata }.
  */
 function createMockBucket(): R2Bucket {
-  const store = new Map<string, { body: string | ArrayBuffer; httpMetadata?: { contentType?: string } }>();
+  const store = new Map<
+    string,
+    { body: string | ArrayBuffer; httpMetadata?: { contentType?: string } }
+  >();
 
   return {
-    put: jest.fn(async (key: string, body: string | ArrayBuffer | ReadableStream, options?: { httpMetadata?: { contentType?: string } }) => {
-      const content = typeof body === 'string' ? body : body;
-      store.set(key, { body: content as string, httpMetadata: options?.httpMetadata });
-      return { key, size: typeof body === 'string' ? body.length : 0 } as unknown as R2Object;
-    }),
+    put: jest.fn(
+      async (
+        key: string,
+        body: string | ArrayBuffer | ReadableStream,
+        options?: { httpMetadata?: { contentType?: string } },
+      ) => {
+        const content = typeof body === 'string' ? body : body;
+        store.set(key, { body: content as string, httpMetadata: options?.httpMetadata });
+        return { key, size: typeof body === 'string' ? body.length : 0 } as unknown as R2Object;
+      },
+    ),
     get: jest.fn(async (key: string) => {
       const item = store.get(key);
       if (!item) return null;
       return {
-        text: async () => typeof item.body === 'string' ? item.body : '',
+        text: async () => (typeof item.body === 'string' ? item.body : ''),
         json: async () => JSON.parse(typeof item.body === 'string' ? item.body : '{}'),
-        arrayBuffer: async () => new TextEncoder().encode(typeof item.body === 'string' ? item.body : '').buffer,
+        arrayBuffer: async () =>
+          new TextEncoder().encode(typeof item.body === 'string' ? item.body : '').buffer,
         body: null,
         bodyUsed: false,
         key,
@@ -46,7 +56,10 @@ function createMockBucket(): R2Bucket {
     head: jest.fn(async (key: string) => {
       const item = store.get(key);
       if (!item) return null;
-      return { key, size: typeof item.body === 'string' ? item.body.length : 0 } as unknown as R2Object;
+      return {
+        key,
+        size: typeof item.body === 'string' ? item.body.length : 0,
+      } as unknown as R2Object;
     }),
     delete: jest.fn(async () => {}),
     list: jest.fn(async () => ({ objects: [], delimitedPrefixes: [], truncated: false })),
@@ -106,13 +119,15 @@ describe('Git Snapshot Service', () => {
 
     it('sets parentId to previous HEAD on second commit', async () => {
       const firstId = await createSnapshot(
-        bucket, 'test-site',
+        bucket,
+        'test-site',
         [{ name: 'index.html', content: 'v1' }],
         'First',
       );
 
       const secondId = await createSnapshot(
-        bucket, 'test-site',
+        bucket,
+        'test-site',
         [{ name: 'index.html', content: 'v2' }],
         'Second',
       );
@@ -125,7 +140,8 @@ describe('Git Snapshot Service', () => {
 
     it('uses custom author and buildVersion', async () => {
       const id = await createSnapshot(
-        bucket, 'test-site',
+        bucket,
+        'test-site',
         [{ name: 'index.html', content: 'test' }],
         'Custom commit',
         'John Doe',
@@ -140,7 +156,8 @@ describe('Git Snapshot Service', () => {
     it('stores file sizes correctly', async () => {
       const content = 'Hello World! This is a test file.';
       const id = await createSnapshot(
-        bucket, 'test-site',
+        bucket,
+        'test-site',
         [{ name: 'test.txt', content }],
         'Size test',
       );
@@ -185,8 +202,13 @@ describe('Git Snapshot Service', () => {
 
     it('returns correct fileCount in summaries', async () => {
       await createSnapshot(
-        bucket, 'test-site',
-        [{ name: 'a.html', content: 'a' }, { name: 'b.css', content: 'b' }, { name: 'c.js', content: 'c' }],
+        bucket,
+        'test-site',
+        [
+          { name: 'a.html', content: 'a' },
+          { name: 'b.css', content: 'b' },
+          { name: 'c.js', content: 'c' },
+        ],
         'Three files',
       );
 
@@ -205,7 +227,8 @@ describe('Git Snapshot Service', () => {
 
     it('returns full commit metadata', async () => {
       const id = await createSnapshot(
-        bucket, 'test-site',
+        bucket,
+        'test-site',
         [{ name: 'index.html', content: '<html></html>' }],
         'Test commit',
         'Test Author',
@@ -237,14 +260,15 @@ describe('Git Snapshot Service', () => {
       const result = await checkoutSnapshot(bucket, 'test-site', id);
 
       expect(result).toHaveLength(3);
-      expect(result.find(f => f.name === 'index.html')!.content).toBe('<html>Page</html>');
-      expect(result.find(f => f.name === 'style.css')!.content).toBe('body { color: red; }');
-      expect(result.find(f => f.name === 'app.js')!.content).toBe('console.log("hi")');
+      expect(result.find((f) => f.name === 'index.html')!.content).toBe('<html>Page</html>');
+      expect(result.find((f) => f.name === 'style.css')!.content).toBe('body { color: red; }');
+      expect(result.find((f) => f.name === 'app.js')!.content).toBe('console.log("hi")');
     });
 
     it('throws for nonexistent commit', async () => {
-      await expect(checkoutSnapshot(bucket, 'test-site', 'bad-id'))
-        .rejects.toThrow('Commit not found: bad-id');
+      await expect(checkoutSnapshot(bucket, 'test-site', 'bad-id')).rejects.toThrow(
+        'Commit not found: bad-id',
+      );
     });
   });
 
@@ -255,8 +279,18 @@ describe('Git Snapshot Service', () => {
       const v1Files = [{ name: 'index.html', content: 'Version 1' }];
       const v1Id = await createSnapshot(bucket, 'test-site', v1Files, 'v1');
 
-      await createSnapshot(bucket, 'test-site', [{ name: 'index.html', content: 'Version 2' }], 'v2');
-      await createSnapshot(bucket, 'test-site', [{ name: 'index.html', content: 'Version 3' }], 'v3');
+      await createSnapshot(
+        bucket,
+        'test-site',
+        [{ name: 'index.html', content: 'Version 2' }],
+        'v2',
+      );
+      await createSnapshot(
+        bucket,
+        'test-site',
+        [{ name: 'index.html', content: 'Version 3' }],
+        'v3',
+      );
 
       const result = await revertToSnapshot(bucket, 'test-site', v1Id);
 
@@ -271,13 +305,21 @@ describe('Git Snapshot Service', () => {
 
     it('throws for empty commit', async () => {
       // Create a commit with a file, but mock the checkout to return empty
-      const id = await createSnapshot(bucket, 'test-site', [{ name: 'test.html', content: 'test' }], 'test');
+      const id = await createSnapshot(
+        bucket,
+        'test-site',
+        [{ name: 'test.html', content: 'test' }],
+        'test',
+      );
 
       // Remove the tree file to simulate empty checkout
-      (bucket as unknown as { _store: Map<string, unknown> })._store.delete(`sites/test-site/git/trees/${id}/test.html`);
+      (bucket as unknown as { _store: Map<string, unknown> })._store.delete(
+        `sites/test-site/git/trees/${id}/test.html`,
+      );
 
-      await expect(revertToSnapshot(bucket, 'test-site', id))
-        .rejects.toThrow('No files found in commit');
+      await expect(revertToSnapshot(bucket, 'test-site', id)).rejects.toThrow(
+        'No files found in commit',
+      );
     });
   });
 
@@ -286,14 +328,19 @@ describe('Git Snapshot Service', () => {
   describe('diffSnapshots', () => {
     it('detects added files', async () => {
       const baseId = await createSnapshot(
-        bucket, 'test-site',
+        bucket,
+        'test-site',
         [{ name: 'index.html', content: 'base' }],
         'Base',
       );
 
       const targetId = await createSnapshot(
-        bucket, 'test-site',
-        [{ name: 'index.html', content: 'base' }, { name: 'new.css', content: 'new' }],
+        bucket,
+        'test-site',
+        [
+          { name: 'index.html', content: 'base' },
+          { name: 'new.css', content: 'new' },
+        ],
         'Added file',
       );
 
@@ -307,13 +354,18 @@ describe('Git Snapshot Service', () => {
 
     it('detects removed files', async () => {
       const baseId = await createSnapshot(
-        bucket, 'test-site',
-        [{ name: 'index.html', content: 'base' }, { name: 'old.css', content: 'old' }],
+        bucket,
+        'test-site',
+        [
+          { name: 'index.html', content: 'base' },
+          { name: 'old.css', content: 'old' },
+        ],
         'Base',
       );
 
       const targetId = await createSnapshot(
-        bucket, 'test-site',
+        bucket,
+        'test-site',
         [{ name: 'index.html', content: 'base' }],
         'Removed file',
       );
@@ -327,13 +379,15 @@ describe('Git Snapshot Service', () => {
 
     it('detects modified files', async () => {
       const baseId = await createSnapshot(
-        bucket, 'test-site',
+        bucket,
+        'test-site',
         [{ name: 'index.html', content: 'old content' }],
         'Base',
       );
 
       const targetId = await createSnapshot(
-        bucket, 'test-site',
+        bucket,
+        'test-site',
         [{ name: 'index.html', content: 'new content' }],
         'Modified',
       );
@@ -348,7 +402,8 @@ describe('Git Snapshot Service', () => {
 
     it('handles complex diffs with all change types', async () => {
       const baseId = await createSnapshot(
-        bucket, 'test-site',
+        bucket,
+        'test-site',
         [
           { name: 'keep.html', content: 'same' },
           { name: 'change.css', content: 'old' },
@@ -358,7 +413,8 @@ describe('Git Snapshot Service', () => {
       );
 
       const targetId = await createSnapshot(
-        bucket, 'test-site',
+        bucket,
+        'test-site',
         [
           { name: 'keep.html', content: 'same' },
           { name: 'change.css', content: 'new' },
@@ -386,7 +442,12 @@ describe('Git Snapshot Service', () => {
 
     it('returns latest commit ID', async () => {
       await createSnapshot(bucket, 'test-site', [{ name: 'a.html', content: 'a' }], 'First');
-      const secondId = await createSnapshot(bucket, 'test-site', [{ name: 'b.html', content: 'b' }], 'Second');
+      const secondId = await createSnapshot(
+        bucket,
+        'test-site',
+        [{ name: 'b.html', content: 'b' }],
+        'Second',
+      );
 
       const head = await getHead(bucket, 'test-site');
       expect(head).toBe(secondId);
@@ -398,7 +459,8 @@ describe('Git Snapshot Service', () => {
   describe('edge cases', () => {
     it('handles sites with special characters in slug', async () => {
       const id = await createSnapshot(
-        bucket, 'my-cool-site-123',
+        bucket,
+        'my-cool-site-123',
         [{ name: 'index.html', content: 'test' }],
         'Test',
       );
@@ -419,12 +481,13 @@ describe('Git Snapshot Service', () => {
       const result = await checkoutSnapshot(bucket, 'test-site', id);
 
       expect(result).toHaveLength(3);
-      expect(result.find(f => f.name === 'assets/images/logo.svg')!.content).toBe('<svg/>');
+      expect(result.find((f) => f.name === 'assets/images/logo.svg')!.content).toBe('<svg/>');
     });
 
     it('handles empty message', async () => {
       const id = await createSnapshot(
-        bucket, 'test-site',
+        bucket,
+        'test-site',
         [{ name: 'index.html', content: 'test' }],
         '',
       );

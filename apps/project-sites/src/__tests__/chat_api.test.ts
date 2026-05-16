@@ -52,13 +52,15 @@ function createApp(r2GetMock: jest.Mock, dbPrepare?: jest.Mock) {
   const env = {
     ENVIRONMENT: 'test',
     DB: {
-      prepare: dbPrepare ?? jest.fn().mockReturnValue({
-        bind: jest.fn().mockReturnValue({
-          first: jest.fn().mockResolvedValue({ business_name: "Test Business" }),
-          all: jest.fn().mockResolvedValue({ results: [] }),
-          run: jest.fn().mockResolvedValue({}),
+      prepare:
+        dbPrepare ??
+        jest.fn().mockReturnValue({
+          bind: jest.fn().mockReturnValue({
+            first: jest.fn().mockResolvedValue({ business_name: 'Test Business' }),
+            all: jest.fn().mockResolvedValue({ results: [] }),
+            run: jest.fn().mockResolvedValue({}),
+          }),
         }),
-      }),
     } as unknown as D1Database,
     SITES_BUCKET: {
       get: r2GetMock,
@@ -92,25 +94,30 @@ afterEach(() => {
 
 describe('GET /api/sites/by-slug/:slug/chat', () => {
   it('returns 200 with dynamically built chat JSON containing boltArtifact', async () => {
-    const r2Get = jest.fn()
-      .mockImplementation((key: string) => {
-        if (key === 'sites/test-site/_manifest.json') {
-          return Promise.resolve(createMockR2Object({
+    const r2Get = jest.fn().mockImplementation((key: string) => {
+      if (key === 'sites/test-site/_manifest.json') {
+        return Promise.resolve(
+          createMockR2Object({
             current_version: 'v1',
             files: ['index.html', 'about.html', 'robots.txt'],
-          }));
-        }
-        if (key === 'sites/test-site/v1/index.html') {
-          return Promise.resolve(createMockR2Object('<!DOCTYPE html><html><body><h1>Test</h1></body></html>'));
-        }
-        if (key === 'sites/test-site/v1/about.html') {
-          return Promise.resolve(createMockR2Object('<!DOCTYPE html><html><body><h1>About</h1></body></html>'));
-        }
-        if (key === 'sites/test-site/v1/robots.txt') {
-          return Promise.resolve(createMockR2Object('User-agent: *\nAllow: /'));
-        }
-        return Promise.resolve(null);
-      });
+          }),
+        );
+      }
+      if (key === 'sites/test-site/v1/index.html') {
+        return Promise.resolve(
+          createMockR2Object('<!DOCTYPE html><html><body><h1>Test</h1></body></html>'),
+        );
+      }
+      if (key === 'sites/test-site/v1/about.html') {
+        return Promise.resolve(
+          createMockR2Object('<!DOCTYPE html><html><body><h1>About</h1></body></html>'),
+        );
+      }
+      if (key === 'sites/test-site/v1/robots.txt') {
+        return Promise.resolve(createMockR2Object('User-agent: *\nAllow: /'));
+      }
+      return Promise.resolve(null);
+    });
 
     const { app, env } = createApp(r2Get);
     const res = await app.request('/api/sites/by-slug/test-site/chat', {}, env);
@@ -141,16 +148,17 @@ describe('GET /api/sites/by-slug/:slug/chat', () => {
   });
 
   it('returns CORS header Access-Control-Allow-Origin: *', async () => {
-    const r2Get = jest.fn()
-      .mockImplementation((key: string) => {
-        if (key === 'sites/test-site/_manifest.json') {
-          return Promise.resolve(createMockR2Object({ current_version: 'v1', files: ['index.html'] }));
-        }
-        if (key === 'sites/test-site/v1/index.html') {
-          return Promise.resolve(createMockR2Object('<html></html>'));
-        }
-        return Promise.resolve(null);
-      });
+    const r2Get = jest.fn().mockImplementation((key: string) => {
+      if (key === 'sites/test-site/_manifest.json') {
+        return Promise.resolve(
+          createMockR2Object({ current_version: 'v1', files: ['index.html'] }),
+        );
+      }
+      if (key === 'sites/test-site/v1/index.html') {
+        return Promise.resolve(createMockR2Object('<html></html>'));
+      }
+      return Promise.resolve(null);
+    });
 
     const { app, env } = createApp(r2Get);
     const res = await app.request('/api/sites/by-slug/test-site/chat', {}, env);
@@ -159,19 +167,20 @@ describe('GET /api/sites/by-slug/:slug/chat', () => {
   });
 
   it('filters out research.json and _meta/ files', async () => {
-    const r2Get = jest.fn()
-      .mockImplementation((key: string) => {
-        if (key === 'sites/test-site/_manifest.json') {
-          return Promise.resolve(createMockR2Object({
+    const r2Get = jest.fn().mockImplementation((key: string) => {
+      if (key === 'sites/test-site/_manifest.json') {
+        return Promise.resolve(
+          createMockR2Object({
             current_version: 'v1',
             files: ['index.html', 'research.json', '_meta/chat.json'],
-          }));
-        }
-        if (key === 'sites/test-site/v1/index.html') {
-          return Promise.resolve(createMockR2Object('<html></html>'));
-        }
-        return Promise.resolve(null);
-      });
+          }),
+        );
+      }
+      if (key === 'sites/test-site/v1/index.html') {
+        return Promise.resolve(createMockR2Object('<html></html>'));
+      }
+      return Promise.resolve(null);
+    });
 
     const { app, env } = createApp(r2Get);
     const res = await app.request('/api/sites/by-slug/test-site/chat', {}, env);
@@ -184,16 +193,17 @@ describe('GET /api/sites/by-slug/:slug/chat', () => {
   });
 
   it('does not require authentication (slug is access token)', async () => {
-    const r2Get = jest.fn()
-      .mockImplementation((key: string) => {
-        if (key === 'sites/public-site/_manifest.json') {
-          return Promise.resolve(createMockR2Object({ current_version: 'v1', files: ['index.html'] }));
-        }
-        if (key === 'sites/public-site/v1/index.html') {
-          return Promise.resolve(createMockR2Object('<html></html>'));
-        }
-        return Promise.resolve(null);
-      });
+    const r2Get = jest.fn().mockImplementation((key: string) => {
+      if (key === 'sites/public-site/_manifest.json') {
+        return Promise.resolve(
+          createMockR2Object({ current_version: 'v1', files: ['index.html'] }),
+        );
+      }
+      if (key === 'sites/public-site/v1/index.html') {
+        return Promise.resolve(createMockR2Object('<html></html>'));
+      }
+      return Promise.resolve(null);
+    });
 
     const { app, env } = createApp(r2Get);
     // No Authorization header
@@ -203,16 +213,17 @@ describe('GET /api/sites/by-slug/:slug/chat', () => {
   });
 
   it('returns Cache-Control: no-cache, no-store, must-revalidate', async () => {
-    const r2Get = jest.fn()
-      .mockImplementation((key: string) => {
-        if (key === 'sites/test-site/_manifest.json') {
-          return Promise.resolve(createMockR2Object({ current_version: 'v1', files: ['index.html'] }));
-        }
-        if (key === 'sites/test-site/v1/index.html') {
-          return Promise.resolve(createMockR2Object('<html></html>'));
-        }
-        return Promise.resolve(null);
-      });
+    const r2Get = jest.fn().mockImplementation((key: string) => {
+      if (key === 'sites/test-site/_manifest.json') {
+        return Promise.resolve(
+          createMockR2Object({ current_version: 'v1', files: ['index.html'] }),
+        );
+      }
+      if (key === 'sites/test-site/v1/index.html') {
+        return Promise.resolve(createMockR2Object('<html></html>'));
+      }
+      return Promise.resolve(null);
+    });
 
     const { app, env } = createApp(r2Get);
     const res = await app.request('/api/sites/by-slug/test-site/chat', {}, env);
@@ -230,13 +241,12 @@ describe('GET /api/sites/by-slug/:slug/chat', () => {
   });
 
   it('returns 404 when manifest has no current_version', async () => {
-    const r2Get = jest.fn()
-      .mockImplementation((key: string) => {
-        if (key === 'sites/no-version/_manifest.json') {
-          return Promise.resolve(createMockR2Object({ current_version: '' }));
-        }
-        return Promise.resolve(null);
-      });
+    const r2Get = jest.fn().mockImplementation((key: string) => {
+      if (key === 'sites/no-version/_manifest.json') {
+        return Promise.resolve(createMockR2Object({ current_version: '' }));
+      }
+      return Promise.resolve(null);
+    });
 
     const { app, env } = createApp(r2Get);
     const res = await app.request('/api/sites/by-slug/no-version/chat', {}, env);
@@ -245,14 +255,15 @@ describe('GET /api/sites/by-slug/:slug/chat', () => {
   });
 
   it('returns 404 when no files found in R2', async () => {
-    const r2Get = jest.fn()
-      .mockImplementation((key: string) => {
-        if (key === 'sites/empty-site/_manifest.json') {
-          return Promise.resolve(createMockR2Object({ current_version: 'v1', files: ['index.html'] }));
-        }
-        // All file reads return null
-        return Promise.resolve(null);
-      });
+    const r2Get = jest.fn().mockImplementation((key: string) => {
+      if (key === 'sites/empty-site/_manifest.json') {
+        return Promise.resolve(
+          createMockR2Object({ current_version: 'v1', files: ['index.html'] }),
+        );
+      }
+      // All file reads return null
+      return Promise.resolve(null);
+    });
 
     const { app, env } = createApp(r2Get);
     const res = await app.request('/api/sites/by-slug/empty-site/chat', {}, env);
@@ -269,16 +280,17 @@ describe('GET /api/sites/by-slug/:slug/chat', () => {
       }),
     });
 
-    const r2Get = jest.fn()
-      .mockImplementation((key: string) => {
-        if (key === 'sites/vitos-mens-salon/_manifest.json') {
-          return Promise.resolve(createMockR2Object({ current_version: 'v1', files: ['index.html'] }));
-        }
-        if (key === 'sites/vitos-mens-salon/v1/index.html') {
-          return Promise.resolve(createMockR2Object('<html></html>'));
-        }
-        return Promise.resolve(null);
-      });
+    const r2Get = jest.fn().mockImplementation((key: string) => {
+      if (key === 'sites/vitos-mens-salon/_manifest.json') {
+        return Promise.resolve(
+          createMockR2Object({ current_version: 'v1', files: ['index.html'] }),
+        );
+      }
+      if (key === 'sites/vitos-mens-salon/v1/index.html') {
+        return Promise.resolve(createMockR2Object('<html></html>'));
+      }
+      return Promise.resolve(null);
+    });
 
     const { app, env } = createApp(r2Get, dbPrepare);
     const res = await app.request('/api/sites/by-slug/vitos-mens-salon/chat', {}, env);

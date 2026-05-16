@@ -261,7 +261,9 @@ describe('securityHeadersMiddleware', () => {
     const app = createApp();
     const res = await app.request('/test');
 
-    expect(res.headers.get('Permissions-Policy')).toBe('camera=(), microphone=(), geolocation=(self)');
+    expect(res.headers.get('Permissions-Policy')).toBe(
+      'camera=(), microphone=(), geolocation=(self)',
+    );
   });
 
   it('sets Cross-Origin-Opener-Policy header for dashboard', async () => {
@@ -292,9 +294,9 @@ describe('securityHeadersMiddleware', () => {
     expect(csp).toContain("'unsafe-inline'");
     expect(csp).toContain('blob:');
     expect(csp).toContain('data:');
-    expect(csp).toContain("img-src * data: blob:");
-    expect(csp).toContain("connect-src * data: blob:");
-    expect(csp).toContain("frame-src *");
+    expect(csp).toContain('img-src * data: blob:');
+    expect(csp).toContain('connect-src * data: blob:');
+    expect(csp).toContain('frame-src *');
     expect(csp).toContain("object-src 'none'");
     expect(csp).toContain("base-uri 'self'");
   });
@@ -304,7 +306,7 @@ describe('securityHeadersMiddleware', () => {
       const app = createApp();
       const res = await app.request('/test');
       const csp = res.headers.get('Content-Security-Policy')!;
-      const imgSrc = csp.split(';').find(d => d.trim().startsWith('img-src'))!;
+      const imgSrc = csp.split(';').find((d) => d.trim().startsWith('img-src'))!;
       expect(imgSrc).toContain('blob:');
       expect(imgSrc).toContain('data:');
     });
@@ -313,7 +315,7 @@ describe('securityHeadersMiddleware', () => {
       const app = createApp();
       const res = await app.request('/test');
       const csp = res.headers.get('Content-Security-Policy')!;
-      const connectSrc = csp.split(';').find(d => d.trim().startsWith('connect-src'))!;
+      const connectSrc = csp.split(';').find((d) => d.trim().startsWith('connect-src'))!;
       expect(connectSrc).toContain('*');
     });
 
@@ -321,7 +323,7 @@ describe('securityHeadersMiddleware', () => {
       const app = createApp();
       const res = await app.request('/test');
       const csp = res.headers.get('Content-Security-Policy')!;
-      const frameSrc = csp.split(';').find(d => d.trim().startsWith('frame-src'))!;
+      const frameSrc = csp.split(';').find((d) => d.trim().startsWith('frame-src'))!;
       expect(frameSrc).toContain('*');
     });
 
@@ -329,7 +331,7 @@ describe('securityHeadersMiddleware', () => {
       const app = createApp();
       const res = await app.request('/test');
       const csp = res.headers.get('Content-Security-Policy')!;
-      const scriptSrc = csp.split(';').find(d => d.trim().startsWith('script-src'))!;
+      const scriptSrc = csp.split(';').find((d) => d.trim().startsWith('script-src'))!;
       expect(scriptSrc).toContain("'unsafe-eval'");
     });
 

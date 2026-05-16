@@ -295,8 +295,7 @@ export async function createMagicLink(
   });
 
   // Build verify URL and send email
-  const baseUrl =
-    `https://${DOMAINS.SITES_BASE}`;
+  const baseUrl = `https://${DOMAINS.SITES_BASE}`;
   const verifyUrl = `${baseUrl}/api/auth/magic-link/verify?token=${encodeURIComponent(token)}`;
 
   await sendEmail(env, {
@@ -305,7 +304,15 @@ export async function createMagicLink(
     html: buildMagicLinkEmail(verifyUrl),
   });
 
-  console.warn(JSON.stringify({ level: 'info', service: 'auth', message: 'Magic link created', email: validated.email, expires_at: expiresAt }));
+  console.warn(
+    JSON.stringify({
+      level: 'info',
+      service: 'auth',
+      message: 'Magic link created',
+      email: validated.email,
+      expires_at: expiresAt,
+    }),
+  );
   return { token, expires_at: expiresAt };
 }
 
@@ -338,22 +345,46 @@ export async function verifyMagicLink(
     redirect_url: string | null;
     used: number;
     expires_at: string;
-  }>(db, 'SELECT id, email, redirect_url, used, expires_at FROM magic_links WHERE token_hash = ? AND used = 0', [tokenHash]);
+  }>(
+    db,
+    'SELECT id, email, redirect_url, used, expires_at FROM magic_links WHERE token_hash = ? AND used = 0',
+    [tokenHash],
+  );
 
   if (!link) {
-    console.warn(JSON.stringify({ level: 'warn', service: 'auth', message: 'Magic link verification failed: invalid or expired token' }));
+    console.warn(
+      JSON.stringify({
+        level: 'warn',
+        service: 'auth',
+        message: 'Magic link verification failed: invalid or expired token',
+      }),
+    );
     throw unauthorized('Invalid or expired magic link');
   }
 
   if (new Date(link.expires_at) < new Date()) {
-    console.warn(JSON.stringify({ level: 'warn', service: 'auth', message: 'Magic link verification failed: expired', email: link.email }));
+    console.warn(
+      JSON.stringify({
+        level: 'warn',
+        service: 'auth',
+        message: 'Magic link verification failed: expired',
+        email: link.email,
+      }),
+    );
     throw unauthorized('Magic link has expired');
   }
 
   // Mark as used
   await dbUpdate(db, 'magic_links', { used: 1 }, 'id = ?', [link.id]);
 
-  console.warn(JSON.stringify({ level: 'info', service: 'auth', message: 'Magic link verified', email: link.email }));
+  console.warn(
+    JSON.stringify({
+      level: 'info',
+      service: 'auth',
+      message: 'Magic link verified',
+      email: link.email,
+    }),
+  );
   return { email: link.email, redirect_url: link.redirect_url };
 }
 
@@ -394,8 +425,7 @@ export async function createGoogleOAuthState(
     deleted_at: null,
   });
 
-  const callbackBase =
-    `https://${DOMAINS.SITES_BASE}`;
+  const callbackBase = `https://${DOMAINS.SITES_BASE}`;
 
   const params = new URLSearchParams({
     client_id: env.GOOGLE_CLIENT_ID,
@@ -438,21 +468,43 @@ export async function handleGoogleOAuthCallback(
   env: Env,
   code: string,
   state: string,
-): Promise<{ email: string; display_name: string | null; avatar_url: string | null; redirect_url: string | null }> {
+): Promise<{
+  email: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  redirect_url: string | null;
+}> {
   // Verify state
-  const stateRecord = await dbQueryOne<{ id: string; state: string; redirect_url: string | null; expires_at: string }>(
+  const stateRecord = await dbQueryOne<{
+    id: string;
+    state: string;
+    redirect_url: string | null;
+    expires_at: string;
+  }>(
     db,
     'SELECT id, state, redirect_url, expires_at FROM oauth_states WHERE state = ? AND provider = ?',
     [state, 'google'],
   );
 
   if (!stateRecord) {
-    console.warn(JSON.stringify({ level: 'warn', service: 'auth', message: 'Google OAuth callback failed: invalid state' }));
+    console.warn(
+      JSON.stringify({
+        level: 'warn',
+        service: 'auth',
+        message: 'Google OAuth callback failed: invalid state',
+      }),
+    );
     throw unauthorized('Invalid OAuth state');
   }
 
   if (new Date(stateRecord.expires_at) < new Date()) {
-    console.warn(JSON.stringify({ level: 'warn', service: 'auth', message: 'Google OAuth callback failed: state expired' }));
+    console.warn(
+      JSON.stringify({
+        level: 'warn',
+        service: 'auth',
+        message: 'Google OAuth callback failed: state expired',
+      }),
+    );
     throw unauthorized('OAuth state expired');
   }
 
@@ -460,8 +512,7 @@ export async function handleGoogleOAuthCallback(
   await dbExecute(db, 'DELETE FROM oauth_states WHERE id = ?', [stateRecord.id]);
 
   // Exchange code for tokens
-  const callbackBase =
-    `https://${DOMAINS.SITES_BASE}`;
+  const callbackBase = `https://${DOMAINS.SITES_BASE}`;
 
   const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
@@ -476,7 +527,14 @@ export async function handleGoogleOAuthCallback(
   });
 
   if (!tokenResponse.ok) {
-    console.warn(JSON.stringify({ level: 'error', service: 'auth', message: 'Google OAuth token exchange failed', status: tokenResponse.status }));
+    console.warn(
+      JSON.stringify({
+        level: 'error',
+        service: 'auth',
+        message: 'Google OAuth token exchange failed',
+        status: tokenResponse.status,
+      }),
+    );
     throw badRequest('Failed to exchange OAuth code');
   }
 
@@ -488,7 +546,14 @@ export async function handleGoogleOAuthCallback(
   });
 
   if (!userInfoResponse.ok) {
-    console.warn(JSON.stringify({ level: 'error', service: 'auth', message: 'Google userinfo fetch failed', status: userInfoResponse.status }));
+    console.warn(
+      JSON.stringify({
+        level: 'error',
+        service: 'auth',
+        message: 'Google userinfo fetch failed',
+        status: userInfoResponse.status,
+      }),
+    );
     throw badRequest('Failed to fetch Google user info');
   }
 
@@ -498,7 +563,14 @@ export async function handleGoogleOAuthCallback(
     picture?: string;
   };
 
-  console.warn(JSON.stringify({ level: 'info', service: 'auth', message: 'Google OAuth callback success', email: userInfo.email }));
+  console.warn(
+    JSON.stringify({
+      level: 'info',
+      service: 'auth',
+      message: 'Google OAuth callback success',
+      email: userInfo.email,
+    }),
+  );
   return {
     email: userInfo.email,
     display_name: userInfo.name ?? null,
@@ -553,9 +625,19 @@ export async function handleGitHubOAuthCallback(
   env: Env,
   code: string,
   state: string,
-): Promise<{ email: string; display_name: string | null; avatar_url: string | null; redirect_url: string | null }> {
+): Promise<{
+  email: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  redirect_url: string | null;
+}> {
   // Verify state
-  const stateRecord = await dbQueryOne<{ id: string; state: string; redirect_url: string | null; expires_at: string }>(
+  const stateRecord = await dbQueryOne<{
+    id: string;
+    state: string;
+    redirect_url: string | null;
+    expires_at: string;
+  }>(
     db,
     'SELECT id, state, redirect_url, expires_at FROM oauth_states WHERE state = ? AND provider = ?',
     [state, 'github'],
@@ -577,7 +659,7 @@ export async function handleGitHubOAuthCallback(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Accept': 'application/json',
+      Accept: 'application/json',
     },
     body: JSON.stringify({
       client_id: env.GITHUB_CLIENT_ID,
@@ -588,7 +670,14 @@ export async function handleGitHubOAuthCallback(
   });
 
   if (!tokenResponse.ok) {
-    console.warn(JSON.stringify({ level: 'error', service: 'auth', message: 'GitHub OAuth token exchange failed', status: tokenResponse.status }));
+    console.warn(
+      JSON.stringify({
+        level: 'error',
+        service: 'auth',
+        message: 'GitHub OAuth token exchange failed',
+        status: tokenResponse.status,
+      }),
+    );
     throw badRequest('Failed to exchange GitHub OAuth code');
   }
 
@@ -630,17 +719,31 @@ export async function handleGitHubOAuthCallback(
     });
 
     if (emailsResponse.ok) {
-      const emails = (await emailsResponse.json()) as Array<{ email: string; primary: boolean; verified: boolean }>;
+      const emails = (await emailsResponse.json()) as Array<{
+        email: string;
+        primary: boolean;
+        verified: boolean;
+      }>;
       const primary = emails.find((e) => e.primary && e.verified);
       email = primary?.email ?? emails.find((e) => e.verified)?.email ?? null;
     }
   }
 
   if (!email) {
-    throw badRequest('GitHub account has no verified email. Please add a verified email to your GitHub account.');
+    throw badRequest(
+      'GitHub account has no verified email. Please add a verified email to your GitHub account.',
+    );
   }
 
-  console.warn(JSON.stringify({ level: 'info', service: 'auth', message: 'GitHub OAuth callback success', email, github_login: ghUser.login }));
+  console.warn(
+    JSON.stringify({
+      level: 'info',
+      service: 'auth',
+      message: 'GitHub OAuth callback success',
+      email,
+      github_login: ghUser.login,
+    }),
+  );
   return {
     email,
     display_name: ghUser.name ?? ghUser.login,
@@ -690,7 +793,15 @@ export async function createSession(
     deleted_at: null,
   });
 
-  console.warn(JSON.stringify({ level: 'info', service: 'auth', message: 'Session created', user_id: userId, expires_at: expiresAt }));
+  console.warn(
+    JSON.stringify({
+      level: 'info',
+      service: 'auth',
+      message: 'Session created',
+      user_id: userId,
+      expires_at: expiresAt,
+    }),
+  );
   return { token, expires_at: expiresAt };
 }
 
@@ -732,7 +843,9 @@ export async function getSession(
   }
 
   // Update last_active_at
-  await dbUpdate(db, 'sessions', { last_active_at: new Date().toISOString() }, 'id = ?', [session.id]);
+  await dbUpdate(db, 'sessions', { last_active_at: new Date().toISOString() }, 'id = ?', [
+    session.id,
+  ]);
 
   return session;
 }
@@ -750,7 +863,14 @@ export async function getSession(
  */
 export async function revokeSession(db: D1Database, sessionId: string): Promise<void> {
   await dbUpdate(db, 'sessions', { deleted_at: new Date().toISOString() }, 'id = ?', [sessionId]);
-  console.warn(JSON.stringify({ level: 'info', service: 'auth', message: 'Session revoked', session_id: sessionId }));
+  console.warn(
+    JSON.stringify({
+      level: 'info',
+      service: 'auth',
+      message: 'Session revoked',
+      session_id: sessionId,
+    }),
+  );
 }
 
 /**
@@ -842,8 +962,16 @@ export async function findOrCreateUser(
 
   const identifier = opts.email ?? 'user';
   const slugBase = opts.email
-    ? opts.email.split('@')[0]!.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').substring(0, 63)
-    : identifier.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').substring(0, 63);
+    ? opts.email
+        .split('@')[0]!
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
+        .substring(0, 63)
+    : identifier
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
+        .substring(0, 63);
   const randomSuffix = crypto.randomUUID().substring(0, 6);
   const slug = `${slugBase}-${randomSuffix}`;
 
@@ -872,6 +1000,15 @@ export async function findOrCreateUser(
     deleted_at: null,
   });
 
-  console.warn(JSON.stringify({ level: 'info', service: 'auth', message: 'New user created', user_id: userId, org_id: orgId, email: opts.email }));
+  console.warn(
+    JSON.stringify({
+      level: 'info',
+      service: 'auth',
+      message: 'New user created',
+      user_id: userId,
+      org_id: orgId,
+      email: opts.email,
+    }),
+  );
   return { user_id: userId, org_id: orgId, is_new: true };
 }

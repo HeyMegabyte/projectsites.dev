@@ -63,7 +63,9 @@ describe('parseHtmlForFindings', () => {
     expect(findings.h1Count).toBe(2);
     expect(findings.jsonLdBlocks).toBe(0);
     expect(findings.imagesMissingAlt).toBe(1);
-    expect(findings.bannedWordHits).toEqual(expect.arrayContaining(['world-class', 'transform', 'revolutionize']));
+    expect(findings.bannedWordHits).toEqual(
+      expect.arrayContaining(['world-class', 'transform', 'revolutionize']),
+    );
     expect(findings.score).toBeLessThan(0.4);
   });
 
@@ -83,7 +85,9 @@ describe('parseHtmlForFindings', () => {
 
 describe('tierPsi', () => {
   const originalFetch = globalThis.fetch;
-  afterEach(() => { globalThis.fetch = originalFetch; });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
 
   it('parses category scores from PSI v5 response', async () => {
     globalThis.fetch = (async (input: RequestInfo | URL) => {
@@ -91,16 +95,19 @@ describe('tierPsi', () => {
       expect(url).toContain('pagespeedonline/v5/runPagespeed');
       expect(url).toContain('strategy=mobile');
       expect(url).toContain('key=fake-key');
-      return new Response(JSON.stringify({
-        lighthouseResult: {
-          categories: {
-            performance: { score: 0.92 },
-            accessibility: { score: 0.97 },
-            seo: { score: 0.95 },
-            'best-practices': { score: 0.88 },
+      return new Response(
+        JSON.stringify({
+          lighthouseResult: {
+            categories: {
+              performance: { score: 0.92 },
+              accessibility: { score: 0.97 },
+              seo: { score: 0.95 },
+              'best-practices': { score: 0.88 },
+            },
           },
-        },
-      }), { status: 200 });
+        }),
+        { status: 200 },
+      );
     }) as typeof fetch;
 
     const psi = await tierPsi('https://njsk.projectsites.dev', 'fake-key');
@@ -118,7 +125,9 @@ describe('tierPsi', () => {
 
 describe('runBenchmarks', () => {
   const originalFetch = globalThis.fetch;
-  afterEach(() => { globalThis.fetch = originalFetch; });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
 
   it('inserts a row and computes mean score across tiers', async () => {
     let inserted: Record<string, unknown> | null = null;
@@ -129,7 +138,11 @@ describe('runBenchmarks', () => {
           bind: (...params: unknown[]) => ({
             run: async () => {
               if (sql.includes('INSERT INTO site_benchmarks')) {
-                const cols = sql.match(/\((.*?)\)/)?.[1].split(',').map((s) => s.trim()) || [];
+                const cols =
+                  sql
+                    .match(/\((.*?)\)/)?.[1]
+                    .split(',')
+                    .map((s) => s.trim()) || [];
                 inserted = Object.fromEntries(cols.map((c, i) => [c, params[i]]));
               }
               return { meta: { changes: 1 } };
@@ -147,14 +160,19 @@ describe('runBenchmarks', () => {
       const url = String(input);
       if (url.includes('pagespeedonline')) {
         psiCalls++;
-        return new Response(JSON.stringify({
-          lighthouseResult: { categories: {
-            performance: { score: 0.9 },
-            accessibility: { score: 1.0 },
-            seo: { score: 0.95 },
-            'best-practices': { score: 0.85 },
-          } },
-        }), { status: 200 });
+        return new Response(
+          JSON.stringify({
+            lighthouseResult: {
+              categories: {
+                performance: { score: 0.9 },
+                accessibility: { score: 1.0 },
+                seo: { score: 0.95 },
+                'best-practices': { score: 0.85 },
+              },
+            },
+          }),
+          { status: 200 },
+        );
       }
       return new Response(goodHtml, { status: 200 });
     }) as typeof fetch;

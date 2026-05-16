@@ -150,7 +150,9 @@ export function extractJsonFromText(text: string): unknown {
 
   const lastEnd = trimmed.lastIndexOf(endChar);
   if (lastEnd <= startIdx) {
-    throw new SyntaxError(`No matching closing bracket in LLM output: ${trimmed.substring(0, 80)}...`);
+    throw new SyntaxError(
+      `No matching closing bracket in LLM output: ${trimmed.substring(0, 80)}...`,
+    );
   }
 
   const candidate = trimmed.substring(startIdx, lastEnd + 1);
@@ -356,24 +358,35 @@ async function runResearchProfile(env: Env, input: WorkflowInput): Promise<Profi
     google_place_id: input.googlePlaceId ?? '',
     additional_context: input.additionalContext ?? '',
   });
-  return validatePromptOutput('research_profile', extractJsonFromText(result.output)) as ProfileResult;
+  return validatePromptOutput(
+    'research_profile',
+    extractJsonFromText(result.output),
+  ) as ProfileResult;
 }
 
 // ── Phase 2: Parallel Research ───────────────────────────────
 
 async function runResearchSocial(
-  env: Env, input: WorkflowInput, businessType: string,
+  env: Env,
+  input: WorkflowInput,
+  businessType: string,
 ): Promise<SocialResult> {
   const result = await runPrompt(env, 'research_social', 1, {
     business_name: input.businessName,
     business_address: input.businessAddress ?? '',
     business_type: businessType,
   });
-  return validatePromptOutput('research_social', extractJsonFromText(result.output)) as SocialResult;
+  return validatePromptOutput(
+    'research_social',
+    extractJsonFromText(result.output),
+  ) as SocialResult;
 }
 
 async function runResearchBrand(
-  env: Env, input: WorkflowInput, businessType: string, websiteUrl: string,
+  env: Env,
+  input: WorkflowInput,
+  businessType: string,
+  websiteUrl: string,
 ): Promise<BrandResult> {
   // Step 1: If website exists, extract REAL colors via GPT-4o vision (Anthropic fallback)
   // This prevents the LLM from guessing colors based on industry stereotypes
@@ -407,10 +420,25 @@ Notes: ${parsed.notes || 'none'}
 Confidence: ${parsed.confidence}
 USE THESE COLORS as the primary palette. Do NOT override with industry-generic colors.`;
       }
-      console.warn(JSON.stringify({ level: 'info', service: 'ai_workflows', step: 'color_extraction', website: websiteUrl, colors: parsed }));
+      console.warn(
+        JSON.stringify({
+          level: 'info',
+          service: 'ai_workflows',
+          step: 'color_extraction',
+          website: websiteUrl,
+          colors: parsed,
+        }),
+      );
     } catch (err) {
       // Non-fatal — fall back to LLM color inference
-      console.warn(JSON.stringify({ level: 'warn', service: 'ai_workflows', step: 'color_extraction', error: err instanceof Error ? err.message : String(err) }));
+      console.warn(
+        JSON.stringify({
+          level: 'warn',
+          service: 'ai_workflows',
+          step: 'color_extraction',
+          error: err instanceof Error ? err.message : String(err),
+        }),
+      );
     }
   }
 
@@ -425,8 +453,11 @@ USE THESE COLORS as the primary palette. Do NOT override with industry-generic c
 }
 
 async function runResearchSellingPoints(
-  env: Env, input: WorkflowInput, businessType: string,
-  servicesJson: string, description: string,
+  env: Env,
+  input: WorkflowInput,
+  businessType: string,
+  servicesJson: string,
+  description: string,
 ): Promise<SellingPointsResult> {
   const result = await runPrompt(env, 'research_selling_points', 1, {
     business_name: input.businessName,
@@ -436,12 +467,16 @@ async function runResearchSellingPoints(
     additional_context: input.additionalContext ?? '',
   });
   return validatePromptOutput(
-    'research_selling_points', extractJsonFromText(result.output),
+    'research_selling_points',
+    extractJsonFromText(result.output),
   ) as SellingPointsResult;
 }
 
 async function runResearchImages(
-  env: Env, input: WorkflowInput, businessType: string, servicesJson: string,
+  env: Env,
+  input: WorkflowInput,
+  businessType: string,
+  servicesJson: string,
 ): Promise<ImagesResult> {
   const result = await runPrompt(env, 'research_images', 1, {
     business_name: input.businessName,
@@ -450,13 +485,18 @@ async function runResearchImages(
     services_json: servicesJson,
     additional_context: input.additionalContext ?? '',
   });
-  return validatePromptOutput('research_images', extractJsonFromText(result.output)) as ImagesResult;
+  return validatePromptOutput(
+    'research_images',
+    extractJsonFromText(result.output),
+  ) as ImagesResult;
 }
 
 // ── Phase 3: Website Generation ──────────────────────────────
 
 async function runGenerateWebsite(
-  env: Env, research: WorkflowResearch, uploads?: string[],
+  env: Env,
+  research: WorkflowResearch,
+  uploads?: string[],
 ): Promise<string> {
   const result = await runPrompt(env, 'generate_website', 1, {
     profile_json: JSON.stringify(research.profile),
@@ -473,11 +513,12 @@ async function runGenerateWebsite(
 // ── Phase 4: Legal Pages ─────────────────────────────────────
 
 async function runGenerateLegalPage(
-  env: Env, research: WorkflowResearch, pageType: 'privacy' | 'terms',
+  env: Env,
+  research: WorkflowResearch,
+  pageType: 'privacy' | 'terms',
 ): Promise<string> {
   const addr = research.profile.address;
-  const addressStr = [addr.street, addr.city, addr.state, addr.zip]
-    .filter(Boolean).join(', ');
+  const addressStr = [addr.street, addr.city, addr.state, addr.zip].filter(Boolean).join(', ');
 
   const result = await runPrompt(env, 'generate_legal_pages', 1, {
     business_name: research.profile.business_name,
@@ -494,7 +535,9 @@ async function runGenerateLegalPage(
 // ── Phase 4: Quality Scoring ─────────────────────────────────
 
 async function runScoreWebsite(
-  env: Env, html: string, businessName: string,
+  env: Env,
+  html: string,
+  businessName: string,
 ): Promise<WebsiteScore> {
   const result = await runPrompt(env, 'score_website', 1, {
     html_content: html.substring(0, 6000),
@@ -520,11 +563,15 @@ export async function runSiteGenerationWorkflowV2(
   // Phase 1: Research profile first (we need business_type for other prompts)
   const profile = await runResearchProfile(env, input);
 
-  console.warn(JSON.stringify({
-    level: 'info', service: 'ai_workflow', phase: 1,
-    message: 'Profile research complete',
-    business_type: profile.business_type,
-  }));
+  console.warn(
+    JSON.stringify({
+      level: 'info',
+      service: 'ai_workflow',
+      phase: 1,
+      message: 'Profile research complete',
+      business_type: profile.business_type,
+    }),
+  );
 
   // Phase 2: Parallel research (all depend on profile.business_type)
   const servicesJson = JSON.stringify(profile.services.map((s) => s.name));
@@ -541,20 +588,30 @@ export async function runSiteGenerationWorkflowV2(
 
   const research: WorkflowResearch = { profile, social, brand, sellingPoints, images };
 
-  console.warn(JSON.stringify({
-    level: 'info', service: 'ai_workflow', phase: 2,
-    message: 'Parallel research complete',
-    social_links_found: social.social_links.filter((l) => l.url && (l.confidence ?? 0) >= 0.9).length,
-    logo_found: brand.logo.found_online,
-  }));
+  console.warn(
+    JSON.stringify({
+      level: 'info',
+      service: 'ai_workflow',
+      phase: 2,
+      message: 'Parallel research complete',
+      social_links_found: social.social_links.filter((l) => l.url && (l.confidence ?? 0) >= 0.9)
+        .length,
+      logo_found: brand.logo.found_online,
+    }),
+  );
 
   // Phase 3: Generate main website HTML
   const html = await runGenerateWebsite(env, research, input.uploadedAssets);
 
-  console.warn(JSON.stringify({
-    level: 'info', service: 'ai_workflow', phase: 3,
-    message: 'Website HTML generated', html_size: html.length,
-  }));
+  console.warn(
+    JSON.stringify({
+      level: 'info',
+      service: 'ai_workflow',
+      phase: 3,
+      message: 'Website HTML generated',
+      html_size: html.length,
+    }),
+  );
 
   // Phase 4: Parallel - legal pages + quality scoring
   const [privacyHtml, termsHtml, quality] = await Promise.all([
@@ -563,12 +620,16 @@ export async function runSiteGenerationWorkflowV2(
     runScoreWebsite(env, html, input.businessName),
   ]);
 
-  console.warn(JSON.stringify({
-    level: 'info', service: 'ai_workflow', phase: 4,
-    message: 'Legal pages and scoring complete',
-    quality_score: quality.overall,
-    missing_sections: quality.missing_sections,
-  }));
+  console.warn(
+    JSON.stringify({
+      level: 'info',
+      service: 'ai_workflow',
+      phase: 4,
+      message: 'Legal pages and scoring complete',
+      quality_score: quality.overall,
+      missing_sections: quality.missing_sections,
+    }),
+  );
 
   return { research, html, privacyHtml, termsHtml, quality };
 }

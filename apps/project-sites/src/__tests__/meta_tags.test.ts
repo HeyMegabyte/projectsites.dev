@@ -35,7 +35,9 @@ describe('Marketing Homepage Meta Tags', () => {
   });
 
   it('has meta description', () => {
-    expect(html).toContain('<meta name="description" content="AI-powered websites for small businesses');
+    expect(html).toContain(
+      '<meta name="description" content="AI-powered websites for small businesses',
+    );
   });
 
   it('has meta keywords', () => {
@@ -65,15 +67,19 @@ describe('Marketing Homepage Meta Tags', () => {
   });
 
   it('has og:title', () => {
-    expect(html).toContain('<meta property="og:title" content="Project Sites - Your Website, Handled. Finally.">');
+    expect(html).toContain(
+      '<meta property="og:title" content="Project Sites - Your Website, Handled. Finally.">',
+    );
   });
 
   it('has og:description', () => {
-    expect(html).toMatch(/<meta property="og:description" content="[^"]+">/)
+    expect(html).toMatch(/<meta property="og:description" content="[^"]+">/);
   });
 
   it('has og:image', () => {
-    expect(html).toContain('<meta property="og:image" content="https://projectsites.dev/icon-512.png">');
+    expect(html).toContain(
+      '<meta property="og:image" content="https://projectsites.dev/icon-512.png">',
+    );
   });
 
   it('has og:url', () => {
@@ -98,15 +104,19 @@ describe('Marketing Homepage Meta Tags', () => {
   });
 
   it('has twitter:title', () => {
-    expect(html).toContain('<meta name="twitter:title" content="Project Sites - Your Website, Handled. Finally.">');
+    expect(html).toContain(
+      '<meta name="twitter:title" content="Project Sites - Your Website, Handled. Finally.">',
+    );
   });
 
   it('has twitter:description', () => {
-    expect(html).toMatch(/<meta name="twitter:description" content="[^"]+">/)
+    expect(html).toMatch(/<meta name="twitter:description" content="[^"]+">/);
   });
 
   it('has twitter:image', () => {
-    expect(html).toContain('<meta name="twitter:image" content="https://projectsites.dev/icon-512.png">');
+    expect(html).toContain(
+      '<meta name="twitter:image" content="https://projectsites.dev/icon-512.png">',
+    );
   });
 
   // PWA
@@ -244,18 +254,12 @@ describe('Brand Color Consistency', () => {
 describe('Email Template Brand Colors', () => {
   it('auth magic link email uses #00d4ff accent', () => {
     // Read the auth service to verify color usage
-    const authTs = fs.readFileSync(
-      path.resolve(__dirname, '../services/auth.ts'),
-      'utf-8',
-    );
+    const authTs = fs.readFileSync(path.resolve(__dirname, '../services/auth.ts'), 'utf-8');
     expect(authTs).toContain('#00d4ff');
   });
 
   it('contact email templates use #50a5db accent', () => {
-    const contactTs = fs.readFileSync(
-      path.resolve(__dirname, '../services/contact.ts'),
-      'utf-8',
-    );
+    const contactTs = fs.readFileSync(path.resolve(__dirname, '../services/contact.ts'), 'utf-8');
     expect(contactTs).toContain('#50a5db');
     expect(contactTs).not.toContain('#64ffda');
   });

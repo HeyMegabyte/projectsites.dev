@@ -16,7 +16,16 @@ const mockRawResearch: RawResearch = {
     business_type: 'Barber Shop',
     categories: ['Barber', 'Grooming'],
     services: [
-      { name: 'Haircut', description: 'Classic cut', price_hint: '$25-$40', price_from: 25, duration_minutes: 30, variants: ['Classic', 'Fade'], add_ons: [], category: 'Haircuts' },
+      {
+        name: 'Haircut',
+        description: 'Classic cut',
+        price_hint: '$25-$40',
+        price_from: 25,
+        duration_minutes: 30,
+        variants: ['Classic', 'Fade'],
+        add_ons: [],
+        category: 'Haircuts',
+      },
     ],
     hours: [
       { day: 'Monday', open: '9:00 AM', close: '6:00 PM', closed: false },
@@ -25,7 +34,13 @@ const mockRawResearch: RawResearch = {
     phone: '+19735550123',
     email: 'test@barber.com',
     website_url: 'https://testbarber.com',
-    address: { street: '123 Main St', city: 'Lake Hiawatha', state: 'NJ', zip: '07034', country: 'US' },
+    address: {
+      street: '123 Main St',
+      city: 'Lake Hiawatha',
+      state: 'NJ',
+      zip: '07034',
+      country: 'US',
+    },
     geo: { lat: 40.88, lng: -74.38 },
     google: { place_id: 'ChIJ123', maps_url: 'https://maps.google.com/?cid=123' },
     service_area: { zips: ['07034'], towns: ['Lake Hiawatha'] },
@@ -34,33 +49,85 @@ const mockRawResearch: RawResearch = {
     payments: ['Cash', 'Credit Cards'],
     amenities: ['Walk-ins welcome', 'Free WiFi'],
     team: [{ name: 'Alex', role: 'Owner', specialties: ['Fades'] }],
-    reviews_summary: { aggregate_rating: 4.8, review_count: 120, featured_reviews: [{ quote: 'Great!', name: 'Mike', source: 'Google' }] },
+    reviews_summary: {
+      aggregate_rating: 4.8,
+      review_count: 120,
+      featured_reviews: [{ quote: 'Great!', name: 'Mike', source: 'Google' }],
+    },
     faq: [{ question: 'Walk-ins?', answer: 'Yes!' }],
-    seo: { title: 'Test Barber - Lake Hiawatha', description: 'Best barber', primary_keywords: ['barber'], secondary_keywords: ['haircut'], service_keywords: ['fade'], neighborhood_keywords: ['07034'] },
+    seo: {
+      title: 'Test Barber - Lake Hiawatha',
+      description: 'Best barber',
+      primary_keywords: ['barber'],
+      secondary_keywords: ['haircut'],
+      service_keywords: ['fade'],
+      neighborhood_keywords: ['07034'],
+    },
     schema_org_type: 'BarberShop',
   },
   social: {
-    social_links: [{ platform: 'instagram', url: 'https://instagram.com/testbarber', confidence: 0.9 }],
+    social_links: [
+      { platform: 'instagram', url: 'https://instagram.com/testbarber', confidence: 0.9 },
+    ],
     website_url: 'https://testbarber.com',
     review_platforms: [{ platform: 'Google', url: 'https://g.co/test', rating: '4.8' }],
     google_business_photos: [{ url: 'https://photos.google.com/1', alt_text: 'Shop front' }],
   },
   brand: {
-    logo: { found_online: false, search_query: 'test barber logo', fallback_design: { text: 'TB', font: 'Inter', accent_shape: 'circle', accent_color: '#64ffda' } },
-    colors: { primary: '#2563eb', secondary: '#7c3aed', accent: '#64ffda', background: '#fff', surface: '#f8f', text_primary: '#111', text_secondary: '#666' },
+    logo: {
+      found_online: false,
+      search_query: 'test barber logo',
+      fallback_design: {
+        text: 'TB',
+        font: 'Inter',
+        accent_shape: 'circle',
+        accent_color: '#64ffda',
+      },
+    },
+    colors: {
+      primary: '#2563eb',
+      secondary: '#7c3aed',
+      accent: '#64ffda',
+      background: '#fff',
+      surface: '#f8f',
+      text_primary: '#111',
+      text_secondary: '#666',
+    },
     fonts: { heading: 'Montserrat', body: 'Lato' },
     brand_personality: 'Modern, friendly',
     style_notes: 'Clean and bold',
   },
   sellingPoints: {
-    selling_points: [{ headline: 'Expert Barbers', description: 'Years of experience', icon: 'users' }],
-    hero_slogans: [{ headline: 'Look Great', subheadline: 'Feel Great', cta_primary: { text: 'Book Now', action: '#contact' }, cta_secondary: { text: 'Learn More', action: '#services' } }],
+    selling_points: [
+      { headline: 'Expert Barbers', description: 'Years of experience', icon: 'users' },
+    ],
+    hero_slogans: [
+      {
+        headline: 'Look Great',
+        subheadline: 'Feel Great',
+        cta_primary: { text: 'Book Now', action: '#contact' },
+        cta_secondary: { text: 'Learn More', action: '#services' },
+      },
+    ],
     benefit_bullets: ['Expert barbers', 'Quick service'],
   },
   images: {
-    hero_images: [{ concept: 'Barber action', search_query: 'barber cutting hair', alt_text: 'Barber cutting hair', aspect_ratio: '16:9' }],
-    storefront_image: { search_query: 'barber shop', confidence: 0.6, fallback_description: 'Shop front' },
-    service_images: [{ service_name: 'Haircut', search_query: 'haircut', alt_text: 'Haircut service' }],
+    hero_images: [
+      {
+        concept: 'Barber action',
+        search_query: 'barber cutting hair',
+        alt_text: 'Barber cutting hair',
+        aspect_ratio: '16:9',
+      },
+    ],
+    storefront_image: {
+      search_query: 'barber shop',
+      confidence: 0.6,
+      fallback_description: 'Shop front',
+    },
+    service_images: [
+      { service_name: 'Haircut', search_query: 'haircut', alt_text: 'Haircut service' },
+    ],
     gallery: [],
     placeholder_strategy: 'stock',
   },
@@ -109,9 +176,7 @@ describe('transformToV3', () => {
       website: 'https://testbarber.com',
       rating: 4.9,
       review_count: 200,
-      hours: [
-        { day: 'Monday', open: '10:00 AM', close: '7:00 PM', closed: false },
-      ],
+      hours: [{ day: 'Monday', open: '10:00 AM', close: '7:00 PM', closed: false }],
       geo: { lat: 40.881, lng: -74.381 },
       maps_url: 'https://maps.google.com/?cid=456',
       photos: [{ url: 'https://photo.google/1', attribution: 'Google', width: 1024, height: 768 }],
@@ -122,7 +187,10 @@ describe('transformToV3', () => {
     };
 
     const v3 = transformToV3(mockRawResearch, placesData, { businessName: 'Test Barber' });
-    const id = v3.identity as Record<string, { value: unknown; confidence: number; sources: Array<{ kind: string }> }>;
+    const id = v3.identity as Record<
+      string,
+      { value: unknown; confidence: number; sources: Array<{ kind: string }> }
+    >;
 
     // Phone should use Google Places value (higher confidence)
     expect(id.phone.value).toBe('+19735550999');
@@ -136,18 +204,29 @@ describe('transformToV3', () => {
     const prov = v3.provenance as Record<string, unknown>;
     expect(prov.version).toBe('v3');
     expect(typeof prov.overallConfidence).toBe('number');
-    expect((prov.overallConfidence as number)).toBeGreaterThan(0);
-    expect((prov.overallConfidence as number)).toBeLessThanOrEqual(1);
+    expect(prov.overallConfidence as number).toBeGreaterThan(0);
+    expect(prov.overallConfidence as number).toBeLessThanOrEqual(1);
     expect(prov.enrichmentPipeline).toEqual(['llm_research']);
     expect(typeof prov.generatedAt).toBe('string');
   });
 
   it('includes google_places in enrichmentPipeline when places data provided', () => {
     const placesData: PlacesResult = {
-      place_id: 'ChIJ789', name: 'Test', formatted_address: '',
-      phone: null, website: null, rating: null, review_count: null,
-      hours: null, geo: null, maps_url: null, photos: [], types: [],
-      price_level: null, reviews: [], business_status: null,
+      place_id: 'ChIJ789',
+      name: 'Test',
+      formatted_address: '',
+      phone: null,
+      website: null,
+      rating: null,
+      review_count: null,
+      hours: null,
+      geo: null,
+      maps_url: null,
+      photos: [],
+      types: [],
+      price_level: null,
+      reviews: [],
+      business_status: null,
     };
     const v3 = transformToV3(mockRawResearch, placesData, { businessName: 'Test' });
     const prov = v3.provenance as Record<string, unknown>;
@@ -175,8 +254,8 @@ describe('transformToV3', () => {
     const v3 = transformToV3(mockRawResearch, null, { businessName: 'Test' });
     const ui = v3.uiPolicy as Record<string, Record<string, unknown>>;
     expect(ui.componentThresholds['contact.phone']).toBe(0.85);
-    expect(ui.componentThresholds['hero.tagline']).toBe(0.80);
-    expect(ui.componentThresholds['images.gallery']).toBe(0.40);
+    expect(ui.componentThresholds['hero.tagline']).toBe(0.8);
+    expect(ui.componentThresholds['images.gallery']).toBe(0.4);
   });
 
   it('transforms services with enriched fields', () => {

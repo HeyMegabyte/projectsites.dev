@@ -65,24 +65,32 @@ afterEach(() => {
 
 describe('Container upload endpoint', () => {
   it('rejects requests without secret', async () => {
-    const res = await app.request('/api/container-upload/sites/test/file.html', {
-      method: 'PUT',
-      body: '<html>test</html>',
-      headers: { 'Content-Type': 'text/html' },
-    }, mockEnv);
+    const res = await app.request(
+      '/api/container-upload/sites/test/file.html',
+      {
+        method: 'PUT',
+        body: '<html>test</html>',
+        headers: { 'Content-Type': 'text/html' },
+      },
+      mockEnv,
+    );
     expect(res.status).toBe(401);
   });
 
   it('accepts requests with correct secret', async () => {
     const secret = MOCK_API_KEY.slice(0, 16);
-    const res = await app.request('/api/container-upload/sites/test/file.html', {
-      method: 'PUT',
-      body: '<html>test</html>',
-      headers: {
-        'Content-Type': 'text/html',
-        'x-container-secret': secret,
+    const res = await app.request(
+      '/api/container-upload/sites/test/file.html',
+      {
+        method: 'PUT',
+        body: '<html>test</html>',
+        headers: {
+          'Content-Type': 'text/html',
+          'x-container-secret': secret,
+        },
       },
-    }, mockEnv);
+      mockEnv,
+    );
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.ok).toBe(true);
@@ -99,33 +107,41 @@ describe('Container upload endpoint', () => {
 
 describe('Container query endpoint', () => {
   it('rejects requests without secret', async () => {
-    const res = await app.request('/api/container-query', {
-      method: 'POST',
-      body: JSON.stringify({ sql: 'SELECT 1' }),
-      headers: { 'Content-Type': 'application/json' },
-    }, mockEnv);
+    const res = await app.request(
+      '/api/container-query',
+      {
+        method: 'POST',
+        body: JSON.stringify({ sql: 'SELECT 1' }),
+        headers: { 'Content-Type': 'application/json' },
+      },
+      mockEnv,
+    );
     expect(res.status).toBe(401);
   });
 
   it('executes parameterized SQL with correct secret', async () => {
     const secret = MOCK_API_KEY.slice(0, 16);
-    const res = await app.request('/api/container-query', {
-      method: 'POST',
-      body: JSON.stringify({
-        sql: "UPDATE sites SET status = ?1 WHERE id = ?2",
-        params: ['published', 'test-id'],
-      }),
-      headers: {
-        'Content-Type': 'application/json',
-        'x-container-secret': secret,
+    const res = await app.request(
+      '/api/container-query',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          sql: 'UPDATE sites SET status = ?1 WHERE id = ?2',
+          params: ['published', 'test-id'],
+        }),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-container-secret': secret,
+        },
       },
-    }, mockEnv);
+      mockEnv,
+    );
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.ok).toBe(true);
 
     // Verify D1 prepare was called
-    expect(mockDb.prepare).toHaveBeenCalledWith("UPDATE sites SET status = ?1 WHERE id = ?2");
+    expect(mockDb.prepare).toHaveBeenCalledWith('UPDATE sites SET status = ?1 WHERE id = ?2');
   });
 });
 

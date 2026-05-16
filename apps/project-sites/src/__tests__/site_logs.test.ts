@@ -64,10 +64,7 @@ const createMockEnv = (overrides: Partial<Env> = {}): Env =>
     ...overrides,
   }) as unknown as Env;
 
-function createAuthenticatedApp(
-  vars: Partial<Variables> = {},
-  envOverrides: Partial<Env> = {},
-) {
+function createAuthenticatedApp(vars: Partial<Variables> = {}, envOverrides: Partial<Env> = {}) {
   const authedApp = new Hono<{ Bindings: Env; Variables: Variables }>();
   authedApp.onError(errorHandler);
   authedApp.use('*', async (c, next) => {
@@ -120,7 +117,13 @@ describe('getSiteAuditLogs', () => {
   it('returns logs filtered by site ID', async () => {
     const logs = [
       { id: 'log-1', action: 'site.created', target_id: siteId, org_id: orgId },
-      { id: 'log-2', action: 'hostname.provisioned', target_id: 'host-1', org_id: orgId, metadata_json: `{"site_id":"${siteId}"}` },
+      {
+        id: 'log-2',
+        action: 'hostname.provisioned',
+        target_id: 'host-1',
+        org_id: orgId,
+        metadata_json: `{"site_id":"${siteId}"}`,
+      },
     ];
     mockDbQuery.mockResolvedValueOnce({ data: logs, error: null });
 
@@ -155,11 +158,13 @@ describe('getSiteAuditLogs', () => {
 
     await getSiteAuditLogs(mockDb, orgId, siteId);
 
-    expect(mockDbQuery).toHaveBeenCalledWith(
-      mockDb,
-      expect.stringContaining('LIMIT'),
-      [orgId, siteId, `%"site_id":"${siteId}"%`, 100, 0],
-    );
+    expect(mockDbQuery).toHaveBeenCalledWith(mockDb, expect.stringContaining('LIMIT'), [
+      orgId,
+      siteId,
+      `%"site_id":"${siteId}"%`,
+      100,
+      0,
+    ]);
   });
 
   it('respects custom limit and offset', async () => {
@@ -167,11 +172,13 @@ describe('getSiteAuditLogs', () => {
 
     await getSiteAuditLogs(mockDb, orgId, siteId, { limit: 25, offset: 50 });
 
-    expect(mockDbQuery).toHaveBeenCalledWith(
-      mockDb,
-      expect.stringContaining('LIMIT'),
-      [orgId, siteId, `%"site_id":"${siteId}"%`, 25, 50],
-    );
+    expect(mockDbQuery).toHaveBeenCalledWith(mockDb, expect.stringContaining('LIMIT'), [
+      orgId,
+      siteId,
+      `%"site_id":"${siteId}"%`,
+      25,
+      50,
+    ]);
   });
 
   it('handles database errors', async () => {
@@ -254,8 +261,18 @@ describe('GET /api/sites/:id/logs', () => {
 
   it('returns logs for a valid authenticated site', async () => {
     const mockLogs = [
-      { id: 'log-a', action: 'site.created', target_id: siteId, created_at: '2025-01-01T00:00:00Z' },
-      { id: 'log-b', action: 'site.updated', target_id: siteId, created_at: '2025-01-02T00:00:00Z' },
+      {
+        id: 'log-a',
+        action: 'site.created',
+        target_id: siteId,
+        created_at: '2025-01-01T00:00:00Z',
+      },
+      {
+        id: 'log-b',
+        action: 'site.updated',
+        target_id: siteId,
+        created_at: '2025-01-02T00:00:00Z',
+      },
     ];
 
     // First call: dbQueryOne for site ownership check

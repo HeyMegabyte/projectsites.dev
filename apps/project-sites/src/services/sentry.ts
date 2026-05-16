@@ -53,7 +53,13 @@ interface SentryEvent {
   platform: string;
   server_name: string;
   contexts?: {
-    trace?: { trace_id: string; span_id: string; parent_span_id?: string; op: string; status: string };
+    trace?: {
+      trace_id: string;
+      span_id: string;
+      parent_span_id?: string;
+      op: string;
+      status: string;
+    };
     request?: { url: string; method: string; headers: Record<string, string> };
     runtime?: { name: string; version: string };
   };
@@ -132,12 +138,7 @@ export class TransactionCollector {
   public tags: Record<string, string> = {};
   public extra: Record<string, unknown> = {};
 
-  constructor(opts: {
-    transaction: string;
-    op: string;
-    traceId?: string;
-    parentSpanId?: string;
-  }) {
+  constructor(opts: { transaction: string; op: string; traceId?: string; parentSpanId?: string }) {
     this.transaction = opts.transaction;
     this.op = opts.op;
     this.traceId = opts.traceId ?? generateTraceId();
@@ -167,7 +168,12 @@ export class TransactionCollector {
   }
 
   /** Add a breadcrumb to the transaction */
-  addBreadcrumb(category: string, message: string, level: SentryBreadcrumb['level'] = 'info', data?: Record<string, unknown>): void {
+  addBreadcrumb(
+    category: string,
+    message: string,
+    level: SentryBreadcrumb['level'] = 'info',
+    data?: Record<string, unknown>,
+  ): void {
     this.breadcrumbs.push({
       type: 'default',
       category,
@@ -268,31 +274,37 @@ export async function captureException(
     server_name: 'cloudflare-worker',
     // Distributed tracing context — connects frontend errors to backend
     contexts: {
-      trace: txn ? {
-        trace_id: txn.traceId,
-        span_id: txn.spanId,
-        parent_span_id: txn.parentSpanId,
-        op: txn.op,
-        status: 'internal_error',
-      } : undefined,
+      trace: txn
+        ? {
+            trace_id: txn.traceId,
+            span_id: txn.spanId,
+            parent_span_id: txn.parentSpanId,
+            op: txn.op,
+            status: 'internal_error',
+          }
+        : undefined,
       runtime: { name: 'cloudflare-workers', version: '0.0.0' },
-      ...(context.request ? {
-        request: {
-          url: context.request.url,
-          method: context.request.method,
-          headers: context.request.headers ?? {},
-        },
-      } : {}),
+      ...(context.request
+        ? {
+            request: {
+              url: context.request.url,
+              method: context.request.method,
+              headers: context.request.headers ?? {},
+            },
+          }
+        : {}),
     },
     breadcrumbs: txn ? { values: txn.breadcrumbs } : undefined,
     ...(context.userId ? { user: { id: context.userId } } : {}),
-    ...(context.request ? {
-      request: {
-        url: context.request.url,
-        method: context.request.method,
-        headers: context.request.headers ?? {},
-      },
-    } : {}),
+    ...(context.request
+      ? {
+          request: {
+            url: context.request.url,
+            method: context.request.method,
+            headers: context.request.headers ?? {},
+          },
+        }
+      : {}),
   };
 
   await sendToSentry(env, sentryEvent);
@@ -360,13 +372,15 @@ export async function sendTransaction(
     },
     breadcrumbs: { values: txn.breadcrumbs },
     spans: txn.spans,
-    ...(request ? {
-      request: {
-        url: request.url,
-        method: request.method,
-        headers: request.headers ?? {},
-      },
-    } : {}),
+    ...(request
+      ? {
+          request: {
+            url: request.url,
+            method: request.method,
+            headers: request.headers ?? {},
+          },
+        }
+      : {}),
     ...(userId ? { user: { id: userId } } : {}),
   };
 
