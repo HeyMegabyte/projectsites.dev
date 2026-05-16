@@ -69,11 +69,15 @@ export const subscriptionSchema = z.object({
  * `success_url` and `cancel_url` redirect targets (both must be valid URLs,
  * max 2048 chars). An optional `site_id` ties the checkout to a specific site.
  */
+export const budgetTierSchema = z.enum(['free', 'standard', 'plus', 'premium', 'patron']);
+export type BudgetTier = z.infer<typeof budgetTierSchema>;
+
 export const createCheckoutSessionSchema = z.object({
   org_id: uuidSchema.optional(),
   site_id: uuidSchema.optional(),
   success_url: z.string().url().max(2048),
   cancel_url: z.string().url().max(2048),
+  budget_tier: budgetTierSchema.optional(),
 });
 
 /**
@@ -87,6 +91,7 @@ export const createEmbeddedCheckoutSchema = z.object({
   org_id: uuidSchema.optional(),
   site_id: uuidSchema.optional(),
   return_url: z.string().url().max(2048),
+  budget_tier: budgetTierSchema.optional(),
 });
 
 /**

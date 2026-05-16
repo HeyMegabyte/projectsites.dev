@@ -34,6 +34,7 @@
  */
 
 import { PRICING, type Entitlements, getEntitlements, badRequest } from '@project-sites/shared';
+import type { BudgetTier } from '@project-sites/shared/schemas';
 import { dbQueryOne, dbInsert, dbUpdate } from './db.js';
 import type { Env } from '../types/env.js';
 
@@ -147,6 +148,7 @@ export async function createCheckoutSession(
     customerEmail: string;
     successUrl: string;
     cancelUrl: string;
+    budgetTier?: BudgetTier;
   },
 ): Promise<{ checkout_url: string; session_id: string }> {
   const { stripe_customer_id } = await getOrCreateStripeCustomer(
@@ -214,6 +216,7 @@ export async function createEmbeddedCheckoutSession(
     siteId?: string;
     customerEmail: string;
     returnUrl: string;
+    budgetTier?: BudgetTier;
   },
 ): Promise<{ client_secret: string; session_id: string }> {
   const { stripe_customer_id } = await getOrCreateStripeCustomer(
