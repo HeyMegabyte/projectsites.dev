@@ -134,6 +134,10 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      - name: Install shared deps
+        working-directory: packages/shared
+        run: npm ci --legacy-peer-deps
+
       - name: Install worker deps
         working-directory: apps/project-sites
         run: npm ci --legacy-peer-deps
@@ -209,6 +213,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install shared deps
+        working-directory: packages/shared
+        run: npm ci --legacy-peer-deps
 
       - name: Install worker deps
         working-directory: apps/project-sites
