@@ -74,6 +74,8 @@ jobs:
           CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
 
       - name: Smoke test — homepage 200
+        env:
+          REAL_UA: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
         run: |
           TARGET="${{ github.event_name == 'workflow_dispatch' && inputs.target || 'production' }}"
           if [ "$TARGET" = "production" ]; then
@@ -81,21 +83,32 @@ jobs:
           else
             URL="https://sites-staging.megabyte.space"
           fi
-          echo "Probing: $URL (waiting 30s for edge propagation)"
-          sleep 30
-          for i in $(seq 1 20); do
-            CODE=$(curl -s -o /dev/null -w "%{http_code}" -L --max-time 15 "$URL")
-            echo "Attempt $i/20: HTTP $CODE"
+          echo "Probing: $URL (waiting 20s for edge propagation)"
+          sleep 20
+          for i in $(seq 1 15); do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" -L --max-time 15 \
+              -A "$REAL_UA" \
+              -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8" \
+              -H "Accept-Language: en-US,en;q=0.9" \
+              -H "Sec-Fetch-Site: none" \
+              -H "Sec-Fetch-Mode: navigate" \
+              -H "Sec-Fetch-User: ?1" \
+              -H "Sec-Fetch-Dest: document" \
+              -H "Upgrade-Insecure-Requests: 1" \
+              "$URL")
+            echo "Attempt $i/15: HTTP $CODE"
             if [ "$CODE" = "200" ]; then
               echo "✓ Homepage live after attempt $i"
               exit 0
             fi
             sleep 10
           done
-          echo "::error::Homepage failed to return 200 after 20 attempts (~3.5 min total)"
+          echo "::error::Homepage failed to return 200 after 15 attempts (~2.5 min total)"
           exit 1
 
       - name: Smoke test — /health endpoint
+        env:
+          REAL_UA: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
         run: |
           TARGET="${{ github.event_name == 'workflow_dispatch' && inputs.target || 'production' }}"
           if [ "$TARGET" = "production" ]; then
@@ -103,4 +116,4 @@ jobs:
           else
             URL="https://sites-staging.megabyte.space/health"
           fi
-          curl -fsSL "$URL" | head -20
+          curl -fsSL -A "$REAL_UA" -H "Accept: application/json,*/*" "$URL" | head -20
