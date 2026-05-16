@@ -18,7 +18,7 @@ describe('Confidence — wrapConf', () => {
   it('wraps a string value with llm_generated confidence', () => {
     const c = wrapConf('hello', 'llm_generated', { rationale: 'test' });
     expect(c.value).toBe('hello');
-    expect(c.confidence).toBe(0.50);
+    expect(c.confidence).toBe(0.5);
     expect(c.sources).toHaveLength(1);
     expect(c.sources[0].kind).toBe('llm_generated');
     expect(c.rationale).toBe('test');
@@ -63,16 +63,16 @@ describe('Confidence — wrapConf', () => {
 
   it('uses correct base confidence for all source kinds', () => {
     expect(BASE_CONFIDENCE.business_owner).toBe(0.95);
-    expect(BASE_CONFIDENCE.user_provided).toBe(0.90);
+    expect(BASE_CONFIDENCE.user_provided).toBe(0.9);
     expect(BASE_CONFIDENCE.google_places).toBe(0.92);
-    expect(BASE_CONFIDENCE.osm).toBe(0.80);
-    expect(BASE_CONFIDENCE.review_platform).toBe(0.80);
-    expect(BASE_CONFIDENCE.domain_whois).toBe(0.70);
-    expect(BASE_CONFIDENCE.street_view).toBe(0.70);
-    expect(BASE_CONFIDENCE.social_profile).toBe(0.70);
-    expect(BASE_CONFIDENCE.llm_generated).toBe(0.50);
+    expect(BASE_CONFIDENCE.osm).toBe(0.8);
+    expect(BASE_CONFIDENCE.review_platform).toBe(0.8);
+    expect(BASE_CONFIDENCE.domain_whois).toBe(0.7);
+    expect(BASE_CONFIDENCE.street_view).toBe(0.7);
+    expect(BASE_CONFIDENCE.social_profile).toBe(0.7);
+    expect(BASE_CONFIDENCE.llm_generated).toBe(0.5);
     expect(BASE_CONFIDENCE.internal_inference).toBe(0.45);
-    expect(BASE_CONFIDENCE.stock_photo).toBe(0.30);
+    expect(BASE_CONFIDENCE.stock_photo).toBe(0.3);
   });
 });
 
@@ -99,12 +99,12 @@ describe('Confidence — mergeConf', () => {
     const a = wrapConf('v1', 'llm_generated');
     const b = wrapConf('v2', 'llm_generated', { rationale: 'second try' });
     const merged = mergeConf(a, b);
-    expect(merged.confidence).toBe(0.50);
+    expect(merged.confidence).toBe(0.5);
   });
 
   it('caps corroboration boost at 0.98', () => {
     const a = wrapConf('val', 'business_owner'); // 0.95
-    const b = wrapConf('val', 'google_places');  // 0.92
+    const b = wrapConf('val', 'google_places'); // 0.92
     const merged = mergeConf(a, b);
     // 0.95 + 0.08 = 1.03 -> capped at 0.98
     expect(merged.confidence).toBe(0.98);
@@ -129,7 +129,7 @@ describe('Confidence — applyBoostPenalties', () => {
   it('applies corroboration boost', () => {
     const c = {
       value: 'test',
-      confidence: 0.80,
+      confidence: 0.8,
       sources: [
         { kind: 'llm_generated' as const, retrievedAt: '' },
         { kind: 'google_places' as const, retrievedAt: '' },
@@ -155,7 +155,7 @@ describe('Confidence — applyBoostPenalties', () => {
   it('applies format validation penalty', () => {
     const c = wrapConf('bad-phone', 'user_provided');
     const score = applyBoostPenalties(c, { formatValid: false });
-    expect(score).toBe(0.80); // 0.90 - 0.10
+    expect(score).toBe(0.8); // 0.90 - 0.10
   });
 
   it('never goes below 0', () => {
@@ -169,8 +169,8 @@ describe('Confidence — applyBoostPenalties', () => {
 describe('Confidence — computeAggregateConfidence', () => {
   it('computes weighted mean of Conf leaves', () => {
     const obj = {
-      name: wrapConf('Test', 'user_provided'),    // 0.90
-      phone: wrapConf('+1234', 'google_places'),   // 0.92
+      name: wrapConf('Test', 'user_provided'), // 0.90
+      phone: wrapConf('+1234', 'google_places'), // 0.92
     };
     const agg = computeAggregateConfidence(obj);
     expect(agg).toBe(0.91); // (0.90 + 0.92) / 2
@@ -179,8 +179,8 @@ describe('Confidence — computeAggregateConfidence', () => {
   it('handles nested objects', () => {
     const obj = {
       identity: {
-        name: wrapConf('Test', 'llm_generated'),    // 0.50
-        phone: wrapConf('+1234', 'google_places'),   // 0.92
+        name: wrapConf('Test', 'llm_generated'), // 0.50
+        phone: wrapConf('+1234', 'google_places'), // 0.92
       },
     };
     const agg = computeAggregateConfidence(obj);
@@ -193,8 +193,8 @@ describe('Confidence — computeAggregateConfidence', () => {
 
   it('applies section weights', () => {
     const obj = {
-      identity: wrapConf('high', 'user_provided'),   // 0.90, weight 5
-      media: wrapConf('low', 'stock_photo'),          // 0.30, weight 1
+      identity: wrapConf('high', 'user_provided'), // 0.90, weight 5
+      media: wrapConf('low', 'stock_photo'), // 0.30, weight 1
     };
     const agg = computeAggregateConfidence(obj, SECTION_WEIGHTS);
     // (0.90*5 + 0.30*1) / (5+1) = 4.80/6 = 0.80
@@ -204,12 +204,12 @@ describe('Confidence — computeAggregateConfidence', () => {
 
 describe('Confidence — UI Prominence', () => {
   it('getProminenceLevel returns correct levels', () => {
-    expect(getProminenceLevel(0.90)).toBe('prominent');
+    expect(getProminenceLevel(0.9)).toBe('prominent');
     expect(getProminenceLevel(0.85)).toBe('prominent');
     expect(getProminenceLevel(0.84)).toBe('standard');
-    expect(getProminenceLevel(0.70)).toBe('standard');
+    expect(getProminenceLevel(0.7)).toBe('standard');
     expect(getProminenceLevel(0.69)).toBe('deemphasize');
-    expect(getProminenceLevel(0.50)).toBe('deemphasize');
+    expect(getProminenceLevel(0.5)).toBe('deemphasize');
     expect(getProminenceLevel(0.49)).toBe('hide_or_placeholder');
     expect(getProminenceLevel(0)).toBe('hide_or_placeholder');
   });
@@ -217,14 +217,14 @@ describe('Confidence — UI Prominence', () => {
   it('shouldShowComponent respects thresholds', () => {
     expect(shouldShowComponent('contact.phone', 0.85)).toBe(true);
     expect(shouldShowComponent('contact.phone', 0.84)).toBe(false);
-    expect(shouldShowComponent('marketing.copy', 0.60)).toBe(true);
+    expect(shouldShowComponent('marketing.copy', 0.6)).toBe(true);
     expect(shouldShowComponent('marketing.copy', 0.59)).toBe(false);
-    expect(shouldShowComponent('images.gallery', 0.40)).toBe(true);
+    expect(shouldShowComponent('images.gallery', 0.4)).toBe(true);
     expect(shouldShowComponent('images.gallery', 0.39)).toBe(false);
   });
 
   it('shouldShowComponent defaults to 0.50 for unknown components', () => {
-    expect(shouldShowComponent('unknown.widget', 0.50)).toBe(true);
+    expect(shouldShowComponent('unknown.widget', 0.5)).toBe(true);
     expect(shouldShowComponent('unknown.widget', 0.49)).toBe(false);
   });
 });

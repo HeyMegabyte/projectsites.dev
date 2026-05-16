@@ -66,15 +66,11 @@ describe('contactFormSchema', () => {
 
   // ─── Name validation ──────────────────────────────────────
   it('rejects missing name', () => {
-    expect(() =>
-      contactFormSchema.parse({ email: 'a@b.com', message: 'Long enough message' }),
-    ).toThrow();
+    expect(() => contactFormSchema.parse({ email: 'a@b.com', message: 'Long enough message' })).toThrow();
   });
 
   it('rejects empty name', () => {
-    expect(() =>
-      contactFormSchema.parse({ name: '', email: 'a@b.com', message: 'Long enough message' }),
-    ).toThrow();
+    expect(() => contactFormSchema.parse({ name: '', email: 'a@b.com', message: 'Long enough message' })).toThrow();
   });
 
   it('rejects name over 200 chars', () => {
@@ -97,9 +93,7 @@ describe('contactFormSchema', () => {
 
   // ─── Email validation ──────────────────────────────────────
   it('rejects missing email', () => {
-    expect(() =>
-      contactFormSchema.parse({ name: 'Bob', message: 'Long enough message' }),
-    ).toThrow();
+    expect(() => contactFormSchema.parse({ name: 'Bob', message: 'Long enough message' })).toThrow();
   });
 
   it('rejects invalid email', () => {
@@ -123,9 +117,7 @@ describe('contactFormSchema', () => {
 
   // ─── Message validation ────────────────────────────────────
   it('rejects missing message', () => {
-    expect(() =>
-      contactFormSchema.parse({ name: 'Bob', email: 'a@b.com' }),
-    ).toThrow();
+    expect(() => contactFormSchema.parse({ name: 'Bob', email: 'a@b.com' })).toThrow();
   });
 
   it('rejects short message (< 10 chars)', () => {

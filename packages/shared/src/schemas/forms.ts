@@ -11,14 +11,7 @@ import { emailSchema, slugSchema } from './base.js';
 /**
  * Supported newsletter providers. `webhook` is a generic JSON POST forwarder.
  */
-export const newsletterProviderSchema = z.enum([
-  'mailchimp',
-  'webhook',
-  'resend',
-  'sendgrid',
-  'convertkit',
-  'klaviyo',
-]);
+export const newsletterProviderSchema = z.enum(['mailchimp', 'webhook', 'resend', 'sendgrid', 'convertkit', 'klaviyo']);
 export type NewsletterProvider = z.infer<typeof newsletterProviderSchema>;
 
 /**
@@ -220,7 +213,10 @@ export const formRuleActionSchema = z.discriminatedUnion('type', [
       title: z.string().min(1).max(120),
       body: z.string().min(1).max(2000),
       severity: z.enum(['info', 'success', 'warning', 'critical']).default('info'),
-      channels: z.array(z.enum(['email', 'in-app'])).min(1).default(['in-app']),
+      channels: z
+        .array(z.enum(['email', 'in-app']))
+        .min(1)
+        .default(['in-app']),
     }),
   }),
 ]);

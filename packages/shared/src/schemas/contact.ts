@@ -28,10 +28,7 @@ export const contactFormSchema = z.object({
     .string()
     .min(10, 'Message must be at least 10 characters')
     .max(5000, 'Message is too long (max 5000 characters)')
-    .refine(
-      (val) => !/<script[\s>]/i.test(val) && !/javascript:/i.test(val),
-      'Invalid characters in message',
-    ),
+    .refine((val) => !/<script[\s>]/i.test(val) && !/javascript:/i.test(val), 'Invalid characters in message'),
 });
 
 /** Inferred TypeScript type for a validated contact form submission. */

@@ -38,16 +38,16 @@ export type SourceRef = z.infer<typeof sourceRefSchema>;
 
 export const BASE_CONFIDENCE: Record<SourceKind, number> = {
   business_owner: 0.95,
-  user_provided: 0.90,
+  user_provided: 0.9,
   google_places: 0.92,
-  osm: 0.80,
-  review_platform: 0.80,
-  domain_whois: 0.70,
-  street_view: 0.70,
-  social_profile: 0.70,
-  llm_generated: 0.50,
+  osm: 0.8,
+  review_platform: 0.8,
+  domain_whois: 0.7,
+  street_view: 0.7,
+  social_profile: 0.7,
+  llm_generated: 0.5,
   internal_inference: 0.45,
-  stock_photo: 0.30,
+  stock_photo: 0.3,
 };
 
 /**
@@ -55,10 +55,10 @@ export const BASE_CONFIDENCE: Record<SourceKind, number> = {
  * More sources = stronger confidence that the data is real.
  */
 export const CORROBORATION_BOOSTS: Record<number, number> = {
-  1: 0.00,  // single source: no boost
-  2: 0.08,  // 2 sources confirm: moderate boost
-  3: 0.15,  // 3 sources confirm: strong boost
-  4: 0.20,  // 4+ sources: very strong boost (e.g. Google + YellowPages + Maps + Yelp)
+  1: 0.0, // single source: no boost
+  2: 0.08, // 2 sources confirm: moderate boost
+  3: 0.15, // 3 sources confirm: strong boost
+  4: 0.2, // 4+ sources: very strong boost (e.g. Google + YellowPages + Maps + Yelp)
 };
 
 /** Max corroboration boost cap */
@@ -150,27 +150,27 @@ export type ProminenceLevel = 'prominent' | 'standard' | 'deemphasize' | 'hide_o
 
 export const PROMINENCE_THRESHOLDS: Record<ProminenceLevel, number> = {
   prominent: 0.85,
-  standard: 0.70,
-  deemphasize: 0.50,
+  standard: 0.7,
+  deemphasize: 0.5,
   hide_or_placeholder: 0.0,
 };
 
 export const UI_COMPONENT_MIN_CONFIDENCE: Record<string, number> = {
-  'hero.title': 0.80,
-  'hero.tagline': 0.80,
+  'hero.title': 0.8,
+  'hero.tagline': 0.8,
   'contact.phone': 0.85,
   'contact.booking_cta': 0.85,
   'contact.address': 0.85,
   'contact.map': 0.85,
-  'hours.display': 0.80,
-  'reviews.aggregate': 0.80,
+  'hours.display': 0.8,
+  'reviews.aggregate': 0.8,
   'services.pricing': 0.75,
-  'team.bios': 0.70,
-  'brand.colors': 0.70,
-  'brand.fonts': 0.70,
-  'marketing.copy': 0.60,
-  'images.hero': 0.50,
-  'images.gallery': 0.40,
+  'team.bios': 0.7,
+  'brand.colors': 0.7,
+  'brand.fonts': 0.7,
+  'marketing.copy': 0.6,
+  'images.hero': 0.5,
+  'images.gallery': 0.4,
 };
 
 export function getProminenceLevel(confidence: number): ProminenceLevel {
@@ -181,7 +181,7 @@ export function getProminenceLevel(confidence: number): ProminenceLevel {
 }
 
 export function shouldShowComponent(component: string, confidence: number): boolean {
-  const min = UI_COMPONENT_MIN_CONFIDENCE[component] ?? 0.50;
+  const min = UI_COMPONENT_MIN_CONFIDENCE[component] ?? 0.5;
   return confidence >= min;
 }
 
@@ -208,19 +208,21 @@ export function wrapConf<T>(
     confidence = Math.max(0, confidence - 0.15);
   }
   if (options?.isPlaceholder) {
-    confidence = Math.max(0, confidence - 0.10);
+    confidence = Math.max(0, confidence - 0.1);
   }
 
   return {
     value,
     confidence: Math.round(confidence * 100) / 100,
-    sources: [{
-      kind: sourceKind,
-      id: options?.sourceId,
-      url: options?.sourceUrl,
-      retrievedAt: now,
-      notes: options?.notes,
-    }],
+    sources: [
+      {
+        kind: sourceKind,
+        id: options?.sourceId,
+        url: options?.sourceUrl,
+        retrievedAt: now,
+        notes: options?.notes,
+      },
+    ],
     rationale: options?.rationale,
     lastVerifiedAt: now,
     isPlaceholder: options?.isPlaceholder ?? false,
@@ -235,12 +237,15 @@ export function wrapConf<T>(
  * -0.10 if format validation fails
  * -0.10 if stale data
  */
-export function applyBoostPenalties(conf: Conf<unknown>, options?: {
-  isEmpty?: boolean;
-  isStale?: boolean;
-  formatValid?: boolean;
-  fieldCategory?: FieldCategory;
-}): number {
+export function applyBoostPenalties(
+  conf: Conf<unknown>,
+  options?: {
+    isEmpty?: boolean;
+    isStale?: boolean;
+    formatValid?: boolean;
+    fieldCategory?: FieldCategory;
+  },
+): number {
   let score = conf.confidence;
 
   // Graduated corroboration boost based on distinct source kinds
@@ -253,13 +258,13 @@ export function applyBoostPenalties(conf: Conf<unknown>, options?: {
     score = Math.max(0, score - 0.15);
   }
   if (conf.isPlaceholder) {
-    score = Math.max(0, score - 0.10);
+    score = Math.max(0, score - 0.1);
   }
   if (options?.isStale) {
-    score = Math.max(0, score - 0.10);
+    score = Math.max(0, score - 0.1);
   }
   if (options?.formatValid === false) {
-    score = Math.max(0, score - 0.10);
+    score = Math.max(0, score - 0.1);
   }
 
   // Extra penalty for inferred fields from LLM-only sources
@@ -308,10 +313,7 @@ export function mergeConf<T>(a: Conf<T>, b: Conf<T>): Conf<T> {
  * Compute aggregate confidence for an object with Conf-wrapped leaves.
  * Uses weighted mean of all leaf confidence values.
  */
-export function computeAggregateConfidence(
-  obj: Record<string, unknown>,
-  weights?: Record<string, number>,
-): number {
+export function computeAggregateConfidence(obj: Record<string, unknown>, weights?: Record<string, number>): number {
   const entries: Array<{ key: string; confidence: number }> = [];
 
   function walk(current: unknown, path: string): void {
