@@ -56,7 +56,9 @@ jobs:
 
       - name: Deploy Worker (builds container image remotely)
         working-directory: apps/project-sites
+        shell: bash
         run: |
+          set -o pipefail
           TARGET="${{ github.event_name == 'workflow_dispatch' && inputs.target || 'production' }}"
           echo "Deploying to: $TARGET"
           npx wrangler deploy --env "$TARGET" 2>&1 | tee deploy.log
@@ -64,7 +66,8 @@ jobs:
           echo "deploy_id=${DEPLOY_ID:-unknown}" >> "$GITHUB_OUTPUT"
         id: deploy
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
 
       - name: Smoke test — homepage 200
         run: |
@@ -74,14 +77,15 @@ jobs:
           else
             URL="https://sites-staging.megabyte.space"
           fi
-          echo "Probing: $URL"
-          for i in 1 2 3 4 5; do
-            CODE=$(curl -s -o /dev/null -w "%{http_code}" -L "$URL")
+          echo "Probing: $URL (waiting 15s for edge propagation)"
+          sleep 15
+          for i in 1 2 3 4 5 6 7 8; do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" -L --max-time 10 "$URL")
             echo "Attempt $i: HTTP $CODE"
             if [ "$CODE" = "200" ]; then exit 0; fi
-            sleep 5
+            sleep 8
           done
-          echo "::error::Homepage failed to return 200 after 5 attempts"
+          echo "::error::Homepage failed to return 200 after 8 attempts"
           exit 1
 
       - name: Smoke test — /health endpoint

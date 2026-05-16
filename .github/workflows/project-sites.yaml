@@ -145,7 +145,8 @@ jobs:
           npx wrangler deploy --env staging 2>&1 | tee deploy.log
           echo "version=$(date +%s)" >> "$GITHUB_OUTPUT"
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
 
   # ─── Stage 4: Playwright E2E on Staging (3 shards) ─────────
   e2e-staging:
@@ -217,7 +218,8 @@ jobs:
         working-directory: apps/project-sites
         run: npx wrangler deploy --env production
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
 
   # ─── Stage 6: Post-deploy E2E on Production (3 shards) ──────
   e2e-production:
@@ -268,4 +270,5 @@ jobs:
           echo "::error::Production E2E shard ${{ matrix.shard }} failed - triggering rollback"
           npx wrangler rollback --env production --message "Automated rollback: E2E shard ${{ matrix.shard }} failed"
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
