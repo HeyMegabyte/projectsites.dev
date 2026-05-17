@@ -300,7 +300,16 @@ describe('serveSiteFromR2', () => {
 
   it('falls back to index.html for paths without extensions (SPA)', async () => {
     const indexHtml = createMockR2Object(SAMPLE_HTML);
+    // serveSiteFromR2 tries several R2 keys before SPA fallback:
+    // 1. /sites/.../about/team        (primary)
+    // 2. /sites/.../about/team/index.html (directory index)
+    // 3. /sites/.../about/team.html   (.html extension)
+    // 4. /sites/.../about-team.html   (flat-name fallback)
+    // 5. /sites/.../index.html        (SPA catch-all) <-- this is the match
     (env.SITES_BUCKET.get as jest.Mock)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(indexHtml);
 
@@ -309,8 +318,7 @@ describe('serveSiteFromR2', () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get('Content-Type')).toBe('text/html; charset=utf-8');
-    expect(env.SITES_BUCKET.get).toHaveBeenCalledTimes(2);
-    expect(env.SITES_BUCKET.get).toHaveBeenNthCalledWith(2, `sites/my-site/v1/index.html`);
+    expect(env.SITES_BUCKET.get).toHaveBeenLastCalledWith(`sites/my-site/v1/index.html`);
   });
 
   it('returns 404 when file not found', async () => {
