@@ -1,4 +1,4 @@
-var CACHE_NAME = 'project-sites-v3';
+var CACHE_NAME = 'project-sites-v4';
 var API_CACHE_NAME = 'project-sites-api-v1';
 var ASSETS_TO_CACHE = [
   '/',
