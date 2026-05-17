@@ -11,13 +11,12 @@ export const test = base.extend<{ authedPage: Page }>({
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
 
-    // Set session in localStorage + dismiss onboarding overlay
+    // Set session in localStorage
     await page.evaluate(() => {
       localStorage.setItem('ps_session', JSON.stringify({
         token: 'mock-token-123',
         identifier: 'test@example.com',
       }));
-      localStorage.setItem('ps_onboarding', 'dismissed');
       localStorage.setItem('ps_feedback_dismissed', 'true');
     });
 

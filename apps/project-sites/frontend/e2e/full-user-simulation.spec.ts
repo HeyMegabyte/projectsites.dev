@@ -13,17 +13,9 @@ import { test, expect } from './fixtures';
 import { test as base, expect as baseExpect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
-/** Dismiss the onboarding overlay + feedback widget if visible. */
+/** Dismiss the feedback widget overlay if visible. */
 async function dismissOverlays(page: Page): Promise<void> {
-  // Dismiss onboarding (shows after 1.5s delay)
-  await page.evaluate(() => localStorage.setItem('ps_onboarding', 'dismissed'));
-  // Also dismiss feedback widget if it has a storage key
   await page.evaluate(() => localStorage.setItem('ps_feedback_dismissed', 'true'));
-  // Click away any visible overlays just in case
-  const closeBtn = page.locator('.close-btn, button[aria-label="Close onboarding"]').first();
-  if (await closeBtn.isVisible({ timeout: 500 }).catch(() => false)) {
-    await closeBtn.click();
-  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -301,7 +293,6 @@ test.describe('B — Keyboard & UI Interactions', () => {
     await page.waitForLoadState('domcontentloaded');
     await page.evaluate(() => {
       localStorage.setItem('ps_session', JSON.stringify({ token: 'mock-token-123', identifier: 'test@example.com' }));
-      localStorage.setItem('ps_onboarding', 'dismissed');
     });
 
     // Intercept auth/me to return 401 BEFORE reload
@@ -589,9 +580,6 @@ base.describe('E — Unauthenticated Flows', () => {
     // Navigate directly to homepage
     await page.goto('http://localhost:4300/');
     await page.waitForLoadState('domcontentloaded');
-
-    // Dismiss onboarding before it appears
-    await page.evaluate(() => localStorage.setItem('ps_onboarding', 'dismissed'));
 
     // Navigate to create page (not logged in)
     await page.goto('http://localhost:4300/create');

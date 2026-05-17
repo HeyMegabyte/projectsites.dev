@@ -19,10 +19,9 @@ import type { Page } from '@playwright/test';
 // Shared helpers
 // ═══════════════════════════════════════════════════════════════
 
-/** Dismiss onboarding + feedback overlays */
+/** Dismiss feedback overlay */
 async function dismissOverlays(page: Page): Promise<void> {
   await page.evaluate(() => {
-    localStorage.setItem('ps_onboarding', 'dismissed');
     localStorage.setItem('ps_feedback_dismissed', 'true');
   });
 }
@@ -685,7 +684,6 @@ test('11. Auth: OAuth redirect, magic link, session guard, sign out', async ({ p
 
   // 5. Now auth is set — verify admin is accessible
   await page.evaluate(() => {
-    localStorage.setItem('ps_onboarding', 'dismissed');
     localStorage.setItem('ps_feedback_dismissed', 'true');
   });
   await page.goto('/admin');
@@ -857,10 +855,10 @@ test('13. Content: blog list, blog post with ToC, changelog, legal pages', async
 
 // ═══════════════════════════════════════════════════════════════
 // TEST 14: A11y + i18n + Progressive Enhancement
-// command palette, shortcuts, onboarding, feedback, Easter egg, language
+// command palette, shortcuts, feedback, Easter egg, language
 // ═══════════════════════════════════════════════════════════════
 
-test('14. A11y + i18n: language toggle, Cmd+K palette, shortcuts, onboarding, feedback', async ({ page }) => {
+test('14. A11y + i18n: language toggle, Cmd+K palette, shortcuts, feedback', async ({ page }) => {
   const errors = trackConsoleErrors(page);
 
   // 1. Visit homepage — fresh user (no localStorage dismissals)
@@ -868,29 +866,8 @@ test('14. A11y + i18n: language toggle, Cmd+K palette, shortcuts, onboarding, fe
   await page.waitForLoadState('domcontentloaded');
   await page.waitForTimeout(2000);
 
-  // Onboarding overlay should appear for new users (after 1.5s delay)
-  const onboarding = page.locator('[class*="onboarding"], [class*="overlay"]').first();
-  if (await onboarding.isVisible({ timeout: 3000 }).catch(() => false)) {
-    // Dismiss via close button, "I'll explore on my own", or "Skip"
-    const closeBtn = page.locator('[class*="onboarding"] button:has-text("explore on my own")').first();
-    const xBtn = page.locator('[class*="onboarding"] button:has-text("×"), [class*="onboarding"] button[class*="close"]').first();
-    if (await closeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await closeBtn.click();
-    } else if (await xBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await xBtn.click();
-    } else {
-      // Force dismiss via localStorage + reload
-      await page.evaluate(() => localStorage.setItem('ps_onboarding', 'dismissed'));
-      await page.reload();
-      await page.waitForLoadState('domcontentloaded');
-      await page.waitForTimeout(500);
-    }
-    await page.waitForTimeout(300);
-  }
-
-  // Dismiss remaining overlays
+  // Dismiss feedback overlay
   await page.evaluate(() => {
-    localStorage.setItem('ps_onboarding', 'dismissed');
     localStorage.setItem('ps_feedback_dismissed', 'true');
   });
   await page.reload();
@@ -944,7 +921,6 @@ test('14. A11y + i18n: language toggle, Cmd+K palette, shortcuts, onboarding, fe
   await page.reload();
   await page.waitForLoadState('domcontentloaded');
   await page.waitForTimeout(1000);
-  await page.evaluate(() => localStorage.setItem('ps_onboarding', 'dismissed'));
 
   const feedbackTab = page.locator('[class*="feedback"], button:has-text("Feedback")').first();
   if (await feedbackTab.isVisible({ timeout: 3000 }).catch(() => false)) {

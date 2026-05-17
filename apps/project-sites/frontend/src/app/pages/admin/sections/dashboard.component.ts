@@ -2,11 +2,16 @@ import { Component, inject, type OnInit, signal } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
 import { AdminStateService } from '../admin-state.service';
 import { ApiService, type LogEntry } from '../../../services/api.service';
+import { listStagger } from '../../../animations/motion';
+import { RippleDirective } from '../../../animations/ripple.directive';
+import { CountUpDirective } from '../../../animations/count-up.directive';
+import { RevealOnScrollDirective } from '../../../animations/reveal-on-scroll.directive';
 
 @Component({
   selector: 'app-admin-dashboard',
   standalone: true,
-  imports: [RouterModule],
+  imports: [RouterModule, RippleDirective, CountUpDirective, RevealOnScrollDirective],
+  animations: [listStagger],
   template: `
     <div class="p-7 flex-1 overflow-y-auto animate-fade-in max-md:p-4">
       @if (state.selectedSite(); as site) {
@@ -75,8 +80,8 @@ import { ApiService, type LogEntry } from '../../../services/api.service';
         </div>
 
         <!-- ═══ Stats Row: 4 even compact cards ═══ -->
-        <div class="grid grid-cols-4 gap-3 mb-5 max-md:grid-cols-2 max-[480px]:grid-cols-1">
-          <div class="stat-card cursor-pointer" role="button" tabindex="0"
+        <div class="grid grid-cols-4 gap-3 mb-5 max-md:grid-cols-2 max-[480px]:grid-cols-1" [@listStagger]="domainCount()">
+          <div class="stat-card cursor-pointer" role="button" tabindex="0" psRipple
                (click)="goTo('/admin/domains')"
                (keydown.enter)="goTo('/admin/domains')"
                (keydown.space)="$event.preventDefault(); goTo('/admin/domains')"
@@ -85,12 +90,12 @@ import { ApiService, type LogEntry } from '../../../services/api.service';
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
             </div>
             <div class="stat-content">
-              <span class="stat-value">{{ domainCount() }}</span>
+              <span class="stat-value" [psCountUp]="domainCount()"></span>
               <span class="stat-label">Domains</span>
             </div>
           </div>
 
-          <div class="stat-card cursor-pointer" role="button" tabindex="0"
+          <div class="stat-card cursor-pointer" role="button" tabindex="0" psRipple
                (click)="goTo('/admin/billing')"
                (keydown.enter)="goTo('/admin/billing')"
                (keydown.space)="$event.preventDefault(); goTo('/admin/billing')"
@@ -104,7 +109,7 @@ import { ApiService, type LogEntry } from '../../../services/api.service';
             </div>
           </div>
 
-          <div class="stat-card cursor-pointer" role="button" tabindex="0"
+          <div class="stat-card cursor-pointer" role="button" tabindex="0" psRipple
                (click)="goTo('/admin/analytics')"
                (keydown.enter)="goTo('/admin/analytics')"
                (keydown.space)="$event.preventDefault(); goTo('/admin/analytics')"
@@ -113,12 +118,12 @@ import { ApiService, type LogEntry } from '../../../services/api.service';
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
             </div>
             <div class="stat-content">
-              <span class="stat-value">{{ state.analytics()?.stats?.uniqueVisitors ?? 0 }}</span>
+              <span class="stat-value" [psCountUp]="state.analytics()?.stats?.uniqueVisitors ?? 0"></span>
               <span class="stat-label">Visitors</span>
             </div>
           </div>
 
-          <div class="stat-card cursor-pointer" role="button" tabindex="0"
+          <div class="stat-card cursor-pointer" role="button" tabindex="0" psRipple
                (click)="goTo('/admin/forms')"
                (keydown.enter)="goTo('/admin/forms')"
                (keydown.space)="$event.preventDefault(); goTo('/admin/forms')"
@@ -127,14 +132,14 @@ import { ApiService, type LogEntry } from '../../../services/api.service';
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
             </div>
             <div class="stat-content">
-              <span class="stat-value">0</span>
+              <span class="stat-value" [psCountUp]="0"></span>
               <span class="stat-label">Submissions</span>
             </div>
           </div>
         </div>
 
         <!-- ═══ Bottom Grid: equal-height 2 columns ═══ -->
-        <div class="grid grid-cols-2 gap-4 items-stretch max-lg:grid-cols-1">
+        <div class="grid grid-cols-2 gap-4 items-stretch max-lg:grid-cols-1" psReveal>
 
           <!-- Recent Activity -->
           <div class="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-5 flex flex-col h-full">
@@ -173,7 +178,7 @@ import { ApiService, type LogEntry } from '../../../services/api.service';
 
           <!-- Section Summaries: 2x2 grid for visual balance -->
           <div class="grid grid-cols-2 gap-3 h-full max-sm:grid-cols-1">
-            <div class="section-link-card" role="button" tabindex="0"
+            <div class="section-link-card" role="button" tabindex="0" psRipple
                  (click)="goTo('/admin/domains')"
                  (keydown.enter)="goTo('/admin/domains')"
                  (keydown.space)="$event.preventDefault(); goTo('/admin/domains')"
@@ -188,7 +193,7 @@ import { ApiService, type LogEntry } from '../../../services/api.service';
               <span class="text-[0.7rem] text-primary/50 self-end">Manage &rarr;</span>
             </div>
 
-            <div class="section-link-card" role="button" tabindex="0"
+            <div class="section-link-card" role="button" tabindex="0" psRipple
                  (click)="goTo('/admin/forms')"
                  (keydown.enter)="goTo('/admin/forms')"
                  (keydown.space)="$event.preventDefault(); goTo('/admin/forms')"
@@ -203,7 +208,7 @@ import { ApiService, type LogEntry } from '../../../services/api.service';
               <span class="text-[0.7rem] text-primary/50 self-end">Manage &rarr;</span>
             </div>
 
-            <div class="section-link-card" role="button" tabindex="0"
+            <div class="section-link-card" role="button" tabindex="0" psRipple
                  (click)="goTo('/admin/billing')"
                  (keydown.enter)="goTo('/admin/billing')"
                  (keydown.space)="$event.preventDefault(); goTo('/admin/billing')"
@@ -219,7 +224,7 @@ import { ApiService, type LogEntry } from '../../../services/api.service';
               <span class="text-[0.7rem] text-primary/50 self-end">Manage &rarr;</span>
             </div>
 
-            <div class="section-link-card" role="button" tabindex="0"
+            <div class="section-link-card" role="button" tabindex="0" psRipple
                  (click)="goTo('/admin/analytics')"
                  (keydown.enter)="goTo('/admin/analytics')"
                  (keydown.space)="$event.preventDefault(); goTo('/admin/analytics')"

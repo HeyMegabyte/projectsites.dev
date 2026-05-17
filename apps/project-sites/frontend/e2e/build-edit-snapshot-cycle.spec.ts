@@ -16,7 +16,6 @@ import type { Page } from '@playwright/test';
 /** Dismiss overlays that block interactions */
 async function dismissOverlays(page: Page): Promise<void> {
   await page.evaluate(() => {
-    localStorage.setItem('ps_onboarding', 'dismissed');
     localStorage.setItem('ps_feedback_dismissed', 'true');
   });
 }

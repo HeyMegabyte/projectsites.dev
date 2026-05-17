@@ -18,13 +18,35 @@
 
 :root {
   --accent: #00E5FF;
+  --accent-secondary: #50AAE3;
+  --accent-purple: #7C3AED;
   --font: 'Sora', system-ui, -apple-system, sans-serif;
   --text-primary: #f0f0f8;
   --text-muted: #94a3b8;
   --error: #ef4444;
+  --success: #10b981;
   --z-header: 1000;
   --z-popover: 1100;
   --z-toast: 1200;
+
+  // ━━━ Motion tokens ━━━
+  // Durations
+  --ps-dur-instant: 80ms;
+  --ps-dur-xs: 120ms;
+  --ps-dur-sm: 180ms;
+  --ps-dur-md: 260ms;
+  --ps-dur-lg: 420ms;
+  --ps-dur-xl: 600ms;
+  // Easings
+  --ps-ease-standard: cubic-bezier(0.2, 0, 0, 1);          // material standard
+  --ps-ease-emphasized: cubic-bezier(0.2, 0, 0, 1);        // entrance/exit
+  --ps-ease-decel: cubic-bezier(0, 0, 0.2, 1);             // decelerate (entrance)
+  --ps-ease-accel: cubic-bezier(0.4, 0, 1, 1);             // accelerate (exit)
+  --ps-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);     // overshoot
+  --ps-ease-spring-soft: cubic-bezier(0.16, 1, 0.3, 1);    // expo-out
+  // Stagger
+  --ps-stagger-step: 60ms;
+  --ps-stagger-fast: 35ms;
 }
 
 html, body {
@@ -83,6 +105,24 @@ html { scroll-behavior: smooth; height: 100%; }
   0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
   100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
 }
+
+// ━━━ Motion-system keyframes ━━━
+@keyframes psRise { from { opacity: 0; transform: translate3d(0, 14px, 0) } to { opacity: 1; transform: translate3d(0, 0, 0) } }
+@keyframes psRiseLg { from { opacity: 0; transform: translate3d(0, 28px, 0) } to { opacity: 1; transform: translate3d(0, 0, 0) } }
+@keyframes psScaleFade { from { opacity: 0; transform: scale(0.96) } to { opacity: 1; transform: scale(1) } }
+@keyframes psSlideRight { from { opacity: 0; transform: translate3d(-12px, 0, 0) } to { opacity: 1; transform: translate3d(0, 0, 0) } }
+@keyframes psDrawerSlide { from { opacity: 0; transform: translate3d(100%, 0, 0) } to { opacity: 1; transform: translate3d(0, 0, 0) } }
+@keyframes psDrawerSlideLeft { from { opacity: 0; transform: translate3d(-100%, 0, 0) } to { opacity: 1; transform: translate3d(0, 0, 0) } }
+@keyframes psToastSlide { from { opacity: 0; transform: translate3d(0, 16px, 0) scale(0.96) } to { opacity: 1; transform: translate3d(0, 0, 0) scale(1) } }
+@keyframes psDialogIn { from { opacity: 0; transform: scale(0.94) translate3d(0, 8px, 0) } to { opacity: 1; transform: scale(1) translate3d(0, 0, 0) } }
+@keyframes psShake { 0%, 100% { transform: translate3d(0, 0, 0) } 20%, 60% { transform: translate3d(-6px, 0, 0) } 40%, 80% { transform: translate3d(6px, 0, 0) } }
+@keyframes psShine { 0% { background-position: -150% 0 } 100% { background-position: 250% 0 } }
+@keyframes psGlowPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(0, 229, 255, 0) } 50% { box-shadow: 0 0 24px 0 rgba(0, 229, 255, 0.4) } }
+@keyframes psCheckDraw { from { stroke-dashoffset: 24 } to { stroke-dashoffset: 0 } }
+@keyframes psSkeleton { 0% { background-position: -200% 0 } 100% { background-position: 200% 0 } }
+@keyframes psFloat { 0%, 100% { transform: translate3d(0, 0, 0) } 50% { transform: translate3d(0, -6px, 0) } }
+@keyframes psCaretBlink { 0%, 49% { opacity: 1 } 50%, 100% { opacity: 0 } }
+@keyframes psRippleInk { from { transform: scale(0); opacity: 0.6 } to { transform: scale(1); opacity: 0 } }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -189,4 +229,204 @@ html { scroll-behavior: smooth; height: 100%; }
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+// ══════════════════════════════════════════════════════
+// Motion-system utilities (FREE-tier hover/enter/state)
+// ══════════════════════════════════════════════════════
+
+// Entrance — auto-applies; pair with reveal-on-scroll directive for viewport-triggered
+.ps-enter-fade {
+  animation: fadeIn var(--ps-dur-md) var(--ps-ease-decel) both;
+}
+.ps-enter-rise {
+  animation: psRise var(--ps-dur-lg) var(--ps-ease-spring-soft) both;
+}
+.ps-enter-rise-lg {
+  animation: psRiseLg var(--ps-dur-xl) var(--ps-ease-spring-soft) both;
+}
+.ps-enter-scale {
+  animation: psScaleFade var(--ps-dur-md) var(--ps-ease-decel) both;
+}
+
+// Stagger — apply to a parent, children animate in sequence
+.ps-stagger > * {
+  animation: psRise var(--ps-dur-lg) var(--ps-ease-spring-soft) both;
+}
+.ps-stagger > *:nth-child(1)  { animation-delay: calc(var(--ps-stagger-step) * 0); }
+.ps-stagger > *:nth-child(2)  { animation-delay: calc(var(--ps-stagger-step) * 1); }
+.ps-stagger > *:nth-child(3)  { animation-delay: calc(var(--ps-stagger-step) * 2); }
+.ps-stagger > *:nth-child(4)  { animation-delay: calc(var(--ps-stagger-step) * 3); }
+.ps-stagger > *:nth-child(5)  { animation-delay: calc(var(--ps-stagger-step) * 4); }
+.ps-stagger > *:nth-child(6)  { animation-delay: calc(var(--ps-stagger-step) * 5); }
+.ps-stagger > *:nth-child(7)  { animation-delay: calc(var(--ps-stagger-step) * 6); }
+.ps-stagger > *:nth-child(8)  { animation-delay: calc(var(--ps-stagger-step) * 7); }
+.ps-stagger > *:nth-child(9)  { animation-delay: calc(var(--ps-stagger-step) * 8); }
+.ps-stagger > *:nth-child(10) { animation-delay: calc(var(--ps-stagger-step) * 9); }
+.ps-stagger > *:nth-child(11) { animation-delay: calc(var(--ps-stagger-step) * 10); }
+.ps-stagger > *:nth-child(12) { animation-delay: calc(var(--ps-stagger-step) * 11); }
+
+.ps-stagger-fast > * {
+  animation: psRise var(--ps-dur-md) var(--ps-ease-spring-soft) both;
+}
+.ps-stagger-fast > *:nth-child(n) {
+  animation-delay: calc(var(--ps-stagger-fast) * (var(--ps-i, 0)));
+}
+
+// Reveal-on-scroll — initial state hidden, directive adds .is-visible
+.ps-reveal {
+  opacity: 0;
+  transform: translate3d(0, 18px, 0);
+  will-change: transform, opacity;
+  transition: opacity var(--ps-dur-lg) var(--ps-ease-spring-soft),
+              transform var(--ps-dur-lg) var(--ps-ease-spring-soft);
+  &.is-visible {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+// Hover lift — for cards/tiles/buttons
+.ps-hover-lift {
+  transition: transform var(--ps-dur-md) var(--ps-ease-spring-soft),
+              box-shadow var(--ps-dur-md) var(--ps-ease-standard),
+              border-color var(--ps-dur-sm) var(--ps-ease-standard);
+  &:hover {
+    transform: translate3d(0, -3px, 0);
+  }
+  &:active {
+    transform: translate3d(0, -1px, 0);
+    transition-duration: var(--ps-dur-xs);
+  }
+}
+
+// Subtle press feedback — for buttons that don't lift
+.ps-press {
+  transition: transform var(--ps-dur-xs) var(--ps-ease-standard);
+  &:active { transform: scale(0.97); }
+}
+
+// Glow on hover/focus — uses --accent
+.ps-glow {
+  transition: box-shadow var(--ps-dur-md) var(--ps-ease-standard);
+  &:hover, &:focus-visible {
+    box-shadow: 0 0 0 1px rgba(0, 229, 255, 0.4),
+                0 0 24px 0 rgba(0, 229, 255, 0.18);
+  }
+}
+
+// Shine sweep — for premium CTAs, gradient text
+.ps-shine {
+  position: relative;
+  overflow: hidden;
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      110deg,
+      transparent 30%,
+      rgba(255, 255, 255, 0.18) 50%,
+      transparent 70%
+    );
+    background-size: 200% 100%;
+    background-position: -150% 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity var(--ps-dur-sm) var(--ps-ease-standard);
+  }
+  &:hover::after {
+    opacity: 1;
+    animation: psShine 1.4s var(--ps-ease-standard) infinite;
+  }
+}
+
+// Skeleton shimmer — for loading states
+.ps-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.12) 50%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+  background-size: 200% 100%;
+  animation: psSkeleton 1.4s linear infinite;
+  border-radius: 8px;
+}
+
+// Form validation shake — add+remove .ps-shake on the field
+.ps-shake {
+  animation: psShake 0.45s var(--ps-ease-standard);
+}
+
+// Success check — apply to <svg><path/></svg>; path gets stroke-dasharray:24
+.ps-check path {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  animation: psCheckDraw 0.45s var(--ps-ease-spring-soft) forwards;
+}
+
+// Float idle animation — for hero badges/avatars (light, ambient)
+.ps-float {
+  animation: psFloat 4s var(--ps-ease-standard) infinite;
+}
+
+// Material-ish ripple — directive-based; this is the rendered span
+.ps-mat-ripple {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.28);
+  transform: scale(0);
+  opacity: 1;
+  animation: clickRipple 0.55s var(--ps-ease-decel) forwards;
+  mix-blend-mode: screen;
+}
+
+// Carret blink for AI/chat typing
+.ps-typing-caret {
+  display: inline-block;
+  width: 0.5ch;
+  background: currentColor;
+  animation: psCaretBlink 0.9s steps(2, end) infinite;
+}
+
+// View Transitions — opt-in route fade (Chrome 111+, Safari 18+)
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 280ms;
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+::view-transition-old(root) { animation-name: fadeOut; }
+::view-transition-new(root) { animation-name: fadeIn; }
+@keyframes fadeOut { from { opacity: 1 } to { opacity: 0 } }
+
+// Honor user preference — KILL non-essential motion
+@media (prefers-reduced-motion: reduce) {
+  .ps-enter-fade,
+  .ps-enter-rise,
+  .ps-enter-rise-lg,
+  .ps-enter-scale,
+  .ps-stagger > *,
+  .ps-stagger-fast > *,
+  .ps-shine::after,
+  .ps-skeleton,
+  .ps-float,
+  .ps-typing-caret {
+    animation: none !important;
+  }
+  .ps-reveal {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .ps-hover-lift:hover,
+  .ps-hover-lift:active,
+  .ps-press:active {
+    transform: none !important;
+  }
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 1ms !important;
+  }
 }

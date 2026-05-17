@@ -23,6 +23,7 @@
       </button>
       <button class="text-text-secondary hover:text-primary transition-colors text-sm font-medium" (click)="goSignin()">{{ 'nav.signIn' | translate }}</button>
       <button
+        psRipple
         class="px-5 py-2 rounded-full bg-primary text-dark font-semibold text-sm hover:shadow-lg hover:shadow-primary/25 transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0"
         (click)="goGetStarted()"
       >
@@ -54,7 +55,7 @@
         </button>
         <hr class="border-white/5" />
         <button class="text-left text-text-secondary hover:text-primary py-2 text-sm" (click)="goSignin()">{{ 'nav.signIn' | translate }}</button>
-        <button class="w-full py-2.5 rounded-full bg-primary text-dark font-semibold text-sm" (click)="goGetStarted()">{{ 'nav.getStarted' | translate }}</button>
+        <button psRipple class="w-full py-2.5 rounded-full bg-primary text-dark font-semibold text-sm" (click)="goGetStarted()">{{ 'nav.getStarted' | translate }}</button>
       </div>
     </div>
   }
@@ -149,12 +150,15 @@
     <!-- CTAs -->
     <div class="flex flex-wrap items-center justify-center gap-4 animate-fade-in-up" style="animation-delay: 0.4s">
       <button
+        psRipple
         class="px-8 py-3.5 rounded-full bg-primary text-dark font-bold text-base hover:shadow-xl hover:shadow-primary/30 transition-all duration-300 hover:-translate-y-1 active:translate-y-0 animate-glow-pulse"
         (click)="goGetStarted()"
       >
         {{ 'hero.cta' | translate }}
       </button>
       <button
+        psRipple
+        [psRippleColor]="'rgba(255, 255, 255, 0.18)'"
         class="px-8 py-3.5 rounded-full border border-white/10 text-light font-semibold text-base hover:border-primary/30 hover:bg-white/5 transition-all duration-300"
         (click)="scrollTo('how-it-works')"
       >

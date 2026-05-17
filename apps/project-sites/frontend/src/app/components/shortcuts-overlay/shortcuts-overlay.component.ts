@@ -1,4 +1,5 @@
 import { Component, EventEmitter, Output, HostListener } from '@angular/core';
+import { scaleFade } from '../../animations/motion';
 
 interface ShortcutEntry {
   keys: string[];
@@ -16,6 +17,7 @@ const SHORTCUTS: ShortcutEntry[] = [
 @Component({
   selector: 'app-shortcuts-overlay',
   standalone: true,
+  animations: [scaleFade],
   template: `
     <div
       class="shortcuts-backdrop"
@@ -24,7 +26,7 @@ const SHORTCUTS: ShortcutEntry[] = [
       aria-modal="true"
       (click)="onBackdropClick($event)"
     >
-      <div class="shortcuts-modal" data-testid="shortcuts-overlay">
+      <div @scaleFade class="shortcuts-modal" data-testid="shortcuts-overlay">
         <div class="shortcuts-header">
           <h2 class="shortcuts-title">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -62,13 +64,12 @@ const SHORTCUTS: ShortcutEntry[] = [
     </div>
   `,
   styles: [`
-    @keyframes fadeInScale {
-      from { opacity: 0; transform: translateY(-8px) scale(0.97); }
-      to   { opacity: 1; transform: translateY(0) scale(1); }
-    }
     @keyframes fadeInBg {
       from { opacity: 0; }
       to   { opacity: 1; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .shortcuts-backdrop { animation: none; }
     }
 
     .shortcuts-backdrop {
@@ -89,7 +90,6 @@ const SHORTCUTS: ShortcutEntry[] = [
         0 0 0 1px rgba(0, 229, 255, 0.06),
         0 0 60px rgba(0, 229, 255, 0.04);
       overflow: hidden;
-      animation: fadeInScale 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
 
     .shortcuts-header {
