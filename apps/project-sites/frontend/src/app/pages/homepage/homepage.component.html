@@ -85,7 +85,7 @@
     </p>
 
     <!-- Search bar -->
-    <div class="relative max-w-xl mx-auto mb-8 animate-fade-in-up" style="animation-delay: 0.3s">
+    <div class="relative max-w-xl mx-auto mb-8 animate-fade-in-up z-[1010]" style="animation-delay: 0.3s">
       <div class="relative group">
         <div class="absolute -inset-0.5 bg-gradient-to-r from-primary/30 via-secondary/20 to-primary/30 rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
         <div class="relative flex items-center bg-dark-card border border-white/10 rounded-2xl overflow-hidden transition-all duration-300 group-hover:border-primary/30">
@@ -110,7 +110,7 @@
 
       <!-- Dropdown -->
       @if (heroDropdownOpen() && results().length > 0) {
-        <div class="absolute top-full left-0 right-0 mt-2 bg-dark-card/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden z-20 animate-fade-in-up" style="animation-duration: 0.2s">
+        <div class="absolute top-full left-0 right-0 mt-2 bg-dark-card/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden z-[1011] animate-fade-in-up" style="animation-duration: 0.2s">
           @for (item of results(); track item.name + item.address) {
             <button
               class="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors text-left"
@@ -453,7 +453,7 @@
     <p class="text-text-secondary text-lg mb-10">{{ 'cta.subtitle' | translate }}</p>
 
     <!-- CTA Search bar -->
-    <div class="relative max-w-xl mx-auto">
+    <div class="relative max-w-xl mx-auto z-[1010]">
       <div class="relative group">
         <div class="absolute -inset-0.5 bg-gradient-to-r from-primary/30 via-secondary/20 to-primary/30 rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
         <div class="relative flex items-center bg-dark-card border border-white/10 rounded-2xl overflow-hidden transition-all duration-300 group-hover:border-primary/30">
@@ -478,7 +478,7 @@
 
       <!-- CTA Dropdown -->
       @if (ctaDropdownOpen() && results().length > 0) {
-        <div class="absolute top-full left-0 right-0 mt-2 bg-dark-card/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden z-20 animate-fade-in-up" style="animation-duration: 0.2s">
+        <div class="absolute top-full left-0 right-0 mt-2 bg-dark-card/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden z-[1011] animate-fade-in-up" style="animation-duration: 0.2s">
           @for (item of results(); track item.name + item.address) {
             <button
               class="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors text-left"

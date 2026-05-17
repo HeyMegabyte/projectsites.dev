@@ -25,7 +25,7 @@ export default {
         float: { '0%,100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-10px)' } },
       },
       animation: {
-        'fade-in-up': 'fadeInUp 0.6s ease-out forwards',
+        'fade-in-up': 'fadeInUp 0.6s ease-out both',
         'glow-pulse': 'glowPulse 2s ease-in-out infinite',
         shimmer: 'shimmer 3s linear infinite',
         float: 'float 3s ease-in-out infinite',

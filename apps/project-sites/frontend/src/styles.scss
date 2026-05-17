@@ -76,6 +76,19 @@ html { scroll-behavior: smooth; height: 100%; }
   outline-offset: 2px;
 }
 
+// Inputs that explicitly opt out of the global focus ring (Tailwind `outline-none`)
+// must NOT show the cyan focus outline. Without this override, the global
+// `*:focus-visible` rule paints a 2px cyan ring that renders as thin vertical
+// stripes flanking adjacent SVG icons / loaders inside the input wrapper.
+input.outline-none:focus,
+input.outline-none:focus-visible,
+textarea.outline-none:focus,
+textarea.outline-none:focus-visible {
+  outline: none !important;
+  outline-offset: 0 !important;
+  box-shadow: none !important;
+}
+
 // Scrollbar
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: #060610; }
@@ -123,6 +136,16 @@ html { scroll-behavior: smooth; height: 100%; }
 @keyframes psFloat { 0%, 100% { transform: translate3d(0, 0, 0) } 50% { transform: translate3d(0, -6px, 0) } }
 @keyframes psCaretBlink { 0%, 49% { opacity: 1 } 50%, 100% { opacity: 0 } }
 @keyframes psRippleInk { from { transform: scale(0); opacity: 0.6 } to { transform: scale(1); opacity: 0 } }
+
+// Anti-FOUC: Tailwind v4 ships these utilities with `animation-fill-mode: forwards`,
+// which leaves the element visible at its default state during `animation-delay`
+// before the keyframes run. Force `both` so the `from {}` state is applied
+// immediately (hidden) and persists through the delay window.
+.animate-fade-in-up,
+.animate-fade-in,
+.animate-fade-in-scale {
+  animation-fill-mode: both;
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
