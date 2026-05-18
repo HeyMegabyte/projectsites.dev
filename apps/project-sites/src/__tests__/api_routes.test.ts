@@ -69,10 +69,7 @@ function makeRequest(
   return app.request(path, options, env);
 }
 
-function createAuthenticatedApp(
-  vars: Partial<Variables> = {},
-  envOverrides: Partial<Env> = {},
-) {
+function createAuthenticatedApp(vars: Partial<Variables> = {}, envOverrides: Partial<Env> = {}) {
   const authedApp = new Hono<{ Bindings: Env; Variables: Variables }>();
   authedApp.onError(errorHandler);
   authedApp.use('*', async (c, next) => {
@@ -195,9 +192,9 @@ describe('POST /api/contact', () => {
 
   it('falls back to SendGrid when Resend fails', async () => {
     mockFetch
-      .mockResolvedValueOnce(new Response('error', { status: 500 }))   // Resend fails (notification)
-      .mockResolvedValueOnce(new Response('', { status: 202 }))        // SendGrid succeeds
-      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'x' }), { status: 200 }));  // Resend succeeds (confirmation)
+      .mockResolvedValueOnce(new Response('error', { status: 500 })) // Resend fails (notification)
+      .mockResolvedValueOnce(new Response('', { status: 202 })) // SendGrid succeeds
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'x' }), { status: 200 })); // Resend succeeds (confirmation)
 
     const { app, env } = createApp();
 

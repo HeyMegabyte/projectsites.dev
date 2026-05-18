@@ -63,27 +63,37 @@ export async function discoverBrandImages(
 
   // ── Unsplash ──────────────────────────────────────────────
   if ((env as any).UNSPLASH_ACCESS_KEY) {
-    fetchers.push(fetchUnsplash(env, slug, businessName, businessType, (env as any).UNSPLASH_ACCESS_KEY));
+    fetchers.push(
+      fetchUnsplash(env, slug, businessName, businessType, (env as any).UNSPLASH_ACCESS_KEY),
+    );
   }
 
   // ── Pexels (photos) ───────────────────────────────────────
   if ((env as any).PEXELS_API_KEY) {
-    fetchers.push(fetchPexelsPhotos(env, slug, businessName, businessType, (env as any).PEXELS_API_KEY));
+    fetchers.push(
+      fetchPexelsPhotos(env, slug, businessName, businessType, (env as any).PEXELS_API_KEY),
+    );
   }
 
   // ── Pexels (videos) ───────────────────────────────────────
   if ((env as any).PEXELS_API_KEY) {
-    fetchers.push(fetchPexelsVideos(env, slug, businessName, businessType, (env as any).PEXELS_API_KEY));
+    fetchers.push(
+      fetchPexelsVideos(env, slug, businessName, businessType, (env as any).PEXELS_API_KEY),
+    );
   }
 
   // ── Pixabay ───────────────────────────────────────────────
   if ((env as any).PIXABAY_API_KEY) {
-    fetchers.push(fetchPixabay(env, slug, businessName, businessType, (env as any).PIXABAY_API_KEY));
+    fetchers.push(
+      fetchPixabay(env, slug, businessName, businessType, (env as any).PIXABAY_API_KEY),
+    );
   }
 
   // ── Foursquare ────────────────────────────────────────────
   if ((env as any).FOURSQUARE_API_KEY) {
-    fetchers.push(fetchFoursquare(env, slug, businessName, businessType, (env as any).FOURSQUARE_API_KEY));
+    fetchers.push(
+      fetchFoursquare(env, slug, businessName, businessType, (env as any).FOURSQUARE_API_KEY),
+    );
   }
 
   // ── Yelp ──────────────────────────────────────────────────
@@ -120,8 +130,13 @@ export async function discoverBrandImages(
 // ── Source: Google Custom Search ─────────────────────────────
 
 async function fetchGoogleCSE(
-  env: Env, slug: string, businessName: string, businessType: string,
-  websiteUrl: string | undefined, apiKey: string, cx: string,
+  env: Env,
+  slug: string,
+  businessName: string,
+  businessType: string,
+  websiteUrl: string | undefined,
+  apiKey: string,
+  cx: string,
 ): Promise<DiscoveredImage[]> {
   const results: DiscoveredImage[] = [];
   const queries = [
@@ -163,7 +178,11 @@ async function fetchGoogleCSE(
 
         const downloaded = await downloadAndStore(env, slug, imageUrl, title, confidence);
         if (downloaded) {
-          results.push({ ...downloaded, attribution: sourceUrl || imageUrl, sourceUrl: sourceUrl || imageUrl });
+          results.push({
+            ...downloaded,
+            attribution: sourceUrl || imageUrl,
+            sourceUrl: sourceUrl || imageUrl,
+          });
         }
       }
     } catch (err) {
@@ -176,7 +195,11 @@ async function fetchGoogleCSE(
 // ── Source: Unsplash ─────────────────────────────────────────
 
 async function fetchUnsplash(
-  env: Env, slug: string, businessName: string, businessType: string, accessKey: string,
+  env: Env,
+  slug: string,
+  businessName: string,
+  businessType: string,
+  accessKey: string,
 ): Promise<DiscoveredImage[]> {
   const results: DiscoveredImage[] = [];
   const queries = [`${businessType} business`, `${businessName} ${businessType}`];
@@ -184,17 +207,25 @@ async function fetchUnsplash(
   for (const query of queries) {
     try {
       const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=5&orientation=landscape`;
-      const res = await fetch(url, { headers: { 'Authorization': `Client-ID ${accessKey}` } });
+      const res = await fetch(url, { headers: { Authorization: `Client-ID ${accessKey}` } });
       if (!res.ok) continue;
 
-      const data = (await res.json()) as { results?: { urls?: { regular?: string }; description?: string; user?: { name?: string; links?: { html?: string } } }[] };
+      const data = (await res.json()) as {
+        results?: {
+          urls?: { regular?: string };
+          description?: string;
+          user?: { name?: string; links?: { html?: string } };
+        }[];
+      };
       if (!data.results) continue;
 
       for (const photo of data.results.slice(0, 3)) {
         const imageUrl = photo.urls?.regular;
         if (!imageUrl) continue;
         const title = photo.description || `${businessType}-unsplash`;
-        const attribution = photo.user?.name ? `Photo by ${photo.user.name} on Unsplash` : 'Unsplash';
+        const attribution = photo.user?.name
+          ? `Photo by ${photo.user.name} on Unsplash`
+          : 'Unsplash';
         const downloaded = await downloadAndStore(env, slug, imageUrl, `unsplash-${title}`, 55);
         if (downloaded) {
           results.push({ ...downloaded, attribution, sourceUrl: imageUrl });
@@ -210,23 +241,31 @@ async function fetchUnsplash(
 // ── Source: Pexels Photos ───────────────────────────────────
 
 async function fetchPexelsPhotos(
-  env: Env, slug: string, businessName: string, businessType: string, apiKey: string,
+  env: Env,
+  slug: string,
+  businessName: string,
+  businessType: string,
+  apiKey: string,
 ): Promise<DiscoveredImage[]> {
   const results: DiscoveredImage[] = [];
   try {
     const query = `${businessType} ${businessName}`;
     const url = `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=6&orientation=landscape`;
-    const res = await fetch(url, { headers: { 'Authorization': apiKey } });
+    const res = await fetch(url, { headers: { Authorization: apiKey } });
     if (!res.ok) return [];
 
-    const data = (await res.json()) as { photos?: { src?: { large?: string }; alt?: string; photographer?: string }[] };
+    const data = (await res.json()) as {
+      photos?: { src?: { large?: string }; alt?: string; photographer?: string }[];
+    };
     if (!data.photos) return [];
 
     for (const photo of data.photos.slice(0, 4)) {
       const imageUrl = photo.src?.large;
       if (!imageUrl) continue;
       const title = photo.alt || `${businessType}-pexels`;
-      const attribution = photo.photographer ? `Photo by ${photo.photographer} on Pexels` : 'Pexels';
+      const attribution = photo.photographer
+        ? `Photo by ${photo.photographer} on Pexels`
+        : 'Pexels';
       const downloaded = await downloadAndStore(env, slug, imageUrl, `pexels-${title}`, 50);
       if (downloaded) {
         results.push({ ...downloaded, attribution, sourceUrl: imageUrl });
@@ -241,35 +280,59 @@ async function fetchPexelsPhotos(
 // ── Source: Pexels Videos ───────────────────────────────────
 
 async function fetchPexelsVideos(
-  env: Env, slug: string, businessName: string, businessType: string, apiKey: string,
+  env: Env,
+  slug: string,
+  businessName: string,
+  businessType: string,
+  apiKey: string,
 ): Promise<DiscoveredImage[]> {
   const results: DiscoveredImage[] = [];
   try {
     const query = `${businessType}`;
     const url = `https://api.pexels.com/videos/search?query=${encodeURIComponent(query)}&per_page=3&orientation=landscape`;
-    const res = await fetch(url, { headers: { 'Authorization': apiKey } });
+    const res = await fetch(url, { headers: { Authorization: apiKey } });
     if (!res.ok) return [];
 
-    const data = (await res.json()) as { videos?: { video_files?: { link?: string; quality?: string; file_type?: string }[]; url?: string }[] };
+    const data = (await res.json()) as {
+      videos?: {
+        video_files?: { link?: string; quality?: string; file_type?: string }[];
+        url?: string;
+      }[];
+    };
     if (!data.videos) return [];
 
     for (const video of data.videos.slice(0, 2)) {
       // Pick the HD MP4 file
-      const hdFile = video.video_files?.find((f) => f.quality === 'hd' && f.file_type === 'video/mp4')
-        || video.video_files?.[0];
+      const hdFile =
+        video.video_files?.find((f) => f.quality === 'hd' && f.file_type === 'video/mp4') ||
+        video.video_files?.[0];
       if (!hdFile?.link) continue;
 
       // Store video metadata as a JSON manifest (videos are too large for R2 direct storage in workflow)
-      const safeName = `${businessType}-pexels-video`.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 50);
+      const safeName = `${businessType}-pexels-video`
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .substring(0, 50);
       const key = `sites/${slug}/assets/discovered/${safeName}-${Date.now()}.video.json`;
-      const manifest = JSON.stringify({ type: 'video', src: hdFile.link, source: 'pexels', pageUrl: video.url || '' });
+      const manifest = JSON.stringify({
+        type: 'video',
+        src: hdFile.link,
+        source: 'pexels',
+        pageUrl: video.url || '',
+      });
       await env.SITES_BUCKET.put(key, manifest, {
         httpMetadata: { contentType: 'application/json' },
         customMetadata: { source: 'discovered-video', confidence: '45' },
       });
       results.push({
-        key, name: `${safeName}.video.json`, size: manifest.length, type: 'application/json',
-        confidence: 45, source: 'discovered', attribution: 'Pexels Video', sourceUrl: hdFile.link,
+        key,
+        name: `${safeName}.video.json`,
+        size: manifest.length,
+        type: 'application/json',
+        confidence: 45,
+        source: 'discovered',
+        attribution: 'Pexels Video',
+        sourceUrl: hdFile.link,
       });
     }
   } catch (err) {
@@ -281,7 +344,11 @@ async function fetchPexelsVideos(
 // ── Source: Pixabay ──────────────────────────────────────────
 
 async function fetchPixabay(
-  env: Env, slug: string, businessName: string, businessType: string, apiKey: string,
+  env: Env,
+  slug: string,
+  businessName: string,
+  businessType: string,
+  apiKey: string,
 ): Promise<DiscoveredImage[]> {
   const results: DiscoveredImage[] = [];
   try {
@@ -290,7 +357,9 @@ async function fetchPixabay(
     const res = await fetch(url);
     if (!res.ok) return [];
 
-    const data = (await res.json()) as { hits?: { largeImageURL?: string; tags?: string; user?: string; pageURL?: string }[] };
+    const data = (await res.json()) as {
+      hits?: { largeImageURL?: string; tags?: string; user?: string; pageURL?: string }[];
+    };
     if (!data.hits) return [];
 
     for (const hit of data.hits.slice(0, 3)) {
@@ -312,22 +381,32 @@ async function fetchPixabay(
 // ── Source: Foursquare ──────────────────────────────────────
 
 async function fetchFoursquare(
-  env: Env, slug: string, businessName: string, businessType: string, apiKey: string,
+  env: Env,
+  slug: string,
+  businessName: string,
+  businessType: string,
+  apiKey: string,
 ): Promise<DiscoveredImage[]> {
   const results: DiscoveredImage[] = [];
   try {
     // Step 1: Search for the venue
     const searchUrl = `https://api.foursquare.com/v3/places/search?query=${encodeURIComponent(businessName)}&limit=1`;
-    const searchRes = await fetch(searchUrl, { headers: { 'Authorization': apiKey, 'Accept': 'application/json' } });
+    const searchRes = await fetch(searchUrl, {
+      headers: { Authorization: apiKey, Accept: 'application/json' },
+    });
     if (!searchRes.ok) return [];
 
-    const searchData = (await searchRes.json()) as { results?: { fsq_id?: string; name?: string }[] };
+    const searchData = (await searchRes.json()) as {
+      results?: { fsq_id?: string; name?: string }[];
+    };
     const venue = searchData.results?.[0];
     if (!venue?.fsq_id) return [];
 
     // Step 2: Get venue photos
     const photosUrl = `https://api.foursquare.com/v3/places/${venue.fsq_id}/photos?limit=5`;
-    const photosRes = await fetch(photosUrl, { headers: { 'Authorization': apiKey, 'Accept': 'application/json' } });
+    const photosRes = await fetch(photosUrl, {
+      headers: { Authorization: apiKey, Accept: 'application/json' },
+    });
     if (!photosRes.ok) return [];
 
     const photos = (await photosRes.json()) as { prefix?: string; suffix?: string }[];
@@ -336,9 +415,19 @@ async function fetchFoursquare(
     for (const photo of photos.slice(0, 3)) {
       if (!photo.prefix || !photo.suffix) continue;
       const imageUrl = `${photo.prefix}original${photo.suffix}`;
-      const downloaded = await downloadAndStore(env, slug, imageUrl, `foursquare-${venue.name || businessName}`, 65);
+      const downloaded = await downloadAndStore(
+        env,
+        slug,
+        imageUrl,
+        `foursquare-${venue.name || businessName}`,
+        65,
+      );
       if (downloaded) {
-        results.push({ ...downloaded, attribution: `Foursquare — ${venue.name || businessName}`, sourceUrl: imageUrl });
+        results.push({
+          ...downloaded,
+          attribution: `Foursquare — ${venue.name || businessName}`,
+          sourceUrl: imageUrl,
+        });
       }
     }
   } catch (err) {
@@ -350,15 +439,21 @@ async function fetchFoursquare(
 // ── Source: Yelp ────────────────────────────────────────────
 
 async function fetchYelp(
-  env: Env, slug: string, businessName: string, businessType: string, apiKey: string,
+  env: Env,
+  slug: string,
+  businessName: string,
+  businessType: string,
+  apiKey: string,
 ): Promise<DiscoveredImage[]> {
   const results: DiscoveredImage[] = [];
   try {
     const searchUrl = `https://api.yelp.com/v3/businesses/search?term=${encodeURIComponent(businessName)}&limit=1`;
-    const searchRes = await fetch(searchUrl, { headers: { 'Authorization': `Bearer ${apiKey}` } });
+    const searchRes = await fetch(searchUrl, { headers: { Authorization: `Bearer ${apiKey}` } });
     if (!searchRes.ok) return [];
 
-    const searchData = (await searchRes.json()) as { businesses?: { id?: string; name?: string; image_url?: string; photos?: string[] }[] };
+    const searchData = (await searchRes.json()) as {
+      businesses?: { id?: string; name?: string; image_url?: string; photos?: string[] }[];
+    };
     const biz = searchData.businesses?.[0];
     if (!biz) return [];
 
@@ -371,19 +466,31 @@ async function fetchYelp(
     if (biz.id) {
       try {
         const detailRes = await fetch(`https://api.yelp.com/v3/businesses/${biz.id}`, {
-          headers: { 'Authorization': `Bearer ${apiKey}` },
+          headers: { Authorization: `Bearer ${apiKey}` },
         });
         if (detailRes.ok) {
           const detail = (await detailRes.json()) as { photos?: string[] };
           if (detail.photos) for (const p of detail.photos) photoUrls.add(p);
         }
-      } catch { /* ignore detail fetch failure */ }
+      } catch {
+        /* ignore detail fetch failure */
+      }
     }
 
     for (const imageUrl of [...photoUrls].slice(0, 4)) {
-      const downloaded = await downloadAndStore(env, slug, imageUrl, `yelp-${biz.name || businessName}`, 60);
+      const downloaded = await downloadAndStore(
+        env,
+        slug,
+        imageUrl,
+        `yelp-${biz.name || businessName}`,
+        60,
+      );
       if (downloaded) {
-        results.push({ ...downloaded, attribution: `Yelp — ${biz.name || businessName}`, sourceUrl: imageUrl });
+        results.push({
+          ...downloaded,
+          attribution: `Yelp — ${biz.name || businessName}`,
+          sourceUrl: imageUrl,
+        });
       }
     }
   } catch (err) {
@@ -403,7 +510,9 @@ async function downloadAndStore(
   confidence: number,
 ): Promise<Omit<DiscoveredImage, 'attribution' | 'sourceUrl'> | null> {
   try {
-    const res = await fetch(imageUrl, { headers: { 'User-Agent': 'ProjectSites/1.0 ImageDiscovery' } });
+    const res = await fetch(imageUrl, {
+      headers: { 'User-Agent': 'ProjectSites/1.0 ImageDiscovery' },
+    });
     if (!res.ok) return null;
 
     const contentType = res.headers.get('content-type') || '';
@@ -414,11 +523,12 @@ async function downloadAndStore(
     if (data.byteLength < 1000) return null; // Skip tiny images (likely tracking pixels)
 
     const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg';
-    const safeName = title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '')
-      .substring(0, 50) || 'discovered';
+    const safeName =
+      title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '')
+        .substring(0, 50) || 'discovered';
     const fileName = `${safeName}-${confidence}pct.${ext}`;
     const key = `sites/${slug}/assets/discovered/${fileName}`;
 

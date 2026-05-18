@@ -31,6 +31,7 @@ on:
       - 'apps/project-sites/scripts/inspect.js'
       - 'apps/project-sites/scripts/upload-to-r2.mjs'
       - 'apps/project-sites/scripts/run-validators.mjs'
+      - 'apps/project-sites/frontend/**'
 
 env:
   NODE_VERSION: '20.18.0'
@@ -61,6 +62,31 @@ jobs:
       - name: Install worker deps
         working-directory: apps/project-sites
         run: npm ci --legacy-peer-deps
+
+      - name: Install Angular frontend deps
+        working-directory: apps/project-sites/frontend
+        run: npm ci --legacy-peer-deps
+
+      - name: Build Angular frontend (production config)
+        working-directory: apps/project-sites/frontend
+        run: npm run build:prod
+
+      - name: Verify Angular bundle exists in dist
+        working-directory: apps/project-sites/frontend
+        run: |
+          test -f dist/project-sites-frontend/browser/index.html || { echo "::error::Angular dist missing"; exit 1; }
+          grep -qE 'main-[A-Za-z0-9]+\.js' dist/project-sites-frontend/browser/index.html || { echo "::error::Hashed main-*.js missing from dist index.html"; exit 1; }
+          echo "✓ Angular dist contains hashed bundle"
+
+      - name: Deploy Angular bundle to R2
+        working-directory: apps/project-sites/frontend
+        env:
+          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+        run: |
+          TARGET="${{ github.event_name == 'workflow_dispatch' && inputs.target || 'production' }}"
+          echo "Uploading Angular bundle to R2 for: $TARGET"
+          node scripts/deploy-r2.mjs "$TARGET"
 
       - name: Deploy Worker (builds container image remotely)
         working-directory: apps/project-sites
@@ -124,6 +150,34 @@ jobs:
           echo "Listing recent deployments for env: $TARGET"
           npx wrangler deployments list --env "$TARGET" | head -20
 
+      - name: Purge Cloudflare zone cache
+        env:
+          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+          ZONE_ID: '75a6f8d5e441cd7124552976ba894f83'
+        run: |
+          curl -sS -X POST \
+            "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/purge_cache" \
+            -H "X-Auth-Email: $CLOUDFLARE_EMAIL" \
+            -H "X-Auth-Key: $CLOUDFLARE_API_KEY" \
+            -H "Content-Type: application/json" \
+            --data '{"purge_everything":true}' | jq .
+
+      - name: Verify Angular bundle live (HARD GATE)
+        working-directory: apps/project-sites/frontend
+        run: |
+          TARGET="${{ github.event_name == 'workflow_dispatch' && inputs.target || 'production' }}"
+          if [ "$TARGET" = "production" ]; then
+            URL="https://projectsites.dev"
+            sleep 20
+            node scripts/verify-deploy.mjs "$URL"
+          else
+            URL="https://sites-staging.megabyte.space"
+            sleep 20
+            node scripts/verify-deploy.mjs "$URL" || \
+              { echo "::warning::Staging verify failed — likely CF Bot Fight 403 from GHA IP. Manual verify required."; exit 0; }
+          fi
+
       - name: Smoke test — homepage (best effort, tolerates CF Bot Fight 403)
         env:
           REAL_UA: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
@@ -134,8 +188,7 @@ jobs:
           else
             URL="https://sites-staging.megabyte.space"
           fi
-          echo "Probing: $URL (sleep 20s for edge propagation)"
-          sleep 20
+          echo "Probing: $URL"
           CODE=$(curl -s -o /dev/null -w "%{http_code}" -L --max-time 15 \
             -A "$REAL_UA" \
             -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" \

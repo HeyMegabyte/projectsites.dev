@@ -27,7 +27,7 @@ import { loadBuildFromR2, validateBuild } from '../services/build_validators.js'
 async function updateSiteStatus(db: D1Database, siteId: string, status: string): Promise<void> {
   try {
     await db
-      .prepare('UPDATE sites SET status = ?, updated_at = datetime(\'now\') WHERE id = ?')
+      .prepare("UPDATE sites SET status = ?, updated_at = datetime('now') WHERE id = ?")
       .bind(status, siteId)
       .run();
   } catch (err) {
@@ -59,13 +59,7 @@ async function workflowLog(
         `INSERT INTO audit_logs (id, org_id, actor_id, action, target_type, target_id, metadata_json, created_at)
          VALUES (?, ?, NULL, ?, 'site', ?, ?, datetime('now'))`,
       )
-      .bind(
-        crypto.randomUUID(),
-        orgId,
-        action,
-        siteId,
-        JSON.stringify(enrichedMeta),
-      )
+      .bind(crypto.randomUUID(), orgId, action, siteId, JSON.stringify(enrichedMeta))
       .run();
   } catch (err) {
     console.warn(
@@ -213,7 +207,9 @@ function buildPrompt(params: SiteGenerationParams): string {
     '- DONE = blockers === 0 from run-validators.mjs AND completeness-checker returns DONE.',
     '',
     params.additionalContext ? `ADDITIONAL CONTEXT FROM USER: ${params.additionalContext}` : '',
-  ].filter(Boolean).join('\n');
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 /**
@@ -284,7 +280,12 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           return await res.text();
         },
       );
-      const parsed = JSON.parse(minimalRes) as { ok: boolean; uploadResult?: { uploaded?: number }; stdoutTail?: string; elapsedMs?: number };
+      const parsed = JSON.parse(minimalRes) as {
+        ok: boolean;
+        uploadResult?: { uploaded?: number };
+        stdoutTail?: string;
+        elapsedMs?: number;
+      };
       await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.minimal_done', {
         ok: parsed.ok,
         uploaded: parsed.uploadResult?.uploaded ?? 0,
@@ -301,41 +302,59 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
 
     // ── Stub mode: validate KV-callback persistence end-to-end (no API cost) ──
     if (params.stubMode) {
-      const stubJobId = await step.do('stub-start-build', {
-        retries: { limit: 2, delay: '10 seconds', backoff: 'exponential' },
-        timeout: '5 minutes',
-      }, async () => {
-        const container = getContainer();
-        const cbSecret = env.INTERNAL_BUILD_SECRET || '';
-        const cbUrl = env.INTERNAL_CALLBACK_URL || `https://${DOMAINS.SITES_BASE}/api/internal/build-status`;
-        const res = await container.fetch('http://container/build-stub', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ slug: params.slug, callbackUrl: cbUrl, callbackSecret: cbSecret }),
-        });
-        if (!res.ok) throw new Error(`stub start failed: ${res.status}`);
-        const r = await res.json() as { jobId?: string; error?: string };
-        if (r.error || !r.jobId) throw new Error(`stub start error: ${r.error ?? 'no jobId'}`);
-        return r.jobId;
-      });
+      const stubJobId = await step.do(
+        'stub-start-build',
+        {
+          retries: { limit: 2, delay: '10 seconds', backoff: 'exponential' },
+          timeout: '5 minutes',
+        },
+        async () => {
+          const container = getContainer();
+          const cbSecret = env.INTERNAL_BUILD_SECRET || '';
+          const cbUrl =
+            env.INTERNAL_CALLBACK_URL || `https://${DOMAINS.SITES_BASE}/api/internal/build-status`;
+          const res = await container.fetch('http://container/build-stub', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              slug: params.slug,
+              callbackUrl: cbUrl,
+              callbackSecret: cbSecret,
+            }),
+          });
+          if (!res.ok) throw new Error(`stub start failed: ${res.status}`);
+          const r = (await res.json()) as { jobId?: string; error?: string };
+          if (r.error || !r.jobId) throw new Error(`stub start error: ${r.error ?? 'no jobId'}`);
+          return r.jobId;
+        },
+      );
 
       let stubFinal: KvBuildRecord | null = null;
       for (let i = 0; i < 30; i++) {
-        const status = await step.do(`stub-heartbeat-${i}`, {
-          retries: { limit: 3, delay: '5 seconds', backoff: 'exponential' },
-          timeout: '1 minute',
-        }, async () => {
-          await new Promise((resolve) => setTimeout(resolve, 6_000));
-          const raw = await env.CACHE_KV.get(`build:${stubJobId}`);
-          return raw || JSON.stringify({ _missing: true });
-        });
+        const status = await step.do(
+          `stub-heartbeat-${i}`,
+          {
+            retries: { limit: 3, delay: '5 seconds', backoff: 'exponential' },
+            timeout: '1 minute',
+          },
+          async () => {
+            await new Promise((resolve) => setTimeout(resolve, 6_000));
+            const raw = await env.CACHE_KV.get(`build:${stubJobId}`);
+            return raw || JSON.stringify({ _missing: true });
+          },
+        );
         const parsed = JSON.parse(status) as KvBuildRecord & { _missing?: boolean };
         if (parsed._missing) continue;
         await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.stub_heartbeat', {
-          poll: i, status: parsed.status, step: parsed.step,
+          poll: i,
+          status: parsed.status,
+          step: parsed.step,
           message: `stub poll ${i}: ${parsed.status} ${parsed.step}`,
         });
-        if (parsed.status !== 'running') { stubFinal = parsed; break; }
+        if (parsed.status !== 'running') {
+          stubFinal = parsed;
+          break;
+        }
       }
       if (!stubFinal || stubFinal.status !== 'complete') {
         throw new Error(`stub mode failed: ${JSON.stringify(stubFinal)}`);
@@ -352,26 +371,30 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
     let assetManifest: string[] = params.uploadedAssets || [];
     if (params.uploadId) {
       try {
-        const moved = await step.do('move-uploaded-assets', {
-          retries: { limit: 2, delay: '5 seconds', backoff: 'exponential' },
-          timeout: '1 minute',
-        }, async () => {
-          const prefix = `uploads/${params.uploadId}/`;
-          const listed = await env.SITES_BUCKET.list({ prefix, limit: 50 });
-          const movedKeys: string[] = [];
-          for (const obj of listed.objects) {
-            const relativePath = obj.key.replace(prefix, '');
-            const destKey = `sites/${params.slug}/assets/${relativePath}`;
-            const data = await env.SITES_BUCKET.get(obj.key);
-            if (data) {
-              await env.SITES_BUCKET.put(destKey, await data.arrayBuffer(), {
-                httpMetadata: data.httpMetadata,
-              });
-              movedKeys.push(destKey);
+        const moved = await step.do(
+          'move-uploaded-assets',
+          {
+            retries: { limit: 2, delay: '5 seconds', backoff: 'exponential' },
+            timeout: '1 minute',
+          },
+          async () => {
+            const prefix = `uploads/${params.uploadId}/`;
+            const listed = await env.SITES_BUCKET.list({ prefix, limit: 50 });
+            const movedKeys: string[] = [];
+            for (const obj of listed.objects) {
+              const relativePath = obj.key.replace(prefix, '');
+              const destKey = `sites/${params.slug}/assets/${relativePath}`;
+              const data = await env.SITES_BUCKET.get(obj.key);
+              if (data) {
+                await env.SITES_BUCKET.put(destKey, await data.arrayBuffer(), {
+                  httpMetadata: data.httpMetadata,
+                });
+                movedKeys.push(destKey);
+              }
             }
-          }
-          return JSON.stringify(movedKeys);
-        });
+            return JSON.stringify(movedKeys);
+          },
+        );
         assetManifest = [...assetManifest, ...JSON.parse(moved)];
       } catch {
         // Non-blocking — continue without uploaded assets
@@ -399,12 +422,26 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
       SITE_VERSION: version,
     };
     const keysToCopy: (keyof Env)[] = [
-      'OPENAI_API_KEY', 'UNSPLASH_ACCESS_KEY', 'PEXELS_API_KEY', 'PIXABAY_API_KEY',
-      'YOUTUBE_API_KEY', 'LOGODEV_TOKEN', 'BRANDFETCH_API_KEY', 'FOURSQUARE_API_KEY',
-      'YELP_API_KEY', 'GOOGLE_PLACES_API_KEY', 'GOOGLE_CSE_KEY', 'GOOGLE_CSE_CX',
-      'IDEOGRAM_API_KEY', 'REPLICATE_API_TOKEN', 'STABILITY_API_KEY',
-      'GOOGLE_MAPS_API_KEY', 'CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY',
-      'CLOUDINARY_API_SECRET', 'MAPBOX_ACCESS_TOKEN',
+      'OPENAI_API_KEY',
+      'UNSPLASH_ACCESS_KEY',
+      'PEXELS_API_KEY',
+      'PIXABAY_API_KEY',
+      'YOUTUBE_API_KEY',
+      'LOGODEV_TOKEN',
+      'BRANDFETCH_API_KEY',
+      'FOURSQUARE_API_KEY',
+      'YELP_API_KEY',
+      'GOOGLE_PLACES_API_KEY',
+      'GOOGLE_CSE_KEY',
+      'GOOGLE_CSE_CX',
+      'IDEOGRAM_API_KEY',
+      'REPLICATE_API_TOKEN',
+      'STABILITY_API_KEY',
+      'GOOGLE_MAPS_API_KEY',
+      'CLOUDINARY_CLOUD_NAME',
+      'CLOUDINARY_API_KEY',
+      'CLOUDINARY_API_SECRET',
+      'MAPBOX_ACCESS_TOKEN',
     ];
     for (const key of keysToCopy) {
       const val = env[key];
@@ -414,58 +451,67 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
     // Context files: asset manifest + any uploaded asset URLs
     const contextFiles: Record<string, string> = {};
     if (assetManifest.length > 0) {
-      const assetUrls = assetManifest.map((key) =>
-        `https://${params.slug}.${DOMAINS.SITES_SUFFIX}/assets/${key.split('/').pop()}`
+      const assetUrls = assetManifest.map(
+        (key) => `https://${params.slug}.${DOMAINS.SITES_SUFFIX}/assets/${key.split('/').pop()}`,
       );
-      contextFiles['assets.json'] = JSON.stringify({ keys: assetManifest, urls: assetUrls }, null, 2);
+      contextFiles['assets.json'] = JSON.stringify(
+        { keys: assetManifest, urls: assetUrls },
+        null,
+        2,
+      );
     }
 
     // ── Step 1: Start build (POST to container) ──
     // Use workers.dev URL to bypass zone-level CF managed challenge intercepting POSTs.
     const callbackSecret = env.INTERNAL_BUILD_SECRET || '';
-    const callbackUrl = env.INTERNAL_CALLBACK_URL || `https://${DOMAINS.SITES_BASE}/api/internal/build-status`;
+    const callbackUrl =
+      env.INTERNAL_CALLBACK_URL || `https://${DOMAINS.SITES_BASE}/api/internal/build-status`;
 
-    const jobId = await step.do('start-build', {
-      retries: { limit: 2, delay: '10 seconds', backoff: 'exponential' },
-      timeout: '5 minutes',
-    }, async () => {
-      const container = getContainer();
+    const jobId = await step.do(
+      'start-build',
+      {
+        retries: { limit: 2, delay: '10 seconds', backoff: 'exponential' },
+        timeout: '5 minutes',
+      },
+      async () => {
+        const container = getContainer();
 
-      const payload = {
-        slug: params.slug,
-        _anthropicKey: env.ANTHROPIC_API_KEY || '',
-        prompt,
-        contextFiles,
-        envVars,
-        timeoutMin: 45,
-        callbackUrl,
-        callbackSecret,
-      };
+        const payload = {
+          slug: params.slug,
+          _anthropicKey: env.ANTHROPIC_API_KEY || '',
+          prompt,
+          contextFiles,
+          envVars,
+          timeoutMin: 45,
+          callbackUrl,
+          callbackSecret,
+        };
 
-      const res = await container.fetch('http://container/build', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+        const res = await container.fetch('http://container/build', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
 
-      if (!res.ok) {
-        const errText = await res.text().catch(() => 'Unknown');
-        throw new Error(`Container start failed: ${res.status} ${errText}`);
-      }
+        if (!res.ok) {
+          const errText = await res.text().catch(() => 'Unknown');
+          throw new Error(`Container start failed: ${res.status} ${errText}`);
+        }
 
-      const result = await res.json() as { jobId?: string; error?: string };
-      if (result.error) throw new Error(`Container start error: ${result.error}`);
-      if (!result.jobId) throw new Error('Container did not return jobId');
+        const result = (await res.json()) as { jobId?: string; error?: string };
+        if (result.error) throw new Error(`Container start error: ${result.error}`);
+        if (!result.jobId) throw new Error('Container did not return jobId');
 
-      await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.build_started', {
-        jobId: result.jobId,
-        prompt_length: prompt.length,
-        env_vars_count: Object.keys(envVars).length,
-        message: `Claude Code build started (${Math.round(prompt.length / 1024)}KB prompt, ${Object.keys(envVars).length} API keys)`,
-      });
+        await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.build_started', {
+          jobId: result.jobId,
+          prompt_length: prompt.length,
+          env_vars_count: Object.keys(envVars).length,
+          message: `Claude Code build started (${Math.round(prompt.length / 1024)}KB prompt, ${Object.keys(envVars).length} API keys)`,
+        });
 
-      return result.jobId;
-    });
+        return result.jobId;
+      },
+    );
 
     // ── Step 2: Heartbeat loop polls container directly with KV fallback ──
     // Each heartbeat sleeps 30s, then hits the container's /status. The inbound
@@ -484,29 +530,35 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
     let lastSeenStep: string | null = null;
 
     for (let i = 0; i < MAX_POLLS; i++) {
-      const result = await step.do(`heartbeat-${i}`, {
-        retries: { limit: 3, delay: '5 seconds', backoff: 'exponential' },
-        timeout: '1 minute',
-      }, async () => {
-        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+      const result = await step.do(
+        `heartbeat-${i}`,
+        {
+          retries: { limit: 3, delay: '5 seconds', backoff: 'exponential' },
+          timeout: '1 minute',
+        },
+        async () => {
+          await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
 
-        // Primary: short-poll the container directly. Inbound HTTP keeps DO warm.
-        try {
-          const container = getContainer();
-          const res = await container.fetch(`http://container/status?jobId=${jobId}`, { method: 'GET' });
-          if (res.ok) {
-            const body = await res.text();
-            return JSON.stringify({ _src: 'container', body });
+          // Primary: short-poll the container directly. Inbound HTTP keeps DO warm.
+          try {
+            const container = getContainer();
+            const res = await container.fetch(`http://container/status?jobId=${jobId}`, {
+              method: 'GET',
+            });
+            if (res.ok) {
+              const body = await res.text();
+              return JSON.stringify({ _src: 'container', body });
+            }
+          } catch {
+            // fall through to KV fallback
           }
-        } catch {
-          // fall through to KV fallback
-        }
 
-        // Fallback: KV record (set by container's pushStatus callback). Survives DO replacement.
-        const raw = await env.CACHE_KV.get(`build:${jobId}`);
-        if (!raw) return JSON.stringify({ _src: 'kv', _missing: true });
-        return JSON.stringify({ _src: 'kv', body: raw });
-      });
+          // Fallback: KV record (set by container's pushStatus callback). Survives DO replacement.
+          const raw = await env.CACHE_KV.get(`build:${jobId}`);
+          if (!raw) return JSON.stringify({ _src: 'kv', _missing: true });
+          return JSON.stringify({ _src: 'kv', body: raw });
+        },
+      );
 
       const wrap = JSON.parse(result) as { _src: string; _missing?: boolean; body?: string };
 
@@ -516,13 +568,20 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
             poll: i,
             message: 'No build status in KV after 2min — container failed to start',
           });
-          finalStatus = { status: 'error', step: 'no-callback', elapsed: 0, fileCount: 0, error: 'Container never reported status to KV' };
+          finalStatus = {
+            status: 'error',
+            step: 'no-callback',
+            elapsed: 0,
+            fileCount: 0,
+            error: 'Container never reported status to KV',
+          };
           break;
         }
         continue;
       }
 
-      const parsed = JSON.parse(wrap.body || '{}') as KvBuildRecord & ContainerStatus & { error?: string | null };
+      const parsed = JSON.parse(wrap.body || '{}') as KvBuildRecord &
+        ContainerStatus & { error?: string | null };
 
       const TERMINAL = new Set(['complete', 'error']);
       const unknownJob = wrap._src === 'container' && parsed.status === undefined;
@@ -564,8 +623,8 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
       // freshness, treat every successful container response as fresh; KV path uses lastUpdate.
       const isFromContainer = wrap._src === 'container';
       const ageMs = isFromContainer
-        ? (Date.now() - lastFreshAt)
-        : (Date.now() - ((parsed as KvBuildRecord).lastUpdate || 0));
+        ? Date.now() - lastFreshAt
+        : Date.now() - ((parsed as KvBuildRecord).lastUpdate || 0);
 
       const stateChanged = parsed.status !== lastSeenStatus || parsed.step !== lastSeenStep;
       // Only bump freshness on responses with a real status; unknown-job (handled above)
@@ -607,7 +666,13 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
           age_ms: ageMs,
           message: `Status stale ${(ageMs / 1000) | 0}s — container died without reporting completion`,
         });
-        finalStatus = { status: 'error', step: 'stale', elapsed: parsed.elapsed, fileCount: parsed.fileCount, error: 'Container stopped reporting status (stale)' };
+        finalStatus = {
+          status: 'error',
+          step: 'stale',
+          elapsed: parsed.elapsed,
+          fileCount: parsed.fileCount,
+          error: 'Container stopped reporting status (stale)',
+        };
         break;
       }
     }
@@ -631,234 +696,300 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
     }
 
     // ── Step 3: Finalize — verify R2 upload succeeded via KV record ──
-    const filesJson = await step.do('finalize-build', {
-      retries: { limit: 3, delay: '10 seconds', backoff: 'exponential' },
-      timeout: '2 minutes',
-    }, async () => {
-      const fileCount = finalStatus!.fileCount || 0;
-      // Prefer in-memory record from heartbeat poll. If missing or empty, re-read
-      // KV — the container's HMAC-protected callback always writes the canonical
-      // uploadResult to `build:${jobId}` regardless of which path saw terminal status first.
-      let uploadResult = kvFinalRecord?.uploadResult || null;
-      if (!uploadResult || !uploadResult.uploaded) {
-        try {
-          const raw = await env.CACHE_KV.get(`build:${jobId}`);
-          if (raw) {
-            const fresh = JSON.parse(raw) as KvBuildRecord;
-            if (fresh?.uploadResult) uploadResult = fresh.uploadResult;
-          }
-        } catch {}
-      }
-      const uploadCount = uploadResult?.uploaded || 0;
+    const filesJson = await step.do(
+      'finalize-build',
+      {
+        retries: { limit: 3, delay: '10 seconds', backoff: 'exponential' },
+        timeout: '2 minutes',
+      },
+      async () => {
+        const fileCount = finalStatus!.fileCount || 0;
+        // Prefer in-memory record from heartbeat poll. If missing or empty, re-read
+        // KV — the container's HMAC-protected callback always writes the canonical
+        // uploadResult to `build:${jobId}` regardless of which path saw terminal status first.
+        let uploadResult = kvFinalRecord?.uploadResult || null;
+        if (!uploadResult || !uploadResult.uploaded) {
+          try {
+            const raw = await env.CACHE_KV.get(`build:${jobId}`);
+            if (raw) {
+              const fresh = JSON.parse(raw) as KvBuildRecord;
+              if (fresh?.uploadResult) uploadResult = fresh.uploadResult;
+            }
+          } catch {}
+        }
+        const uploadCount = uploadResult?.uploaded || 0;
 
-      if (uploadCount === 0) {
-        await updateSiteStatus(env.DB, params.siteId, 'error');
-        await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.upload_failed', {
+        if (uploadCount === 0) {
+          await updateSiteStatus(env.DB, params.siteId, 'error');
+          await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.upload_failed', {
+            file_count: fileCount,
+            upload_result: uploadResult,
+            message: `R2 upload failed — refusing to mark published. uploaded=${uploadCount} failed=${uploadResult?.failed ?? 'n/a'}`,
+          });
+          throw new Error(
+            `R2 upload produced 0 files (uploadResult=${JSON.stringify(uploadResult)})`,
+          );
+        }
+
+        await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.build_complete', {
           file_count: fileCount,
-          upload_result: uploadResult,
-          message: `R2 upload failed — refusing to mark published. uploaded=${uploadCount} failed=${uploadResult?.failed ?? 'n/a'}`,
+          upload_count: uploadCount,
+          upload_failed: uploadResult?.failed || 0,
+          message: `Build complete: ${fileCount} source files, ${uploadCount} files uploaded to R2`,
         });
-        throw new Error(`R2 upload produced 0 files (uploadResult=${JSON.stringify(uploadResult)})`);
-      }
 
-      await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.build_complete', {
-        file_count: fileCount,
-        upload_count: uploadCount,
-        upload_failed: uploadResult?.failed || 0,
-        message: `Build complete: ${fileCount} source files, ${uploadCount} files uploaded to R2`,
-      });
+        // Update D1 status to published
+        await env.DB.prepare(
+          "UPDATE sites SET status = 'published', current_build_version = ?, updated_at = datetime('now') WHERE id = ?",
+        )
+          .bind(version, params.siteId)
+          .run();
 
-      // Update D1 status to published
-      await env.DB.prepare(
-        "UPDATE sites SET status = 'published', current_build_version = ?, updated_at = datetime('now') WHERE id = ?",
-      ).bind(version, params.siteId).run();
+        // Create initial snapshot
+        await env.DB.prepare(
+          "INSERT OR IGNORE INTO site_snapshots (id, site_id, snapshot_name, build_version, description) VALUES (?, ?, 'initial', ?, 'First published version')",
+        )
+          .bind(crypto.randomUUID(), params.siteId, version)
+          .run();
 
-      // Create initial snapshot
-      await env.DB.prepare(
-        "INSERT OR IGNORE INTO site_snapshots (id, site_id, snapshot_name, build_version, description) VALUES (?, ?, 'initial', ?, 'First published version')",
-      ).bind(crypto.randomUUID(), params.siteId, version).run();
-
-      return JSON.stringify({ fileCount, version });
-    });
+        return JSON.stringify({ fileCount, version });
+      },
+    );
 
     // ── Step 3.5: Build validators (report mode — log to D1, never throw) ──
     // Enforces audit recommendations: asset existence, JSON-LD count, image format,
     // og-image quality, apple-touch-icon, meta lengths, H1 in shell, sitemap lastmod,
     // banned slop words, JS chunk size, lightbox presence, required well-known files.
     // See services/build_validators.ts and skill 15 quality-gates.md.
-    await step.do('validate-build', {
-      retries: { limit: 1, delay: '5 seconds', backoff: 'exponential' },
-      timeout: '2 minutes',
-    }, async () => {
-      try {
-        const prefix = `sites/${params.slug}/${version}/`;
-        const files = await loadBuildFromR2(env.SITES_BUCKET, prefix);
-        const report = validateBuild(files);
-        await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.build_validation', {
-          ok: report.ok,
-          file_count: files.length,
-          errors: report.errors.slice(0, 50),
-          warnings: report.warnings.slice(0, 50),
-          summary: report.summary,
-          message: `Build validation: ${report.summary}`,
-        });
-        return JSON.stringify({ ok: report.ok, summary: report.summary });
-      } catch (err) {
-        await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.build_validation_error', {
-          error: err instanceof Error ? err.message : String(err),
-          message: 'Build validation skipped due to error',
-        });
-        return JSON.stringify({ skipped: true });
-      }
-    });
+    await step.do(
+      'validate-build',
+      {
+        retries: { limit: 1, delay: '5 seconds', backoff: 'exponential' },
+        timeout: '2 minutes',
+      },
+      async () => {
+        try {
+          const prefix = `sites/${params.slug}/${version}/`;
+          const files = await loadBuildFromR2(env.SITES_BUCKET, prefix);
+          const report = validateBuild(files);
+          await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.build_validation', {
+            ok: report.ok,
+            file_count: files.length,
+            errors: report.errors.slice(0, 50),
+            warnings: report.warnings.slice(0, 50),
+            summary: report.summary,
+            message: `Build validation: ${report.summary}`,
+          });
+          return JSON.stringify({ ok: report.ok, summary: report.summary });
+        } catch (err) {
+          await workflowLog(
+            env.DB,
+            params.orgId,
+            params.siteId,
+            'workflow.build_validation_error',
+            {
+              error: err instanceof Error ? err.message : String(err),
+              message: 'Build validation skipped due to error',
+            },
+          );
+          return JSON.stringify({ skipped: true });
+        }
+      },
+    );
 
     // ── Step 4: Final visual inspection (non-blocking) ──
-    await step.do('visual-inspection', {
-      retries: { limit: 1, delay: '5 seconds', backoff: 'exponential' },
-      timeout: '2 minutes',
-    }, async () => {
-      if (!env.OPENAI_API_KEY) return JSON.stringify({ skipped: true, reason: 'no_openai_key' });
-      try {
-        const ssUrl = `https://api.microlink.io/?url=https://${params.slug}.${DOMAINS.SITES_SUFFIX}&screenshot=true&meta=false&embed=screenshot.url`;
-        const ssRes = await fetch(ssUrl);
-        if (!ssRes.ok) return JSON.stringify({ skipped: true, reason: 'screenshot_failed' });
-        const ssData = await ssRes.json() as { data?: { screenshot?: { url?: string } } };
-        const imageUrl = ssData?.data?.screenshot?.url;
-        if (!imageUrl) return JSON.stringify({ skipped: true, reason: 'no_screenshot_url' });
+    await step.do(
+      'visual-inspection',
+      {
+        retries: { limit: 1, delay: '5 seconds', backoff: 'exponential' },
+        timeout: '2 minutes',
+      },
+      async () => {
+        if (!env.OPENAI_API_KEY) return JSON.stringify({ skipped: true, reason: 'no_openai_key' });
+        try {
+          const ssUrl = `https://api.microlink.io/?url=https://${params.slug}.${DOMAINS.SITES_SUFFIX}&screenshot=true&meta=false&embed=screenshot.url`;
+          const ssRes = await fetch(ssUrl);
+          if (!ssRes.ok) return JSON.stringify({ skipped: true, reason: 'screenshot_failed' });
+          const ssData = (await ssRes.json()) as { data?: { screenshot?: { url?: string } } };
+          const imageUrl = ssData?.data?.screenshot?.url;
+          if (!imageUrl) return JSON.stringify({ skipped: true, reason: 'no_screenshot_url' });
 
-        const critiqueRes = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: 'gpt-4o',
-            messages: [{
-              role: 'user',
-              content: [
-                { type: 'text', text: 'Score this website screenshot 1-10 on visual quality. List top 5 issues. Return JSON: { score: number, issues: string[], logo_visible: boolean, brand_colors_correct: boolean }' },
-                { type: 'image_url', image_url: { url: imageUrl, detail: 'high' } },
+          const critiqueRes = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o',
+              messages: [
+                {
+                  role: 'user',
+                  content: [
+                    {
+                      type: 'text',
+                      text: 'Score this website screenshot 1-10 on visual quality. List top 5 issues. Return JSON: { score: number, issues: string[], logo_visible: boolean, brand_colors_correct: boolean }',
+                    },
+                    { type: 'image_url', image_url: { url: imageUrl, detail: 'high' } },
+                  ],
+                },
               ],
-            }],
-            max_tokens: 500,
-            temperature: 0.2,
-          }),
-        });
-        if (!critiqueRes.ok) return JSON.stringify({ skipped: true, reason: 'gpt4o_failed' });
-        const critiqueData = await critiqueRes.json() as { choices: { message: { content: string } }[] };
-        const raw = critiqueData.choices?.[0]?.message?.content || '';
-        const cleaned = raw.replace(/```json\n?/g, '').replace(/```/g, '').trim();
-        const parsed = JSON.parse(cleaned) as { score?: number; issues?: string[] };
+              max_tokens: 500,
+              temperature: 0.2,
+            }),
+          });
+          if (!critiqueRes.ok) return JSON.stringify({ skipped: true, reason: 'gpt4o_failed' });
+          const critiqueData = (await critiqueRes.json()) as {
+            choices: { message: { content: string } }[];
+          };
+          const raw = critiqueData.choices?.[0]?.message?.content || '';
+          const cleaned = raw
+            .replace(/```json\n?/g, '')
+            .replace(/```/g, '')
+            .trim();
+          const parsed = JSON.parse(cleaned) as { score?: number; issues?: string[] };
 
-        await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.visual_inspection', {
-          score: parsed.score,
-          issues: parsed.issues,
-          screenshot_url: imageUrl,
-          message: `Visual inspection: score=${parsed.score}/10, ${(parsed.issues || []).length} issues`,
-        });
+          await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.visual_inspection', {
+            score: parsed.score,
+            issues: parsed.issues,
+            screenshot_url: imageUrl,
+            message: `Visual inspection: score=${parsed.score}/10, ${(parsed.issues || []).length} issues`,
+          });
 
-        return JSON.stringify(parsed);
-      } catch {
-        return JSON.stringify({ skipped: true, reason: 'error' });
-      }
-    });
+          return JSON.stringify(parsed);
+        } catch {
+          return JSON.stringify({ skipped: true, reason: 'error' });
+        }
+      },
+    );
 
     // ── Step 4.5: Benchmark + retrospective (non-blocking, $0 default) ──
     // Tier 1 (programmatic) + Tier 2 (PSI) both free. Retrospective LLM call
     // (~$0.001 Haiku) only fires when build regressed or score < 0.85.
     // See services/benchmark.ts and services/retrospective.ts.
-    await step.do('benchmark-and-learn', {
-      retries: { limit: 1, delay: '10 seconds', backoff: 'exponential' },
-      timeout: '3 minutes',
-    }, async () => {
-      try {
-        const { runBenchmarks } = await import('../services/benchmark.js');
-        const { buildRetrospective, recordRetrospectivePath } = await import('../services/retrospective.js');
+    await step.do(
+      'benchmark-and-learn',
+      {
+        retries: { limit: 1, delay: '10 seconds', backoff: 'exponential' },
+        timeout: '3 minutes',
+      },
+      async () => {
+        try {
+          const { runBenchmarks } = await import('../services/benchmark.js');
+          const { buildRetrospective, recordRetrospectivePath } =
+            await import('../services/retrospective.js');
 
-        const prevRow = await env.DB.prepare(
-          'SELECT id, mean_score FROM site_benchmarks WHERE site_id = ? ORDER BY run_at DESC LIMIT 1',
-        ).bind(params.siteId).first() as { id: string; mean_score: number | null } | null;
+          const prevRow = (await env.DB.prepare(
+            'SELECT id, mean_score FROM site_benchmarks WHERE site_id = ? ORDER BY run_at DESC LIMIT 1',
+          )
+            .bind(params.siteId)
+            .first()) as { id: string; mean_score: number | null } | null;
 
-        const result = await runBenchmarks({
-          env,
-          siteId: params.siteId,
-          slug: params.slug,
-          siteUrl: `https://${params.slug}.${DOMAINS.SITES_SUFFIX}`,
-          previousMeanScore: prevRow?.mean_score ?? null,
-        });
-
-        await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.benchmark', {
-          mean_score: result.meanScore,
-          programmatic_score: result.programmatic.score,
-          psi_perf: result.psi?.performance ?? null,
-          regressed: result.regressedFromPrevious,
-          banned_words: result.programmatic.bannedWordHits,
-          message: `Benchmark: mean=${result.meanScore.toFixed(2)} regressed=${result.regressedFromPrevious}`,
-        });
-
-        const retro = await buildRetrospective({ env, current: result });
-        if (!retro.generated) {
-          await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.retrospective_skipped', {
-            reason: retro.skipReason,
+          const result = await runBenchmarks({
+            env,
+            siteId: params.siteId,
+            slug: params.slug,
+            siteUrl: `https://${params.slug}.${DOMAINS.SITES_SUFFIX}`,
+            previousMeanScore: prevRow?.mean_score ?? null,
           });
-          return JSON.stringify({ benchmark: result.meanScore, retrospective: 'skipped' });
+
+          await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.benchmark', {
+            mean_score: result.meanScore,
+            programmatic_score: result.programmatic.score,
+            psi_perf: result.psi?.performance ?? null,
+            regressed: result.regressedFromPrevious,
+            banned_words: result.programmatic.bannedWordHits,
+            message: `Benchmark: mean=${result.meanScore.toFixed(2)} regressed=${result.regressedFromPrevious}`,
+          });
+
+          const retro = await buildRetrospective({ env, current: result });
+          if (!retro.generated) {
+            await workflowLog(
+              env.DB,
+              params.orgId,
+              params.siteId,
+              'workflow.retrospective_skipped',
+              {
+                reason: retro.skipReason,
+              },
+            );
+            return JSON.stringify({ benchmark: result.meanScore, retrospective: 'skipped' });
+          }
+
+          const retroRow = (await env.DB.prepare(
+            'SELECT id FROM site_benchmarks WHERE site_id = ? ORDER BY run_at DESC LIMIT 1',
+          )
+            .bind(params.siteId)
+            .first()) as { id: string } | null;
+
+          const retroPath = `retrospectives/${retro.filename}`;
+          await env.SITES_BUCKET.put(retroPath, retro.markdown, {
+            httpMetadata: { contentType: 'text/markdown; charset=utf-8' },
+          });
+
+          if (retroRow) await recordRetrospectivePath(env, retroRow.id, retroPath);
+
+          await workflowLog(
+            env.DB,
+            params.orgId,
+            params.siteId,
+            'workflow.retrospective_generated',
+            {
+              path: retroPath,
+              filename: retro.filename,
+              message: `Retrospective written to ${retroPath}`,
+            },
+          );
+
+          return JSON.stringify({ benchmark: result.meanScore, retrospective: retroPath });
+        } catch (err) {
+          await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.benchmark_error', {
+            error: err instanceof Error ? err.message : String(err),
+            message: 'Benchmark/retrospective skipped due to error',
+          });
+          return JSON.stringify({ skipped: true });
         }
-
-        const retroRow = await env.DB.prepare(
-          'SELECT id FROM site_benchmarks WHERE site_id = ? ORDER BY run_at DESC LIMIT 1',
-        ).bind(params.siteId).first() as { id: string } | null;
-
-        const retroPath = `retrospectives/${retro.filename}`;
-        await env.SITES_BUCKET.put(retroPath, retro.markdown, {
-          httpMetadata: { contentType: 'text/markdown; charset=utf-8' },
-        });
-
-        if (retroRow) await recordRetrospectivePath(env, retroRow.id, retroPath);
-
-        await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.retrospective_generated', {
-          path: retroPath,
-          filename: retro.filename,
-          message: `Retrospective written to ${retroPath}`,
-        });
-
-        return JSON.stringify({ benchmark: result.meanScore, retrospective: retroPath });
-      } catch (err) {
-        await workflowLog(env.DB, params.orgId, params.siteId, 'workflow.benchmark_error', {
-          error: err instanceof Error ? err.message : String(err),
-          message: 'Benchmark/retrospective skipped due to error',
-        });
-        return JSON.stringify({ skipped: true });
-      }
-    });
+      },
+    );
 
     // ── Step 5: Send notification ──
-    await step.do('notify', {
-      retries: { limit: 1, delay: '5 seconds', backoff: 'exponential' },
-      timeout: '30 seconds',
-    }, async () => {
-      try {
-        // Look up user email for notification
-        const siteRow = await env.DB.prepare(
-          'SELECT o.id as org_id FROM sites s JOIN orgs o ON s.org_id = o.id WHERE s.id = ?',
-        ).bind(params.siteId).first() as { org_id: string } | null;
-        if (siteRow) {
-          const userRow = await env.DB.prepare(
-            'SELECT u.email FROM memberships m JOIN users u ON m.user_id = u.id WHERE m.org_id = ? LIMIT 1',
-          ).bind(siteRow.org_id).first() as { email: string } | null;
-          if (userRow?.email) {
-            const { notifySiteBuilt } = await import('../services/notifications.js');
-            await notifySiteBuilt(env, {
-              email: userRow.email,
-              siteName: params.businessName,
-              slug: params.slug,
-              siteUrl: `https://${params.slug}.${DOMAINS.SITES_SUFFIX}`,
-              version: (JSON.parse(filesJson) as { version: string }).version,
-            });
+    await step.do(
+      'notify',
+      {
+        retries: { limit: 1, delay: '5 seconds', backoff: 'exponential' },
+        timeout: '30 seconds',
+      },
+      async () => {
+        try {
+          // Look up user email for notification
+          const siteRow = (await env.DB.prepare(
+            'SELECT o.id as org_id FROM sites s JOIN orgs o ON s.org_id = o.id WHERE s.id = ?',
+          )
+            .bind(params.siteId)
+            .first()) as { org_id: string } | null;
+          if (siteRow) {
+            const userRow = (await env.DB.prepare(
+              'SELECT u.email FROM memberships m JOIN users u ON m.user_id = u.id WHERE m.org_id = ? LIMIT 1',
+            )
+              .bind(siteRow.org_id)
+              .first()) as { email: string } | null;
+            if (userRow?.email) {
+              const { notifySiteBuilt } = await import('../services/notifications.js');
+              await notifySiteBuilt(env, {
+                email: userRow.email,
+                siteName: params.businessName,
+                slug: params.slug,
+                siteUrl: `https://${params.slug}.${DOMAINS.SITES_SUFFIX}`,
+                version: (JSON.parse(filesJson) as { version: string }).version,
+              });
+            }
           }
+        } catch {
+          // Non-critical
         }
-      } catch {
-        // Non-critical
-      }
-      return 'ok';
-    });
+        return 'ok';
+      },
+    );
 
     const totalSeconds = Math.round((Date.now() - startTime) / 1000);
     const result = JSON.parse(filesJson) as { fileCount: number; version: string };
@@ -881,4 +1012,3 @@ export class SiteGenerationWorkflow extends WorkflowEntrypoint<Env, SiteGenerati
     };
   }
 }
-

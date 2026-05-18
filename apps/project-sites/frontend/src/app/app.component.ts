@@ -7,7 +7,6 @@ import { BgOrbsComponent } from './components/bg-orbs/bg-orbs.component';
 import { EasterEggsComponent } from './components/easter-eggs/easter-eggs.component';
 import { CommandPaletteComponent } from './components/command-palette/command-palette.component';
 import { ShortcutsOverlayComponent } from './components/shortcuts-overlay/shortcuts-overlay.component';
-import { OnboardingComponent } from './components/onboarding/onboarding.component';
 import { FeedbackWidgetComponent } from './components/feedback-widget/feedback-widget.component';
 import { AuthService } from './services/auth.service';
 import { ApiService } from './services/api.service';
@@ -16,7 +15,7 @@ import { MetaService } from './services/meta.service';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, HeaderComponent, ToastComponent, BgOrbsComponent, EasterEggsComponent, CommandPaletteComponent, ShortcutsOverlayComponent, OnboardingComponent, FeedbackWidgetComponent],
+  imports: [RouterOutlet, HeaderComponent, ToastComponent, BgOrbsComponent, EasterEggsComponent, CommandPaletteComponent, ShortcutsOverlayComponent, FeedbackWidgetComponent],
   template: `
     <a class="skip-link" href="#main-content">Skip to main content</a>
     @if (showHeader()) { <app-header role="banner" /> }
@@ -35,7 +34,6 @@ import { MetaService } from './services/meta.service';
     <main id="main-content" role="main" class="app" [class.no-pad]="!showHeader()">
       <router-outlet />
     </main>
-    <app-onboarding />
     <app-feedback-widget />
   `,
   styles: [`
@@ -102,10 +100,20 @@ export class AppComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.meta.init();
+    this.cleanupLegacyOnboardingKeys();
     this.handleAuthCallback();
     this.restoreSession();
     this.trackRoute();
     this.initCursorFollower();
+  }
+
+  private cleanupLegacyOnboardingKeys(): void {
+    try {
+      localStorage.removeItem('ps_onboarding');
+      localStorage.removeItem('ps_onboarding_seen');
+    } catch {
+      // ignore — private mode / quota
+    }
   }
 
   private isHeaderlessRoute(url: string): boolean {

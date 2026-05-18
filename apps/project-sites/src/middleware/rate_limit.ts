@@ -36,9 +36,10 @@ export function rateLimitMiddleware(opts: RateLimitOptions): MiddlewareHandler<{
 }> {
   return async (c, next) => {
     // Extract client IP (Cloudflare headers)
-    const ip = c.req.header('cf-connecting-ip')
-      || c.req.header('x-forwarded-for')?.split(',')[0]?.trim()
-      || 'unknown';
+    const ip =
+      c.req.header('cf-connecting-ip') ||
+      c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ||
+      'unknown';
 
     const key = `${opts.prefix}:${ip}`;
 
@@ -47,18 +48,22 @@ export function rateLimitMiddleware(opts: RateLimitOptions): MiddlewareHandler<{
       const count = current ? parseInt(current, 10) : 0;
 
       if (count >= opts.maxRequests) {
-        return c.json({
-          error: {
-            code: 'RATE_LIMITED',
-            message: `Too many requests. Please try again in ${opts.windowSeconds} seconds.`,
-            retry_after: opts.windowSeconds,
+        return c.json(
+          {
+            error: {
+              code: 'RATE_LIMITED',
+              message: `Too many requests. Please try again in ${opts.windowSeconds} seconds.`,
+              retry_after: opts.windowSeconds,
+            },
           },
-        }, 429, {
-          'Retry-After': String(opts.windowSeconds),
-          'X-RateLimit-Limit': String(opts.maxRequests),
-          'X-RateLimit-Remaining': '0',
-          'X-RateLimit-Reset': String(Math.floor(Date.now() / 1000) + opts.windowSeconds),
-        });
+          429,
+          {
+            'Retry-After': String(opts.windowSeconds),
+            'X-RateLimit-Limit': String(opts.maxRequests),
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': String(Math.floor(Date.now() / 1000) + opts.windowSeconds),
+          },
+        );
       }
 
       // Increment counter with TTL

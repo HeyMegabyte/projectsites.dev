@@ -187,11 +187,7 @@ describe('POST /api/sites/:id/reset', () => {
     });
 
     // Send request with no body at all
-    const res = await app.request(
-      `/api/sites/${TEST_SITE_ID}/reset`,
-      { method: 'POST' },
-      env,
-    );
+    const res = await app.request(`/api/sites/${TEST_SITE_ID}/reset`, { method: 'POST' }, env);
 
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -245,7 +241,8 @@ describe('POST /api/sites/:id/reset', () => {
 
   it('handles workflow creation failure gracefully', async () => {
     // First create call fails (duplicate ID), second also fails
-    const mockCreate = jest.fn()
+    const mockCreate = jest
+      .fn()
       .mockRejectedValueOnce(new Error('Instance already exists'))
       .mockRejectedValueOnce(new Error('Workflow unavailable'));
 
@@ -283,7 +280,8 @@ describe('POST /api/sites/:id/reset', () => {
 
   it('retries workflow creation with a unique suffix when first attempt fails', async () => {
     // First create call fails, second succeeds with the reset-suffixed ID
-    const mockCreate = jest.fn()
+    const mockCreate = jest
+      .fn()
       .mockRejectedValueOnce(new Error('Instance already exists'))
       .mockResolvedValueOnce({ id: `${TEST_SITE_ID}-reset-12345` });
 

@@ -23,11 +23,7 @@ const POSTHOG_API_URL = 'https://us.i.posthog.com/capture/';
  * Fire-and-forget: uses waitUntil to avoid blocking the response.
  * Safe to call even if POSTHOG_API_KEY is not configured.
  */
-export function capture(
-  env: Env,
-  ctx: ExecutionContext,
-  event: PostHogEvent,
-): void {
+export function capture(env: Env, ctx: ExecutionContext, event: PostHogEvent): void {
   if (!env.POSTHOG_API_KEY) return;
 
   const host = env.POSTHOG_HOST ?? POSTHOG_API_URL;
@@ -50,12 +46,14 @@ export function capture(
     headers: { 'Content-Type': 'application/json' },
     body,
   }).catch((err) => {
-    console.warn(JSON.stringify({
-      level: 'warn',
-      service: 'posthog',
-      message: 'Failed to capture event',
-      error: err instanceof Error ? err.message : String(err),
-    }));
+    console.warn(
+      JSON.stringify({
+        level: 'warn',
+        service: 'posthog',
+        message: 'Failed to capture event',
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
   });
 
   ctx.waitUntil(promise);

@@ -38,10 +38,12 @@ ${body}
 const file = (path: string, text?: string, size?: number): BuildFile => ({
   path,
   text,
-  size: size ?? (text?.length ?? 0),
+  size: size ?? text?.length ?? 0,
 });
 
-const completeBuild = (overrides: Partial<{ html: string; sitemap: string; bundleJs: string }> = {}): BuildFile[] => [
+const completeBuild = (
+  overrides: Partial<{ html: string; sitemap: string; bundleJs: string }> = {},
+): BuildFile[] => [
   file('index.html', overrides.html ?? html('<img src="/hero.jpg" alt="Hero">')),
   file('hero.jpg', undefined, 50000),
   file('og-image.png', undefined, 80000),
@@ -52,17 +54,22 @@ const completeBuild = (overrides: Partial<{ html: string; sitemap: string; bundl
   file('site.webmanifest', '{}'),
   file('robots.txt', 'User-agent: *'),
   file('humans.txt', 'Team: Acme'),
-  file('sitemap.xml', overrides.sitemap ?? '<urlset><url><loc>https://acme.test/</loc><lastmod>2026-01-01</lastmod></url></urlset>'),
+  file(
+    'sitemap.xml',
+    overrides.sitemap ??
+      '<urlset><url><loc>https://acme.test/</loc><lastmod>2026-01-01</lastmod></url></urlset>',
+  ),
   file('browserconfig.xml', '<?xml version="1.0"?><browserconfig/>'),
   file('.well-known/security.txt', 'Contact: mailto:security@acme.test'),
-  file('assets/index-abc.js', overrides.bundleJs ?? 'const x = "data-zoomable"; const y = "data-gallery";'),
+  file(
+    'assets/index-abc.js',
+    overrides.bundleJs ?? 'const x = "data-zoomable"; const y = "data-gallery";',
+  ),
 ];
 
 describe('validateAssetExistence', () => {
   it('flags missing internal references', () => {
-    const files = [
-      file('index.html', html('<img src="/missing.png" alt="x">')),
-    ];
+    const files = [file('index.html', html('<img src="/missing.png" alt="x">'))];
     const v = validateAssetExistence(files);
     expect(v).toHaveLength(1);
     expect(v[0].code).toBe('asset.missing');
@@ -83,7 +90,9 @@ describe('validateAssetExistence', () => {
   });
 
   it('allows allowlisted external hosts', () => {
-    const files = [file('index.html', html('<img src="https://images.unsplash.com/p.jpg" alt="x">'))];
+    const files = [
+      file('index.html', html('<img src="https://images.unsplash.com/p.jpg" alt="x">')),
+    ];
     expect(validateAssetExistence(files)).toEqual([]);
   });
 });
@@ -130,15 +139,29 @@ describe('validateAppleTouchIcon', () => {
 
 describe('validateMetaLengths', () => {
   it('flags short title', () => {
-    const f = [file('index.html', '<!DOCTYPE html><html><head><title>Short</title><meta name="description" content="' + 'x'.repeat(140) + '"></head><body></body></html>')];
+    const f = [
+      file(
+        'index.html',
+        '<!DOCTYPE html><html><head><title>Short</title><meta name="description" content="' +
+          'x'.repeat(140) +
+          '"></head><body></body></html>',
+      ),
+    ];
     const v = validateMetaLengths(f);
-    expect(v.some(x => x.code === 'meta.title_length')).toBe(true);
+    expect(v.some((x) => x.code === 'meta.title_length')).toBe(true);
   });
 
   it('flags short description', () => {
-    const f = [file('index.html', '<!DOCTYPE html><html><head><title>' + 'x'.repeat(55) + '</title><meta name="description" content="too short"></head><body></body></html>')];
+    const f = [
+      file(
+        'index.html',
+        '<!DOCTYPE html><html><head><title>' +
+          'x'.repeat(55) +
+          '</title><meta name="description" content="too short"></head><body></body></html>',
+      ),
+    ];
     const v = validateMetaLengths(f);
-    expect(v.some(x => x.code === 'meta.description_length')).toBe(true);
+    expect(v.some((x) => x.code === 'meta.description_length')).toBe(true);
   });
 
   it('passes valid lengths', () => {
@@ -148,7 +171,12 @@ describe('validateMetaLengths', () => {
 
 describe('validateJsonLdCount', () => {
   it('flags fewer than 4 blocks', () => {
-    const partial = '<!DOCTYPE html><html><head><title>' + 'x'.repeat(55) + '</title><meta name="description" content="' + 'x'.repeat(140) + '"><script type="application/ld+json">{}</script></head><body><h1>x</h1></body></html>';
+    const partial =
+      '<!DOCTYPE html><html><head><title>' +
+      'x'.repeat(55) +
+      '</title><meta name="description" content="' +
+      'x'.repeat(140) +
+      '"><script type="application/ld+json">{}</script></head><body><h1>x</h1></body></html>';
     const v = validateJsonLdCount([file('index.html', partial)]);
     expect(v[0].code).toBe('jsonld.count_below_threshold');
   });
@@ -160,29 +188,44 @@ describe('validateJsonLdCount', () => {
 
 describe('validateH1InShell', () => {
   it('flags missing h1', () => {
-    const f = file('index.html', '<!DOCTYPE html><html><head><title>x</title></head><body><h2>nope</h2></body></html>');
+    const f = file(
+      'index.html',
+      '<!DOCTYPE html><html><head><title>x</title></head><body><h2>nope</h2></body></html>',
+    );
     expect(validateH1InShell([f])[0].code).toBe('html.h1_count');
   });
 
   it('flags multiple h1s', () => {
-    const f = file('index.html', '<!DOCTYPE html><html><head><title>x</title></head><body><h1>a</h1><h1>b</h1></body></html>');
+    const f = file(
+      'index.html',
+      '<!DOCTYPE html><html><head><title>x</title></head><body><h1>a</h1><h1>b</h1></body></html>',
+    );
     expect(validateH1InShell([f])[0].code).toBe('html.h1_count');
   });
 
   it('ignores h1 inside script tags', () => {
-    const f = file('index.html', '<!DOCTYPE html><html><head><title>x</title></head><body><h1>real</h1><script>const s = "<h1>fake</h1>"</script></body></html>');
+    const f = file(
+      'index.html',
+      '<!DOCTYPE html><html><head><title>x</title></head><body><h1>real</h1><script>const s = "<h1>fake</h1>"</script></body></html>',
+    );
     expect(validateH1InShell([f])).toEqual([]);
   });
 });
 
 describe('validateColorScheme', () => {
   it('warns when missing', () => {
-    const f = file('index.html', '<!DOCTYPE html><html><head><title>x</title></head><body></body></html>');
+    const f = file(
+      'index.html',
+      '<!DOCTYPE html><html><head><title>x</title></head><body></body></html>',
+    );
     expect(validateColorScheme([f])[0].code).toBe('meta.color_scheme_missing');
   });
 
   it('passes when present', () => {
-    const f = file('index.html', '<!DOCTYPE html><html><head><meta name="color-scheme" content="dark"><title>x</title></head><body></body></html>');
+    const f = file(
+      'index.html',
+      '<!DOCTYPE html><html><head><meta name="color-scheme" content="dark"><title>x</title></head><body></body></html>',
+    );
     expect(validateColorScheme([f])).toEqual([]);
   });
 });
@@ -198,7 +241,12 @@ describe('validateSitemapLastmod', () => {
   });
 
   it('passes when every url has lastmod', () => {
-    const f = [file('sitemap.xml', '<urlset><url><loc>https://x.test/</loc><lastmod>2026-01-01</lastmod></url></urlset>')];
+    const f = [
+      file(
+        'sitemap.xml',
+        '<urlset><url><loc>https://x.test/</loc><lastmod>2026-01-01</lastmod></url></urlset>',
+      ),
+    ];
     expect(validateSitemapLastmod(f)).toEqual([]);
   });
 });
@@ -208,11 +256,13 @@ describe('validateBannedWords', () => {
     const f = file('index.html', html('<p>Our limitless cutting-edge platform.</p>'));
     const v = validateBannedWords([f]);
     expect(v.length).toBeGreaterThanOrEqual(2);
-    expect(v.map(x => x.code)).toContain('copy.banned_word');
+    expect(v.map((x) => x.code)).toContain('copy.banned_word');
   });
 
   it('passes clean copy', () => {
-    expect(validateBannedWords([file('index.html', html('<p>Hand-rolled sourdough since 1992.</p>'))])).toEqual([]);
+    expect(
+      validateBannedWords([file('index.html', html('<p>Hand-rolled sourdough since 1992.</p>'))]),
+    ).toEqual([]);
   });
 });
 
@@ -230,7 +280,7 @@ describe('validateJsBundleSize', () => {
 describe('validateLightboxPresence', () => {
   it('flags missing markers', () => {
     const v = validateLightboxPresence([file('assets/i.js', 'const x = 1;')]);
-    expect(v.map(x => x.code)).toEqual(
+    expect(v.map((x) => x.code)).toEqual(
       expect.arrayContaining(['lightbox.zoomable_missing', 'lightbox.gallery_missing']),
     );
   });
@@ -313,7 +363,7 @@ describe('validateBuild (integration)', () => {
     const report = validateBuild(broken);
     expect(report.ok).toBe(false);
     expect(report.errors.length).toBeGreaterThan(3);
-    const codes = report.errors.map(e => e.code);
+    const codes = report.errors.map((e) => e.code);
     expect(codes).toContain('meta.title_length');
     expect(codes).toContain('meta.description_length');
     expect(codes).toContain('jsonld.count_below_threshold');

@@ -40,7 +40,7 @@ const createMockEnv = () => ({
   DB: {} as D1Database,
 });
 
-const createMockDb = () => ({} as D1Database);
+const createMockDb = () => ({}) as D1Database;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -87,7 +87,10 @@ describe('resolveSite', () => {
     mockQueryOne
       // sites table query
       .mockResolvedValueOnce({
-        id: 'site-001', slug: 'cool-biz', org_id: 'org-001', current_build_version: 'v2',
+        id: 'site-001',
+        slug: 'cool-biz',
+        org_id: 'org-001',
+        current_build_version: 'v2',
       })
       // subscriptions query
       .mockResolvedValueOnce({ plan: 'paid', status: 'active' });
@@ -106,7 +109,10 @@ describe('resolveSite', () => {
   it('looks up site by slug in DB', async () => {
     mockQueryOne
       .mockResolvedValueOnce({
-        id: 'site-abc', slug: 'test-slug', org_id: 'org-abc', current_build_version: 'v5',
+        id: 'site-abc',
+        slug: 'test-slug',
+        org_id: 'org-abc',
+        current_build_version: 'v5',
       })
       .mockResolvedValueOnce(null); // no subscription
 
@@ -139,7 +145,12 @@ describe('resolveSite', () => {
 
   it('returns plan=paid when subscription is paid and active', async () => {
     mockQueryOne
-      .mockResolvedValueOnce({ id: 'site-p', slug: 'paid-site', org_id: 'org-p', current_build_version: 'v1' })
+      .mockResolvedValueOnce({
+        id: 'site-p',
+        slug: 'paid-site',
+        org_id: 'org-p',
+        current_build_version: 'v1',
+      })
       .mockResolvedValueOnce({ plan: 'paid', status: 'active' });
 
     const result = await resolveSite(env as any, db, `paid-site${DOMAINS.SITES_SUFFIX}`);
@@ -149,7 +160,12 @@ describe('resolveSite', () => {
 
   it('returns plan=free when no subscription exists', async () => {
     mockQueryOne
-      .mockResolvedValueOnce({ id: 'site-f', slug: 'free-site', org_id: 'org-f', current_build_version: 'v1' })
+      .mockResolvedValueOnce({
+        id: 'site-f',
+        slug: 'free-site',
+        org_id: 'org-f',
+        current_build_version: 'v1',
+      })
       .mockResolvedValueOnce(null);
 
     const result = await resolveSite(env as any, db, `free-site${DOMAINS.SITES_SUFFIX}`);
@@ -160,7 +176,10 @@ describe('resolveSite', () => {
   it('returns plan=free when subscription exists but is not active', async () => {
     mockQueryOne
       .mockResolvedValueOnce({
-        id: 'site-i', slug: 'inactive-site', org_id: 'org-i', current_build_version: 'v1',
+        id: 'site-i',
+        slug: 'inactive-site',
+        org_id: 'org-i',
+        current_build_version: 'v1',
       })
       .mockResolvedValueOnce({ plan: 'paid', status: 'canceled' });
 
@@ -179,7 +198,12 @@ describe('resolveSite', () => {
 
   it('caches resolved site in KV with 60-second TTL', async () => {
     mockQueryOne
-      .mockResolvedValueOnce({ id: 'site-c', slug: 'cached-site', org_id: 'org-c', current_build_version: 'v1' })
+      .mockResolvedValueOnce({
+        id: 'site-c',
+        slug: 'cached-site',
+        org_id: 'org-c',
+        current_build_version: 'v1',
+      })
       .mockResolvedValueOnce({ plan: 'paid', status: 'active' });
 
     await resolveSite(env as any, db, `cached-site${DOMAINS.SITES_SUFFIX}`);
@@ -276,7 +300,16 @@ describe('serveSiteFromR2', () => {
 
   it('falls back to index.html for paths without extensions (SPA)', async () => {
     const indexHtml = createMockR2Object(SAMPLE_HTML);
+    // serveSiteFromR2 tries several R2 keys before SPA fallback:
+    // 1. /sites/.../about/team        (primary)
+    // 2. /sites/.../about/team/index.html (directory index)
+    // 3. /sites/.../about/team.html   (.html extension)
+    // 4. /sites/.../about-team.html   (flat-name fallback)
+    // 5. /sites/.../index.html        (SPA catch-all) <-- this is the match
     (env.SITES_BUCKET.get as jest.Mock)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(indexHtml);
 
@@ -285,8 +318,7 @@ describe('serveSiteFromR2', () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get('Content-Type')).toBe('text/html; charset=utf-8');
-    expect(env.SITES_BUCKET.get).toHaveBeenCalledTimes(2);
-    expect(env.SITES_BUCKET.get).toHaveBeenNthCalledWith(2, `sites/my-site/v1/index.html`);
+    expect(env.SITES_BUCKET.get).toHaveBeenLastCalledWith(`sites/my-site/v1/index.html`);
   });
 
   it('returns 404 when file not found', async () => {

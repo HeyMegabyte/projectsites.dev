@@ -171,15 +171,12 @@ describe('sendEmail fallback (Resend → SendGrid)', () => {
       SENDGRID_API_KEY: 'test-sendgrid-key',
     } as any;
 
-    const mockFetch = jest.fn()
+    const mockFetch = jest
+      .fn()
       // First call (Resend) → 403 error
-      .mockResolvedValueOnce(
-        new Response('Domain not verified', { status: 403 }),
-      )
+      .mockResolvedValueOnce(new Response('Domain not verified', { status: 403 }))
       // Second call (SendGrid) → 202 success
-      .mockResolvedValueOnce(
-        new Response('', { status: 202 }),
-      );
+      .mockResolvedValueOnce(new Response('', { status: 202 }));
     global.fetch = mockFetch;
 
     const result = await createMagicLink(mockDb, envWithBoth, input);
@@ -198,9 +195,9 @@ describe('sendEmail fallback (Resend → SendGrid)', () => {
       SENDGRID_API_KEY: 'test-sendgrid-key',
     } as any;
 
-    const mockFetch = jest.fn().mockResolvedValueOnce(
-      new Response(JSON.stringify({ id: 'msg-1' }), { status: 200 }),
-    );
+    const mockFetch = jest
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'msg-1' }), { status: 200 }));
     global.fetch = mockFetch;
 
     await createMagicLink(mockDb, envWithBoth, input);
@@ -215,9 +212,7 @@ describe('sendEmail fallback (Resend → SendGrid)', () => {
       RESEND_API_KEY: 'test-resend-key',
     } as any;
 
-    global.fetch = jest.fn().mockResolvedValueOnce(
-      new Response('Unauthorized', { status: 401 }),
-    );
+    global.fetch = jest.fn().mockResolvedValueOnce(new Response('Unauthorized', { status: 401 }));
 
     await expect(createMagicLink(mockDb, envResendOnly, input)).rejects.toThrow(
       'Failed to send email (status 401)',

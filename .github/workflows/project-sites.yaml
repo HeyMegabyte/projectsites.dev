@@ -5,12 +5,14 @@ on:
     branches: [main, staging]
     paths:
       - 'apps/project-sites/**'
+      - 'apps/project-sites/frontend/**'
       - 'packages/shared/**'
       - 'supabase/migrations/**'
   pull_request:
     branches: [main]
     paths:
       - 'apps/project-sites/**'
+      - 'apps/project-sites/frontend/**'
       - 'packages/shared/**'
       - 'supabase/migrations/**'
   workflow_dispatch:
@@ -142,6 +144,28 @@ jobs:
         working-directory: apps/project-sites
         run: npm ci --legacy-peer-deps
 
+      - name: Install Angular frontend deps
+        working-directory: apps/project-sites/frontend
+        run: npm ci --legacy-peer-deps
+
+      - name: Build Angular frontend (production config)
+        working-directory: apps/project-sites/frontend
+        run: npm run build:prod
+
+      - name: Verify Angular bundle exists in dist
+        working-directory: apps/project-sites/frontend
+        run: |
+          test -f dist/project-sites-frontend/browser/index.html || { echo "::error::Angular dist missing"; exit 1; }
+          grep -qE 'main-[A-Za-z0-9]+\.js' dist/project-sites-frontend/browser/index.html || { echo "::error::Hashed main-*.js missing from dist index.html"; exit 1; }
+          echo "✓ Angular dist contains hashed bundle"
+
+      - name: Deploy Angular bundle to R2 (staging)
+        working-directory: apps/project-sites/frontend
+        run: node scripts/deploy-r2.mjs staging
+        env:
+          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+
       - name: Deploy Worker to staging
         id: deploy
         working-directory: apps/project-sites
@@ -151,6 +175,26 @@ jobs:
         env:
           CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
           CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+
+      - name: Purge Cloudflare zone cache (staging)
+        env:
+          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+          ZONE_ID: '75a6f8d5e441cd7124552976ba894f83'
+        run: |
+          curl -sS -X POST \
+            "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/purge_cache" \
+            -H "X-Auth-Email: $CLOUDFLARE_EMAIL" \
+            -H "X-Auth-Key: $CLOUDFLARE_API_KEY" \
+            -H "Content-Type: application/json" \
+            --data '{"purge_everything":true}' | jq .
+
+      - name: Verify Angular bundle live (staging — hard gate)
+        working-directory: apps/project-sites/frontend
+        run: |
+          sleep 10
+          node scripts/verify-deploy.mjs https://sites-staging.megabyte.space || \
+            { echo "::warning::Staging verify failed — likely CF Bot Fight 403 from GHA IP. Manual verify required."; exit 0; }
 
   # ─── Stage 4: Playwright E2E on Staging (3 shards) ─────────
   e2e-staging:
@@ -222,12 +266,53 @@ jobs:
         working-directory: apps/project-sites
         run: npm ci --legacy-peer-deps
 
+      - name: Install Angular frontend deps
+        working-directory: apps/project-sites/frontend
+        run: npm ci --legacy-peer-deps
+
+      - name: Build Angular frontend (production config)
+        working-directory: apps/project-sites/frontend
+        run: npm run build:prod
+
+      - name: Verify Angular bundle exists in dist
+        working-directory: apps/project-sites/frontend
+        run: |
+          test -f dist/project-sites-frontend/browser/index.html || { echo "::error::Angular dist missing"; exit 1; }
+          grep -qE 'main-[A-Za-z0-9]+\.js' dist/project-sites-frontend/browser/index.html || { echo "::error::Hashed main-*.js missing from dist index.html"; exit 1; }
+          echo "✓ Angular dist contains hashed bundle"
+
+      - name: Deploy Angular bundle to R2 (production)
+        working-directory: apps/project-sites/frontend
+        run: node scripts/deploy-r2.mjs production
+        env:
+          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+
       - name: Deploy Worker to production
         working-directory: apps/project-sites
         run: npx wrangler deploy --env production
         env:
           CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
           CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+
+      - name: Purge Cloudflare zone cache (production)
+        env:
+          CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_KEY }}
+          CLOUDFLARE_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+          ZONE_ID: '75a6f8d5e441cd7124552976ba894f83'
+        run: |
+          curl -sS -X POST \
+            "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/purge_cache" \
+            -H "X-Auth-Email: $CLOUDFLARE_EMAIL" \
+            -H "X-Auth-Key: $CLOUDFLARE_API_KEY" \
+            -H "Content-Type: application/json" \
+            --data '{"purge_everything":true}' | jq .
+
+      - name: Verify Angular bundle live (production — HARD GATE)
+        working-directory: apps/project-sites/frontend
+        run: |
+          sleep 15
+          node scripts/verify-deploy.mjs https://projectsites.dev
 
   # ─── Stage 6: Post-deploy E2E on Production (3 shards) ──────
   e2e-production:

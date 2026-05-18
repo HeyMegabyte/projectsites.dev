@@ -30,9 +30,7 @@ function corsOriginCheck(origin: string | undefined): string {
 describe('CORS origin matching', () => {
   describe('exact allowed origins', () => {
     it('allows projectsites.dev', () => {
-      expect(corsOriginCheck('https://projectsites.dev')).toBe(
-        'https://projectsites.dev',
-      );
+      expect(corsOriginCheck('https://projectsites.dev')).toBe('https://projectsites.dev');
     });
 
     it('allows editor.projectsites.dev', () => {
@@ -64,9 +62,7 @@ describe('CORS origin matching', () => {
     });
 
     it('allows http subdomain origins too', () => {
-      expect(corsOriginCheck('http://test.projectsites.dev')).toBe(
-        'http://test.projectsites.dev',
-      );
+      expect(corsOriginCheck('http://test.projectsites.dev')).toBe('http://test.projectsites.dev');
     });
 
     it('allows deeply nested subdomains ending in projectsites.dev', () => {

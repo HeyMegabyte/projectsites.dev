@@ -61,7 +61,8 @@ describe('Workflow log message format', () => {
       step: 'research-profile',
       error: 'LLM returned invalid JSON: unexpected token at position 42',
       elapsed_ms: 12000,
-      message: 'Profile research failed: LLM returned invalid JSON: unexpected token at position 42',
+      message:
+        'Profile research failed: LLM returned invalid JSON: unexpected token at position 42',
       phase: 'data_collection',
       recoverable: false,
     };
@@ -95,9 +96,21 @@ describe('Workflow log message format', () => {
 
   it('status_update log includes phase transitions', () => {
     const statuses = [
-      { status: 'collecting', phase: 'data_collection', message: 'Starting AI-powered business research' },
-      { status: 'generating', phase: 'generation', message: 'Data collection complete — generating website HTML' },
-      { status: 'uploading', phase: 'deployment', message: 'All content generated — uploading files to storage' },
+      {
+        status: 'collecting',
+        phase: 'data_collection',
+        message: 'Starting AI-powered business research',
+      },
+      {
+        status: 'generating',
+        phase: 'generation',
+        message: 'Data collection complete — generating website HTML',
+      },
+      {
+        status: 'uploading',
+        phase: 'deployment',
+        message: 'All content generated — uploading files to storage',
+      },
     ];
 
     for (const s of statuses) {

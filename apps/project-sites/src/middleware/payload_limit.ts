@@ -31,18 +31,15 @@ export const payloadLimitMiddleware: MiddlewareHandler<{
       return;
     }
 
-    const isUpload = (UPLOAD_PATHS.some((p) => url.pathname.startsWith(p)) &&
-      (url.pathname.endsWith('/deploy') || url.pathname === '/api/publish/bolt')) ||
+    const isUpload =
+      (UPLOAD_PATHS.some((p) => url.pathname.startsWith(p)) &&
+        (url.pathname.endsWith('/deploy') || url.pathname === '/api/publish/bolt')) ||
       url.pathname === '/api/assets/upload' ||
       url.pathname.endsWith('/publish-bolt');
-    const maxBytes = isUpload
-      ? UPLOAD_MAX_BYTES
-      : DEFAULT_CAPS.MAX_REQUEST_BODY_BYTES;
+    const maxBytes = isUpload ? UPLOAD_MAX_BYTES : DEFAULT_CAPS.MAX_REQUEST_BODY_BYTES;
 
     if (!Number.isNaN(size) && size > maxBytes) {
-      throw payloadTooLarge(
-        `Request body exceeds maximum size of ${maxBytes} bytes`,
-      );
+      throw payloadTooLarge(`Request body exceeds maximum size of ${maxBytes} bytes`);
     }
   }
 

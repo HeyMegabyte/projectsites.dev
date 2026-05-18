@@ -1,5 +1,6 @@
 import { Component, inject, signal, computed, ElementRef, ViewChild, type AfterViewInit, type OnDestroy, EventEmitter, Output } from '@angular/core';
 import { Router } from '@angular/router';
+import { scaleFade, listStagger } from '../../animations/motion';
 
 interface PaletteCommand {
   id: string;
@@ -27,6 +28,7 @@ const COMMANDS: PaletteCommand[] = [
 @Component({
   selector: 'app-command-palette',
   standalone: true,
+  animations: [scaleFade, listStagger],
   template: `
     <div
       class="palette-backdrop"
@@ -36,7 +38,7 @@ const COMMANDS: PaletteCommand[] = [
       (click)="onBackdropClick($event)"
       (keydown)="onKeydown($event)"
     >
-      <div class="palette-modal" data-testid="command-palette">
+      <div @scaleFade class="palette-modal" data-testid="command-palette">
         <div class="palette-input-wrap">
           <svg class="palette-search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
@@ -55,7 +57,7 @@ const COMMANDS: PaletteCommand[] = [
           <kbd class="palette-esc">esc</kbd>
         </div>
         <div class="palette-divider"></div>
-        <ul class="palette-list" role="listbox" aria-label="Commands">
+        <ul class="palette-list" role="listbox" aria-label="Commands" [@listStagger]="filtered().length">
           @for (cmd of filtered(); track cmd.id; let i = $index) {
             <li
               class="palette-item"
@@ -86,10 +88,6 @@ const COMMANDS: PaletteCommand[] = [
     </div>
   `,
   styles: [`
-    @keyframes fadeInScale {
-      from { opacity: 0; transform: translateY(-12px) scale(0.96); }
-      to   { opacity: 1; transform: translateY(0) scale(1); }
-    }
     @keyframes fadeInBg {
       from { opacity: 0; }
       to   { opacity: 1; }
@@ -114,7 +112,9 @@ const COMMANDS: PaletteCommand[] = [
         0 0 0 1px rgba(0, 229, 255, 0.06),
         0 0 60px rgba(0, 229, 255, 0.04);
       overflow: hidden;
-      animation: fadeInScale 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .palette-backdrop { animation: none; }
     }
 
     /* Input area */

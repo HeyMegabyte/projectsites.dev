@@ -25,6 +25,7 @@ import {
 import { ApiService, type BusinessResult } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { GeolocationService } from '../../services/geolocation.service';
+import { RippleDirective } from '../../animations/ripple.directive';
 
 interface SearchItem {
   type: 'business' | 'prebuilt' | 'custom';
@@ -59,7 +60,7 @@ interface SearchItem {
 @Component({
   selector: 'app-homepage',
   standalone: true,
-  imports: [FormsModule, TranslateModule, RouterLink],
+  imports: [FormsModule, TranslateModule, RouterLink, RippleDirective],
   templateUrl: './homepage.component.html',
   styleUrl: './homepage.component.scss',
 })

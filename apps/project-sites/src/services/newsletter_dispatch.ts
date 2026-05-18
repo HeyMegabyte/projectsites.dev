@@ -67,7 +67,10 @@ export async function dispatchToIntegrations(
   return Promise.all(integrations.map((row) => dispatchOne(submission, row)));
 }
 
-async function dispatchOne(submission: DispatchSubmission, row: IntegrationRow): Promise<DispatchResult> {
+async function dispatchOne(
+  submission: DispatchSubmission,
+  row: IntegrationRow,
+): Promise<DispatchResult> {
   const base: Pick<DispatchResult, 'integration_id' | 'provider'> = {
     integration_id: row.id,
     provider: row.provider,
@@ -291,9 +294,10 @@ function collectMergeFields(fields: Record<string, unknown>): Record<string, str
 }
 
 function pickName(fields: Record<string, unknown>, kind: 'first' | 'last'): string | undefined {
-  const candidates = kind === 'first'
-    ? ['first_name', 'firstName', 'firstname', 'fname', 'first']
-    : ['last_name', 'lastName', 'lastname', 'lname', 'last'];
+  const candidates =
+    kind === 'first'
+      ? ['first_name', 'firstName', 'firstname', 'fname', 'first']
+      : ['last_name', 'lastName', 'lastname', 'lname', 'last'];
   for (const k of candidates) {
     const v = fields[k];
     if (typeof v === 'string' && v.trim()) return v.trim();

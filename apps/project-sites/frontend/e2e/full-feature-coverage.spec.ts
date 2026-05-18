@@ -31,11 +31,11 @@ function filterNoise(errors: string[]): string[] {
 }
 
 /**
- * Dismiss the onboarding overlay so it doesn't intercept clicks.
- * Call this after page.goto('/') and waitForLoadState.
+ * No-op kept for backwards-compatibility with existing test calls.
+ * The onboarding overlay feature has been removed from the application.
  */
-async function dismissOnboarding(page: Page): Promise<void> {
-  await page.evaluate(() => localStorage.setItem('ps_onboarding', 'dismissed'));
+async function dismissOnboarding(_page: Page): Promise<void> {
+  // intentionally empty
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -247,11 +247,7 @@ test.describe('Authentication Flow', () => {
   });
 
   test('11 - Magic link form validates email format before submission', async ({ page }) => {
-    // Dismiss onboarding first to avoid pointer interception
     await page.goto('/signin');
-    await page.waitForLoadState('networkidle');
-    await page.evaluate(() => localStorage.setItem('ps_onboarding', 'dismissed'));
-    await page.reload();
     await page.waitForLoadState('networkidle');
 
     // Click Continue with Email to show form
@@ -720,9 +716,6 @@ test.describe('Interactive Features', () => {
     await page.goto('/blog');
     await page.waitForLoadState('networkidle');
 
-    // Dismiss onboarding to avoid interference
-    await page.evaluate(() => localStorage.setItem('ps_onboarding', 'dismissed'));
-
     // Make sure no input is focused (click on body first)
     await page.locator('body').click({ position: { x: 10, y: 10 } });
     await page.waitForTimeout(200);
@@ -744,36 +737,28 @@ test.describe('Interactive Features', () => {
     await expect(overlay).toContainText('Escape');
   });
 
-  test('35 - Onboarding checklist appears for first-time visitors and can be dismissed', async ({ page }) => {
+  test('35 - Legacy onboarding keys are cleared on app bootstrap', async ({ page }) => {
+    // Seed stale onboarding state from a prior app version
     await page.goto('/');
     await page.waitForLoadState('networkidle');
+    await page.evaluate(() => {
+      localStorage.setItem('ps_onboarding', 'pending');
+      localStorage.setItem('ps_onboarding_seen', 'false');
+    });
 
-    // Clear any existing onboarding state to simulate first visit
-    await page.evaluate(() => localStorage.removeItem('ps_onboarding'));
+    // Reload — AppComponent.cleanupLegacyOnboardingKeys() should wipe them
     await page.reload();
     await page.waitForLoadState('networkidle');
 
-    // Onboarding shows after 1500ms delay
-    const onboardingCard = page.locator('.onboarding-card');
-    await expect(onboardingCard).toBeVisible({ timeout: 5000 });
+    const legacy = await page.evaluate(() => ({
+      ps_onboarding: localStorage.getItem('ps_onboarding'),
+      ps_onboarding_seen: localStorage.getItem('ps_onboarding_seen'),
+    }));
+    expect(legacy.ps_onboarding).toBeNull();
+    expect(legacy.ps_onboarding_seen).toBeNull();
 
-    // Should show welcome heading
-    await expect(onboardingCard).toContainText('Welcome to Project Sites');
-
-    // Should have steps listed
-    const steps = onboardingCard.locator('.step');
-    const stepCount = await steps.count();
-    expect(stepCount).toBeGreaterThan(0);
-
-    // Click dismiss button
-    const dismissBtn = onboardingCard.locator('.dismiss-btn');
-    await dismissBtn.click();
-
-    // Should disappear
-    await expect(onboardingCard).not.toBeVisible({ timeout: 2000 });
-
-    // localStorage should store dismissed state
-    const stored = await page.evaluate(() => localStorage.getItem('ps_onboarding'));
-    expect(stored).toBe('dismissed');
+    // No onboarding UI should render
+    const onboardingCard = page.locator('.onboarding-card, app-onboarding');
+    await expect(onboardingCard).toHaveCount(0);
   });
 });

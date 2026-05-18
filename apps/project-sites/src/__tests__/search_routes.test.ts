@@ -79,7 +79,14 @@ afterEach(() => {
 // ─── Google Places response helpers ─────────────────────────────────────────
 
 function makePlacesResponse(
-  places: Array<{ id: string; name: string; address: string; types?: string[]; lat?: number; lng?: number }>,
+  places: Array<{
+    id: string;
+    name: string;
+    address: string;
+    types?: string[];
+    lat?: number;
+    lng?: number;
+  }>,
 ) {
   return {
     places: places.map((p) => ({
@@ -87,7 +94,9 @@ function makePlacesResponse(
       displayName: { text: p.name, languageCode: 'en' },
       formattedAddress: p.address,
       types: p.types ?? ['establishment'],
-      ...(p.lat != null && p.lng != null ? { location: { latitude: p.lat, longitude: p.lng } } : {}),
+      ...(p.lat != null && p.lng != null
+        ? { location: { latitude: p.lat, longitude: p.lng } }
+        : {}),
     })),
   };
 }
@@ -157,7 +166,9 @@ describe('GET /api/search/businesses', () => {
 
   it('returns max 10 results even if API returns more', async () => {
     const fifteenPlaces = Array.from({ length: 15 }, (_, i) => ({
-      id: `place_${i}`, name: `Business ${i}`, address: `${i} Test St`,
+      id: `place_${i}`,
+      name: `Business ${i}`,
+      address: `${i} Test St`,
     }));
     const placesPayload = makePlacesResponse(fifteenPlaces);
 
@@ -302,7 +313,9 @@ describe('POST /api/sites/create-from-search', () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error.code).toBe('BAD_REQUEST');
-    expect(body.error.message).toContain('Missing required field: business_name (or business.name)');
+    expect(body.error.message).toContain(
+      'Missing required field: business_name (or business.name)',
+    );
   });
 
   it('creates site, enqueues workflow, and returns 201', async () => {

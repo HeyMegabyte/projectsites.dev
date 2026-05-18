@@ -343,6 +343,21 @@
       line-gap-override: 0%;
     }
     html, body { font-family: 'Sora', 'Sora Fallback', system-ui, -apple-system, sans-serif; }
+
+    /* Anti-FOUC: hide entrance-animated elements before bundled CSS/Tailwind loads.
+       Mirrors the resting/start frame so nothing flashes at final state before the
+       animation begins. The animations themselves restore visibility via `forwards`/`both`. */
+    .reveal { opacity: 0; transform: translateY(24px); }
+    .ps-reveal { opacity: 0; transform: translate3d(0, 18px, 0); }
+    .animate-fade-in-up { opacity: 0; transform: translateY(20px); }
+    .animate-fade-in { opacity: 0; }
+    .animate-fade-in-scale { opacity: 0; transform: scale(0.95); }
+    @media (prefers-reduced-motion: reduce) {
+      .reveal, .ps-reveal,
+      .animate-fade-in-up, .animate-fade-in, .animate-fade-in-scale {
+        opacity: 1; transform: none;
+      }
+    }
   </style>
 </head>
 <body>

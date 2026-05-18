@@ -58,11 +58,13 @@ export function captureError(
     sentry.captureException(error);
   } catch {
     // Don't let Sentry errors break the app
-    console.warn(JSON.stringify({
-      level: 'warn',
-      service: 'sentry',
-      message: 'Failed to report to Sentry',
-    }));
+    console.warn(
+      JSON.stringify({
+        level: 'warn',
+        service: 'sentry',
+        message: 'Failed to report to Sentry',
+      }),
+    );
   }
 }
 

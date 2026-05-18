@@ -332,7 +332,14 @@ export async function resolveSite(
   const cached = await env.CACHE_KV.get(cacheKey, 'json');
 
   if (cached) {
-    console.warn(JSON.stringify({ level: 'debug', service: 'site_serving', message: 'KV cache hit', hostname }));
+    console.warn(
+      JSON.stringify({
+        level: 'debug',
+        service: 'site_serving',
+        message: 'KV cache hit',
+        hostname,
+      }),
+    );
     return cached as {
       site_id: string;
       slug: string;
@@ -377,8 +384,7 @@ export async function resolveSite(
           [hostnameRow.org_id],
         );
 
-        const plan =
-          subRow?.plan === 'paid' && subRow.status === 'active' ? 'paid' : 'free';
+        const plan = subRow?.plan === 'paid' && subRow.status === 'active' ? 'paid' : 'free';
 
         const resolved = {
           site_id: hostnameRow.site_id,
@@ -438,11 +444,16 @@ export async function resolveSite(
           if (snapshot) {
             siteRow = candidateRow;
             snapshotVersion = snapshot.build_version;
-            console.warn(JSON.stringify({
-              level: 'debug', service: 'site_serving',
-              message: 'Snapshot resolved', slug: candidateSlug, snapshot: candidateSnapshot,
-              version: snapshot.build_version,
-            }));
+            console.warn(
+              JSON.stringify({
+                level: 'debug',
+                service: 'site_serving',
+                message: 'Snapshot resolved',
+                slug: candidateSlug,
+                snapshot: candidateSnapshot,
+                version: snapshot.build_version,
+              }),
+            );
           }
           break;
         }
@@ -456,8 +467,7 @@ export async function resolveSite(
         [siteRow.org_id],
       );
 
-      const plan =
-        subRow?.plan === 'paid' && subRow.status === 'active' ? 'paid' : 'free';
+      const plan = subRow?.plan === 'paid' && subRow.status === 'active' ? 'paid' : 'free';
 
       const resolved = {
         site_id: siteRow.id,
@@ -494,7 +504,14 @@ export async function resolveSite(
     }
   }
 
-  console.warn(JSON.stringify({ level: 'debug', service: 'site_serving', message: 'Site not found for hostname', hostname }));
+  console.warn(
+    JSON.stringify({
+      level: 'debug',
+      service: 'site_serving',
+      message: 'Site not found for hostname',
+      hostname,
+    }),
+  );
   return null;
 }
 
@@ -527,7 +544,14 @@ export async function serveSiteFromR2(
 ): Promise<Response> {
   // Block access to meta files and manifests
   if (requestPath.startsWith('/_meta/') || requestPath === '/_manifest.json') {
-    console.warn(JSON.stringify({ level: 'warn', action: 'serve_blocked_path', slug: site.slug, path: requestPath }));
+    console.warn(
+      JSON.stringify({
+        level: 'warn',
+        action: 'serve_blocked_path',
+        slug: site.slug,
+        path: requestPath,
+      }),
+    );
 
     return new Response('Not Found', { status: 404 });
   }
@@ -554,7 +578,15 @@ export async function serveSiteFromR2(
 
   const r2Path = `sites/${site.slug}/${version}${filePath}`;
 
-  console.warn(JSON.stringify({ level: 'info', action: 'serve_site_lookup', slug: site.slug, version, r2Path }));
+  console.warn(
+    JSON.stringify({
+      level: 'info',
+      action: 'serve_site_lookup',
+      slug: site.slug,
+      version,
+      r2Path,
+    }),
+  );
 
   let object = await env.SITES_BUCKET.get(r2Path);
 
@@ -578,7 +610,9 @@ export async function serveSiteFromR2(
     const flatPath = `sites/${site.slug}/${version}/${flatName}.html`;
     object = await env.SITES_BUCKET.get(flatPath);
     if (object) {
-      console.warn(JSON.stringify({ level: 'info', action: 'serve_flat_fallback', slug: site.slug, flatPath }));
+      console.warn(
+        JSON.stringify({ level: 'info', action: 'serve_flat_fallback', slug: site.slug, flatPath }),
+      );
     }
   }
 
@@ -589,8 +623,19 @@ export async function serveSiteFromR2(
       const asset = await env.SITES_BUCKET.get(assetPath);
       if (asset) {
         const ext = requestPath.split('.').pop()?.toLowerCase() || '';
-        const ct = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', svg: 'image/svg+xml', webp: 'image/webp', ico: 'image/x-icon' }[ext] || 'application/octet-stream';
-        return new Response(asset.body, { headers: { 'Content-Type': ct, 'Cache-Control': 'public, max-age=86400' } });
+        const ct =
+          {
+            png: 'image/png',
+            jpg: 'image/jpeg',
+            jpeg: 'image/jpeg',
+            gif: 'image/gif',
+            svg: 'image/svg+xml',
+            webp: 'image/webp',
+            ico: 'image/x-icon',
+          }[ext] || 'application/octet-stream';
+        return new Response(asset.body, {
+          headers: { 'Content-Type': ct, 'Cache-Control': 'public, max-age=86400' },
+        });
       }
     }
 
@@ -600,13 +645,28 @@ export async function serveSiteFromR2(
       const fallback = await env.SITES_BUCKET.get(fallbackPath);
 
       if (fallback) {
-        console.warn(JSON.stringify({ level: 'info', action: 'serve_spa_fallback', slug: site.slug, requestPath }));
+        console.warn(
+          JSON.stringify({
+            level: 'info',
+            action: 'serve_spa_fallback',
+            slug: site.slug,
+            requestPath,
+          }),
+        );
 
         return buildSiteResponse(fallback, site, 'text/html; charset=utf-8', env);
       }
     }
 
-    console.warn(JSON.stringify({ level: 'warn', action: 'serve_not_found', slug: site.slug, r2Path, requestPath }));
+    console.warn(
+      JSON.stringify({
+        level: 'warn',
+        action: 'serve_not_found',
+        slug: site.slug,
+        r2Path,
+        requestPath,
+      }),
+    );
 
     return new Response('Not Found', { status: 404 });
   }
@@ -614,7 +674,9 @@ export async function serveSiteFromR2(
   // Use the resolved file path for content-type detection, not the raw request path.
   // Raw path '/' has no extension → would return 'application/octet-stream' (download).
   // For directory/bare paths that resolved via fallback, force text/html.
-  const contentType = filePath.includes('.') ? getContentType(filePath) : 'text/html; charset=utf-8';
+  const contentType = filePath.includes('.')
+    ? getContentType(filePath)
+    : 'text/html; charset=utf-8';
   return buildSiteResponse(object, site, contentType, env);
 }
 

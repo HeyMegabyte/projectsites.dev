@@ -23,9 +23,7 @@ describe('Workflow status transitions', () => {
       .prepare("UPDATE sites SET status = ?, updated_at = datetime('now') WHERE id = ?")
       .bind('collecting', 'site-123')
       .run();
-    expect(mockPrepare).toHaveBeenCalledWith(
-      expect.stringContaining('UPDATE sites SET status'),
-    );
+    expect(mockPrepare).toHaveBeenCalledWith(expect.stringContaining('UPDATE sites SET status'));
     expect(mockBind).toHaveBeenCalledWith('collecting', 'site-123');
     expect(mockRun).toHaveBeenCalled();
   });
@@ -180,7 +178,7 @@ describe('Inline title input style inheritance', () => {
     const siteCardName = {
       fontSize: '0.9rem',
       fontWeight: '600',
-      fontFamily: "var(--font)",
+      fontFamily: 'var(--font)',
       letterSpacing: 'normal',
       lineHeight: '1.5',
       color: 'var(--text-primary)',
@@ -188,7 +186,7 @@ describe('Inline title input style inheritance', () => {
     const inlineEditWrap = {
       fontSize: '0.9rem',
       fontWeight: '600',
-      fontFamily: "var(--font)",
+      fontFamily: 'var(--font)',
       letterSpacing: 'normal',
       lineHeight: '1.5',
       color: 'var(--text-primary)',
@@ -230,7 +228,9 @@ describe('Relative time formatting (formatLogTimestamp)', () => {
       if (months < 12) return months + ' months ago';
       if (months < 18) return 'a year ago';
       return years + ' years ago';
-    } catch (_e) { return iso; }
+    } catch (_e) {
+      return iso;
+    }
   }
 
   it('returns "just now" for timestamps under 10 seconds', () => {

@@ -1,13 +1,16 @@
 import { Component, inject } from '@angular/core';
 import { ToastService } from '../../services/toast.service';
+import { toastSlide } from '../../animations/motion';
 
 @Component({
   selector: 'app-toast',
   standalone: true,
+  animations: [toastSlide],
   template: `
     <div class="toast-container" aria-live="polite" aria-atomic="true" role="status">
       @for (toast of toastService.toasts(); track toast.id) {
         <div
+          @toastSlide
           class="toast"
           [class]="'toast-' + toast.type"
           [attr.role]="toast.type === 'error' ? 'alert' : 'status'"

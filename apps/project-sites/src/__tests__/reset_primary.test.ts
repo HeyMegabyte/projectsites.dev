@@ -73,8 +73,10 @@ describe('reset-primary endpoint logic', () => {
 
     mockDbPrepare.mockImplementation((sql: string) => {
       if (sql.includes('SELECT')) return { bind: jest.fn().mockReturnValue({ first: selectMock }) };
-      if (sql.includes('UPDATE hostnames')) return { bind: jest.fn().mockReturnValue({ run: updateMock }) };
-      if (sql.includes('INSERT INTO audit_logs')) return { bind: jest.fn().mockReturnValue({ run: auditMock }) };
+      if (sql.includes('UPDATE hostnames'))
+        return { bind: jest.fn().mockReturnValue({ run: updateMock }) };
+      if (sql.includes('INSERT INTO audit_logs'))
+        return { bind: jest.fn().mockReturnValue({ run: auditMock }) };
       return { bind: jest.fn().mockReturnValue({ run: jest.fn(), first: jest.fn() }) };
     });
 
@@ -85,13 +87,15 @@ describe('reset-primary endpoint logic', () => {
     // 1. Verify site ownership
     const site = await mockEnv.DB.prepare(
       'SELECT id FROM sites WHERE id = ? AND org_id = ? AND deleted_at IS NULL',
-    ).bind(siteId, orgId).first();
+    )
+      .bind(siteId, orgId)
+      .first();
     expect(site).toEqual({ id: 'site-123' });
 
     // 2. Clear is_primary
-    await mockEnv.DB.prepare(
-      'UPDATE hostnames SET is_primary = 0 WHERE site_id = ?',
-    ).bind(siteId).run();
+    await mockEnv.DB.prepare('UPDATE hostnames SET is_primary = 0 WHERE site_id = ?')
+      .bind(siteId)
+      .run();
     expect(updateMock).toHaveBeenCalled();
   });
 

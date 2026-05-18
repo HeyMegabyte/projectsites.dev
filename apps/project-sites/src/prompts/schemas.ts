@@ -95,122 +95,190 @@ export const ResearchProfileInput = z.object({
 });
 export type ResearchProfileInput = z.infer<typeof ResearchProfileInput>;
 
-const serviceAddOnSchema = z.object({
-  name: z.string(),
-  price_from: z.number().nullable().optional().default(null),
-  duration_minutes: z.number().nullable().optional().default(null),
-}).passthrough();
-
-export const ResearchProfileOutput = z.object({
-  business_name: z.string(),
-  tagline: z.string().nullable().optional().default(''),
-  description: z.string().nullable().optional().default(''),
-  mission_statement: z.string().nullable().optional().default(''),
-  business_type: z.string().nullable().optional().default('general'),
-  categories: z.array(z.string()).optional().default([]),
-  services: z.array(z.object({
+const serviceAddOnSchema = z
+  .object({
     name: z.string(),
-    description: z.string().nullable().optional().default(''),
-    price_hint: z.string().nullable().optional().default(null),
     price_from: z.number().nullable().optional().default(null),
     duration_minutes: z.number().nullable().optional().default(null),
-    variants: z.array(z.string()).optional().default([]),
-    add_ons: z.array(serviceAddOnSchema).optional().default([]),
-    requirements: z.string().nullable().optional().default(null),
-    category: z.string().nullable().optional().default(null),
-  }).passthrough()).optional().default([]),
-  hours: z.array(z.object({
-    day: z.string(),
-    open: z.string().nullable().optional().default(null),
-    close: z.string().nullable().optional().default(null),
-    closed: z.boolean().nullable().optional().default(false),
-  })).optional().default([]),
-  phone: z.string().nullable().optional().default(null),
-  email: z.string().nullable().optional().default(null),
-  website_url: z.string().nullable().optional().default(null),
-  primary_contact_name: z.string().nullable().optional().default(null),
-  address: z.object({
-    street: z.string().nullable().optional().default(null),
-    city: z.string().nullable().optional().default(null),
-    state: z.string().nullable().optional().default(null),
-    zip: z.string().nullable().optional().default(null),
-    country: z.string().nullable().optional().default('US'),
-  }).optional().default({}),
-  geo: z.object({
-    lat: z.number().nullable().optional().default(null),
-    lng: z.number().nullable().optional().default(null),
-  }).nullable().optional().default(null),
-  google: z.object({
-    place_id: z.string().nullable().optional().default(null),
-    maps_url: z.string().nullable().optional().default(null),
-    cid: z.string().nullable().optional().default(null),
-  }).nullable().optional().default(null),
-  service_area: z.object({
-    zips: z.array(z.string()).optional().default([]),
-    towns: z.array(z.string()).optional().default([]),
-  }).nullable().optional().default(null),
-  neighborhood: z.string().nullable().optional().default(null),
-  parking: z.string().nullable().optional().default(null),
-  public_transit: z.string().nullable().optional().default(null),
-  landmarks_nearby: z.array(z.string()).optional().default([]),
-  booking: z.object({
-    url: z.string().nullable().optional().default(null),
-    platform: z.string().nullable().optional().default(null),
-    walkins_accepted: z.boolean().nullable().optional().default(true),
-    typical_wait_minutes: z.number().nullable().optional().default(null),
-    appointment_required: z.boolean().nullable().optional().default(false),
-    lead_time_minutes: z.number().nullable().optional().default(null),
-  }).nullable().optional().default(null),
-  policies: z.object({
-    cancellation: z.string().nullable().optional().default(null),
-    late: z.string().nullable().optional().default(null),
-    no_show: z.string().nullable().optional().default(null),
-    age: z.string().nullable().optional().default(null),
-    discount_rules: z.string().nullable().optional().default(null),
-  }).nullable().optional().default(null),
-  payments: z.array(z.string()).optional().default([]),
-  amenities: z.array(z.string()).optional().default([]),
-  accessibility: z.object({
-    wheelchair: z.boolean().nullable().optional().default(false),
-    hearing_loop: z.boolean().nullable().optional().default(false),
-    service_animals: z.boolean().nullable().optional().default(true),
-    notes: z.string().nullable().optional().default(null),
-  }).nullable().optional().default(null),
-  languages_spoken: z.array(z.string()).optional().default([]),
-  products_sold: z.array(z.string()).optional().default([]),
-  team: z.array(z.object({
-    name: z.string(),
-    role: z.string().nullable().optional().default(''),
-    bio: z.string().nullable().optional().default(null),
-    specialties: z.array(z.string()).optional().default([]),
-    years_experience: z.number().nullable().optional().default(null),
-    instagram: z.string().nullable().optional().default(null),
-  }).passthrough()).optional().default([]),
-  reviews_summary: z.object({
-    aggregate_rating: z.number().nullable().optional().default(null),
-    review_count: z.number().nullable().optional().default(null),
-    featured_reviews: z.array(z.object({
-      quote: z.string(),
-      name: z.string(),
-      source: z.string().optional().default(''),
-      rating: z.number().nullable().optional().default(null),
-    })).optional().default([]),
-  }).nullable().optional().default(null),
-  faq: z.array(z.object({ question: z.string(), answer: z.string().nullable().optional().default('') })).optional().default([]),
-  seo: z.object({
-    title: z.string().nullable().optional().default(''),
+  })
+  .passthrough();
+
+export const ResearchProfileOutput = z
+  .object({
+    business_name: z.string(),
+    tagline: z.string().nullable().optional().default(''),
     description: z.string().nullable().optional().default(''),
-    primary_keywords: z.array(z.string()).optional().default([]),
-    secondary_keywords: z.array(z.string()).optional().default([]),
-    service_keywords: z.array(z.string()).optional().default([]),
-    neighborhood_keywords: z.array(z.string()).optional().default([]),
-  }).nullable().optional().default(null),
-  schema_org_type: z.string().nullable().optional().default(null),
-  guarantee_details: z.string().nullable().optional().default(null),
-  // Backward compat: old prompts may return these at top level
-  seo_title: z.string().nullable().optional().default(''),
-  seo_description: z.string().nullable().optional().default(''),
-}).passthrough();
+    mission_statement: z.string().nullable().optional().default(''),
+    business_type: z.string().nullable().optional().default('general'),
+    categories: z.array(z.string()).optional().default([]),
+    services: z
+      .array(
+        z
+          .object({
+            name: z.string(),
+            description: z.string().nullable().optional().default(''),
+            price_hint: z.string().nullable().optional().default(null),
+            price_from: z.number().nullable().optional().default(null),
+            duration_minutes: z.number().nullable().optional().default(null),
+            variants: z.array(z.string()).optional().default([]),
+            add_ons: z.array(serviceAddOnSchema).optional().default([]),
+            requirements: z.string().nullable().optional().default(null),
+            category: z.string().nullable().optional().default(null),
+          })
+          .passthrough(),
+      )
+      .optional()
+      .default([]),
+    hours: z
+      .array(
+        z.object({
+          day: z.string(),
+          open: z.string().nullable().optional().default(null),
+          close: z.string().nullable().optional().default(null),
+          closed: z.boolean().nullable().optional().default(false),
+        }),
+      )
+      .optional()
+      .default([]),
+    phone: z.string().nullable().optional().default(null),
+    email: z.string().nullable().optional().default(null),
+    website_url: z.string().nullable().optional().default(null),
+    primary_contact_name: z.string().nullable().optional().default(null),
+    address: z
+      .object({
+        street: z.string().nullable().optional().default(null),
+        city: z.string().nullable().optional().default(null),
+        state: z.string().nullable().optional().default(null),
+        zip: z.string().nullable().optional().default(null),
+        country: z.string().nullable().optional().default('US'),
+      })
+      .optional()
+      .default({}),
+    geo: z
+      .object({
+        lat: z.number().nullable().optional().default(null),
+        lng: z.number().nullable().optional().default(null),
+      })
+      .nullable()
+      .optional()
+      .default(null),
+    google: z
+      .object({
+        place_id: z.string().nullable().optional().default(null),
+        maps_url: z.string().nullable().optional().default(null),
+        cid: z.string().nullable().optional().default(null),
+      })
+      .nullable()
+      .optional()
+      .default(null),
+    service_area: z
+      .object({
+        zips: z.array(z.string()).optional().default([]),
+        towns: z.array(z.string()).optional().default([]),
+      })
+      .nullable()
+      .optional()
+      .default(null),
+    neighborhood: z.string().nullable().optional().default(null),
+    parking: z.string().nullable().optional().default(null),
+    public_transit: z.string().nullable().optional().default(null),
+    landmarks_nearby: z.array(z.string()).optional().default([]),
+    booking: z
+      .object({
+        url: z.string().nullable().optional().default(null),
+        platform: z.string().nullable().optional().default(null),
+        walkins_accepted: z.boolean().nullable().optional().default(true),
+        typical_wait_minutes: z.number().nullable().optional().default(null),
+        appointment_required: z.boolean().nullable().optional().default(false),
+        lead_time_minutes: z.number().nullable().optional().default(null),
+      })
+      .nullable()
+      .optional()
+      .default(null),
+    policies: z
+      .object({
+        cancellation: z.string().nullable().optional().default(null),
+        late: z.string().nullable().optional().default(null),
+        no_show: z.string().nullable().optional().default(null),
+        age: z.string().nullable().optional().default(null),
+        discount_rules: z.string().nullable().optional().default(null),
+      })
+      .nullable()
+      .optional()
+      .default(null),
+    payments: z.array(z.string()).optional().default([]),
+    amenities: z.array(z.string()).optional().default([]),
+    accessibility: z
+      .object({
+        wheelchair: z.boolean().nullable().optional().default(false),
+        hearing_loop: z.boolean().nullable().optional().default(false),
+        service_animals: z.boolean().nullable().optional().default(true),
+        notes: z.string().nullable().optional().default(null),
+      })
+      .nullable()
+      .optional()
+      .default(null),
+    languages_spoken: z.array(z.string()).optional().default([]),
+    products_sold: z.array(z.string()).optional().default([]),
+    team: z
+      .array(
+        z
+          .object({
+            name: z.string(),
+            role: z.string().nullable().optional().default(''),
+            bio: z.string().nullable().optional().default(null),
+            specialties: z.array(z.string()).optional().default([]),
+            years_experience: z.number().nullable().optional().default(null),
+            instagram: z.string().nullable().optional().default(null),
+          })
+          .passthrough(),
+      )
+      .optional()
+      .default([]),
+    reviews_summary: z
+      .object({
+        aggregate_rating: z.number().nullable().optional().default(null),
+        review_count: z.number().nullable().optional().default(null),
+        featured_reviews: z
+          .array(
+            z.object({
+              quote: z.string(),
+              name: z.string(),
+              source: z.string().optional().default(''),
+              rating: z.number().nullable().optional().default(null),
+            }),
+          )
+          .optional()
+          .default([]),
+      })
+      .nullable()
+      .optional()
+      .default(null),
+    faq: z
+      .array(
+        z.object({ question: z.string(), answer: z.string().nullable().optional().default('') }),
+      )
+      .optional()
+      .default([]),
+    seo: z
+      .object({
+        title: z.string().nullable().optional().default(''),
+        description: z.string().nullable().optional().default(''),
+        primary_keywords: z.array(z.string()).optional().default([]),
+        secondary_keywords: z.array(z.string()).optional().default([]),
+        service_keywords: z.array(z.string()).optional().default([]),
+        neighborhood_keywords: z.array(z.string()).optional().default([]),
+      })
+      .nullable()
+      .optional()
+      .default(null),
+    schema_org_type: z.string().nullable().optional().default(null),
+    guarantee_details: z.string().nullable().optional().default(null),
+    // Backward compat: old prompts may return these at top level
+    seo_title: z.string().nullable().optional().default(''),
+    seo_description: z.string().nullable().optional().default(''),
+  })
+  .passthrough();
 export type ResearchProfileOutput = z.infer<typeof ResearchProfileOutput>;
 
 // ── Research Social ──────────────────────────────────────────
@@ -222,28 +290,49 @@ export const ResearchSocialInput = z.object({
 });
 export type ResearchSocialInput = z.infer<typeof ResearchSocialInput>;
 
-export const ResearchSocialOutput = z.object({
-  social_links: z.array(z.object({
-    platform: z.string(),
-    url: z.string().nullable(),
-    confidence: z.number().min(0).max(1).nullable().optional().default(0.5),
-    handle: z.string().nullable().optional().default(null),
-    followers: z.number().nullable().optional().default(null),
-    verified: z.boolean().nullable().optional().default(false),
-  }).passthrough()).optional().default([]),
-  website_url: z.string().nullable().optional().default(null),
-  review_platforms: z.array(z.object({
-    platform: z.string(),
-    url: z.string().nullable(),
-    rating: z.union([z.string(), z.number().transform(String)]).nullable(),
-    review_count: z.number().nullable().optional().default(null),
-  }).passthrough()).optional().default([]),
-  google_business_photos: z.array(z.object({
-    url: z.string(),
-    alt_text: z.string().optional().default(''),
-    source: z.string().optional().default('google'),
-  })).optional().default([]),
-}).passthrough();
+export const ResearchSocialOutput = z
+  .object({
+    social_links: z
+      .array(
+        z
+          .object({
+            platform: z.string(),
+            url: z.string().nullable(),
+            confidence: z.number().min(0).max(1).nullable().optional().default(0.5),
+            handle: z.string().nullable().optional().default(null),
+            followers: z.number().nullable().optional().default(null),
+            verified: z.boolean().nullable().optional().default(false),
+          })
+          .passthrough(),
+      )
+      .optional()
+      .default([]),
+    website_url: z.string().nullable().optional().default(null),
+    review_platforms: z
+      .array(
+        z
+          .object({
+            platform: z.string(),
+            url: z.string().nullable(),
+            rating: z.union([z.string(), z.number().transform(String)]).nullable(),
+            review_count: z.number().nullable().optional().default(null),
+          })
+          .passthrough(),
+      )
+      .optional()
+      .default([]),
+    google_business_photos: z
+      .array(
+        z.object({
+          url: z.string(),
+          alt_text: z.string().optional().default(''),
+          source: z.string().optional().default('google'),
+        }),
+      )
+      .optional()
+      .default([]),
+  })
+  .passthrough();
 export type ResearchSocialOutput = z.infer<typeof ResearchSocialOutput>;
 
 // ── Research Brand ───────────────────────────────────────────
@@ -258,29 +347,44 @@ export const ResearchBrandInput = z.object({
 export type ResearchBrandInput = z.infer<typeof ResearchBrandInput>;
 
 export const ResearchBrandOutput = z.object({
-  logo: z.object({
-    found_online: z.boolean().optional().default(false),
-    search_query: z.string().nullable().optional().default(''),
-    fallback_design: z.object({
-      text: z.string().optional().default(''),
-      font: z.string().optional().default('Inter'),
-      accent_shape: z.string().optional().default('circle'),
-      accent_color: z.string().optional().default('#64ffda'),
-    }).nullable().optional().transform(v => v ?? { text: '', font: 'Inter', accent_shape: 'circle', accent_color: '#64ffda' }),
-  }).optional().default({}),
-  colors: z.object({
-    primary: z.string().optional().default('#2563eb'),
-    secondary: z.string().optional().default('#7c3aed'),
-    accent: z.string().optional().default('#64ffda'),
-    background: z.string().optional().default('#ffffff'),
-    surface: z.string().optional().default('#f8fafc'),
-    text_primary: z.string().optional().default('#1e293b'),
-    text_secondary: z.string().optional().default('#64748b'),
-  }).optional().default({}),
-  fonts: z.object({
-    heading: z.string().optional().default('Inter'),
-    body: z.string().optional().default('Inter'),
-  }).optional().default({}),
+  logo: z
+    .object({
+      found_online: z.boolean().optional().default(false),
+      search_query: z.string().nullable().optional().default(''),
+      fallback_design: z
+        .object({
+          text: z.string().optional().default(''),
+          font: z.string().optional().default('Inter'),
+          accent_shape: z.string().optional().default('circle'),
+          accent_color: z.string().optional().default('#64ffda'),
+        })
+        .nullable()
+        .optional()
+        .transform(
+          (v) => v ?? { text: '', font: 'Inter', accent_shape: 'circle', accent_color: '#64ffda' },
+        ),
+    })
+    .optional()
+    .default({}),
+  colors: z
+    .object({
+      primary: z.string().optional().default('#2563eb'),
+      secondary: z.string().optional().default('#7c3aed'),
+      accent: z.string().optional().default('#64ffda'),
+      background: z.string().optional().default('#ffffff'),
+      surface: z.string().optional().default('#f8fafc'),
+      text_primary: z.string().optional().default('#1e293b'),
+      text_secondary: z.string().optional().default('#64748b'),
+    })
+    .optional()
+    .default({}),
+  fonts: z
+    .object({
+      heading: z.string().optional().default('Inter'),
+      body: z.string().optional().default('Inter'),
+    })
+    .optional()
+    .default({}),
   brand_personality: z.string().optional().default(''),
   style_notes: z.string().optional().default(''),
 });
@@ -298,31 +402,43 @@ export const ResearchSellingPointsInput = z.object({
 export type ResearchSellingPointsInput = z.infer<typeof ResearchSellingPointsInput>;
 
 export const ResearchSellingPointsOutput = z.object({
-  selling_points: z.array(z.object({
-    headline: z.string(),
-    description: z.string(),
-    icon: z.string().optional().default('star'),
-  })).min(1).max(6),
-  hero_slogans: z.array(z.object({
-    headline: z.string(),
-    subheadline: z.string().nullable().optional().default(''),
-    cta_primary: z.union([
-      z.object({ text: z.string(), action: z.string() }),
-      z.string(),
-    ]).nullable().optional().transform((v) => {
-      if (!v) return { text: 'Get Started', action: '#contact' };
-      if (typeof v === 'string') return { text: v, action: '#contact' };
-      return v;
-    }),
-    cta_secondary: z.union([
-      z.object({ text: z.string(), action: z.string() }),
-      z.string(),
-    ]).nullable().optional().transform((v) => {
-      if (!v) return { text: 'Learn More', action: '#services' };
-      if (typeof v === 'string') return { text: v, action: '#services' };
-      return v;
-    }),
-  })).optional().default([]),
+  selling_points: z
+    .array(
+      z.object({
+        headline: z.string(),
+        description: z.string(),
+        icon: z.string().optional().default('star'),
+      }),
+    )
+    .min(1)
+    .max(6),
+  hero_slogans: z
+    .array(
+      z.object({
+        headline: z.string(),
+        subheadline: z.string().nullable().optional().default(''),
+        cta_primary: z
+          .union([z.object({ text: z.string(), action: z.string() }), z.string()])
+          .nullable()
+          .optional()
+          .transform((v) => {
+            if (!v) return { text: 'Get Started', action: '#contact' };
+            if (typeof v === 'string') return { text: v, action: '#contact' };
+            return v;
+          }),
+        cta_secondary: z
+          .union([z.object({ text: z.string(), action: z.string() }), z.string()])
+          .nullable()
+          .optional()
+          .transform((v) => {
+            if (!v) return { text: 'Learn More', action: '#services' };
+            if (typeof v === 'string') return { text: v, action: '#services' };
+            return v;
+          }),
+      }),
+    )
+    .optional()
+    .default([]),
   benefit_bullets: z.array(z.string()).optional().default([]),
 });
 export type ResearchSellingPointsOutput = z.infer<typeof ResearchSellingPointsOutput>;
@@ -338,54 +454,83 @@ export const ResearchImagesInput = z.object({
 });
 export type ResearchImagesInput = z.infer<typeof ResearchImagesInput>;
 
-export const ResearchImagesOutput = z.object({
-  hero_images: z.array(z.object({
-    concept: z.string().nullable().optional().default(''),
-    url: z.string().nullable().optional().default(null),
-    search_query_specific: z.string().nullable().optional().default(''),
-    search_query_stock: z.string().nullable().optional().default(''),
-    search_query: z.string().nullable().optional().default(''),
-    stock_fallback: z.string().nullable().optional().default(''),
-    alt_text: z.string().nullable().optional().default(''),
-    aspect_ratio: z.string().nullable().optional().default('16:9'),
-    confidence_specific: z.number().nullable().optional().default(0.5),
-    confidence_score: z.number().nullable().optional().default(0.5),
-    confidence: z.number().nullable().optional().default(0.5),
-    source: z.string().nullable().optional().default('stock'),
-    license: z.string().nullable().optional().default('royalty-free'),
-  }).passthrough()).optional().default([]),
-  storefront_image: z.object({
-    url: z.string().nullable().optional().default(null),
-    search_query: z.string().nullable().optional().default(''),
-    confidence: z.number().nullable().optional().default(0.5),
-    fallback_description: z.string().nullable().optional().default(''),
-    alt_text: z.string().nullable().optional().default(''),
-    source: z.string().nullable().optional().default('inference'),
-  }).passthrough().optional().default({ search_query: '', confidence: 0, fallback_description: '' }),
-  team_image: z.object({
-    url: z.string().nullable().optional().default(null),
-    search_query: z.string().nullable().optional().default(''),
-    confidence: z.number().nullable().optional().default(0.5),
-    fallback_description: z.string().nullable().optional().default(''),
-    alt_text: z.string().nullable().optional().default(''),
-  }).passthrough().optional().default({ search_query: '', confidence: 0, fallback_description: '' }),
-  service_images: z.array(z.object({
-    service_name: z.string().nullable().optional().default(''),
-    url: z.string().nullable().optional().default(null),
-    search_query_stock: z.string().nullable().optional().default(''),
-    search_query: z.string().nullable().optional().default(''),
-    alt_text: z.string().nullable().optional().default(''),
-    name: z.string().nullable().optional().default(''),
-    source: z.string().nullable().optional().default('stock'),
-  }).passthrough()).optional().default([]),
-  gallery: z.array(z.object({
-    url: z.string(),
-    alt_text: z.string().optional().default(''),
-    source: z.string().optional().default(''),
-    license: z.string().optional().default(''),
-  })).optional().default([]),
-  placeholder_strategy: z.string().nullable().optional().default('stock'),
-}).passthrough();
+export const ResearchImagesOutput = z
+  .object({
+    hero_images: z
+      .array(
+        z
+          .object({
+            concept: z.string().nullable().optional().default(''),
+            url: z.string().nullable().optional().default(null),
+            search_query_specific: z.string().nullable().optional().default(''),
+            search_query_stock: z.string().nullable().optional().default(''),
+            search_query: z.string().nullable().optional().default(''),
+            stock_fallback: z.string().nullable().optional().default(''),
+            alt_text: z.string().nullable().optional().default(''),
+            aspect_ratio: z.string().nullable().optional().default('16:9'),
+            confidence_specific: z.number().nullable().optional().default(0.5),
+            confidence_score: z.number().nullable().optional().default(0.5),
+            confidence: z.number().nullable().optional().default(0.5),
+            source: z.string().nullable().optional().default('stock'),
+            license: z.string().nullable().optional().default('royalty-free'),
+          })
+          .passthrough(),
+      )
+      .optional()
+      .default([]),
+    storefront_image: z
+      .object({
+        url: z.string().nullable().optional().default(null),
+        search_query: z.string().nullable().optional().default(''),
+        confidence: z.number().nullable().optional().default(0.5),
+        fallback_description: z.string().nullable().optional().default(''),
+        alt_text: z.string().nullable().optional().default(''),
+        source: z.string().nullable().optional().default('inference'),
+      })
+      .passthrough()
+      .optional()
+      .default({ search_query: '', confidence: 0, fallback_description: '' }),
+    team_image: z
+      .object({
+        url: z.string().nullable().optional().default(null),
+        search_query: z.string().nullable().optional().default(''),
+        confidence: z.number().nullable().optional().default(0.5),
+        fallback_description: z.string().nullable().optional().default(''),
+        alt_text: z.string().nullable().optional().default(''),
+      })
+      .passthrough()
+      .optional()
+      .default({ search_query: '', confidence: 0, fallback_description: '' }),
+    service_images: z
+      .array(
+        z
+          .object({
+            service_name: z.string().nullable().optional().default(''),
+            url: z.string().nullable().optional().default(null),
+            search_query_stock: z.string().nullable().optional().default(''),
+            search_query: z.string().nullable().optional().default(''),
+            alt_text: z.string().nullable().optional().default(''),
+            name: z.string().nullable().optional().default(''),
+            source: z.string().nullable().optional().default('stock'),
+          })
+          .passthrough(),
+      )
+      .optional()
+      .default([]),
+    gallery: z
+      .array(
+        z.object({
+          url: z.string(),
+          alt_text: z.string().optional().default(''),
+          source: z.string().optional().default(''),
+          license: z.string().optional().default(''),
+        }),
+      )
+      .optional()
+      .default([]),
+    placeholder_strategy: z.string().nullable().optional().default('stock'),
+  })
+  .passthrough();
 export type ResearchImagesOutput = z.infer<typeof ResearchImagesOutput>;
 
 // ── Generate Website (v2 workflow) ───────────────────────────
@@ -437,16 +582,19 @@ export const ScoreWebsiteInput = z.object({
 export type ScoreWebsiteInput = z.infer<typeof ScoreWebsiteInput>;
 
 export const ScoreWebsiteOutput = z.object({
-  scores: z.object({
-    visual_design: z.number().min(0).max(1).optional().default(0.5),
-    content_quality: z.number().min(0).max(1).optional().default(0.5),
-    completeness: z.number().min(0).max(1).optional().default(0.5),
-    responsiveness: z.number().min(0).max(1).optional().default(0.5),
-    accessibility: z.number().min(0).max(1).optional().default(0.5),
-    seo: z.number().min(0).max(1).optional().default(0.5),
-    performance: z.number().min(0).max(1).optional().default(0.5),
-    brand_consistency: z.number().min(0).max(1).optional().default(0.5),
-  }).optional().default({}),
+  scores: z
+    .object({
+      visual_design: z.number().min(0).max(1).optional().default(0.5),
+      content_quality: z.number().min(0).max(1).optional().default(0.5),
+      completeness: z.number().min(0).max(1).optional().default(0.5),
+      responsiveness: z.number().min(0).max(1).optional().default(0.5),
+      accessibility: z.number().min(0).max(1).optional().default(0.5),
+      seo: z.number().min(0).max(1).optional().default(0.5),
+      performance: z.number().min(0).max(1).optional().default(0.5),
+      brand_consistency: z.number().min(0).max(1).optional().default(0.5),
+    })
+    .optional()
+    .default({}),
   overall: z.number().min(0).max(1).optional().default(0.5),
   issues: z.array(z.string()).optional().default([]),
   suggestions: z.array(z.string()).optional().default([]),
@@ -465,28 +613,43 @@ export const SiteStructurePlanInput = z.object({
 export type SiteStructurePlanInput = z.infer<typeof SiteStructurePlanInput>;
 
 export const SiteStructurePlanOutput = z.object({
-  pages: z.array(z.object({
-    path: z.string(),
-    title: z.string(),
-    purpose: z.string(),
-    sections: z.array(z.string()),
-  })).min(1),
-  design: z.object({
-    primary_color: z.string().optional().default('#2563eb'),
-    secondary_color: z.string().optional().default('#7c3aed'),
-    accent_color: z.string().optional().default('#64ffda'),
-    font_heading: z.string().optional().default('Inter'),
-    font_body: z.string().optional().default('Inter'),
-    style_notes: z.string().optional().default(''),
-  }).optional().default({}),
-  nav_links: z.array(z.object({
-    label: z.string(),
-    href: z.string(),
-  })).optional().default([]),
-  seo: z.object({
-    site_title: z.string().optional().default(''),
-    default_description: z.string().optional().default(''),
-  }).optional().default({}),
+  pages: z
+    .array(
+      z.object({
+        path: z.string(),
+        title: z.string(),
+        purpose: z.string(),
+        sections: z.array(z.string()),
+      }),
+    )
+    .min(1),
+  design: z
+    .object({
+      primary_color: z.string().optional().default('#2563eb'),
+      secondary_color: z.string().optional().default('#7c3aed'),
+      accent_color: z.string().optional().default('#64ffda'),
+      font_heading: z.string().optional().default('Inter'),
+      font_body: z.string().optional().default('Inter'),
+      style_notes: z.string().optional().default(''),
+    })
+    .optional()
+    .default({}),
+  nav_links: z
+    .array(
+      z.object({
+        label: z.string(),
+        href: z.string(),
+      }),
+    )
+    .optional()
+    .default([]),
+  seo: z
+    .object({
+      site_title: z.string().optional().default(''),
+      default_description: z.string().optional().default(''),
+    })
+    .optional()
+    .default({}),
 });
 export type SiteStructurePlanOutput = z.infer<typeof SiteStructurePlanOutput>;
 
@@ -502,15 +665,22 @@ export const MultiPageSiteInput = z.object({
 export type MultiPageSiteInput = z.infer<typeof MultiPageSiteInput>;
 
 export const MultiPageSiteOutput = z.object({
-  files: z.array(z.object({
-    path: z.string(),
-    content: z.string(),
-    content_type: z.string().optional().default('text/html'),
-  })).min(1),
-  metadata: z.object({
-    model_used: z.string().optional().default('unknown'),
-    quality_self_score: z.number().min(0).max(100).optional().default(75),
-  }).optional().default({}),
+  files: z
+    .array(
+      z.object({
+        path: z.string(),
+        content: z.string(),
+        content_type: z.string().optional().default('text/html'),
+      }),
+    )
+    .min(1),
+  metadata: z
+    .object({
+      model_used: z.string().optional().default('unknown'),
+      quality_self_score: z.number().min(0).max(100).optional().default(75),
+    })
+    .optional()
+    .default({}),
 });
 export type MultiPageSiteOutput = z.infer<typeof MultiPageSiteOutput>;
 
@@ -527,7 +697,10 @@ export const PROMPT_SCHEMAS: Record<string, { input: z.ZodType; output?: z.ZodTy
   research_profile: { input: ResearchProfileInput, output: ResearchProfileOutput },
   research_social: { input: ResearchSocialInput, output: ResearchSocialOutput },
   research_brand: { input: ResearchBrandInput, output: ResearchBrandOutput },
-  research_selling_points: { input: ResearchSellingPointsInput, output: ResearchSellingPointsOutput },
+  research_selling_points: {
+    input: ResearchSellingPointsInput,
+    output: ResearchSellingPointsOutput,
+  },
   research_images: { input: ResearchImagesInput, output: ResearchImagesOutput },
   generate_website: { input: GenerateWebsiteInput, output: GenerateWebsiteOutput },
   generate_legal_pages: { input: GenerateLegalPageInput, output: GenerateLegalPageOutput },

@@ -106,10 +106,22 @@ app.use(
 
 // Rate limiting on sensitive endpoints
 import { rateLimitMiddleware } from './middleware/rate_limit.js';
-app.use('/api/auth/magic-link', rateLimitMiddleware({ maxRequests: 5, windowSeconds: 300, prefix: 'rl:magic' }));
-app.use('/api/search/businesses', rateLimitMiddleware({ maxRequests: 30, windowSeconds: 60, prefix: 'rl:search' }));
-app.use('/api/sites/create-from-search', rateLimitMiddleware({ maxRequests: 10, windowSeconds: 3600, prefix: 'rl:create' }));
-app.use('/api/v1/forms/submit', rateLimitMiddleware({ maxRequests: 30, windowSeconds: 60, prefix: 'rl:forms' }));
+app.use(
+  '/api/auth/magic-link',
+  rateLimitMiddleware({ maxRequests: 5, windowSeconds: 300, prefix: 'rl:magic' }),
+);
+app.use(
+  '/api/search/businesses',
+  rateLimitMiddleware({ maxRequests: 30, windowSeconds: 60, prefix: 'rl:search' }),
+);
+app.use(
+  '/api/sites/create-from-search',
+  rateLimitMiddleware({ maxRequests: 10, windowSeconds: 3600, prefix: 'rl:create' }),
+);
+app.use(
+  '/api/v1/forms/submit',
+  rateLimitMiddleware({ maxRequests: 30, windowSeconds: 60, prefix: 'rl:forms' }),
+);
 app.use('/api/ai/*', rateLimitMiddleware({ maxRequests: 20, windowSeconds: 60, prefix: 'rl:ai' }));
 
 // Auth middleware for API routes (sets userId/orgId if valid session)
@@ -121,9 +133,9 @@ app.onError(errorHandler);
 // ─── Mount Routes ────────────────────────────────────────────
 
 app.route('/', health);
-app.route('/', search);  // Must come before api so /api/sites/search wins over /api/sites/:id
-app.route('/', assets);  // Asset uploads + build-assets listing
-app.route('/', forms);   // Public form ingest + auth-gated submissions/integrations CRUD
+app.route('/', search); // Must come before api so /api/sites/search wins over /api/sites/:id
+app.route('/', assets); // Asset uploads + build-assets listing
+app.route('/', forms); // Public form ingest + auth-gated submissions/integrations CRUD
 app.route('/', api);
 app.route('/', webhooks);
 
@@ -168,13 +180,23 @@ app.post('/api/internal/build-status', async (c) => {
   const body = await c.req.text();
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(
-    'raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
+    'raw',
+    enc.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
   );
   const sigBytes = new Uint8Array(await crypto.subtle.sign('HMAC', key, enc.encode(body)));
-  const expected = Array.from(sigBytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+  const expected = Array.from(sigBytes)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
   if (sig !== expected) return c.json({ error: 'invalid signature' }, 401);
   let payload: { jobId?: string; status?: string; step?: string };
-  try { payload = JSON.parse(body); } catch { return c.json({ error: 'bad json' }, 400); }
+  try {
+    payload = JSON.parse(body);
+  } catch {
+    return c.json({ error: 'bad json' }, 400);
+  }
   const jobId = payload.jobId;
   if (!jobId || typeof jobId !== 'string') return c.json({ error: 'missing jobId' }, 400);
   const record = JSON.stringify({ ...payload, lastUpdate: Date.now() });
@@ -228,7 +250,10 @@ app.all('*', async (c) => {
         let html = await marketingAsset.text();
         const phKey = c.env.POSTHOG_API_KEY ?? 'none';
         const stripePk = c.env.STRIPE_PUBLISHABLE_KEY ?? '';
-        html = html.replace('</head>', `<meta name="x-posthog-key" content="${phKey}">\n<meta name="x-stripe-pk" content="${stripePk}">\n</head>`);
+        html = html.replace(
+          '</head>',
+          `<meta name="x-posthog-key" content="${phKey}">\n<meta name="x-stripe-pk" content="${stripePk}">\n</head>`,
+        );
         return new Response(html, {
           headers: {
             'Content-Type': 'text/html',
@@ -343,9 +368,7 @@ export default {
             businessAddress: payload.business_address
               ? String(payload.business_address)
               : undefined,
-            businessPhone: payload.business_phone
-              ? String(payload.business_phone)
-              : undefined,
+            businessPhone: payload.business_phone ? String(payload.business_phone) : undefined,
             googlePlaceId: payload.google_place_id ? String(payload.google_place_id) : undefined,
             additionalContext: payload.additional_context
               ? String(payload.additional_context)
@@ -479,28 +502,34 @@ export default {
             `UPDATE sites SET status = 'error', updated_at = datetime('now') WHERE id = ?`,
             [site.id],
           );
-          console.warn(JSON.stringify({
-            level: 'warn',
-            service: 'cron',
-            message: 'Unstuck build',
-            siteId: site.id,
-            slug: site.slug,
-            businessName: site.business_name,
-          }));
+          console.warn(
+            JSON.stringify({
+              level: 'warn',
+              service: 'cron',
+              message: 'Unstuck build',
+              siteId: site.id,
+              slug: site.slug,
+              businessName: site.business_name,
+            }),
+          );
         }
-        console.warn(JSON.stringify({
-          level: 'info',
-          service: 'cron',
-          message: `Unstuck ${stuckSites.data.length} builds`,
-        }));
+        console.warn(
+          JSON.stringify({
+            level: 'info',
+            service: 'cron',
+            message: `Unstuck ${stuckSites.data.length} builds`,
+          }),
+        );
       }
     } catch (err) {
-      console.warn(JSON.stringify({
-        level: 'error',
-        service: 'cron',
-        message: 'Stuck build scanner failed',
-        error: err instanceof Error ? err.message : String(err),
-      }));
+      console.warn(
+        JSON.stringify({
+          level: 'error',
+          service: 'cron',
+          message: 'Stuck build scanner failed',
+          error: err instanceof Error ? err.message : String(err),
+        }),
+      );
     }
   },
 };

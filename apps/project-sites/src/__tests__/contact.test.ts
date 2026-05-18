@@ -95,7 +95,11 @@ describe('handleContactForm – validation', () => {
 
   it('rejects invalid email', async () => {
     await expect(
-      handleContactForm(mockEnv, { name: 'Bob', email: 'not-an-email', message: 'Long enough message' }),
+      handleContactForm(mockEnv, {
+        name: 'Bob',
+        email: 'not-an-email',
+        message: 'Long enough message',
+      }),
     ).rejects.toThrow();
     expect(mockFetch).not.toHaveBeenCalled();
   });
@@ -108,9 +112,7 @@ describe('handleContactForm – validation', () => {
   });
 
   it('rejects missing message', async () => {
-    await expect(
-      handleContactForm(mockEnv, { name: 'Bob', email: 'a@b.com' }),
-    ).rejects.toThrow();
+    await expect(handleContactForm(mockEnv, { name: 'Bob', email: 'a@b.com' })).rejects.toThrow();
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
@@ -184,9 +186,9 @@ describe('handleContactForm – validation', () => {
 describe('handleContactForm – email providers', () => {
   it('falls back to SendGrid when Resend fails', async () => {
     mockFetch
-      .mockResolvedValueOnce(new Response('error', { status: 500 }))   // Resend fails (notification)
-      .mockResolvedValueOnce(new Response('', { status: 202 }))        // SendGrid succeeds (notification)
-      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'x' }), { status: 200 }));  // Resend succeeds (confirmation)
+      .mockResolvedValueOnce(new Response('error', { status: 500 })) // Resend fails (notification)
+      .mockResolvedValueOnce(new Response('', { status: 202 })) // SendGrid succeeds (notification)
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'x' }), { status: 200 })); // Resend succeeds (confirmation)
 
     await handleContactForm(mockEnv, {
       name: 'Jane',

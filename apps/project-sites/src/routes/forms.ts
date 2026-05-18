@@ -29,10 +29,7 @@ import {
 } from '@project-sites/shared';
 import type { Env, Variables } from '../types/env.js';
 import { dbExecute, dbInsert, dbQuery, dbQueryOne } from '../services/db.js';
-import {
-  dispatchToIntegrations,
-  type IntegrationRow,
-} from '../services/newsletter_dispatch.js';
+import { dispatchToIntegrations, type IntegrationRow } from '../services/newsletter_dispatch.js';
 
 const forms = new Hono<{ Bindings: Env; Variables: Variables }>();
 
@@ -75,7 +72,9 @@ forms.post('/api/v1/forms/submit', async (c) => {
   const validated = formSubmissionInputSchema.parse(body ?? {});
 
   const ip =
-    c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+    c.req.header('cf-connecting-ip') ??
+    c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ??
+    null;
   const userAgent = c.req.header('user-agent')?.slice(0, 512) ?? null;
 
   const submissionId = crypto.randomUUID();
@@ -339,11 +338,10 @@ forms.patch('/api/sites/:siteId/integrations/:id', async (c) => {
   const keys = Object.keys(updates);
   const setClause = keys.map((k) => `${k} = ?`).join(', ');
   const values = keys.map((k) => updates[k]);
-  await dbExecute(
-    c.env.DB,
-    `UPDATE newsletter_integrations SET ${setClause} WHERE id = ?`,
-    [...values, id],
-  );
+  await dbExecute(c.env.DB, `UPDATE newsletter_integrations SET ${setClause} WHERE id = ?`, [
+    ...values,
+    id,
+  ]);
 
   return c.json({ data: { id, updated: true } });
 });

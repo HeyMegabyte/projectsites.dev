@@ -79,10 +79,7 @@ const createMockEnv = (overrides: Partial<Env> = {}): Env =>
     ...overrides,
   }) as unknown as Env;
 
-function createAuthenticatedApp(
-  vars: Partial<Variables> = {},
-  envOverrides: Partial<Env> = {},
-) {
+function createAuthenticatedApp(vars: Partial<Variables> = {}, envOverrides: Partial<Env> = {}) {
   const authedApp = new Hono<{ Bindings: Env; Variables: Variables }>();
   authedApp.onError(errorHandler);
   authedApp.use('*', async (c, next) => {
