@@ -130,6 +130,117 @@ forms.post('/api/v1/forms/submit', async (c) => {
     created_at: submittedAt,
   });
 
+  // ── AI Form Router ──
+  // Run the customer's single router prompt over this submission. The LLM
+  // picks one MCP tool (Mailchimp/Stripe/Resend/HubSpot) or "noop"; the
+  // worker executes it server-side and writes one ai_form_logs row.
+  c.executionCtx.waitUntil(
+    (async () => {
+      const { buildPrompt, parseRouterAction, executeRouterAction } = await import('../services/form_router.js');
+      const { loadAvailableTools } = await import('../services/mcp_client.js');
+      const { writeAiLog, estTokens } = await import('../services/ai_logger.js');
+      const { debitCredits, getBalance, maybeFireAlerts } = await import('../services/credits.js');
+      const bal = await getBalance(c.env, site.org_id as string);
+      if (bal <= 0) {
+        await writeAiLog(c.env, {
+          orgId: site.org_id as string,
+          siteId: site.id,
+          submissionId,
+          traceKind: 'form',
+          status: 'rate_limited',
+          errorMessage: 'AI credits exhausted',
+        });
+        return;
+      }
+      const settings = await c.env.DB.prepare(
+        `SELECT form_router_prompt, reply_email FROM ai_site_settings WHERE site_id = ?`,
+      )
+        .bind(site.id)
+        .first<{ form_router_prompt: string | null; reply_email: string | null }>();
+      const contextRows = await c.env.DB.prepare(
+        `SELECT extracted_text FROM ai_chat_context_files WHERE site_id = ? AND enabled = 1
+         AND extracted_text IS NOT NULL ORDER BY created_at DESC LIMIT 5`,
+      )
+        .bind(site.id)
+        .all<{ extracted_text: string }>();
+      const tools = await loadAvailableTools(c.env, site.id as string);
+      const businessName = (site as { business_name?: string }).business_name ?? (site.slug as string);
+      const prompt = buildPrompt({
+        customPrompt: settings?.form_router_prompt ?? null,
+        businessName,
+        contextSnippets: (contextRows.results ?? []).map((r) => r.extracted_text.slice(0, 1200)),
+        availableTools: tools,
+      });
+      const userMessage = JSON.stringify({
+        form_name: validated.form_name,
+        email: validated.email,
+        fields: validated.fields,
+      });
+      const model = '@cf/meta/llama-3.1-8b-instruct';
+      const started = Date.now();
+      let outText = '';
+      let action: ReturnType<typeof parseRouterAction> | null = null;
+      let toolResult: Awaited<ReturnType<typeof executeRouterAction>> | null = null;
+      let logStatus: 'ok' | 'error' = 'ok';
+      let errorMessage: string | undefined;
+      try {
+        const ai = (await c.env.AI.run(model as Parameters<typeof c.env.AI.run>[0], {
+          messages: [
+            { role: 'system', content: prompt },
+            { role: 'user', content: userMessage },
+          ],
+          max_tokens: 300,
+        })) as { response?: string };
+        outText = (ai.response ?? '').trim();
+        action = parseRouterAction(outText);
+        if (action) {
+          toolResult = await executeRouterAction(c.env, site.id as string, action, {
+            replyEmail: settings?.reply_email ?? null,
+          });
+          if (toolResult.status === 'error') {
+            logStatus = 'error';
+            errorMessage = toolResult.error;
+          }
+        } else {
+          logStatus = 'error';
+          errorMessage = 'router output was not valid JSON';
+        }
+      } catch (err) {
+        logStatus = 'error';
+        errorMessage = err instanceof Error ? err.message : String(err);
+      }
+      const logId = await writeAiLog(c.env, {
+        orgId: site.org_id as string,
+        siteId: site.id,
+        submissionId,
+        traceKind: 'form',
+        promptTemplate: prompt,
+        input: { form_name: validated.form_name, fields: validated.fields, email: validated.email },
+        outputText: outText,
+        outputJson: action ?? undefined,
+        toolName: action?.tool,
+        toolArgs: action?.args,
+        toolResult: toolResult ?? undefined,
+        toolStatus: toolResult?.status,
+        model,
+        status: logStatus,
+        errorMessage,
+        latencyMs: Date.now() - started,
+        tokensInput: estTokens(prompt + userMessage),
+        tokensOutput: estTokens(outText),
+        creditsDebited: 1,
+      });
+      const newBal = await debitCredits(c.env, {
+        orgId: site.org_id as string,
+        siteId: site.id,
+        amount: 1,
+        reason: 'form_router',
+        aiLogId: logId,
+      });
+      await maybeFireAlerts(c.env, site.org_id as string, newBal);
+    })(),
+  );
+
   // Update integration health metadata.
   for (const result of dispatchResults) {
     if (result.ok) {

@@ -13,6 +13,16 @@ interface Snapshot {
   created_at: string;
 }
 
+interface GhStatus {
+  connected: boolean;
+  repo_html_url?: string;
+  repo_full_name?: string;
+  default_branch?: string;
+  last_commit_sha?: string;
+  commit_count?: number;
+  github_user?: string;
+}
+
 @Component({
   selector: 'app-admin-snapshots',
   standalone: true,
@@ -21,21 +31,56 @@ interface Snapshot {
     <div class="p-7 flex-1 overflow-y-auto animate-fade-in max-md:p-4 space-y-6">
 
       <!-- Header -->
-      <div>
-        <h2 class="text-lg font-bold text-white m-0">Snapshots</h2>
-        <p class="text-[0.78rem] text-text-secondary m-0 mt-1">
-          Version history for
-          <a
-            class="text-primary font-mono no-underline hover:underline transition-colors duration-150 inline-flex items-center gap-1 group/sitelink"
-            [href]="'https://' + state.selectedSite()?.slug + '.projectsites.dev'"
-            target="_blank"
-            rel="noopener noreferrer"
-            [title]="'Open live site ' + state.selectedSite()?.slug + '.projectsites.dev in new tab'"
-          >
-            {{ state.selectedSite()?.slug }}.projectsites.dev
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="opacity-60 group-hover/sitelink:opacity-100 transition-opacity"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-          </a>
-        </p>
+      <div class="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h2 class="text-lg font-bold text-white m-0">Snapshots</h2>
+          <p class="text-[0.78rem] text-text-secondary m-0 mt-1">
+            Version history for
+            <a
+              class="text-primary font-mono no-underline hover:underline transition-colors duration-150 inline-flex items-center gap-1 group/sitelink"
+              [href]="'https://' + state.selectedSite()?.slug + '.projectsites.dev'"
+              target="_blank"
+              rel="noopener noreferrer"
+              [title]="'Open live site ' + state.selectedSite()?.slug + '.projectsites.dev in new tab'"
+            >
+              {{ state.selectedSite()?.slug }}.projectsites.dev
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="opacity-60 group-hover/sitelink:opacity-100 transition-opacity"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            </a>
+          </p>
+        </div>
+
+        <!-- GitHub link/sync — mirrors the isomorphic-git snapshot tree to GitHub on every build. -->
+        @if (!ghStatus()?.connected) {
+          <button class="btn-github-link" [disabled]="linkingGh() || !state.selectedSite()" (click)="linkGithub()"
+                  title="Mirror snapshot history to a GitHub repo; every new snapshot will push automatically.">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+            <span>{{ linkingGh() ? 'Opening GitHub…' : 'Link GitHub' }}</span>
+          </button>
+        } @else {
+          <div class="btn-github-linked-wrap">
+            <a class="btn-github-linked" [href]="ghStatus()!.repo_html_url" target="_blank" rel="noopener noreferrer"
+               [title]="'Open ' + ghStatus()!.repo_full_name + ' on GitHub'">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+              <span class="font-mono text-[0.7rem]">{{ ghStatus()!.repo_full_name }}</span>
+              @if (pushingGh()) {
+                <span class="text-[0.62rem] opacity-70">syncing…</span>
+              } @else if (ghStatus()!.commit_count) {
+                <span class="text-[0.62rem] opacity-70">{{ ghStatus()!.commit_count }} commits</span>
+              }
+            </a>
+            <button class="btn-github-push" [disabled]="pushingGh()" (click)="pushToGithub(true)"
+                    title="Push the latest build to GitHub now">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                   [class.animate-spin]="pushingGh()">
+                <path d="M12 5v14M19 12l-7 7-7-7"/>
+              </svg>
+            </button>
+            <button class="btn-github-unlink" [disabled]="unlinkingGh()" (click)="unlinkGithub()"
+                    title="Disconnect GitHub backup">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        }
       </div>
 
       <!-- Create Snapshot -->
@@ -134,6 +179,19 @@ interface Snapshot {
 
     </div>
   `,
+  styles: [`
+    :host { display: block; }
+    .btn-github-link { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.75rem; border-radius: 8px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); color: #e5e7eb; font-size: 0.72rem; font-weight: 600; cursor: pointer; transition: all 150ms ease; }
+    .btn-github-link:hover:not(:disabled) { background: rgba(0,229,255,0.1); border-color: rgba(0,229,255,0.35); color: #00E5FF; transform: translateY(-1px); }
+    .btn-github-link:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-github-linked-wrap { display: inline-flex; align-items: stretch; border-radius: 8px; border: 1px solid rgba(0,229,255,0.25); background: rgba(0,229,255,0.06); overflow: hidden; }
+    .btn-github-linked { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.38rem 0.65rem; color: #00E5FF; text-decoration: none; font-size: 0.72rem; font-weight: 600; transition: background 150ms ease; }
+    .btn-github-linked:hover { background: rgba(0,229,255,0.12); }
+    .btn-github-push, .btn-github-unlink { display: inline-flex; align-items: center; justify-content: center; width: 26px; border: none; border-left: 1px solid rgba(0,229,255,0.18); background: transparent; color: #00E5FF; cursor: pointer; transition: background 150ms ease, color 150ms ease; }
+    .btn-github-push:hover:not(:disabled) { background: rgba(0,229,255,0.16); }
+    .btn-github-unlink:hover:not(:disabled) { background: rgba(248,113,113,0.16); color: #f87171; }
+    .btn-github-push:disabled, .btn-github-unlink:disabled { opacity: 0.45; cursor: not-allowed; }
+  `],
 })
 export class AdminSnapshotsComponent implements OnInit {
   state = inject(AdminStateService);
@@ -147,9 +205,71 @@ export class AdminSnapshotsComponent implements OnInit {
   creatingSnapshot = signal(false);
   reverting = signal(false);
 
+  // GitHub mirror (replaces the standalone GitHub Backup nav item).
+  ghStatus = signal<GhStatus | null>(null);
+  linkingGh = signal(false);
+  pushingGh = signal(false);
+  unlinkingGh = signal(false);
+
   ngOnInit(): void {
     const site = this.state.selectedSite();
-    if (site) this.loadSnapshots(site.id);
+    if (site) {
+      this.loadSnapshots(site.id);
+      this.loadGhStatus(site.id);
+    }
+  }
+
+  private loadGhStatus(siteId: string): void {
+    this.api.get<{ data: GhStatus }>(`/sites/${siteId}/github/status`).subscribe({
+      next: (r) => this.ghStatus.set(r.data),
+      error: () => this.ghStatus.set({ connected: false }),
+    });
+  }
+
+  linkGithub(): void {
+    const site = this.state.selectedSite();
+    if (!site) return;
+    this.linkingGh.set(true);
+    const returnUrl = encodeURIComponent('/admin/snapshots');
+    window.location.href = `/api/sites/${site.id}/github/connect?return_url=${returnUrl}`;
+  }
+
+  pushToGithub(manual: boolean): void {
+    const site = this.state.selectedSite();
+    const status = this.ghStatus();
+    if (!site || !status?.connected) return;
+    this.pushingGh.set(true);
+    this.api.post<{ data: { commit_sha: string; html_url: string } }>(`/sites/${site.id}/github/backup`, {}).subscribe({
+      next: () => {
+        this.pushingGh.set(false);
+        if (manual) this.toast.success('Mirrored to GitHub');
+        this.loadGhStatus(site.id);
+      },
+      error: (err) => {
+        this.pushingGh.set(false);
+        const msg = err?.error?.error?.message || 'GitHub mirror failed';
+        if (manual) this.toast.error(msg);
+        else this.toast.error(`Snapshot saved · GitHub mirror failed: ${msg}`);
+      },
+    });
+  }
+
+  unlinkGithub(): void {
+    const site = this.state.selectedSite();
+    if (!site) return;
+    if (!window.confirm('Disconnect GitHub mirror? The existing repo + commits stay; future snapshots will no longer push automatically.')) return;
+    this.unlinkingGh.set(true);
+    this.api.post(`/sites/${site.id}/github/disconnect`, {}).subscribe({
+      next: () => {
+        this.unlinkingGh.set(false);
+        this.ghStatus.set({ connected: false });
+        this.toast.success('GitHub mirror disconnected');
+      },
+      error: () => {
+        this.unlinkingGh.set(false);
+        this.toast.error('Failed to disconnect');
+      },
+    });
   }
 
   private loadSnapshots(siteId: string): void {
@@ -174,6 +294,7 @@ export class AdminSnapshotsComponent implements OnInit {
         this.newSnapshotDescription = '';
         this.creatingSnapshot.set(false);
         this.loadSnapshots(site.id);
+        if (this.ghStatus()?.connected) this.pushToGithub(false);
       },
       error: (err) => {
         this.toast.error(err?.error?.error?.message || 'Failed to create snapshot');

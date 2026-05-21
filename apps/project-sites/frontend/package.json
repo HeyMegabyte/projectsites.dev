@@ -26,6 +26,8 @@
     "@ngx-translate/core": "^17.0.0",
     "@ngx-translate/http-loader": "^17.0.0",
     "@tailwindcss/postcss": "^4.2.2",
+    "ag-grid-angular": "^33.3.2",
+    "ag-grid-community": "^33.3.2",
     "animate.css": "^4.1.1",
     "autoprefixer": "^10.5.0",
     "jszip": "^3.10.1",

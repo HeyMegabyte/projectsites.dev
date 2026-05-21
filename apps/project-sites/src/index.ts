@@ -41,12 +41,25 @@ import { search } from './routes/search.js';
 import { webhooks } from './routes/webhooks.js';
 import { assets } from './routes/assets.js';
 import { forms } from './routes/forms.js';
+import { aiAdmin } from './routes/ai_admin.js';
+import { aiEndpointsPublic } from './routes/ai_endpoints_public.js';
+import { mcpOauth } from './routes/mcp_oauth.js';
 import { resolveSite, serveSiteFromR2 } from './services/site_serving.js';
 import { dbUpdate } from './services/db.js';
 import { registerAllPrompts } from './services/ai_workflows.js';
 import { DOMAINS } from '@project-sites/shared';
 export { SiteGenerationWorkflow } from './workflows/site-generation.js';
 export { SiteBuilderContainer } from './container.js';
+
+// Stub DO classes from a prior session, present so the delete-class
+// migration in wrangler.toml can drop them. Once the next deploy succeeds
+// and clears the bindings, remove these and the migration block.
+export class TraceHub {
+  async fetch(): Promise<Response> { return new Response('deprecated', { status: 410 }); }
+}
+export class ActivityHub {
+  async fetch(): Promise<Response> { return new Response('deprecated', { status: 410 }); }
+}
 
 // Register all prompt definitions at module load
 registerAllPrompts();
@@ -136,6 +149,9 @@ app.route('/', health);
 app.route('/', search); // Must come before api so /api/sites/search wins over /api/sites/:id
 app.route('/', assets); // Asset uploads + build-assets listing
 app.route('/', forms); // Public form ingest + auth-gated submissions/integrations CRUD
+app.route('/', aiEndpointsPublic); // Public /api/ai/:slug/:endpoint dispatcher
+app.route('/', mcpOauth); // MCP OAuth start + callback (MailChimp/Stripe/Resend/HubSpot)
+app.route('/', aiAdmin); // Form submissions, AI logs, chat, endpoints, credits, alerts, team
 app.route('/', api);
 app.route('/', webhooks);
 

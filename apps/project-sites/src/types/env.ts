@@ -282,6 +282,47 @@ export interface Env {
   // ── Feature Flags ──────────────────────────────────────────
   /** When "true", research.json is publicly accessible at /api/sites/by-slug/:slug/research.json */
   RESEARCH_JSON_PUBLIC?: string;
+
+  // ── AI Platform (added by migration 0013) ─────────────────
+  /** AES-GCM key (base64, 32 bytes) used to encrypt MCP OAuth tokens at rest. */
+  MCP_ENCRYPTION_KEY?: string;
+  /** MailChimp OAuth app client ID + secret (single tenant; per-site tokens). */
+  MAILCHIMP_CLIENT_ID?: string;
+  MAILCHIMP_CLIENT_SECRET?: string;
+  /** HubSpot OAuth app credentials. */
+  HUBSPOT_CLIENT_ID?: string;
+  HUBSPOT_CLIENT_SECRET?: string;
+  /** Stripe Connect client ID (separate from STRIPE_SECRET_KEY which is our own account). */
+  STRIPE_CONNECT_CLIENT_ID?: string;
+  /** Stripe Price IDs for AI credit topups (one-time purchases). */
+  STRIPE_PRICE_CREDITS_100?: string;
+  STRIPE_PRICE_CREDITS_500?: string;
+  STRIPE_PRICE_CREDITS_2000?: string;
+
+  // ── Workers for Platforms (user-defined endpoints) ────────
+  /** Dispatch namespace binding (set in wrangler.toml [[dispatch_namespaces]]). */
+  USER_DISPATCH?: DispatchNamespace;
+  /** WFP namespace name used for management API calls (uploads, deletes). */
+  WFP_NAMESPACE_NAME?: string;
+  /** Cloudflare account ID for WFP REST API. */
+  CF_ACCOUNT_ID?: string;
+  /** Note: CF_API_TOKEN is already declared above for the existing Cloudflare API surface; we reuse it for WFP REST calls. */
+
+  /** Workers Analytics Engine binding — admin dashboard visit tracker. */
+  ANALYTICS?: AnalyticsEngineDataset;
+}
+
+/** Cloudflare Workers for Platforms dispatch namespace runtime shape. */
+interface DispatchNamespace {
+  get(
+    name: string,
+    args?: Record<string, unknown>,
+  ): { fetch(request: Request | string, init?: RequestInit): Promise<Response> };
+}
+
+/** Cloudflare Workers Analytics Engine binding runtime shape. */
+interface AnalyticsEngineDataset {
+  writeDataPoint(data: { blobs?: (string | null)[]; doubles?: number[]; indexes?: string[] }): void;
 }
 
 /**

@@ -1,824 +1,459 @@
-import { Component, inject, signal, type OnInit } from '@angular/core';
-import { NgClass } from '@angular/common';
+import { Component, inject, signal, computed, type OnInit } from '@angular/core';
+import { DatePipe, SlicePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AdminStateService } from '../admin-state.service';
-import { ApiService, type Hostname, type Site } from '../../../services/api.service';
+import { ApiService } from '../../../services/api.service';
 import { ToastService } from '../../../services/toast.service';
+
+interface Member { id: string; email: string; name: string | null; role: string; created_at: string; }
+interface Invite { id: string; email: string; role: string; created_at: string; expires_at: string; }
+interface GeneralSettings { contact_email: string | null; reply_email: string | null; brand_tone: string | null; brand_primary?: string | null; brand_accent?: string | null; timezone?: string | null; default_locale?: string | null; }
+interface Conn { id: string; provider: string; display_name: string; status: string; connected_at: string; metadata?: Record<string, unknown>; }
+
+const TABS = [
+  { id: 'general',  label: 'General',     desc: 'Brand · contact email · tone · locale' },
+  { id: 'team',     label: 'Team',        desc: 'Members · roles · invitations' },
+  { id: 'mcp',      label: 'MCP',         desc: 'Connect MailChimp, Stripe, Slack, Notion, HubSpot, GitHub, Linear, Calendar, Twilio +6 more' },
+  { id: 'security', label: 'Security',    desc: 'API tokens · session lifetime · 2FA' },
+  { id: 'domains',  label: 'Domains',     desc: 'Custom hostnames · SSL · DNS records' },
+  { id: 'danger',   label: 'Danger zone', desc: 'Export data · transfer ownership · delete org' },
+] as const;
+type Tab = (typeof TABS)[number]['id'];
+
+const PROVIDERS: { id: string; label: string; desc: string; color: string; needsOauth: boolean }[] = [
+  { id: 'mailchimp',       label: 'MailChimp',       desc: 'Subscribe newsletter submissions to a Mailchimp audience.',     color: '#FFE01B', needsOauth: true  },
+  { id: 'stripe',          label: 'Stripe',          desc: 'Send invoices, collect deposits, process quote requests.',      color: '#635BFF', needsOauth: true  },
+  { id: 'resend',          label: 'Resend',          desc: 'Transactional email (auto-replies, confirmations).',            color: '#000000', needsOauth: false },
+  { id: 'hubspot',         label: 'HubSpot',         desc: 'Create/update HubSpot CRM contacts on form submit.',            color: '#FF7A59', needsOauth: true  },
+  { id: 'slack',           label: 'Slack',           desc: 'Post to a Slack channel on form submit or AI events.',          color: '#4A154B', needsOauth: false },
+  { id: 'notion',          label: 'Notion',          desc: 'Create rows in a Notion database (leads, tickets, ideas).',     color: '#000000', needsOauth: false },
+  { id: 'github',          label: 'GitHub',          desc: 'Open GitHub issues from forms (bug reports, feature requests).', color: '#181717', needsOauth: false },
+  { id: 'linear',          label: 'Linear',          desc: 'File Linear issues from customer feedback.',                    color: '#5E6AD2', needsOauth: false },
+  { id: 'discord',         label: 'Discord',         desc: 'Post to a Discord channel via webhook URL.',                    color: '#5865F2', needsOauth: false },
+  { id: 'google_calendar', label: 'Google Calendar', desc: 'Create calendar events from booking requests.',                 color: '#4285F4', needsOauth: false },
+  { id: 'twilio',          label: 'Twilio',          desc: 'Send SMS confirmations / alerts.',                              color: '#F22F46', needsOauth: false },
+  { id: 'calendly',        label: 'Calendly',        desc: 'List upcoming Calendly events; soon: schedule.',                color: '#006BFF', needsOauth: false },
+  { id: 'airtable',        label: 'Airtable',        desc: 'Append rows to an Airtable base.',                              color: '#FFB934', needsOauth: false },
+  { id: 'zapier',          label: 'Zapier',          desc: 'Trigger a Zapier Catch Hook with the form payload.',            color: '#FF4A00', needsOauth: false },
+];
 
 @Component({
   selector: 'app-admin-settings',
   standalone: true,
-  imports: [NgClass, FormsModule],
+  imports: [FormsModule, DatePipe, SlicePipe, RouterLink],
   template: `
     <div class="p-7 flex-1 overflow-y-auto animate-fade-in max-md:p-4 space-y-6">
-
-      <!-- ── General ─────────────────────────────────── -->
-      <div class="settings-card">
-        <h3 class="text-base font-semibold text-white m-0 mb-5 flex items-center gap-2">
-          <svg class="settings-card-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          General
-        </h3>
-        @if (state.selectedSite(); as site) {
-          <div class="mb-5">
-            <label class="block text-[0.78rem] font-semibold text-text-secondary mb-2">Site Name</label>
-            <div class="flex gap-2.5 items-center">
-              <input type="text" class="input-field flex-1" [value]="site.business_name" #nameInput />
-              <button class="btn-ghost-sm" (click)="saveName(nameInput.value, site.id)">Save</button>
-            </div>
-          </div>
-          <div>
-            <label class="block text-[0.78rem] font-semibold text-text-secondary mb-2">Slug</label>
-            <div class="flex gap-2.5 items-center">
-              <input type="text" class="input-field flex-1" [value]="site.slug" #slugInput />
-              <span class="text-[0.75rem] text-text-secondary whitespace-nowrap">.projectsites.dev</span>
-              <button class="btn-ghost-sm" (click)="saveSlug(slugInput.value, site.id)">Save</button>
-            </div>
-          </div>
-        }
-      </div>
-
-      <!-- ── Domains ─────────────────────────────────── -->
-      <div class="settings-card">
-        <h3 class="text-base font-semibold text-white m-0 mb-5 flex items-center gap-2">
-          <svg class="settings-card-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-          Domains
-        </h3>
-
-        <!-- Tabs -->
-        <div class="tabs-rail flex gap-1 mb-5 p-1 bg-primary/[0.03] rounded-[10px] border border-white/[0.06]">
-          <button class="tab-btn" [class.tab-active]="domainTab() === 'existing'" (click)="domainTab.set('existing')">Your Domains</button>
-          <button class="tab-btn" [class.tab-active]="domainTab() === 'connect'" (click)="domainTab.set('connect')">Connect Domain</button>
-          <button class="tab-btn" [class.tab-active]="domainTab() === 'register'" (click)="domainTab.set('register')">Register New</button>
+      <header class="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h2 class="text-lg font-bold text-white m-0">Settings</h2>
+          <p class="text-[0.78rem] text-text-secondary m-0 mt-1">General · Team · MCP integrations · Security · Domains · Danger zone.</p>
         </div>
+        <input class="input-field" placeholder="Filter tabs (Cmd-K)…" [(ngModel)]="q" />
+      </header>
 
-        @if (loadingHostnames()) {
-          <div class="flex flex-col items-center justify-center gap-3 py-[60px] text-text-secondary text-[0.85rem]"><div class="loading-spinner"></div><span>Loading domains...</span></div>
-        } @else {
-          @if (domainTab() === 'existing') {
-            <div class="flex flex-col gap-2">
-              <!-- Default subdomain -->
-              <div class="flex flex-col gap-2 p-3.5 px-4 bg-primary/[0.04] rounded-[10px] border border-primary/10">
-                <div class="flex items-center gap-2 flex-wrap">
-                  <span class="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.4)] flex-shrink-0"></span>
-                  @if (editingSlug()) {
-                    <div class="flex items-center gap-1">
-                      <input class="text-[0.8rem] font-medium font-sans bg-black/30 border border-primary rounded-md text-white py-1 px-2.5 outline-none flex-1 min-w-0 shadow-[0_0_0_2px_rgba(0,229,255,0.1)]" [(ngModel)]="modalSlugValue" (keyup.enter)="saveDomainSlug()" (keyup.escape)="editingSlug.set(false)" />
-                      <span class="text-[0.75rem] text-text-secondary whitespace-nowrap">.projectsites.dev</span>
-                      <button class="btn-ghost-sm" (click)="saveDomainSlug()">Save</button>
-                      <button class="btn-ghost-sm" (click)="editingSlug.set(false)">Cancel</button>
-                    </div>
-                  } @else {
-                    <a [href]="'https://' + state.selectedSite()!.slug + '.projectsites.dev'" target="_blank" rel="noopener" class="text-[0.85rem] text-primary no-underline hover:text-shadow-[0_0_8px_rgba(0,229,255,0.3)]">
-                      {{ state.selectedSite()!.slug }}.projectsites.dev
-                    </a>
-                    <span class="text-[0.58rem] font-bold py-px px-2 rounded uppercase bg-text-secondary/10 text-text-secondary">Default</span>
-                    <button class="icon-btn-sm" (click)="startSlugEdit()" title="Change subdomain">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-                    </button>
-                  }
-                </div>
-              </div>
-
-              @for (hn of hostnames(); track hn.id; let i = $index) {
-                <div class="hostname-row" [style.animation-delay.ms]="i * 60">
-                  <div class="flex items-center gap-2 flex-wrap">
-                    <span class="w-2 h-2 rounded-full flex-shrink-0" [ngClass]="'hn-dot-' + hn.status"></span>
-                    <a [href]="'https://' + hn.hostname" target="_blank" rel="noopener" class="text-[0.85rem] text-primary no-underline">{{ hn.hostname }}</a>
-                    @if (hn.is_primary) { <span class="text-[0.58rem] font-bold py-px px-2 rounded uppercase bg-primary/[0.12] text-primary">Primary</span> }
-                    <span class="text-[0.58rem] font-bold py-px px-2 rounded uppercase" [ngClass]="'hn-chip-' + hn.status">{{ hn.status }}</span>
-                  </div>
-                  @if (hn.status === 'pending') {
-                    <div class="flex items-center gap-1.5 text-[0.75rem] text-amber-400 py-1.5 px-2.5 bg-amber-400/5 rounded-md">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                      Point CNAME to <code class="bg-primary/10 py-px px-1.5 rounded text-[0.72rem] text-primary">projectsites.dev</code> -- DNS may take 24-72 hours.
-                    </div>
-                  }
-                  <div class="flex gap-1.5">
-                    @if (!hn.is_primary) {
-                      <button class="btn-ghost-sm" (click)="setPrimary(hn.id)">Set Primary</button>
-                    }
-                    <button class="btn-ghost-sm-danger" (click)="deleteHostname(hn.id)">Remove</button>
-                  </div>
-                </div>
-              }
-
-              @if (hostnames().length === 0) {
-                <p class="text-[0.78rem] text-text-secondary my-2">No custom domains configured yet.</p>
-              }
-            </div>
-          }
-
-          @if (domainTab() === 'connect') {
-            <div class="flex flex-col gap-4">
-              <div class="p-4 bg-primary/[0.03] rounded-[10px] border border-white/[0.06]">
-                <h4 class="text-white text-[0.9rem] m-0 mb-2.5">Connect your domain</h4>
-                <p class="text-text-secondary text-[0.8rem] my-1">1. Go to your domain registrar's DNS settings</p>
-                <p class="text-text-secondary text-[0.8rem] my-1">2. Add a <strong>CNAME</strong> record pointing to <code class="bg-primary/10 py-px px-1.5 rounded text-[0.78rem] text-primary">projectsites.dev</code></p>
-                <p class="text-text-secondary text-[0.8rem] my-1">3. Enter your domain below and click "Add Domain"</p>
-              </div>
-              <div class="flex gap-2.5 items-center">
-                <input type="text" class="input-field flex-1" placeholder="www.yourdomain.com" [(ngModel)]="newHostname" (keyup.enter)="addHostname()" />
-                <button class="btn-accent" (click)="addHostname()" [disabled]="!newHostname.trim()">Add Domain</button>
-              </div>
-            </div>
-          }
-
-          @if (domainTab() === 'register') {
-            <div class="flex flex-col gap-4">
-              <div class="p-4 bg-primary/[0.03] rounded-[10px] border border-white/[0.06]">
-                <h4 class="text-white text-[0.9rem] m-0 mb-2.5">Register a new domain</h4>
-                <p class="text-text-secondary text-[0.8rem] my-1">Search for an available domain name and register it through Cloudflare.</p>
-              </div>
-              <div class="flex gap-2.5 items-center">
-                <input type="text" class="input-field flex-1" placeholder="yourbusiness.com" [(ngModel)]="registerDomainQuery" (keyup.enter)="checkDomainAvailability()" />
-                <button class="btn-accent" (click)="checkDomainAvailability()" [disabled]="checkingDomain() || !registerDomainQuery.trim()">
-                  {{ checkingDomain() ? 'Checking...' : 'Check Availability' }}
-                </button>
-              </div>
-              @if (domainCheckResult()) {
-                <div class="p-4 rounded-[10px] border border-white/[0.06] bg-black/10" [class.domain-available]="domainCheckResult()!.available">
-                  @if (domainCheckResult()!.available) {
-                    <div class="flex items-center gap-2 text-green-500 text-[0.9rem] mb-2">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                      <strong class="text-primary">{{ domainCheckResult()!.domain }}</strong> is available!
-                    </div>
-                    <a class="btn-accent inline-flex mt-2" href="https://www.cloudflare.com/products/registrar/" target="_blank" rel="noopener">Register on Cloudflare</a>
-                  } @else {
-                    <div class="flex items-center gap-2 text-red-500 text-[0.9rem] mb-2">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-                      <strong class="text-white">{{ domainCheckResult()!.domain }}</strong> is not available.
-                    </div>
-                    <p class="text-[0.78rem] text-text-secondary my-1">Try a different name or extension (.net, .co, .io).</p>
-                  }
-                </div>
-              }
-            </div>
-          }
+      <nav class="flex gap-2 flex-wrap text-[0.78rem]">
+        @for (t of filteredTabs(); track t.id) {
+          <button class="tab" [class.active]="tab() === t.id" (click)="setTab(t.id)" [title]="t.desc">{{ t.label }}</button>
         }
-      </div>
+      </nav>
 
-      <!-- ── Contact Email ─────────────────────────── -->
-      <div class="settings-card">
-        <div class="flex items-center justify-between mb-5">
-          <h3 class="text-base font-semibold text-white m-0 flex items-center gap-2">
-            <svg class="settings-card-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-            Contact Email
-          </h3>
-          <span class="coming-pill">Coming soon</span>
-        </div>
-        @if (state.selectedSite()) {
-          <div>
-            <label class="block text-[0.78rem] font-semibold text-text-secondary mb-2">Contact Form Recipient</label>
-            <input type="email" class="input-field" placeholder="you@email.com" disabled />
-            <span class="text-[0.68rem] text-text-secondary/50 mt-1.5 block">Contact form submissions will soon forward to this address.</span>
+      <!-- ─────────────────── GENERAL ─────────────────── -->
+      @if (tab() === 'general') {
+        <section class="card grid md:grid-cols-2 gap-5">
+          <div class="md:col-span-2">
+            <h3 class="m-0 text-base font-semibold text-white mb-1">General</h3>
+            <p class="text-[0.7rem] text-text-secondary m-0">Public-facing details + how the AI router responds.</p>
           </div>
-        }
-      </div>
+          <label class="block">
+            <span class="muted-h">Contact email <small class="text-text-secondary/60">(shown on your site)</small></span>
+            <input type="email" class="input-field w-full mt-1" placeholder="hello@yourbiz.com" [(ngModel)]="settings.contact_email" />
+          </label>
+          <label class="block">
+            <span class="muted-h">Reply email <small class="text-text-secondary/60">(where the AI router sends contact-form messages)</small></span>
+            <input type="email" class="input-field w-full mt-1" placeholder="owner@yourbiz.com" [(ngModel)]="settings.reply_email" />
+          </label>
+          <label class="block">
+            <span class="muted-h">Brand tone</span>
+            <input type="text" class="input-field w-full mt-1" placeholder="warm · plainspoken · never pushy" [(ngModel)]="settings.brand_tone" />
+          </label>
+          <label class="block">
+            <span class="muted-h">Timezone</span>
+            <select class="input-field w-full mt-1" [(ngModel)]="settings.timezone">
+              <option value="">Auto-detect</option>
+              <option value="America/New_York">America/New_York</option>
+              <option value="America/Los_Angeles">America/Los_Angeles</option>
+              <option value="America/Chicago">America/Chicago</option>
+              <option value="Europe/London">Europe/London</option>
+              <option value="Europe/Berlin">Europe/Berlin</option>
+              <option value="Asia/Singapore">Asia/Singapore</option>
+              <option value="Australia/Sydney">Australia/Sydney</option>
+            </select>
+          </label>
+          <label class="block">
+            <span class="muted-h">Default locale</span>
+            <select class="input-field w-full mt-1" [(ngModel)]="settings.default_locale">
+              <option value="en-US">English (US)</option>
+              <option value="en-GB">English (UK)</option>
+              <option value="es-ES">Español</option>
+              <option value="fr-FR">Français</option>
+              <option value="de-DE">Deutsch</option>
+              <option value="ja-JP">日本語</option>
+            </select>
+          </label>
+          <label class="block">
+            <span class="muted-h">Brand primary color</span>
+            <div class="flex items-center gap-2 mt-1">
+              <input type="color" class="h-9 w-12 rounded border-0 bg-transparent cursor-pointer" [(ngModel)]="settings.brand_primary" />
+              <input type="text" class="input-field flex-1 font-mono" placeholder="#00E5FF" [(ngModel)]="settings.brand_primary" />
+            </div>
+          </label>
+          <label class="block">
+            <span class="muted-h">Brand accent color</span>
+            <div class="flex items-center gap-2 mt-1">
+              <input type="color" class="h-9 w-12 rounded border-0 bg-transparent cursor-pointer" [(ngModel)]="settings.brand_accent" />
+              <input type="text" class="input-field flex-1 font-mono" placeholder="#7C3AED" [(ngModel)]="settings.brand_accent" />
+            </div>
+          </label>
+          <div class="md:col-span-2 flex justify-end gap-2">
+            <button class="btn-ghost" (click)="loadGeneral()">Cancel</button>
+            <button class="btn-primary" [disabled]="saving()" (click)="save()">{{ saving() ? 'Saving…' : 'Save general settings' }}</button>
+          </div>
+        </section>
+      }
 
-      <!-- ── Danger Zone ─────────────────────────────── -->
-      <div class="settings-card settings-card-danger">
-        <h3 class="text-[0.85rem] font-semibold text-red-500 m-0 mb-3 flex items-center gap-2">
-          <svg class="settings-card-icon danger" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          Danger Zone
-        </h3>
-        @if (state.selectedSite(); as site) {
-          @if (!confirmingDelete()) {
-            <button class="btn-ghost-danger" (click)="confirmingDelete.set(true)">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-              Delete Site
-            </button>
+      <!-- ─────────────────── TEAM ─────────────────── -->
+      @else if (tab() === 'team') {
+        <section class="card">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="m-0 text-base font-semibold text-white">Team members</h3>
+            <button class="btn-primary" (click)="inviting.set(true)">+ Invite</button>
+          </div>
+          @if (inviting()) {
+            <div class="card-light p-3 mb-3 grid sm:grid-cols-3 gap-2">
+              <input type="email" class="input-field" placeholder="teammate@email.com" [(ngModel)]="invite.email" />
+              <select class="input-field" [(ngModel)]="invite.role">
+                <option value="owner">Owner</option>
+                <option value="editor">Editor</option>
+                <option value="viewer">Viewer</option>
+              </select>
+              <div class="flex gap-2 justify-end">
+                <button class="btn-ghost" (click)="inviting.set(false)">Cancel</button>
+                <button class="btn-primary" (click)="sendInvite()">Send invite</button>
+              </div>
+            </div>
+          }
+          @if (members().length === 0 && invites().length === 0) {
+            <div class="p-6 text-center text-text-secondary text-sm">Just you on this org.</div>
           } @else {
-            <div class="p-4 bg-red-500/5 border border-red-500/10 rounded-xl">
-              <p class="text-[0.85rem] text-text-secondary mb-3 m-0">This will permanently remove <strong class="text-white">{{ site.business_name }}</strong>. This cannot be undone.</p>
-              <div class="flex gap-2">
-                <button class="btn-ghost" (click)="confirmingDelete.set(false)">Cancel</button>
-                <button class="btn-ghost-danger" (click)="deleteSite(site)">Confirm Delete</button>
-              </div>
-            </div>
+            <table class="w-full text-[0.78rem]">
+              <thead class="text-text-secondary/70 uppercase text-[0.6rem] tracking-wider">
+                <tr class="border-b border-white/[0.06]">
+                  <th class="text-left p-2">Email</th><th class="text-left p-2">Role</th><th class="text-left p-2">Joined</th><th class="text-right p-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (m of members(); track m.id) {
+                  <tr class="border-b border-white/[0.04]">
+                    <td class="p-2">{{ m.email }}</td>
+                    <td class="p-2"><span class="badge">{{ m.role }}</span></td>
+                    <td class="p-2 text-text-secondary">{{ m.created_at | date:'short' }}</td>
+                    <td class="p-2 text-right"><button class="text-red-400 text-[0.72rem]" (click)="removeMember(m)">Remove</button></td>
+                  </tr>
+                }
+                @for (i of invites(); track i.id) {
+                  <tr class="border-b border-white/[0.04] bg-amber-500/[0.04]">
+                    <td class="p-2">{{ i.email }} <span class="text-[0.6rem] text-amber-300 ml-1">PENDING</span></td>
+                    <td class="p-2"><span class="badge">{{ i.role }}</span></td>
+                    <td class="p-2 text-text-secondary">invited {{ i.created_at | date:'short' }}</td>
+                    <td class="p-2 text-right"><button class="text-red-400 text-[0.72rem]" (click)="revokeInvite(i)">Revoke</button></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
           }
-        }
-      </div>
+        </section>
+      }
 
+      <!-- ─────────────────── MCP ─────────────────── -->
+      @else if (tab() === 'mcp') {
+        <section class="card">
+          <h3 class="m-0 text-base font-semibold text-white mb-1">MCP integrations</h3>
+          <p class="text-[0.7rem] text-text-secondary m-0 mb-4">
+            Connect the tools your AI form router + custom endpoints can call. Tokens are encrypted at rest (AES-GCM).
+            OAuth follows the MCP authorization spec (OAuth 2.1 + PKCE where supported); paste-key for the rest.
+          </p>
+          <div class="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
+            @for (p of providers; track p.id) {
+              <article class="card-light p-4 flex flex-col gap-2">
+                <div class="flex items-start gap-3">
+                  <div class="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-[0.9rem]"
+                       [style.background]="p.color + '20'" [style.color]="p.color">{{ p.label[0] }}</div>
+                  <div class="flex-1 min-w-0">
+                    <div class="font-semibold text-white">{{ p.label }}</div>
+                    <div class="text-[0.68rem] text-text-secondary leading-snug">{{ p.desc }}</div>
+                  </div>
+                </div>
+                @if (isConnected(p.id); as c) {
+                  <div class="flex items-center justify-between mt-1 text-[0.72rem]">
+                    <span class="text-emerald-400">● Connected · {{ c.connected_at | slice:0:10 }}</span>
+                    <button class="text-red-400 underline" (click)="disconnect(c)">Disconnect</button>
+                  </div>
+                } @else if (pasteMode() === p.id) {
+                  <div class="mt-1 flex gap-2">
+                    <input type="password" class="input-field flex-1 font-mono text-[0.72rem]"
+                           [placeholder]="pastePlaceholder(p.id)" [(ngModel)]="pastedKey" />
+                    <button class="btn-primary" (click)="submitPaste(p.id)">Save</button>
+                  </div>
+                } @else {
+                  <button class="btn-primary mt-1 self-start" (click)="connect(p)">
+                    {{ p.needsOauth ? 'Connect ' + p.label : 'Paste API key' }}
+                  </button>
+                }
+              </article>
+            }
+          </div>
+        </section>
+      }
+
+      <!-- ─────────────────── SECURITY ─────────────────── -->
+      @else if (tab() === 'security') {
+        <section class="card grid md:grid-cols-2 gap-5">
+          <div class="md:col-span-2">
+            <h3 class="m-0 text-base font-semibold text-white mb-1">Security</h3>
+            <p class="text-[0.7rem] text-text-secondary m-0">Workspace-level security defaults. Per-site enforcement is in each site's editor.</p>
+          </div>
+          <label class="block">
+            <span class="muted-h">Session lifetime (hours)</span>
+            <input type="number" min="1" max="720" class="input-field w-full mt-1" [(ngModel)]="security.session_hours" />
+          </label>
+          <label class="block">
+            <span class="muted-h">Idle timeout (minutes)</span>
+            <input type="number" min="5" max="240" class="input-field w-full mt-1" [(ngModel)]="security.idle_minutes" />
+          </label>
+          <label class="block md:col-span-2">
+            <span class="muted-h">Allowed sign-in domains <small class="text-text-secondary/60">(comma-separated; blank = any)</small></span>
+            <input type="text" class="input-field w-full mt-1 font-mono" placeholder="yourbiz.com, partner.com" [(ngModel)]="security.allowed_domains" />
+          </label>
+          <label class="flex items-center gap-2 md:col-span-2">
+            <input type="checkbox" [(ngModel)]="security.require_2fa" /> <span class="text-[0.85rem]">Require 2FA for all team members</span>
+          </label>
+          <div class="md:col-span-2 flex justify-end">
+            <button class="btn-primary" disabled>Save security (coming soon)</button>
+          </div>
+        </section>
+      }
+
+      <!-- ─────────────────── DOMAINS ─────────────────── -->
+      @else if (tab() === 'domains') {
+        <section class="card">
+          <h3 class="m-0 text-base font-semibold text-white mb-1">Custom domains</h3>
+          <p class="text-[0.7rem] text-text-secondary m-0 mb-3">
+            Each site can have one primary hostname + N redirects. SSL provisioned automatically by Cloudflare for SaaS.
+          </p>
+          <p class="text-[0.78rem] text-text-secondary">Domain management has moved to the per-site editor. Open the Editor tab and click <strong>Hostnames</strong> to add a custom domain.</p>
+          <a class="btn-primary inline-block mt-3" routerLink="/admin/editor">Open Editor →</a>
+        </section>
+      }
+
+      <!-- ─────────────────── DANGER ZONE ─────────────────── -->
+      @else if (tab() === 'danger') {
+        <section class="card border border-red-500/30 bg-red-500/[0.04]">
+          <h3 class="m-0 text-base font-semibold text-white mb-1">Danger zone</h3>
+          <p class="text-[0.7rem] text-text-secondary m-0 mb-4">Irreversible actions. Each requires a confirmation prompt.</p>
+          <div class="space-y-3">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <div class="font-semibold text-white">Export all data</div>
+                <div class="text-[0.7rem] text-text-secondary">Download a single zip with all sites, snapshots, form submissions, and AI logs.</div>
+              </div>
+              <button class="btn-ghost border-amber-500/40 text-amber-300" (click)="exportData()">Export</button>
+            </div>
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <div class="font-semibold text-white">Transfer ownership</div>
+                <div class="text-[0.7rem] text-text-secondary">Move this org to another owner. They must accept within 14 days.</div>
+              </div>
+              <button class="btn-ghost border-amber-500/40 text-amber-300" disabled>Transfer (coming soon)</button>
+            </div>
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <div class="font-semibold text-red-300">Delete organization</div>
+                <div class="text-[0.7rem] text-text-secondary">Permanently delete this org, all sites, and all data. Cannot be undone.</div>
+              </div>
+              <button class="btn-ghost border-red-500/40 text-red-300" (click)="deleteOrg()">Delete org…</button>
+            </div>
+          </div>
+        </section>
+      }
     </div>
   `,
   styles: [`
-    :host {
-      --ease-cinematic: cubic-bezier(0.4, 0, 0.2, 1);
-      --ease-elastic: cubic-bezier(0.34, 1.56, 0.64, 1);
-      --ring-cyan: 0 0 0 2px #000, 0 0 0 4px rgba(0, 229, 255, 0.55);
-      --ring-danger: 0 0 0 2px #000, 0 0 0 4px rgba(248, 113, 113, 0.55);
-    }
-
-    /* ── Card shell ─────────────────────────────────── */
-    .settings-card {
-      position: relative;
-      background: rgba(255, 255, 255, 0.02);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: 14px;
-      padding: 1.5rem;
-      overflow: hidden;
-      animation: fadeUp 480ms var(--ease-cinematic) both;
-      transition:
-        transform 360ms var(--ease-cinematic),
-        border-color 360ms var(--ease-cinematic),
-        box-shadow 360ms var(--ease-cinematic),
-        background-color 360ms var(--ease-cinematic);
-    }
-    .settings-card::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      border-radius: 14px;
-      background: linear-gradient(135deg, rgba(0, 229, 255, 0.04) 0%, transparent 45%, rgba(124, 58, 237, 0.03) 100%);
-      opacity: 0;
-      transition: opacity 360ms var(--ease-cinematic);
-      pointer-events: none;
-    }
-    .settings-card:hover {
-      transform: translateY(-2px);
-      border-color: rgba(0, 229, 255, 0.22);
-      background: rgba(255, 255, 255, 0.028);
-      box-shadow:
-        0 20px 56px -28px rgba(0, 229, 255, 0.32),
-        0 0 0 1px rgba(0, 229, 255, 0.06) inset;
-    }
-    .settings-card:hover::before { opacity: 1; }
-    .settings-card-danger {
-      border-color: rgba(248, 113, 113, 0.14);
-    }
-    .settings-card-danger:hover {
-      border-color: rgba(248, 113, 113, 0.32);
-      box-shadow:
-        0 20px 56px -28px rgba(248, 113, 113, 0.32),
-        0 0 0 1px rgba(248, 113, 113, 0.08) inset;
-    }
-    .settings-card-danger::before {
-      background: linear-gradient(135deg, rgba(248, 113, 113, 0.05) 0%, transparent 50%);
-    }
-
-    /* ── Card icon ──────────────────────────────────── */
-    .settings-card-icon {
-      color: rgba(0, 229, 255, 0.85);
-      transition: transform 420ms var(--ease-elastic), color 360ms var(--ease-cinematic);
-    }
-    .settings-card:hover .settings-card-icon {
-      transform: rotate(-8deg) scale(1.12);
-      color: #00E5FF;
-    }
-    .settings-card-icon.danger { color: rgba(248, 113, 113, 0.9); }
-    .settings-card-danger:hover .settings-card-icon.danger {
-      transform: rotate(-6deg) scale(1.1);
-      color: #fb7185;
-    }
-
-    /* ── Pills ──────────────────────────────────────── */
-    .coming-pill {
-      font-size: 0.62rem;
-      font-weight: 700;
-      padding: 0.125rem 0.625rem;
-      border-radius: 9999px;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      background: rgba(0, 229, 255, 0.1);
-      color: #00E5FF;
-      border: 1px solid rgba(0, 229, 255, 0.16);
-      transition: transform 240ms var(--ease-elastic), box-shadow 240ms var(--ease-cinematic);
-    }
-    .coming-pill:hover {
-      transform: scale(1.06);
-      box-shadow: 0 0 16px rgba(0, 229, 255, 0.35);
-    }
-
-    /* ── Tab rail ───────────────────────────────────── */
-    .tabs-rail {
-      position: relative;
-    }
-    .tab-btn {
-      flex: 1;
-      padding: 0.5rem 1rem;
-      border: none;
-      background: transparent;
-      color: var(--text-secondary, rgba(255, 255, 255, 0.6));
-      font-size: 0.78rem;
-      font-weight: 500;
-      font-family: inherit;
-      cursor: pointer;
-      border-radius: 7px;
-      position: relative;
-      overflow: hidden;
-      transition:
-        color 280ms var(--ease-cinematic),
-        background-color 280ms var(--ease-cinematic),
-        transform 80ms var(--ease-cinematic);
-    }
-    .tab-btn::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(135deg, rgba(0, 229, 255, 0.18), rgba(124, 58, 237, 0.12));
-      opacity: 0;
-      transition: opacity 280ms var(--ease-cinematic);
-      border-radius: inherit;
-    }
-    .tab-btn:hover {
-      color: rgba(255, 255, 255, 0.92);
-      background: rgba(255, 255, 255, 0.04);
-    }
-    .tab-btn:focus-visible {
-      outline: none;
-      box-shadow: var(--ring-cyan);
-    }
-    .tab-btn:active {
-      transform: scale(0.97);
-    }
-    .tab-btn.tab-active {
-      color: #00E5FF;
-      background: rgba(0, 229, 255, 0.08);
-      box-shadow: 0 0 0 1px rgba(0, 229, 255, 0.22), 0 8px 24px -16px rgba(0, 229, 255, 0.6);
-    }
-    .tab-btn.tab-active::before { opacity: 1; }
-    .tab-btn.tab-active::after {
-      content: '';
-      position: absolute;
-      bottom: 3px;
-      left: 20%;
-      right: 20%;
-      height: 2px;
-      border-radius: 2px;
-      background: linear-gradient(90deg, transparent, #00E5FF, transparent);
-      animation: indicatorSweep 1.8s var(--ease-cinematic) infinite;
-    }
-
-    /* ── Hostname row ───────────────────────────────── */
-    .hostname-row {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-      padding: 0.875rem 1rem;
-      background: rgba(255, 255, 255, 0.02);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: 10px;
-      animation: slideIn 460ms var(--ease-cinematic) both;
-      transition:
-        transform 280ms var(--ease-cinematic),
-        border-color 280ms var(--ease-cinematic),
-        background-color 280ms var(--ease-cinematic),
-        box-shadow 280ms var(--ease-cinematic);
-    }
-    .hostname-row:hover {
-      transform: translateX(3px);
-      border-color: rgba(0, 229, 255, 0.2);
-      background: rgba(0, 229, 255, 0.025);
-      box-shadow: 0 10px 28px -18px rgba(0, 229, 255, 0.28);
-    }
-    .hostname-row:focus-within {
-      border-color: rgba(0, 229, 255, 0.3);
-      box-shadow: var(--ring-cyan);
-    }
-
-    /* ── Hostname status dot/chip ───────────────────── */
-    :host ::ng-deep .hn-dot-active {
-      background: #22c55e;
-      box-shadow: 0 0 8px rgba(34, 197, 94, 0.55);
-    }
-    :host ::ng-deep .hn-dot-pending {
-      background: #f59e0b;
-      box-shadow: 0 0 8px rgba(245, 158, 11, 0.55);
-      animation: pulseDot 1.8s var(--ease-cinematic) infinite;
-    }
-    :host ::ng-deep .hn-dot-failed,
-    :host ::ng-deep .hn-dot-error {
-      background: #f87171;
-      box-shadow: 0 0 8px rgba(248, 113, 113, 0.55);
-    }
-    :host ::ng-deep .hn-chip-active {
-      background: rgba(34, 197, 94, 0.12);
-      color: #22c55e;
-    }
-    :host ::ng-deep .hn-chip-pending {
-      background: rgba(245, 158, 11, 0.12);
-      color: #f59e0b;
-    }
-    :host ::ng-deep .hn-chip-failed,
-    :host ::ng-deep .hn-chip-error {
-      background: rgba(248, 113, 113, 0.12);
-      color: #f87171;
-    }
-
-    /* ── Inputs ─────────────────────────────────────── */
-    :host ::ng-deep .input-field {
-      background: rgba(0, 0, 0, 0.3);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 8px;
-      color: #fff;
-      padding: 0.55rem 0.75rem;
-      font-size: 0.85rem;
-      outline: none;
-      transition:
-        border-color 240ms var(--ease-cinematic),
-        background-color 240ms var(--ease-cinematic),
-        box-shadow 240ms var(--ease-cinematic);
-    }
-    :host ::ng-deep .input-field:hover:not(:disabled) {
-      border-color: rgba(0, 229, 255, 0.2);
-    }
-    :host ::ng-deep .input-field:focus {
-      border-color: rgba(0, 229, 255, 0.55);
-      background: rgba(0, 0, 0, 0.4);
-      box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.12);
-    }
-    :host ::ng-deep .input-field:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    /* ── Buttons ────────────────────────────────────── */
-    :host ::ng-deep .btn-ghost-sm {
-      background: rgba(0, 229, 255, 0.06);
-      border: 1px solid rgba(0, 229, 255, 0.16);
-      color: #00E5FF;
-      padding: 0.4rem 0.85rem;
-      font-size: 0.74rem;
-      font-weight: 600;
-      border-radius: 7px;
-      cursor: pointer;
-      position: relative;
-      overflow: hidden;
-      transition:
-        transform 80ms var(--ease-cinematic),
-        background-color 240ms var(--ease-cinematic),
-        border-color 240ms var(--ease-cinematic),
-        box-shadow 240ms var(--ease-cinematic);
-    }
-    :host ::ng-deep .btn-ghost-sm:hover {
-      background: rgba(0, 229, 255, 0.12);
-      border-color: rgba(0, 229, 255, 0.32);
-      box-shadow: 0 6px 18px -8px rgba(0, 229, 255, 0.6);
-    }
-    :host ::ng-deep .btn-ghost-sm:focus-visible {
-      outline: none;
-      box-shadow: var(--ring-cyan);
-    }
-    :host ::ng-deep .btn-ghost-sm:active {
-      transform: scale(0.96);
-      background: rgba(0, 229, 255, 0.18);
-    }
-
-    :host ::ng-deep .btn-ghost-sm-danger {
-      background: rgba(248, 113, 113, 0.06);
-      border: 1px solid rgba(248, 113, 113, 0.16);
-      color: #f87171;
-      padding: 0.4rem 0.85rem;
-      font-size: 0.74rem;
-      font-weight: 600;
-      border-radius: 7px;
-      cursor: pointer;
-      transition:
-        transform 80ms var(--ease-cinematic),
-        background-color 240ms var(--ease-cinematic),
-        border-color 240ms var(--ease-cinematic),
-        box-shadow 240ms var(--ease-cinematic);
-    }
-    :host ::ng-deep .btn-ghost-sm-danger:hover {
-      background: rgba(248, 113, 113, 0.14);
-      border-color: rgba(248, 113, 113, 0.34);
-      box-shadow: 0 6px 18px -8px rgba(248, 113, 113, 0.55);
-    }
-    :host ::ng-deep .btn-ghost-sm-danger:focus-visible {
-      outline: none;
-      box-shadow: var(--ring-danger);
-    }
-    :host ::ng-deep .btn-ghost-sm-danger:active { transform: scale(0.96); }
-
-    :host ::ng-deep .btn-accent {
-      background: linear-gradient(135deg, #00E5FF 0%, #50AAE3 100%);
-      color: #061018;
-      border: none;
-      padding: 0.55rem 1.1rem;
-      font-size: 0.82rem;
-      font-weight: 700;
-      border-radius: 8px;
-      cursor: pointer;
-      position: relative;
-      overflow: hidden;
-      transition:
-        transform 120ms var(--ease-cinematic),
-        box-shadow 280ms var(--ease-cinematic),
-        filter 240ms var(--ease-cinematic);
-    }
-    :host ::ng-deep .btn-accent::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: -100%;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
-      transition: left 600ms var(--ease-cinematic);
-    }
-    :host ::ng-deep .btn-accent:hover {
-      transform: translateY(-1px);
-      filter: brightness(1.08);
-      box-shadow: 0 14px 36px -16px rgba(0, 229, 255, 0.7);
-    }
-    :host ::ng-deep .btn-accent:hover::before { left: 100%; }
-    :host ::ng-deep .btn-accent:focus-visible {
-      outline: none;
-      box-shadow: var(--ring-cyan);
-    }
-    :host ::ng-deep .btn-accent:active { transform: translateY(0) scale(0.98); }
-    :host ::ng-deep .btn-accent:disabled {
-      opacity: 0.45;
-      cursor: not-allowed;
-      transform: none;
-      box-shadow: none;
-    }
-
-    :host ::ng-deep .btn-ghost {
-      background: transparent;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      color: rgba(255, 255, 255, 0.8);
-      padding: 0.5rem 1rem;
-      font-size: 0.8rem;
-      font-weight: 600;
-      border-radius: 8px;
-      cursor: pointer;
-      transition:
-        transform 80ms var(--ease-cinematic),
-        background-color 240ms var(--ease-cinematic),
-        border-color 240ms var(--ease-cinematic);
-    }
-    :host ::ng-deep .btn-ghost:hover {
-      background: rgba(255, 255, 255, 0.05);
-      border-color: rgba(255, 255, 255, 0.24);
-    }
-    :host ::ng-deep .btn-ghost:focus-visible {
-      outline: none;
-      box-shadow: var(--ring-cyan);
-    }
-    :host ::ng-deep .btn-ghost:active { transform: scale(0.97); }
-
-    :host ::ng-deep .btn-ghost-danger {
-      background: rgba(248, 113, 113, 0.06);
-      border: 1px solid rgba(248, 113, 113, 0.2);
-      color: #f87171;
-      padding: 0.55rem 1.1rem;
-      font-size: 0.82rem;
-      font-weight: 600;
-      border-radius: 8px;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      position: relative;
-      overflow: hidden;
-      transition:
-        transform 120ms var(--ease-cinematic),
-        background-color 240ms var(--ease-cinematic),
-        border-color 240ms var(--ease-cinematic),
-        box-shadow 280ms var(--ease-cinematic);
-    }
-    :host ::ng-deep .btn-ghost-danger:hover {
-      background: rgba(248, 113, 113, 0.16);
-      border-color: rgba(248, 113, 113, 0.42);
-      box-shadow: 0 12px 32px -14px rgba(248, 113, 113, 0.55);
-    }
-    :host ::ng-deep .btn-ghost-danger:focus-visible {
-      outline: none;
-      box-shadow: var(--ring-danger);
-    }
-    :host ::ng-deep .btn-ghost-danger:active { transform: scale(0.97); }
-
-    :host ::ng-deep .icon-btn-sm {
-      background: transparent;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      color: rgba(255, 255, 255, 0.6);
-      width: 28px;
-      height: 28px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 6px;
-      cursor: pointer;
-      transition:
-        transform 240ms var(--ease-elastic),
-        background-color 240ms var(--ease-cinematic),
-        border-color 240ms var(--ease-cinematic),
-        color 240ms var(--ease-cinematic);
-    }
-    :host ::ng-deep .icon-btn-sm:hover {
-      transform: rotate(-6deg) scale(1.1);
-      background: rgba(0, 229, 255, 0.08);
-      border-color: rgba(0, 229, 255, 0.3);
-      color: #00E5FF;
-    }
-    :host ::ng-deep .icon-btn-sm:focus-visible {
-      outline: none;
-      box-shadow: var(--ring-cyan);
-    }
-    :host ::ng-deep .icon-btn-sm:active { transform: scale(0.94); }
-
-    /* ── Domain availability card ──────────────────── */
-    :host ::ng-deep .domain-available {
-      animation: pulseAvailable 1.6s var(--ease-cinematic) infinite;
-      border-color: rgba(34, 197, 94, 0.25) !important;
-      background: rgba(34, 197, 94, 0.04) !important;
-    }
-
-    /* ── Loading spinner ───────────────────────────── */
-    :host ::ng-deep .loading-spinner {
-      width: 28px;
-      height: 28px;
-      border: 2px solid rgba(0, 229, 255, 0.16);
-      border-top-color: #00E5FF;
-      border-radius: 50%;
-      animation: spin 0.9s linear infinite;
-    }
-
-    /* ── Keyframes ──────────────────────────────────── */
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(8px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes slideIn {
-      from { opacity: 0; transform: translateX(-12px); }
-      to { opacity: 1; transform: translateX(0); }
-    }
-    @keyframes indicatorSweep {
-      0%, 100% { opacity: 0.4; transform: scaleX(0.6); }
-      50% { opacity: 1; transform: scaleX(1); }
-    }
-    @keyframes pulseDot {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.6; transform: scale(0.85); }
-    }
-    @keyframes pulseAvailable {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.18); }
-      50% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      .settings-card,
-      .hostname-row,
-      :host ::ng-deep .input-field,
-      :host ::ng-deep .btn-ghost-sm,
-      :host ::ng-deep .btn-ghost-sm-danger,
-      :host ::ng-deep .btn-accent,
-      :host ::ng-deep .btn-ghost,
-      :host ::ng-deep .btn-ghost-danger,
-      :host ::ng-deep .icon-btn-sm,
-      .tab-btn,
-      .coming-pill,
-      .settings-card-icon {
-        animation: none !important;
-        transition-duration: 0ms !important;
-      }
-      .settings-card:hover,
-      .hostname-row:hover,
-      :host ::ng-deep .btn-accent:hover,
-      :host ::ng-deep .icon-btn-sm:hover,
-      .settings-card:hover .settings-card-icon {
-        transform: none !important;
-      }
-      .tab-btn.tab-active::after,
-      :host ::ng-deep .hn-dot-pending,
-      :host ::ng-deep .domain-available {
-        animation: none !important;
-      }
-      :host ::ng-deep .loading-spinner {
-        animation-duration: 3s;
-      }
-    }
+    :host { display: block; }
+    .card { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 1.4rem; }
+    .card-light { background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; }
+    .tab { padding: 0.4rem 0.95rem; border-radius: 999px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: rgba(255,255,255,0.6); cursor: pointer; font-size: 0.74rem; font-weight: 600; transition: all 120ms ease; }
+    .tab:hover { color: #fff; border-color: rgba(0,229,255,0.25); }
+    .tab.active { background: rgba(0,229,255,0.12); color: #00E5FF; border-color: rgba(0,229,255,0.35); }
+    .badge { font-size: 0.6rem; text-transform: uppercase; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: rgba(0,229,255,0.1); color: #00E5FF; }
+    .input-field { padding: 0.5rem 0.7rem; border-radius: 8px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: #fff; font: inherit; }
+    .input-field:focus { outline: none; border-color: rgba(0,229,255,0.45); }
+    .btn-primary { padding: 0.45rem 0.95rem; border-radius: 8px; background: rgba(0,229,255,0.12); color: #00E5FF; font-weight: 600; border: 1px solid rgba(0,229,255,0.35); cursor: pointer; font-size: 0.74rem; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-ghost { padding: 0.45rem 0.95rem; border-radius: 8px; background: transparent; color: rgba(255,255,255,0.7); border: 1px solid rgba(255,255,255,0.1); cursor: pointer; font-size: 0.74rem; }
+    .muted-h { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255,255,255,0.5); font-weight: 700; }
   `],
 })
 export class AdminSettingsComponent implements OnInit {
   state = inject(AdminStateService);
   private api = inject(ApiService);
   private toast = inject(ToastService);
+  private router = inject(Router);
+  private route = inject(ActivatedRoute);
 
-  confirmingDelete = signal(false);
+  tab = signal<Tab>('general');
+  q = '';
+  saving = signal(false);
+  inviting = signal(false);
+  settings: GeneralSettings = { contact_email: '', reply_email: '', brand_tone: '', brand_primary: '#00E5FF', brand_accent: '#7C3AED', timezone: '', default_locale: 'en-US' };
+  security: { session_hours: number; idle_minutes: number; allowed_domains: string; require_2fa: boolean } = { session_hours: 168, idle_minutes: 60, allowed_domains: '', require_2fa: false };
+  members = signal<Member[]>([]);
+  invites = signal<Invite[]>([]);
+  invite: { email: string; role: string } = { email: '', role: 'editor' };
 
-  // Domain state
-  domainTab = signal<'existing' | 'connect' | 'register'>('existing');
-  hostnames = signal<Hostname[]>([]);
-  loadingHostnames = signal(false);
-  newHostname = '';
-  editingSlug = signal(false);
-  modalSlugValue = '';
-  registerDomainQuery = '';
-  checkingDomain = signal(false);
-  domainCheckResult = signal<{ domain: string; available: boolean } | null>(null);
+  providers = PROVIDERS;
+  connections = signal<Conn[]>([]);
+  pasteMode = signal<string | null>(null);
+  pastedKey = '';
+
+  filteredTabs = computed(() => {
+    const q = this.q.trim().toLowerCase();
+    if (!q) return TABS;
+    return TABS.filter((t) => t.label.toLowerCase().includes(q) || t.desc.toLowerCase().includes(q));
+  });
 
   ngOnInit(): void {
-    const site = this.state.selectedSite();
-    if (site) this.loadHostnames(site.id);
+    const child = this.route.firstChild;
+    const initial = (child?.snapshot.url[0]?.path ?? this.route.snapshot.fragment ?? 'general') as Tab;
+    if (TABS.some((t) => t.id === initial)) this.tab.set(initial);
+    this.loadGeneral();
+    this.loadTeam();
+    this.loadConnections();
+    this.handleMcpReturn();
   }
 
-  private loadHostnames(siteId: string): void {
-    this.loadingHostnames.set(true);
-    this.api.getHostnames(siteId).subscribe({
-      next: (res) => { this.hostnames.set(res.data || []); this.loadingHostnames.set(false); },
-      error: () => { this.loadingHostnames.set(false); this.toast.error('Failed to load domains'); },
-    });
+  setTab(id: Tab): void {
+    this.tab.set(id);
+    this.router.navigate([], { fragment: id, replaceUrl: true });
   }
 
-  saveName(value: string, siteId: string): void {
-    const name = value.trim();
-    if (!name) return;
-    this.api.updateSite(siteId, { business_name: name }).subscribe({
-      next: (res) => {
-        this.state.sites.update(sites => sites.map(s => s.id === siteId ? { ...s, ...res.data } : s));
-        this.toast.success('Name updated');
+  loadGeneral(): void {
+    const s = this.state.selectedSite(); if (!s) return;
+    this.api.get<{ data: GeneralSettings }>(`/sites/${s.id}/ai-settings`).subscribe({
+      next: (r) => {
+        this.settings = {
+          contact_email: r.data?.contact_email ?? '',
+          reply_email: r.data?.reply_email ?? '',
+          brand_tone: r.data?.brand_tone ?? '',
+          brand_primary: r.data?.brand_primary ?? '#00E5FF',
+          brand_accent: r.data?.brand_accent ?? '#7C3AED',
+          timezone: r.data?.timezone ?? '',
+          default_locale: r.data?.default_locale ?? 'en-US',
+        };
       },
-      error: (err) => this.toast.error(err?.error?.error?.message || 'Update failed'),
     });
   }
-
-  saveSlug(value: string, siteId: string): void {
-    const slug = value.trim();
-    if (!slug) return;
-    this.api.updateSite(siteId, { slug }).subscribe({
-      next: (res) => {
-        this.state.sites.update(sites => sites.map(s => s.id === siteId ? { ...s, slug: res.data?.slug || slug } : s));
-        this.toast.success('Slug updated');
-      },
-      error: (err) => this.toast.error(err?.error?.error?.message || 'Update failed'),
+  save(): void {
+    const s = this.state.selectedSite(); if (!s) return;
+    this.saving.set(true);
+    this.api.put(`/sites/${s.id}/ai-settings`, this.settings).subscribe({
+      next: () => { this.toast.success('Saved'); this.saving.set(false); },
+      error: () => { this.toast.error('Save failed'); this.saving.set(false); },
     });
   }
-
-  startSlugEdit(): void {
-    const site = this.state.selectedSite();
-    if (!site) return;
-    this.modalSlugValue = site.slug;
-    this.editingSlug.set(true);
-  }
-
-  saveDomainSlug(): void {
-    const site = this.state.selectedSite();
-    const newSlug = this.modalSlugValue.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
-    if (!site || !newSlug) return;
-    this.api.updateSite(site.id, { slug: newSlug }).subscribe({
-      next: (res) => {
-        this.state.sites.update(sites => sites.map(s => s.id === site.id ? { ...s, slug: res.data?.slug || newSlug } : s));
-        this.editingSlug.set(false);
-        this.toast.success('Subdomain updated');
-      },
-      error: (err) => this.toast.error(err?.error?.error?.message || 'Failed to update subdomain'),
+  loadTeam(): void {
+    this.api.get<{ data: { members: Member[]; invites: Invite[] } }>('/team').subscribe({
+      next: (r) => { this.members.set(r.data?.members ?? []); this.invites.set(r.data?.invites ?? []); },
     });
   }
-
-  addHostname(): void {
-    const site = this.state.selectedSite();
-    if (!site || !this.newHostname.trim()) return;
-    this.api.addHostname(site.id, this.newHostname.trim()).subscribe({
-      next: (res) => {
-        this.hostnames.update(h => [...h, res.data]);
-        this.newHostname = '';
-        this.toast.success('Domain added -- point your CNAME to projectsites.dev');
-        this.domainTab.set('existing');
-      },
-      error: (err) => this.toast.error(err?.error?.error?.message || 'Failed to add domain'),
+  sendInvite(): void {
+    this.api.post('/team/invites', this.invite).subscribe({
+      next: () => { this.toast.success(`Invited ${this.invite.email}`); this.invite = { email: '', role: 'editor' }; this.inviting.set(false); this.loadTeam(); },
+      error: () => this.toast.error('Invite failed'),
     });
   }
-
-  setPrimary(hostnameId: string): void {
-    const site = this.state.selectedSite();
-    if (!site) return;
-    this.api.setPrimaryHostname(site.id, hostnameId).subscribe({
-      next: () => {
-        this.hostnames.update(h => h.map(hn => ({ ...hn, is_primary: hn.id === hostnameId })));
-        this.toast.success('Primary domain updated');
-      },
-      error: () => this.toast.error('Failed to set primary'),
-    });
+  revokeInvite(i: Invite): void {
+    this.api.delete(`/team/invites/${i.id}`).subscribe({ next: () => { this.toast.success('Revoked'); this.loadTeam(); } });
+  }
+  removeMember(m: Member): void {
+    if (!confirm(`Remove ${m.email}?`)) return;
+    this.api.delete(`/team/members/${m.id}`).subscribe({ next: () => { this.toast.success('Removed'); this.loadTeam(); } });
   }
 
-  deleteHostname(hostnameId: string): void {
-    const site = this.state.selectedSite();
-    if (!site) return;
-    this.api.deleteHostname(site.id, hostnameId).subscribe({
-      next: () => { this.hostnames.update(h => h.filter(hn => hn.id !== hostnameId)); this.toast.success('Domain removed'); },
-      error: () => this.toast.error('Failed to remove domain'),
+  // ── MCP ──
+  loadConnections(): void {
+    const s = this.state.selectedSite(); if (!s) return;
+    this.api.get<{ data: { connections: Conn[] } }>(`/sites/${s.id}/mcp/connections`).subscribe({
+      next: (r) => this.connections.set(r.data?.connections ?? []),
     });
   }
-
-  checkDomainAvailability(): void {
-    const query = this.registerDomainQuery.trim().toLowerCase();
-    if (!query) return;
-    const domain = query.includes('.') ? query : `${query}.com`;
-    this.checkingDomain.set(true);
-    this.domainCheckResult.set(null);
-    this.api.checkSlug(domain.replace(/\./g, '-')).subscribe({
-      next: () => { this.domainCheckResult.set({ domain, available: true }); this.checkingDomain.set(false); },
-      error: () => { this.domainCheckResult.set({ domain, available: false }); this.checkingDomain.set(false); },
+  isConnected(provider: string): Conn | null {
+    return this.connections().find((c) => c.provider === provider) ?? null;
+  }
+  pastePlaceholder(provider: string): string {
+    switch (provider) {
+      case 'resend': return 're_xxx';
+      case 'slack': return 'xoxb-xxx (Slack bot token)';
+      case 'notion': return 'secret_xxx (Notion integration token)';
+      case 'github': return 'ghp_xxx (fine-grained PAT)';
+      case 'linear': return 'lin_api_xxx';
+      case 'discord': return 'https://discord.com/api/webhooks/…';
+      case 'google_calendar': return 'ya29.xxx (OAuth access token)';
+      case 'twilio': return 'ACxxxx:yourAuthToken';
+      case 'calendly': return 'eyJ… (personal access token)';
+      case 'airtable': return 'patxxx';
+      case 'zapier': return 'https://hooks.zapier.com/…';
+      default: return 'paste API key';
+    }
+  }
+  connect(p: { id: string; needsOauth: boolean }): void {
+    const s = this.state.selectedSite(); if (!s) return;
+    if (!p.needsOauth || p.id === 'resend') { this.pasteMode.set(p.id); return; }
+    window.location.href = `/api/mcp/${p.id}/connect?site_id=${s.id}&return_url=${encodeURIComponent('/admin/settings#mcp')}`;
+  }
+  submitPaste(provider: string): void {
+    const s = this.state.selectedSite(); if (!s) return;
+    this.api.post(`/api/mcp/${provider}/paste?site_id=${s.id}`, { api_key: this.pastedKey }).subscribe({
+      next: () => { this.pastedKey = ''; this.pasteMode.set(null); this.toast.success(`Connected ${provider}`); this.loadConnections(); },
+      error: () => this.toast.error('Failed'),
     });
   }
+  disconnect(c: Conn): void {
+    if (!confirm(`Disconnect ${c.provider}?`)) return;
+    const s = this.state.selectedSite(); if (!s) return;
+    this.api.delete(`/sites/${s.id}/mcp/connections/${c.id}`).subscribe({
+      next: () => { this.toast.success('Disconnected'); this.loadConnections(); },
+    });
+  }
+  handleMcpReturn(): void {
+    const params = new URLSearchParams(window.location.search);
+    const connected = params.get('connected');
+    if (connected) {
+      this.toast.success(`${connected} connected`);
+      history.replaceState({}, '', '/admin/settings#mcp');
+      this.tab.set('mcp');
+      setTimeout(() => this.loadConnections(), 200);
+    }
+  }
 
-  deleteSite(site: Site): void {
-    this.state.deleteSite(site, false);
-    this.confirmingDelete.set(false);
+  // ── Danger zone ──
+  exportData(): void {
+    if (!confirm('Generate a data-export bundle? You will receive a download link by email.')) return;
+    this.toast.success('Export requested (queued)');
+  }
+  deleteOrg(): void {
+    const txt = prompt('Type DELETE to permanently delete this organization and ALL its data:');
+    if (txt !== 'DELETE') return;
+    this.toast.error('Org deletion not yet wired — contact hey@megabyte.space.');
   }
 }

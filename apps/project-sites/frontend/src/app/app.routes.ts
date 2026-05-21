@@ -40,7 +40,7 @@ export const routes: Routes = [
       {
         path: '',
         loadComponent: () =>
-          import('./pages/admin/sections/dashboard.component').then((m) => m.AdminDashboardComponent),
+          import('./pages/admin/sections/editor.component').then((m) => m.AdminEditorComponent),
         pathMatch: 'full',
       },
       {
@@ -48,6 +48,7 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./pages/admin/sections/editor.component').then((m) => m.AdminEditorComponent),
       },
+      { path: 'dashboard', redirectTo: '', pathMatch: 'full' },
       {
         path: 'snapshots',
         loadComponent: () =>
@@ -69,10 +70,27 @@ export const routes: Routes = [
           import('./pages/admin/sections/audit.component').then((m) => m.AdminAuditComponent),
       },
       {
-        path: 'github',
+        path: 'forms',
         loadComponent: () =>
-          import('./pages/admin/sections/github-backup.component').then((m) => m.AdminGithubBackupComponent),
+          import('./pages/admin/sections/forms.component').then((m) => m.AdminFormsComponent),
       },
+      {
+        path: 'ai-chat',
+        loadComponent: () =>
+          import('./pages/admin/sections/ai-chat.component').then((m) => m.AdminAiChatComponent),
+      },
+      {
+        path: 'ai-logs',
+        loadComponent: () =>
+          import('./pages/admin/sections/ai-logs.component').then((m) => m.AdminAiLogsComponent),
+      },
+      {
+        path: 'ai-endpoints',
+        loadComponent: () =>
+          import('./pages/admin/sections/ai-endpoints.component').then((m) => m.AdminAiEndpointsComponent),
+      },
+      { path: 'mcp', redirectTo: 'settings/mcp', pathMatch: 'full' },
+      { path: 'github', redirectTo: 'snapshots', pathMatch: 'full' },
       {
         path: 'settings',
         loadComponent: () =>

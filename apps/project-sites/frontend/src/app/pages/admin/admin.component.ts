@@ -2,7 +2,7 @@ import { Component, type OnInit, type OnDestroy, inject, signal } from '@angular
 import { Router, RouterModule, NavigationEnd } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Subscription, filter } from 'rxjs';
-import { type Site } from '../../services/api.service';
+import { ApiService, type Site } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 import { AdminStateService } from './admin-state.service';
@@ -30,17 +30,24 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   private routerSub?: Subscription;
 
+  private api = inject(ApiService);
+
   private updateRouteState(url: string): void {
-    this.isEditorRoute.set(url.includes('/admin/editor'));
+    this.isEditorRoute.set(url === '/admin' || url.startsWith('/admin/editor'));
     const segment = url.split('/').pop() || '';
     const labels: Record<string, string> = {
-      '': 'Dashboard', 'admin': 'Dashboard', 'editor': 'Editor',
+      '': 'Editor', 'admin': 'Editor', 'editor': 'Editor',
       'snapshots': 'Snapshots', 'analytics': 'Analytics',
-      'social': 'Social', 'forms': 'Forms', 'integrations': 'Integrations',
-      'github': 'GitHub Backup',
+      'forms': 'Forms', 'ai-logs': 'AI Logs', 'ai-chat': 'AI Chat',
+      'ai-endpoints': 'AI Endpoints',
       'billing': 'Billing', 'audit': 'Audit Log', 'settings': 'Settings',
     };
-    this.currentSection.set(labels[segment] || 'Dashboard');
+    this.currentSection.set(labels[segment] || 'Editor');
+    // Fire CF Analytics Engine data point per route change (fire-and-forget).
+    this.api.post('/analytics/track', {
+      route: url.split('?')[0],
+      site_id: this.state.selectedSite()?.id ?? null,
+    }).subscribe({ error: () => {} });
   }
 
   ngOnInit(): void {

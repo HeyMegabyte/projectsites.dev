@@ -83,6 +83,12 @@ class_name = "SiteGenerationWorkflow"
 [env.production.ai]
 binding = "AI"
 
+# Workers Analytics Engine — admin dashboard visit tracker.
+# Powers the Analytics page (queried via the SQL API).
+[[env.production.analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "projectsites_admin_v1"
+
 # Claude Code build container — custom image with Claude Code + skills + template pre-baked
 # standard-4 = 4 vCPU, 12 GiB RAM, 8 GB disk. Larger size accelerates parallel prompt execution.
 [[env.production.containers]]
@@ -95,9 +101,13 @@ instance_type = "standard-4"
 name = "SITE_BUILDER"
 class_name = "SiteBuilderContainer"
 
-[[env.production.migrations]]
-tag = "v1"
-new_sqlite_classes = ["SiteBuilderContainer"]
+[[env.production.durable_objects.bindings]]
+name = "TRACE_HUB"
+class_name = "TraceHub"
+
+[[env.production.durable_objects.bindings]]
+name = "ACTIVITY_HUB"
+class_name = "ActivityHub"
 
 [env.production.observability]
 enabled = true

@@ -453,3 +453,198 @@ textarea.outline-none:focus-visible {
     animation-duration: 1ms !important;
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// V3 Glow-up — global polish layer that every admin page inherits.
+// All classes are opt-in (prefixed `glow-`) except a handful of base
+// upgrades to inputs/cards/buttons that improve consistency app-wide.
+// ═══════════════════════════════════════════════════════════════════
+:root {
+  // OKLCH brand palette + tonal scale (derived once)
+  --glow-bg-0: oklch(7% 0.02 280);
+  --glow-bg-1: oklch(10% 0.025 280);
+  --glow-bg-2: oklch(13% 0.03 280);
+  --glow-line: oklch(100% 0 0 / 0.06);
+  --glow-line-hi: oklch(100% 0 0 / 0.12);
+  --glow-text: oklch(96% 0.01 280);
+  --glow-muted: oklch(70% 0.02 280);
+  --glow-accent: #00E5FF;
+  --glow-accent-2: #7C3AED;
+  --glow-success: oklch(72% 0.18 145);
+  --glow-warn: oklch(80% 0.15 80);
+  --glow-danger: oklch(70% 0.22 25);
+
+  // Modern shadow ladder (cooler tint, layered)
+  --glow-shadow-xs: 0 1px 0 rgba(255,255,255,0.04) inset;
+  --glow-shadow-sm: 0 4px 14px -8px rgba(0,0,0,0.55);
+  --glow-shadow-md: 0 12px 32px -16px rgba(0,0,0,0.55), 0 2px 6px -2px rgba(0,229,255,0.05);
+  --glow-shadow-lg: 0 24px 60px -24px rgba(0,0,0,0.65), 0 4px 16px -6px rgba(124,58,237,0.08);
+  --glow-shadow-glow: 0 0 0 1px rgba(0,229,255,0.18), 0 14px 48px -16px rgba(0,229,255,0.28);
+
+  // Radii
+  --glow-r-sm: 8px;
+  --glow-r-md: 14px;
+  --glow-r-lg: 20px;
+  --glow-r-pill: 999px;
+}
+
+// Mesh-gradient backdrop — global; appears behind the admin shell.
+// Three radial gradients composited; tiny opacity so it never fights content.
+html { background: var(--glow-bg-0); }
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(60vw 60vh at 12% 10%, rgba(124,58,237,0.10), transparent 60%),
+    radial-gradient(50vw 50vh at 90% 20%, rgba(0,229,255,0.08), transparent 60%),
+    radial-gradient(70vw 70vh at 50% 110%, rgba(80,170,227,0.07), transparent 60%);
+  filter: saturate(1.05);
+}
+
+// Globally-tighter focus ring (cyan glow, not a hard outline).
+*:focus-visible {
+  outline: 0 !important;
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.8), 0 0 0 4px rgba(0,229,255,0.55), 0 0 18px -2px rgba(0,229,255,0.45);
+  border-radius: var(--glow-r-sm);
+}
+
+// Polished scrollbar (replaces the basic dark one above).
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.05));
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(0,229,255,0.35); background-clip: padding-box; }
+
+// Modern input baseline — auto-applies wherever .input-field exists.
+.input-field {
+  background: rgba(255,255,255,0.025);
+  border: 1px solid var(--glow-line);
+  color: var(--glow-text);
+  font: inherit;
+  padding: 0.55rem 0.8rem;
+  border-radius: var(--glow-r-sm);
+  transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+.input-field:hover:not(:disabled):not(:focus) { border-color: var(--glow-line-hi); background: rgba(255,255,255,0.04); }
+.input-field:focus, .input-field:focus-visible {
+  outline: 0 !important;
+  background: rgba(0,229,255,0.04);
+  border-color: rgba(0,229,255,0.55);
+  box-shadow: 0 0 0 4px rgba(0,229,255,0.12), 0 0 24px -6px rgba(0,229,255,0.45);
+}
+
+// Card upgrades — all `.card`s in admin sections lift smoothly on hover.
+.card {
+  position: relative;
+  background: linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.015)) !important;
+  border: 1px solid var(--glow-line) !important;
+  border-radius: var(--glow-r-md) !important;
+  box-shadow: var(--glow-shadow-sm);
+  transition: transform 280ms var(--ps-ease-spring-soft), box-shadow 280ms ease, border-color 200ms ease;
+  -webkit-backdrop-filter: blur(8px) saturate(1.1);
+  backdrop-filter: blur(8px) saturate(1.1);
+}
+.card:hover { box-shadow: var(--glow-shadow-md); border-color: var(--glow-line-hi) !important; }
+.card::before {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(0,229,255,0.18), transparent 45%, rgba(124,58,237,0.10));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0.45;
+  transition: opacity 240ms ease;
+}
+.card:hover::before { opacity: 0.9; }
+
+// Buttons — consistent app-wide. Don't override existing utility classes,
+// just upgrade the primary/ghost system if those classes exist.
+.btn-primary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+  padding: 0.55rem 1.05rem;
+  border-radius: var(--glow-r-sm);
+  background: linear-gradient(135deg, rgba(0,229,255,0.16), rgba(124,58,237,0.16));
+  color: var(--glow-accent);
+  font-weight: 600;
+  border: 1px solid rgba(0,229,255,0.38);
+  cursor: pointer; font-size: 0.78rem;
+  transition: transform 160ms ease, box-shadow 200ms ease, background 200ms ease;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.4);
+}
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: linear-gradient(135deg, rgba(0,229,255,0.26), rgba(124,58,237,0.24));
+  box-shadow: var(--glow-shadow-glow);
+}
+.btn-primary:active:not(:disabled) { transform: translateY(0); }
+
+.btn-ghost {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+  padding: 0.55rem 1.05rem;
+  border-radius: var(--glow-r-sm);
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.78);
+  border: 1px solid var(--glow-line);
+  cursor: pointer; font-size: 0.78rem;
+  transition: all 160ms ease;
+}
+.btn-ghost:hover:not(:disabled) { background: rgba(0,229,255,0.08); border-color: var(--glow-line-hi); color: var(--glow-text); }
+
+// Opt-in utility classes (use anywhere)
+.glow-card-tilt:hover { transform: translateY(-2px) rotate(-0.2deg); }
+.glow-h-grad {
+  background: linear-gradient(90deg, #fff, #00E5FF 60%, #7C3AED);
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent;
+  text-wrap: balance;
+}
+.glow-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--glow-line-hi), transparent);
+}
+
+// Skeleton loader (replaces plain text "Loading…")
+.glow-skel {
+  display: inline-block;
+  background: linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.12) 35%, rgba(255,255,255,0.04) 70%);
+  background-size: 200% 100%;
+  animation: psSkeleton 1.6s linear infinite;
+  border-radius: 6px;
+  color: transparent;
+}
+
+// View Transitions for SPA route changes (Chrome 124+ / Safari 18+).
+// Falls back gracefully where unsupported.
+@view-transition { navigation: auto; }
+::view-transition-old(root) {
+  animation: 220ms cubic-bezier(0.2,0,0,1) both psVtOut;
+}
+::view-transition-new(root) {
+  animation: 320ms cubic-bezier(0.16,1,0.3,1) both psVtIn;
+}
+@keyframes psVtOut { to { opacity: 0; transform: translateY(-4px); filter: blur(2px); } }
+@keyframes psVtIn  { from { opacity: 0; transform: translateY(6px); filter: blur(2px); } }
+
+// Friendly tags (chips) for badges
+.glow-chip {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  padding: 0.18rem 0.6rem;
+  border-radius: var(--glow-r-pill);
+  font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+  background: rgba(0,229,255,0.10);
+  color: var(--glow-accent);
+  border: 1px solid rgba(0,229,255,0.22);
+}
+.glow-chip-warn  { background: rgba(245,158,11,0.10); color: #fbbf24; border-color: rgba(245,158,11,0.28); }
+.glow-chip-danger{ background: rgba(248,113,113,0.10); color: #fca5a5; border-color: rgba(248,113,113,0.28); }
+.glow-chip-ok    { background: rgba(16,185,129,0.10); color: #6ee7b7; border-color: rgba(16,185,129,0.28); }
+
